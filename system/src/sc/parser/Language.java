@@ -766,13 +766,6 @@ public abstract class Language extends LayerFileComponent {
       return useCommonBuildDir;
    }
    
-   public String getOutputDir() {
-      return null;
-   }
-
-   public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, Layer buildLayer) {
-      return buildSrcDir;
-   }
 
    // Name the parselets
    public void initialize() {

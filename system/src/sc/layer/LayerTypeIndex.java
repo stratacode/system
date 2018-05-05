@@ -85,4 +85,16 @@ public class LayerTypeIndex implements Serializable {
       }
       return this;
    }
+
+   public TypeIndexEntry getTypeIndexEntryForPath(String pathName) {
+      int pathLen = pathName.length();
+      int layerPathLen = layerPathName.length();
+      if (pathLen > layerPathLen + 1 && pathName.startsWith(layerPathName)) {
+         String fileName = pathName.substring(layerPathName.length() + 1);
+         if (fileName.length() > 0) {
+            return fileIndex.get(pathName);
+         }
+      }
+      return null;
+   }
 }

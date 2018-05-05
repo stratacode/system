@@ -4389,12 +4389,20 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (origIdent != null && origIdent.replacedByStatement instanceof IdentifierExpression)
          origIdent = (IdentifierExpression) origIdent.replacedByStatement;
 
+      boolean hasDummyPrefix = false;
+      for (IString ident:idents) {
+         String identStr = ident.toString();
+         if (identStr.indexOf(dummyIdentifier) != -1)
+            hasDummyPrefix = true;
+      }
+
       int i = 0;
       for (IString ident:idents) {
          String identStr = ident.toString();
          int dummyIx = identStr.indexOf(dummyIdentifier);
-         if (dummyIx != -1) {
-            String matchPrefix = identStr.substring(0, dummyIx);
+         // For some reason, for 'scr' file types the Position element does not have the dummy string so we'll take a slightly less accurate approach and just match nodeText to the prefix
+         if (dummyIx != -1 || (!hasDummyPrefix && identStr.equals(extMatchPrefix))) {
+            String matchPrefix = dummyIx == -1 ? extMatchPrefix : identStr.substring(0, dummyIx);
 
             Object curType = origNode == null ? origModel == null ? null : origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
             if (origNode != null && curType == null)
@@ -4417,7 +4425,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
                   //System.out.println("*** SuggestMembers returns: " + candidates + " for type: " + curType);
                }
-               else if (origModel != null) {
+               else if (origModel != null && i == 0) {
                   ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
                   //System.out.println("*** SuggestTypes returns: " + candidates);
                }
@@ -5522,10 +5530,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   public void setParentNode(ISemanticNode node) {
-      super.setParentNode(node);
-   }
-
    public boolean producesHtml() {
       if (!started) {
          resolveTypeReference();
@@ -5634,5 +5638,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
       */
       return false; // Did not resolve properly for this runtime - maybe the variable is not defined?
+   }
+
+   public void setParentNode(ISemanticNode node) {
+      super.setParentNode(node);
    }
 }

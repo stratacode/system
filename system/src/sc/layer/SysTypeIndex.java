@@ -130,6 +130,19 @@ public class SysTypeIndex {
       return inactiveTypeIndex.modifyTypeIndex.get(typeName);
    }
 
+   public TypeIndexEntry getTypeIndexEntryForPath(String pathName) {
+      if (activeTypeIndex != null) {
+         TypeIndexEntry ent = activeTypeIndex.getTypeIndexEntryForPath(pathName);
+         if (ent != null)
+            return ent;
+      }
+      if (inactiveTypeIndex != null) {
+         TypeIndexEntry ent = inactiveTypeIndex.getTypeIndexEntryForPath(pathName);
+         if (ent != null)
+            return ent;
+      }
+      return null;
+   }
 
    public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer) {
       if (inactiveTypeIndex.sys.writeLocked == 0) {

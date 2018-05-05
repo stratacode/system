@@ -29,6 +29,8 @@ public interface IFileProcessorResult {
 
    void postBuild(Layer buildLayer, String buildDir);
 
+   SrcEntry getSrcFile();
+
    void addSrcFile(SrcEntry file);
 
    /** Returns the unique name of the file or type this entity produces so we only process it once in a given system.  */

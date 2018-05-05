@@ -26,6 +26,7 @@ import sc.obj.IChildInit;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
+import sc.type.RTypeUtil;
 import sc.util.FileUtil;
 import sc.util.IdentityHashSet;
 import sc.util.StringUtil;
@@ -3528,6 +3529,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             Object meth = tagObject.findMethod(name, parametersOrExpressions, fromChild, refType, staticOnly, inferredType);
             if (meth != null)
                return meth;
+         }
+         else {
+            Object res = ModelUtil.definesMethod(Element.class, name, parametersOrExpressions, null, refType, false, staticOnly, inferredType, null, getLayeredSystem());
+            if (res != null)
+               return res;
          }
       }
       return super.findMethod(name, parametersOrExpressions, fromChild, refType, staticOnly, inferredType);

@@ -117,7 +117,8 @@ public class RepositorySystem {
    }
 
    public RepositoryPackage getRepositoryPackage(String pkgName) {
-      return store.packages.get(pkgName);
+      RepositoryPackage res = store.packages.get(pkgName);
+      return res;
    }
 
    public RepositoryPackage addRepositoryPackage(RepositoryPackage pkg) {

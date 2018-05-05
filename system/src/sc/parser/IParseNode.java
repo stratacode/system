@@ -91,7 +91,7 @@ public interface IParseNode extends CharSequence, IParseResult {
    ISemanticNode getNodeAtLine(NodeAtLineCtx ctx, int requiredLineNum);
 
    /** Find the parse node at the specified start index.  If matchParselet is not null the match is only returned if it is the same as the parselet specified */
-   IParseNode findParseNode(int startIndex, Parselet matchParselet);
+   IParseNode findParseNode(int startIndex, Parselet matchParselet, boolean overlap);
 
    int getChildStartOffset(Parselet childParselet);
 

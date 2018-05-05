@@ -59,7 +59,7 @@ public interface IFileProcessor {
 
    void resetBuild();
 
-   /** Returns true for Language implementations that are parseable. */
+   /** Returns true for Language implementations that are parseable and processable - TODO: rename to isProcessed() or isTransformed().  We have scr files that can be parsed but are not transformed */
    boolean isParsed();
 
    public String[] getSrcPathTypes();

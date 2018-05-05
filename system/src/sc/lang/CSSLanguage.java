@@ -7,7 +7,7 @@ package sc.lang;
 import sc.layer.Layer;
 import sc.parser.*;
 
-/** TODO: For now, the scss format is just the template language generating a string.  This is the hook for
+/** TODO: For now, the sccss format is just the template language generating a string.  This is the hook for
     extending the template grammar so it can also parse CSS.  Maybe add nice expressions and simpler syntax. 
     Use that also to incrementally update the css on the client.   For now, the template language will work
     by itself and where we refresh page-by-page.  Since CSS is layered by design - rules override previous rules
@@ -39,7 +39,7 @@ public class CSSLanguage extends TemplateLanguage {
             addToSemanticValueClassPath("sc.lang.css");
         }
         languageName = "SCCss";
-        defaultExtension = "scss";
+        defaultExtension = "sccss";
     }
 
     public static CSSLanguage getCSSLanguage() {

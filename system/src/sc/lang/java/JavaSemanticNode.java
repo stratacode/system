@@ -25,7 +25,7 @@ import java.util.*;
  */
 public abstract class JavaSemanticNode extends SemanticNode {
 
-   /** When debugging problems in toLangaugeString - i.e. generating a language description from a changed model, set this to true to prevent the debugger from generating the thing during it's variable display */
+   /** When debugging problems in toLanguageString - i.e. generating a language description from a changed model, set this to true to prevent the debugger from generating the thing during it's variable display */
    public static boolean debugDisablePrettyToString = false;
 
    /** Return from findMemberInBody when an Object has been found */
@@ -624,7 +624,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
                int startIx = origParseNode.getStartIndex();
                if (startIx != -1) {
                   IParseNode newParseNode = newModel.getParseNode();
-                  IParseNode newNode = newParseNode == null ? null : newParseNode.findParseNode(startIx, origParseNode.getParselet());
+                  IParseNode newNode = newParseNode == null ? null : newParseNode.findParseNode(startIx, origParseNode.getParselet(), true);
                   if (newNode != null) {
                      Object semValue = newNode.getSemanticValue();
                      if (semValue != null && semValue.getClass() == getClass())

@@ -76,6 +76,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public boolean exitOnError = true;
    public boolean noPrompt = false;
 
+   /** A stateless class we use for resolving scripts at edit time - i.e. in the IDE */
+   public static class DefaultCmdClassDeclaration extends ClassDeclaration {
+      public boolean isDynamicStub(boolean includeExt) {
+         return false;
+      }
+
+      public Class getCompiledClass() {
+         return AbstractInterpreter.class.getClass();
+      }
+   }
+
+   /** This one is like the above but gets modified during the the running of the script in the interpreter instance */
    public class CmdClassDeclaration extends ClassDeclaration {
       public boolean isDynamicStub(boolean includeExt) {
          return false;
@@ -86,13 +98,22 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
    }
 
+   public static ClassDeclaration defaultCmdObject = new DefaultCmdClassDeclaration();
+   static {
+      defaultCmdObject.staleClassName = defaultCmdObject.fullTypeName = defaultCmdObject.typeName = "cmd";
+      defaultCmdObject.operator = "object"; // this one needs to be object and unlike cmdObject is not used in sync - it's edit time only
+      defaultCmdObject.setDynamicType(true);
+      defaultCmdObject.liveDynType = true;
+      defaultCmdObject.setProperty("extendsType", ClassType.create(AbstractInterpreter.class.getTypeName()));
+   }
+
    public ClassDeclaration cmdObject = new CmdClassDeclaration();
    {
       cmdObject.staleClassName = cmdObject.fullTypeName = cmdObject.typeName = "cmd";
       cmdObject.operator = "class"; // If we use object, this becomes a 'rooted object' in the sync system and we won't construct it during sync
-      cmdObject.setProperty("extendsType", ClassType.create(getClass().getTypeName()));
       cmdObject.setDynamicType(true);
       cmdObject.liveDynType = true;
+      cmdObject.setProperty("extendsType", ClassType.create(getClass().getTypeName()));
       // We used to not have this scriptObject and disallowed classBodyDeclarations from the top-level - as though you were editing a Java file.  But when writing scripts,
       // it's really useful to be able to just define fields, and methods, and not save them - you are already authoring them in the script.  So now, the idea is that we have
       // a 'cmd' object which stores all of the script stuff which is thrown away.  The downside is that we may need some way to limit references to persistent edited code to

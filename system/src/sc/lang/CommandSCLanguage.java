@@ -27,6 +27,8 @@ import sc.parser.Symbol;
  *    expression
  */
 public class CommandSCLanguage extends SCLanguage {
+   public final static String SCR_SUFFIX = "scr";
+
    public Sequence startClassDeclaration = new Sequence("ClassDeclaration(modifiers, operator,,typeName,typeParameters,extendsType,implementsTypes,)",
                         modifiers, classOperators, spacing, identifierSp, optTypeParameters, extendsType, implementsTypes, openBraceEOL);
 
@@ -50,6 +52,13 @@ public class CommandSCLanguage extends SCLanguage {
            new OrderedChoice("([],[],[],[],[],[],[])", REPEAT | OPTIONAL, reqPackageDeclaration, reqImport, startClassDeclaration,
                              startModifyDeclaration, reqClassBodyDeclaration, statement, endTypeDeclaration),
            new Symbol(EOF));
+   {
+      // Just like blockStatements, when doing partialValues for the command line, need to skip over error text so we can keep going and not produce an incomplete result at the first failure.
+      topLevelCommands.skipOnErrorParselet = skipBodyError;
+   }
+
+   /** The command line interpreter does not use this parselet but we need it for the IDE */
+   public Sequence cmdScript = new Sequence("CmdScriptModel(commands,)", topLevelCommands, new Symbol(Symbol.EOF));
 
    // NOTE: we allow statements in the class body for the command line (and at the top-level)
    public Sequence typeCommands = new Sequence("(,.,)", spacing,
@@ -67,7 +76,7 @@ public class CommandSCLanguage extends SCLanguage {
                                                       new OrderedChoice("(.,.)", completeExtends, expression),
                                                       new Symbol(Symbol.EOF));
 
-   public static CommandSCLanguage INSTANCE = new CommandSCLanguage();
+   public final static CommandSCLanguage INSTANCE = new CommandSCLanguage();
 
    public static CommandSCLanguage getCommandSCLanguage() {
       return INSTANCE;
@@ -78,10 +87,16 @@ public class CommandSCLanguage extends SCLanguage {
 
    public CommandSCLanguage(Layer layer) {
       super(layer);
+      setStartParselet(cmdScript);
+      // TODO: we can probably remove these now that we set the StartParselet because it will start everything
       typeCommands.setLanguage(this);
       topLevelCommands.setLanguage(this);
       completionCommands.setLanguage(this);
       modifyDeclaration.setLanguage(this);
+      languageName = "SCCmd";
+      defaultExtension = SCR_SUFFIX;
+      prependLayerPackage = false;
+      useSrcDir = false;
    }
 
    private boolean _inited = false;
@@ -99,5 +114,10 @@ public class CommandSCLanguage extends SCLanguage {
       ParseUtil.initAndStartComponent(completionCommands);
       ParseUtil.initAndStartComponent(modifyDeclaration);
       super.initialize();
+   }
+
+   /** TODO: This really should be isProcessed or isTransformed since we can parse these files */
+   public boolean isParsed() {
+      return false;
    }
 }

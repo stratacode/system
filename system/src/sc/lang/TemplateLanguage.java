@@ -189,12 +189,6 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    /** Filter command to run for evalled templates */
    public List<String> filterCommand;
 
-   /** Store results here instead of buildDir */
-   public String outputDir;
-
-   /** Use buildSrcDir instead of buildDir */
-   public boolean useSrcDir;
-
    /** The Template should implement toString by evaluating itself.  Useful for cases where there are no parameters needed to evaluate and you want something like <%= templateName %> to work.  */
    public boolean evalToString = false;
 
@@ -598,10 +592,6 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
 
    public boolean getNeedsCompile() {
       return false;
-   }
-
-   public String getOutputDir() {
-      return outputDir;
    }
 
    public String escapeBodyMethod() {

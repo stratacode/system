@@ -70,6 +70,10 @@ public class LayerFileProcessorResult implements IFileProcessorResult {
       System.err.println("*** post build not yet implemented for layer files");
    }
 
+   public SrcEntry getSrcFile() {
+      return srcEnt;
+   }
+
    public void addSrcFile(SrcEntry file) {
    }
 

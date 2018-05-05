@@ -176,8 +176,8 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
       return null;
    }
 
-   public IParseNode findParseNode(int startIndex, Parselet matchParselet) {
-      if (this.startIndex == startIndex && (matchParselet == null || matchParselet == getParselet()))
+   public IParseNode findParseNode(int startIndex, Parselet matchParselet, boolean overlap) {
+      if ((this.startIndex == startIndex || (overlap && (this.startIndex < startIndex && this.startIndex + this.length() > startIndex))) && (matchParselet == null || matchParselet == getParselet()))
          return this;
       return null;
    }

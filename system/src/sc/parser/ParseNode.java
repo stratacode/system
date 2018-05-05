@@ -267,13 +267,13 @@ public class ParseNode extends AbstractParseNode {
       return null;
    }
 
-   public IParseNode findParseNode(int startIndex, Parselet matchParselet) {
-      IParseNode res = super.findParseNode(startIndex, matchParselet);
+   public IParseNode findParseNode(int startIndex, Parselet matchParselet, boolean overlap) {
+      IParseNode res = super.findParseNode(startIndex, matchParselet, overlap);
       if (res != null)
          return res;
 
       if (value instanceof IParseNode)
-         return ((IParseNode) value).findParseNode(startIndex, matchParselet);
+         return ((IParseNode) value).findParseNode(startIndex, matchParselet, overlap);
 
       return null;
    }

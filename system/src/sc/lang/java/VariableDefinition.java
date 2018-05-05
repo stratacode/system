@@ -733,7 +733,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       JavaModel oldModel = getJavaModel();
       Statement def = getDefinition();
       if (def instanceof FieldDefinition) {
-         BodyTypeDeclaration type = getEnclosingType().refreshNode();
+         BodyTypeDeclaration enclType = getEnclosingType();
+         if (enclType == null)
+            return this;
+         BodyTypeDeclaration type = enclType.refreshNode();
          if (type == null)
             return this;
          Object newField = type.declaresMember(variableName, MemberType.FieldSet, null, null);

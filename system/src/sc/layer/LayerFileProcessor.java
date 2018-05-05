@@ -29,14 +29,6 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public String[] patterns;
 
-   public String outputDir;
-
-   /** If true, use the resulting file part of the generated source and store it in the buildSrcDir of the layer. */
-   public boolean useSrcDir = true;
-
-   /** If true, store the file in the directory used for java classes */
-   public boolean useClassesDir = false;
-
    /** Optionally set to restrict this processor to only working on files with a given type - e.g. files in the web directory are marked as 'web' files and have different processors. */
    public String[] srcPathTypes;
 
@@ -49,9 +41,6 @@ public class LayerFileProcessor extends LayerFileComponent {
    public boolean disableProcessing = false;
 
    public boolean compiledLayersOnly = false;
-
-   /** Ordinarily files are copied to the current build dir for the build layer.  Setting this changes it so they are always copied to a fixed shared buildDir, say for a WEB-INF directory */
-   public boolean useCommonBuildDir = false;
 
    /** Should the resulting file be executable */
    public boolean makeExecutable = false;
@@ -118,12 +107,6 @@ public class LayerFileProcessor extends LayerFileComponent {
    }
    */
 
-   public void validate() {
-      if (useSrcDir && useClassesDir) {
-         System.err.println("*** LayerFileProcessor: " + this + " has both useSrcDir and useClassesDir set.  Set useSrcDir to store the results in the buildSrc directory and useClassesDir to store it next to the classes in the runtime specific folder.  If useSrcDir = false and useClassesDir=false, the default is to store it in the buildDir without the runtime prefix.");
-      }
-   }
-
    public Object process(SrcEntry srcEnt, boolean enablePartialValues) {
       LayerFileProcessorResult res;
       LayerFileProcessorResult current = fileIndex.get(srcEnt.relFileName);
@@ -165,13 +148,6 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public void resetBuild() {
       fileIndex.clear();
-   }
-
-   public String getOutputDirToUse(LayeredSystem sys, String buildSrcDir, Layer buildLayer) {
-      return outputDir == null ?
-              (useSrcDir ? buildSrcDir :
-                      useClassesDir ? (buildLayer.buildClassesDir != null ? buildLayer.buildClassesDir : sys.buildClassesDir):
-                              (useCommonBuildDir ? sys.commonBuildDir : buildLayer.buildDir)) : outputDir;
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {

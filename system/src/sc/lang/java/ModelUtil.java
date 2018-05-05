@@ -3704,6 +3704,8 @@ public class ModelUtil {
       else if (srcMember instanceof ArrayTypeDeclaration) {
          return getEnclosingType(((ArrayTypeDeclaration) srcMember).getComponentType());
       }
+      else if (srcMember instanceof ITypeDeclaration)
+         return null; // CmdScriptModel or Template?
       throw new UnsupportedOperationException();
    }
 

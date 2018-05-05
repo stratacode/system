@@ -969,15 +969,15 @@ public class ParentParseNode extends AbstractParseNode {
       return null;
    }
 
-   public IParseNode findParseNode(int startIndex, Parselet matchParselet) {
-      IParseNode res = super.findParseNode(startIndex, matchParselet);
+   public IParseNode findParseNode(int startIndex, Parselet matchParselet, boolean overlap) {
+      IParseNode res = super.findParseNode(startIndex, matchParselet, overlap);
       if (res != null)
          return res;
 
       if (children != null) {
          for (Object child:children) {
             if (child instanceof IParseNode) {
-               res = ((IParseNode) child).findParseNode(startIndex, matchParselet);
+               res = ((IParseNode) child).findParseNode(startIndex, matchParselet, overlap);
                if (res != null)
                   return res;
             }

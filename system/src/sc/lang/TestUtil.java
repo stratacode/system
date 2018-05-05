@@ -313,8 +313,9 @@ public class TestUtil {
          Language.registerLanguage(HTMLLanguage.INSTANCE, "html");
          Language.registerLanguage(HTMLLanguage.INSTANCE, "scsp");
          Language.registerLanguage(XMLLanguage.INSTANCE, "xml");
-         Language.registerLanguage(CSSLanguage.INSTANCE, "scss");
+         Language.registerLanguage(CSSLanguage.INSTANCE, "sccss");
          Language.registerLanguage(CSSLanguage.INSTANCE, "css");
+         Language.registerLanguage(CommandSCLanguage.INSTANCE, "scr");
       }
       else {
          if (opts.srcPath == null && buildList != null) {

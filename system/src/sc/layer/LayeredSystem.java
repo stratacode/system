@@ -1156,6 +1156,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
       Language.registerLanguage(objDefTemplateLang, "sctd");
       Language.registerLanguage(TemplateLanguage.INSTANCE, TemplateLanguage.SCT_SUFFIX);
+      Language.registerLanguage(CommandSCLanguage.INSTANCE, CommandSCLanguage.SCR_SUFFIX);
 
       // Not registering Javascript yet because it is not complete.  In most projects we just copy the JS files as well so don't need to parse them as a language
       JSLanguage.INSTANCE.initialize();
@@ -2720,6 +2721,36 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName);
          }
       }
+   }
+
+   /**
+    * Returns the first TypeIndexEntry available for a given file path - does not initialize the type index or create layers.  Does not check active layers.  This is used
+    * for determining the icons in the file menu which happens early on in the initialization of the IDE.
+    */
+   public TypeIndexEntry getTypeIndexEntry(String filePath) {
+      if (inactiveLayers != null) {
+         for (int i = 0; i < inactiveLayers.size(); i++) {
+            Layer inactiveLayer = inactiveLayers.get(i);
+            TypeIndexEntry ent = inactiveLayer.getTypeIndexEntryForPath(filePath);
+            if (ent != null)
+               return ent;
+         }
+         if (peerSystems != null && !peerMode) {
+            for (LayeredSystem peerSys:peerSystems) {
+               TypeIndexEntry ent = peerSys.getTypeIndexEntry(filePath);
+               if (ent != null)
+                  return ent;
+            }
+         }
+      }
+      if (typeIndexProcessMap != null) {
+         for (SysTypeIndex typeIndex:typeIndexProcessMap.values()) {
+            TypeIndexEntry ent = typeIndex.getTypeIndexEntryForPath(filePath);
+            if (ent != null)
+               return ent;
+         }
+      }
+      return null;
    }
 
    /** This method is used by the IDE to retrieve names for code-completion, name-lookup, etc.  */
@@ -6878,7 +6909,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             typeIndexFile.delete();
       }
       catch (InvalidClassException exc) {
-         System.out.println("typeIndex - version changed: " + this);
+         System.out.println("typeIndex - version changed: " + typeIndexFile);
          typeIndexFile.delete();
       }
       catch (IOException exc) {
@@ -9501,7 +9532,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy, boolean incremental) {
       if (modelObj instanceof IFileProcessorResult) {
          IFileProcessorResult res = (IFileProcessorResult) modelObj;
-         res.addSrcFile(srcEnt);
+         SrcEntry oldSrcEnt = res.getSrcFile();
+         if (oldSrcEnt == null)
+            res.addSrcFile(srcEnt);
+         else if (!oldSrcEnt.absFileName.equals(srcEnt.absFileName))
+            System.out.println("*** error mismatching files");
 
          if (res instanceof ILanguageModel) {
             ILanguageModel newModel = (ILanguageModel) res;
@@ -10811,8 +10846,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       ILanguageModel cachedModel = beingLoaded.get(srcEnt.absFileName);
       if (cachedModel != null && cachedModel.getLayer() == srcEnt.layer)
          return cachedModel;
-      // We only inactive models to go through the external model index.
-      if (externalModelIndex != null && (layer != null && !layer.activated) && !activeOrInactive) {
+      if (externalModelIndex != null && (layer != null && !layer.activated) /* && !activeOrInactive */) {
          ILanguageModel extModel = externalModelIndex.lookupJavaModel(srcEnt, loadIfUnloaded);
          // We may end up storing two copies of the model - activated and inactivated.  The editor can be out of sync
          // with what we are requesting here, in which case we may need to load a new copy that's in the right state.

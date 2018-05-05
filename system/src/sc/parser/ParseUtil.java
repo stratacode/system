@@ -1031,7 +1031,7 @@ public class ParseUtil  {
       return parseNode.getNodeAtLine(ctx, requiredLineNum);
    }
 
-   public static ISemanticNode findSameNodeInNewModel(ILanguageModel newModel, ISemanticNode oldNode) {
+   public static ISemanticNode findSameNodeInNewModel(ILanguageModel newModel, ISemanticNode oldNode, int defaultOffset) {
       // Our file model is not the current one managed by the system so we need to find the corresponding node.
       IParseNode origParseNode = oldNode.getParseNode();
       boolean computed = false;
@@ -1046,7 +1046,9 @@ public class ParseUtil  {
       if (origParseNode != null) {
          int startIx = origParseNode.getStartIndex();
          if (startIx != -1 && newModel != null && newModel.getParseNode() != null) {
-            IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
+            IParseNode newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet(), false);
+            if (newNode == null) // Look for overlaps just in case it's a small change - this is more expensive because of the need to call length() on each parseNode that might overlap
+               newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet(), true);
             if (newNode != null) {
                Object semValue = newNode.getSemanticValue();
                if (semValue instanceof JavaSemanticNode)
@@ -1056,8 +1058,16 @@ public class ParseUtil  {
                }
             }
             else {
+               if (defaultOffset != -1) {
+                  newNode = newModel.getParseNode().findParseNode(defaultOffset, origParseNode.getParselet(), true);
+                  if (newNode != null) {
+                     Object semValue = newNode.getSemanticValue();
+                     if (semValue instanceof JavaSemanticNode)
+                        return (JavaSemanticNode) semValue;
+                  }
+               }
                System.err.println("*** Failed to find new parse node in model");
-               newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet());
+               newNode = newModel.getParseNode().findParseNode(startIx, origParseNode.getParselet(), true);
             }
          }
       }

@@ -228,4 +228,15 @@ public class LayerListTypeIndex {
       sb.append(" numModTypes: " + modifyTypeIndex.size());
       return sb;
    }
+
+   public TypeIndexEntry getTypeIndexEntryForPath(String pathName) {
+      if (typeIndex != null) {
+         for (LayerTypeIndex layerTypeIndex:typeIndex.values()) {
+            TypeIndexEntry ent = layerTypeIndex.getTypeIndexEntryForPath(pathName);
+            if (ent != null)
+               return ent;
+         }
+      }
+      return null;
+   }
 }

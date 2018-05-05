@@ -7971,6 +7971,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       idx.baseTypes = baseTypes;
       idx.declType = getDeclarationType();
       idx.isLayerType = isLayerType;
+      idx.isInnerType = getEnclosingType() != null;
+      idx.isModify = this instanceof ModifyDeclaration;
       // Inner types store their own index entries
       // Overridden properties use the type index and are built up when from that
       return idx;

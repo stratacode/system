@@ -769,7 +769,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             layerTypeIndex = new LayerTypeIndex();
          }
          TypeIndexEntry oldTypeEnt = layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
-         layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
+         // We can only have one type per file name so don't also register inner types here
+         if (!typeIndexEntry.isInnerType)
+            layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
          if (typeIndexRestored) {
             if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry)) {
                typeIndexNeedsSave = true;
@@ -778,6 +780,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                typeIndexFileLastModified = lastModified;
          }
       }
+   }
+
+   public TypeIndexEntry getTypeIndexEntry(String typeName) {
+      if (layerTypeIndex != null)
+         return layerTypeIndex.layerTypeIndex.get(typeName);
+      return null;
    }
 
    // TODO: Note - there could potentially be multiple returns here - say 'desktop' and 'server' but I'm not sure we'll ever need two different 'java' runtimes activated at the same time
@@ -2680,6 +2688,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       // else - we can get here in some cases where we are not started... e.g. looking for source files in separate layers when we are not a separate layer.
+      return null;
+   }
+
+   public TypeIndexEntry getTypeIndexEntryForPath(String absFileName) {
+      if (layerTypeIndex != null) {
+         SrcEntry srcEnt = getSrcEntry(absFileName);
+         if (srcEnt != null)
+            return getTypeIndexEntry(srcEnt.getTypeName());
+      }
       return null;
    }
 
