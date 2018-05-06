@@ -877,10 +877,6 @@ public abstract class Language extends LayerFileComponent {
       return getClass().getName();
    }
 
-   public boolean getInheritFiles() {
-      return true;
-   }
-
    public void validate() {
       initialize();
    }

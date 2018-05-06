@@ -63,4 +63,6 @@ public interface IFileProcessor {
    boolean isParsed();
 
    public String[] getSrcPathTypes();
+
+   boolean getProcessInAllLayers();
 }

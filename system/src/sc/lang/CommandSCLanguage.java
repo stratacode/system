@@ -97,8 +97,10 @@ public class CommandSCLanguage extends SCLanguage {
       languageName = "SCCmd";
       defaultExtension = SCR_SUFFIX;
       prependLayerPackage = false;
+      processInAllLayers = true;
       useSrcDir = false;
       fileIndex = new HashMap<String,IFileProcessorResult>();
+      inheritFiles = false;
    }
 
    private boolean _inited = false;

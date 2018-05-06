@@ -41,9 +41,6 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public boolean compiledLayersOnly = false;
 
-   /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
-   public boolean inheritFiles = false;
-
    private boolean producesTypes = false;
 
    {
@@ -117,10 +114,6 @@ public class LayerFileProcessor extends LayerFileComponent {
       }
       else
          return new LayerFileProcessorResult(this, srcEnt); //FILE_OVERRIDDEN_SENTINEL;
-   }
-
-   public boolean getInheritFiles() {
-      return inheritFiles;
    }
 
    public boolean getNeedsCompile() {

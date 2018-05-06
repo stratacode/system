@@ -38,6 +38,10 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
     */
    public boolean processInAllLayers = false;
 
+   /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
+   public boolean inheritFiles = false;
+
+
    // Stores a mapping from file path to the most specific result file - used by LayerFileProcessor and the test script language to determine
    // which file is the most specific.  Since it's not used by languages which are processed, it's initialized only when it's needed by a subclass.
    protected HashMap<String,IFileProcessorResult> fileIndex = null;
@@ -126,6 +130,14 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
          return Collections.singletonList(resEnt);
       }
       return null;
+   }
+
+   public boolean getProcessInAllLayers() {
+      return processInAllLayers;
+   }
+
+   public boolean getInheritFiles() {
+      return inheritFiles;
    }
 
 }
