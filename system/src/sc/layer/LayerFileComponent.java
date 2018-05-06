@@ -2,15 +2,20 @@ package sc.layer;
 
 import sc.util.FileUtil;
 
-public abstract class LayerFileComponent extends LayerComponent implements IFileProcessor {
+import java.io.File;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 
+/** This is the base class for the LayerFileProcessor and Language - the two ways to add new file formats to the build processor.  */
+public abstract class LayerFileComponent extends LayerComponent implements IFileProcessor {
    /** If true, add the layer's package prefix onto the path name of the file in the layer to get the generated/copied file. */
    public boolean prependLayerPackage = true;
 
    /** For files that start with this prefix, do not include that prefix in the output path used for the file. e.g. with skipSrcPathPrefix = "resources", a path of "resources/icons/foo.gif" turns into "icons/foo.gif" */
    public String skipSrcPathPrefix;
 
-   /** Prefix pre-pended onto the file in the build dir. */
+   /** Specifies a specific prefix that's pre-pended onto all files placed in the build dir. */
    public String templatePrefix;
 
    public String outputDir;
@@ -23,6 +28,19 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
 
    /** Ordinarily files are copied to the current build dir for the build layer.  Setting this changes it so they are always copied to a fixed shared buildDir, say for a WEB-INF directory */
    public boolean useCommonBuildDir = false;
+
+   /** Should the resulting file be executable - TODO: this is supported for layer files only right now but could also be supported for processed languages if needed */
+   public boolean makeExecutable = false;
+
+   /**
+    * Set this to true so that result files are copied to the build dir for for all build layers (e.g. web files).  Other assets like resources only need to be built in the first
+    * build layer where they are included because they are picked up in the classpath.
+    */
+   public boolean processInAllLayers = false;
+
+   // Stores a mapping from file path to the most specific result file - used by LayerFileProcessor and the test script language to determine
+   // which file is the most specific.  Since it's not used by languages which are processed, it's initialized only when it's needed by a subclass.
+   protected HashMap<String,IFileProcessorResult> fileIndex = null;
 
    public LayerFileComponent() {
    }
@@ -80,6 +98,34 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
       if (useSrcDir && useClassesDir) {
          System.err.println("*** LayerFileProcessor: " + this + " has both useSrcDir and useClassesDir set.  Set useSrcDir to store the results in the buildSrc directory and useClassesDir to store it next to the classes in the runtime specific folder.  If useSrcDir = false and useClassesDir=false, the default is to store it in the buildDir without the runtime prefix.");
       }
+   }
+
+   public IFileProcessorResult getLayerFile(String relFileName) {
+      return fileIndex.get(relFileName);
+   }
+
+   public List<SrcEntry> getProcessedFiles(IFileProcessorResult result, Layer buildLayer, String buildSrcDir, boolean generate) {
+      SrcEntry srcEnt = result.getSrcFile();
+      if (getLayerFile(srcEnt.relFileName) == result || processInAllLayers) {
+         LayeredSystem sys = srcEnt.layer.layeredSystem;
+         String newRelFile = getOutputFileToUse(sys, result, srcEnt, buildLayer);
+         String newFile = FileUtil.concat(getOutputDirToUse(sys, buildSrcDir, buildLayer),  newRelFile);
+
+         // The layered system processes hidden layer files backwards.  So generate will be true the for the
+         // final layer's objects but an overridden component comes in afterwards... don't overwrite the new file
+         // with the previous one.  We really don't need to transform this but I think it is moot because it will
+         // have been transformed anyway.
+         if (generate) {
+            if (!FileUtil.copyFile(srcEnt.absFileName, newFile, true))
+               result.setHasErrors(true);
+         }
+         SrcEntry resEnt = new SrcEntry(srcEnt.layer, newFile, newRelFile);
+         resEnt.hash = FileUtil.computeHash(newFile);
+         if (makeExecutable)
+            new File(newFile).setExecutable(true, true);
+         return Collections.singletonList(resEnt);
+      }
+      return null;
    }
 
 }

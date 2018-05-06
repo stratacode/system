@@ -356,6 +356,11 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return this;
    }
 
+   @Override
+   public boolean useDefaultModifier() {
+      return baseType instanceof ITypeDeclaration ? ((ITypeDeclaration) baseType).useDefaultModifier() : false;
+   }
+
    public boolean isLayerType() {
       return false;
    }

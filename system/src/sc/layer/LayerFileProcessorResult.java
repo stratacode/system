@@ -12,12 +12,12 @@ import java.util.List;
 
 public class LayerFileProcessorResult implements IFileProcessorResult {
    SrcEntry srcEnt;
-   LayerFileProcessor processor;
+   LayerFileComponent processor;
    long lastModifiedTime;
 
    private boolean hasErrors;
 
-   LayerFileProcessorResult(LayerFileProcessor processor, SrcEntry srcEnt) {
+   LayerFileProcessorResult(LayerFileComponent processor, SrcEntry srcEnt) {
       this.processor = processor;
       this.srcEnt = srcEnt;
       if (srcEnt != null)
@@ -32,6 +32,10 @@ public class LayerFileProcessorResult implements IFileProcessorResult {
       return hasErrors;
    }
 
+   public void setHasErrors(boolean val) {
+      hasErrors = val;
+   }
+
    public boolean needsCompile() {
       return false;
    }
@@ -41,29 +45,7 @@ public class LayerFileProcessorResult implements IFileProcessorResult {
    }
 
    public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
-      // If not overridden by another file with the same name... maybe this is not needed though since generate is
-      // false for none files
-      if (processor.getLayerFile(srcEnt.relFileName) == this || processor.processInAllLayers) {
-         SrcEntry src = srcEnt;
-         LayeredSystem sys = srcEnt.layer.layeredSystem;
-         String newRelFile = processor.getOutputFileToUse(sys, this, src, buildLayer);
-         String newFile = FileUtil.concat(processor.getOutputDirToUse(sys, buildSrcDir, buildLayer),  newRelFile);
-
-         // The layered system processes hidden layer files backwards.  So generate will be true the for the
-         // final layer's objects but an overridden component comes in afterwards... don't overwrite the new file
-         // with the previous one.  We really don't need to transform this but I think it is moot because it will
-         // have been transformed anyway.
-         if (generate) {
-            if (!FileUtil.copyFile(srcEnt.absFileName, newFile, true))
-               hasErrors = true;
-         }
-         SrcEntry srcEnt = new SrcEntry(src.layer, newFile, newRelFile);
-         srcEnt.hash = FileUtil.computeHash(newFile);
-         if (processor.makeExecutable)
-            new File(newFile).setExecutable(true, true);
-         return Collections.singletonList(srcEnt);
-      }
-      return null;
+      return processor.getProcessedFiles(this, buildLayer, buildSrcDir, generate);
    }
 
    public void postBuild(Layer buildLayer, String buildDir) {

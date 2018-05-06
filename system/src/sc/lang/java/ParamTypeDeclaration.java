@@ -620,7 +620,6 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return null;
    }
 
-   @Override
    public ITypeDeclaration resolve(boolean modified) {
       if (baseType instanceof ITypeDeclaration) {
          Object newType = ((ITypeDeclaration) baseType).resolve(modified);
@@ -628,6 +627,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             baseType = newType;
       }
       return this;
+   }
+
+   public boolean useDefaultModifier() {
+      return baseType instanceof ITypeDeclaration && ((ITypeDeclaration) baseType).useDefaultModifier();
    }
 
    public String toString() {

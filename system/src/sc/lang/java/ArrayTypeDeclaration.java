@@ -466,7 +466,6 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return this;
    }
 
-   @Override
    public ITypeDeclaration resolve(boolean modified) {
       if (componentType instanceof ITypeDeclaration) {
          Object newType = ((ITypeDeclaration) componentType).resolve(modified);
@@ -474,5 +473,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
             componentType = newType;
       }
       return this;
+   }
+
+   public boolean useDefaultModifier() {
+      return componentType instanceof ITypeDeclaration && ((ITypeDeclaration) componentType).useDefaultModifier();
    }
 }

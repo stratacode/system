@@ -1454,6 +1454,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return this; // TODO: should we support replacing these?
    }
 
+   public boolean useDefaultModifier() {
+      return false;
+   }
+
    public void error(CharSequence... args) {
       reportMessage(MessageType.Error, args);
    }

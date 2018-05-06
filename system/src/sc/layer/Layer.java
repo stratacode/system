@@ -4616,12 +4616,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public SrcEntry getBaseLayerFileFromRelName(String relName) {
       SrcEntry res;
-      // Pick any layer before this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
-      for (int i = layerPosition - 1; i >= 0; i--) {
-         Layer baseLayer = layeredSystem.layers.get(i);
-         res = baseLayer.getLayerFileFromRelName(relName, false);
-         if (res != null)
-            return res;
+      List<Layer> layersList = getLayersList();
+      if (layerPosition < layersList.size()) {
+         // Pick any layer before this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
+         for (int i = layerPosition - 1; i >= 0; i--) {
+            Layer baseLayer = layersList.get(i);
+            res = baseLayer.getLayerFileFromRelName(relName, false);
+            if (res != null)
+               return res;
+         }
       }
       return null;
    }

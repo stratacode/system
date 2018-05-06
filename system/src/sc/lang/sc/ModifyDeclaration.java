@@ -182,7 +182,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   }
                }
 
-               if (modifyTypeDecl.replacedByType == null && !modifyInherited) {
+               if (modifyTypeDecl.replacedByType == null && !modifyInherited && !(thisModel instanceof CmdScriptModel)) {
                   modifyTypeDecl.updateReplacedByType(this);
                }
             }
@@ -429,7 +429,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       return res == null ? thisModel.getPreviousDeclaration(fullTypeName) : res;
    }
 
-   private void checkModify() {
+   void checkModify() {
+      JavaModel model = getJavaModel();
+      if (model instanceof CmdScriptModel)
+         return;
       if (getLayer() != null && modifyTypeDecl != null && modifyTypeDecl.getLayer() != null) {
          if (!temporaryType && getLayer().activated != modifyTypeDecl.getLayer().activated) {
             System.out.println("*** Invalid modify type - mixing inactive and active layers");

@@ -1613,8 +1613,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // for finding the layer.  The package prefix is used for finding types inside of the layer.
          if (model.isLayerModel)
             return useTypeName;
-         else
-            res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), useTypeName);
+         else {
+            res = model.getChildTypeName(this, useTypeName);
+         }
       }
       else if (pnode instanceof ITypeDeclaration) {
          ITypeDeclaration itd = (ITypeDeclaration) pnode;

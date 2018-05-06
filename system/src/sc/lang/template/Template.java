@@ -410,11 +410,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return null;
    }
 
-   @Override
    public ITypeDeclaration resolve(boolean modified) {
       if (removed)
          return (ITypeDeclaration) replacedByModel;
       return this;
+   }
+
+   public boolean useDefaultModifier() {
+      return true;
    }
 
    public DeclarationType getDeclarationType() {

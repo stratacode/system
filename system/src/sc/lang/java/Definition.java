@@ -652,6 +652,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
          Layer l = m.getLayer();
          if (l != null && (defaultModifier = l.defaultModifier) != null)
             return defaultModifier;
+         return m.getModelDefaultModifier();
       }
       return null;
    }

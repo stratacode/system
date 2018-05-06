@@ -451,7 +451,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
    /** Turn this on unless we are in an interface or annotation type */
    public boolean useDefaultModifier() {
-      TypeDeclaration type = getEnclosingType();
+      ITypeDeclaration type = getEnclosingIType();
       if (type == null)
          return false;
       return type.useDefaultModifier();

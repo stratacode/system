@@ -298,6 +298,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       typeIndex.put(typeName,td);
    }
 
+   public String getChildTypeName(BodyTypeDeclaration bodyTypeDeclaration, String useTypeName) {
+      return CTypeUtil.prefixPath(getPackagePrefix(), useTypeName);
+   }
+
    private static class WildcardImport {
       public String typeName;
       public WildcardImport(String tn) {
@@ -2133,6 +2137,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return hasErrors;
    }
 
+   public void setHasErrors(boolean val) {
+      hasErrors = val;
+   }
+
    public Object findMember(String name, EnumSet<MemberType> mtype, Object fromChild, Object refType, TypeContext ctx, boolean skipIfaces) {
       Object v;
 
@@ -2370,12 +2378,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (sys == null || thisLayer == null || sys.buildLayer == null || !thisLayer.activated)
          return null;
 
-      // First approach is to use the buildSrcIndex to find the most specific file for this guy.
-      for (int i = sys.buildLayer.getLayerPosition(); i >= thisLayer.getLayerPosition(); i--) {
-         Layer layer = sys.layers.get(i);
-         String srcIndexName = getModelTypeDeclaration().getSrcIndexName();
-         if (layer.getSrcFileIndex(srcIndexName) != null)
-            return layer;
+      TypeDeclaration modelType = getModelTypeDeclaration();
+
+      if (modelType != null) {
+         // First approach is to use the buildSrcIndex to find the most specific file for this guy.
+         for (int i = sys.buildLayer.getLayerPosition(); i >= thisLayer.getLayerPosition(); i--) {
+            Layer layer = sys.layers.get(i);
+            String srcIndexName = getModelTypeDeclaration().getSrcIndexName();
+            if (layer.getSrcFileIndex(srcIndexName) != null)
+               return layer;
+         }
       }
 
       // Secondly, pick the most specific build layer after this type is defined
@@ -3008,9 +3020,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (needsRestart) {  // Has this model been explicitly marked for a 'restart' (e.g. during a second buildAll build) - if so, consider it as changed even if it has not actually changed.
          return true;
       }
-      for (TypeDeclaration td:types) {
-         if (td.changedSinceLayer(transformedInLayer, genLayer, false, null, changedTypes, processJava))
-            return true;
+      if (types != null) {
+         for (TypeDeclaration td:types) {
+            if (td.changedSinceLayer(transformedInLayer, genLayer, false, null, changedTypes, processJava))
+               return true;
+         }
       }
       return false;
    }
@@ -3241,6 +3255,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          System.out.println("*** Completed genFileIndex for: " + getSrcFile() + " index: " + idx);
       idx.cleanUp();
       return idx;
+   }
+
+   public Object getModelDefaultModifier() {
+      return null;
    }
 }
 

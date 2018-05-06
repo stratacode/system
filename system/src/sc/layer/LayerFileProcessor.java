@@ -16,15 +16,14 @@ import java.util.HashMap;
 /**
  * Manages the process of building (or simply copying) a particular type of file during the layered build process.
  * Typically a LayerFileProcessor is registered during system startup by calling layeredSystem.registerFileProcessor from a
- * layer configuration file.  You register it with one or more suffixes, prefixes, or patterns.  The file processor uses those to match
- * files in the layers during the build process.  It matches any files defined in layers which extends from the layer in which it was defined (if
- * definedInLayer is set), or any subsequent layer if not.  You may prepend the package name of the source file or layer when appropriate.
- * For example, in wicket, a .gif file as a java resource would typically prepend the package suffix.  A .gif file in the web subdirectory
- * of a web application would not prepend it's layer's package prefix.
+ * layer configuration file, or via an 'object processorName extends LayerFileProcessor {}' in your layer definition file.
+ * Either way, a layer file processor is configured with a list of file extensions, prefixes, or patterns to match and process at build time.
+ * A LayerFileProcessor controls it's visibility to other layers via the definedInLayer property (inherited from LayerComponent).  It's set to the layer which registers or defines the processor.
+ * When it's not null, only layers which explicitly extend the defined layer will see this LayerFileProcessor.  When definedInLayer is not set, all files in all layers are matched.
+ * A LayerFileProcessor inherits the properties from LayerFileComponent which control where processed files are placed - in the 'buildSrcDir', 'buildDir', or buildClassesDir.  You can
+ * prepend the layers package onto the file path (e.g. for files that are compiled to .class or Java resources) or not - (e.g. files that are in the web directory).
  */
 public class LayerFileProcessor extends LayerFileComponent {
-   private HashMap<String,LayerFileProcessorResult> fileIndex = new HashMap<String,LayerFileProcessorResult>();
-
    public String[] extensions;
 
    public String[] patterns;
@@ -42,15 +41,14 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public boolean compiledLayersOnly = false;
 
-   /** Should the resulting file be executable */
-   public boolean makeExecutable = false;
-
-   public boolean processInAllLayers = false;
-
    /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
    public boolean inheritFiles = false;
 
    private boolean producesTypes = false;
+
+   {
+      fileIndex = new HashMap<String,IFileProcessorResult>();
+   }
 
    public LayerFileProcessor() {
    }
@@ -109,7 +107,7 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public Object process(SrcEntry srcEnt, boolean enablePartialValues) {
       LayerFileProcessorResult res;
-      LayerFileProcessorResult current = fileIndex.get(srcEnt.relFileName);
+      LayerFileProcessorResult current = (LayerFileProcessorResult) fileIndex.get(srcEnt.relFileName);
       int cpos, spos;
       // If processInAllLayers is set, we put the generated file in all build layers.  That means every time this gets called with the right file, we
       // process it.
@@ -212,10 +210,6 @@ public class LayerFileProcessor extends LayerFileComponent {
 
    public boolean getPrependLayerPackage() {
       return prependLayerPackage;
-   }
-
-   public LayerFileProcessorResult getLayerFile(String relFileName) {
-      return fileIndex.get(relFileName);
    }
 
    public String toString() {

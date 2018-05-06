@@ -11902,6 +11902,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
    }
 
+   public Object parseActiveFile(SrcEntry srcEnt) {
+      ILanguageModel model = getCachedModel(srcEnt, true);
+      if (model == null) {
+         return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
+      }
+      return model;
+   }
+
    public JavaModel parseInactiveModel(SrcEntry srcEnt) {
       Object res = parseInactiveFile(srcEnt);
       if (res instanceof JavaModel)
@@ -13460,7 +13468,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      System.err.println("*** Error node without a parent layer");
                   if (refLayer != null && refLayer.layeredSystem != this)
                      refLayer = getPeerLayerFromRemote(refLayer);
-                  TypeDeclaration res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                  TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                   if (res != null) {
                      // Make sure we don't add any sub-types which are from the same layer as this one.
@@ -13490,7 +13498,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            if (!subTypeLayer.closed) {
                               // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
                               // a different runtime.
-                              res = (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                              res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                               if (res != null && res.getFullTypeName().equals(subTypeName) && !ModelUtil.sameTypesAndLayers(this, type, res))
                                  result.add(0, res);
                            }

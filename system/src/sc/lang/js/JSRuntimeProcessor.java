@@ -508,8 +508,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          // First transform to Java but the java files are not part of the build themselves so just ignore them here
          List<SrcEntry> javaFiles = model.getProcessedFiles(genLayer, buildSrcDir, generate);
-
-         if (compileJavaFiles)
+         if (compileJavaFiles && javaFiles != null)
             resFiles.addAll(javaFiles);
 
          if (proc instanceof TemplateLanguage) {

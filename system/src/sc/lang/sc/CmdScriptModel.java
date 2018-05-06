@@ -4,16 +4,15 @@
 
 package sc.lang.sc;
 
-import sc.lang.AbstractInterpreter;
-import sc.lang.ILanguageModel;
-import sc.lang.ISemanticNode;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.java.Package;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
+import sc.parser.ParseError;
 import sc.parser.ParseUtil;
+import sc.type.CTypeUtil;
 import sc.type.DynType;
 
 import java.util.*;
@@ -31,77 +30,62 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
 
    public transient AbstractInterpreter.DefaultCmdClassDeclaration cmdObject;
 
-   @Override
    public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
       return getCmdObject().isAssignableFrom(other, assignmentSemantics);
    }
 
-   @Override
    public boolean isAssignableTo(ITypeDeclaration other) {
       return getCmdObject().isAssignableTo(other);
    }
 
-   @Override
    public boolean isAssignableFromClass(Class other) {
       return getCmdObject().isAssignableFromClass(other);
    }
 
-   @Override
    public String getTypeName() {
       return getCmdObject().getTypeName();
    }
 
-   @Override
    public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
       return getCmdObject().getFullTypeName(includeDims, includeTypeParams);
    }
 
-   @Override
    public String getFullTypeName() {
       return getCmdObject().getFullTypeName();
    }
 
-   @Override
    public String getJavaFullTypeName() {
       return getCmdObject().getJavaFullTypeName();
    }
 
-   @Override
    public String getFullBaseTypeName() {
       return getCmdObject().getFullBaseTypeName();
    }
 
-   @Override
    public String getInnerTypeName() {
       return getCmdObject().getInnerTypeName();
    }
 
-   @Override
    public Class getCompiledClass() {
       return getCmdObject().getCompiledClass();
    }
 
-   @Override
    public String getCompiledClassName() {
       return getCmdObject().getCompiledClassName();
    }
 
-   @Override
    public String getCompiledTypeName() {
       return getCmdObject().getCompiledTypeName();
    }
 
-   @Override
    public Object getRuntimeType() {
       return getCmdObject().getRuntimeType();
    }
 
-   @Override
    public boolean isDynamicStub(boolean includeExtends) {
       return getCmdObject().isDynamicStub(includeExtends);
    }
 
-   @Override
    public Object definesMember(String name, EnumSet<MemberType> type, Object refType, TypeContext ctx) {
       Object res = super.definesMember(name, type, refType, ctx, false, false);
       if (res != null)
@@ -109,184 +93,152 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return getCmdObject().definesMember(name, type, refType, ctx);
    }
 
-   @Override
    public Object getInnerType(String name, TypeContext ctx) {
       return getCmdObject().getInnerType(name, ctx);
    }
 
-   @Override
    public boolean implementsType(String otherTypeName, boolean assignment, boolean allowUnbound) {
       return getCmdObject().implementsType(otherTypeName, assignment, allowUnbound);
    }
 
-   @Override
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       return getCmdObject().getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
    }
 
-   @Override
    public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       return getCmdObject().getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
    }
 
-   @Override
    public Object getDerivedTypeDeclaration() {
       return getCmdObject().getDerivedTypeDeclaration();
    }
 
-   @Override
    public Object getExtendsTypeDeclaration() {
       return getCmdObject().getExtendsTypeDeclaration();
    }
 
-   @Override
    public Object getExtendsType() {
       return getCmdObject().getExtendsType();
    }
 
-   @Override
    public List<?> getImplementsTypes() {
       return getCmdObject().getImplementsTypes();
    }
 
-   @Override
    public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
       return getCmdObject().getAllMethods(modifier, hasModifier, isDyn, overridesComp);
    }
 
-   @Override
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
       return getCmdObject().getMethods(methodName, modifier, includeExtends);
    }
 
-   @Override
    public Object getConstructorFromSignature(String sig) {
       return getCmdObject().getConstructorFromSignature(sig);
    }
 
-   @Override
    public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
       return getCmdObject().getMethodFromSignature(methodName, signature, resolveLayer);
    }
 
-   @Override
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       return getCmdObject().getAllProperties(modifier, includeAssigns);
    }
 
-   @Override
    public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       return getCmdObject().getAllFields(modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
    }
 
-   @Override
    public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
       return getCmdObject().getAllInnerTypes(modifier, thisClassOnly);
    }
 
-   @Override
    public DeclarationType getDeclarationType() {
       return DeclarationType.OBJECT;
    }
 
-   @Override
    public boolean isLayerType() {
       return false;
    }
 
-   @Override
    public List<?> getClassTypeParameters() {
       return getCmdObject().getClassTypeParameters();
    }
 
-   @Override
    public Object[] getConstructors(Object refType) {
       return getCmdObject().getConstructors(refType);
    }
 
-   @Override
    public boolean isComponentType() {
       return getCmdObject().isComponentType();
    }
 
-   @Override
    public DynType getPropertyCache() {
       return getCmdObject().getPropertyCache();
    }
 
-   @Override
    public boolean isEnumeratedType() {
       return getCmdObject().isEnumeratedType();
    }
 
-   @Override
    public Object getEnumConstant(String nextName) {
       return getCmdObject().getEnumConstant(nextName);
    }
 
-   @Override
    public boolean isCompiledProperty(String name, boolean fieldMode, boolean interfaceMode) {
       return getCmdObject().isCompiledProperty(name, fieldMode, interfaceMode);
    }
 
-   @Override
    public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
       return getCmdObject().getCompiledTypeArgs(typeArgs);
    }
 
-   @Override
    public boolean needsOwnClass(boolean checkComponents) {
       return getCmdObject().needsOwnClass(checkComponents);
    }
 
-   @Override
    public boolean isDynamicNew() {
       return getCmdObject().isDynamicNew();
    }
 
-   @Override
    public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
       getCmdObject().initDynStatements(inst, ctx, mode);
    }
 
-   @Override
    public void clearDynFields(Object inst, ExecutionContext ctx) {
       getCmdObject().clearDynFields(inst, ctx);
    }
 
-   @Override
    public Object[] getImplementsTypeDeclarations() {
       return getCmdObject().getImplementsTypeDeclarations();
    }
 
-   @Override
    public Object[] getAllImplementsTypeDeclarations() {
       return getCmdObject().getAllImplementsTypeDeclarations();
    }
 
-   @Override
    public boolean isRealType() {
       return getCmdObject().isRealType();
    }
 
-   @Override
    public void staticInit() {
       getCmdObject().staticInit();
    }
 
-   @Override
    public boolean isTransformedType() {
       return getCmdObject().isTransformedType();
    }
 
-   @Override
    public Object getArrayComponentType() {
       return getCmdObject().getArrayComponentType();
    }
 
-   @Override
    public ITypeDeclaration resolve(boolean modified) {
       return getCmdObject().resolve(modified);
+   }
+
+   public boolean useDefaultModifier() {
+      return true;
    }
 
    static class IncludeCommand {
@@ -357,14 +309,35 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       super.start();
    }
 
+   /** By default, all scripts use the public modifier */
+   public Object getModelDefaultModifier() {
+      return "public";
+   }
+
    private void addInclude(LayeredSystem sys, int ix, SrcEntry includeSrcEnt) {
-      ILanguageModel annotModel = sys.getAnnotatedModel(includeSrcEnt);
-      if (annotModel instanceof CmdScriptModel) {
+      Layer layer = getLayer();
+      ILanguageModel model;
+      if (layer == null || !layer.activated)
+         model = sys.getAnnotatedModel(includeSrcEnt);
+      else {
+         Object incFile = sys.parseActiveFile(includeSrcEnt);
+         if (incFile instanceof ParseError) {
+            displayError("Error parsing include file: " + includeSrcEnt + " for: ");
+            return;
+         }
+         else if (incFile instanceof CmdScriptModel)
+            model = (CmdScriptModel) incFile;
+         else {
+            displayError("Expected 'scr' file not: " + incFile);
+            return;
+         }
+      }
+      if (model instanceof CmdScriptModel) {
          if (includeCommands == null)
             includeCommands = new ArrayList<IncludeCommand>();
          IncludeCommand ic = new IncludeCommand();
          ic.commandIx = ix;
-         ic.includedModel = (CmdScriptModel) annotModel;
+         ic.includedModel = (CmdScriptModel) model;
          includeCommands.add(ic);
       }
 
@@ -420,6 +393,7 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
                res = nextInclude.includedModel.findMember(name, mtype, null, refType, ctx, skipIfaces);
                if (res != null)
                   return res;
+               nextInclude = getNextIncludeIx(i);
             }
 
             Object command = commands.get(i);
@@ -436,6 +410,100 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
          if (currentType != null) {
             do {
                res = ModelUtil.definesMember(currentType, name, mtype, refType, ctx, sys);
+               if (res != null)
+                  return res;
+               currentType = ModelUtil.getEnclosingType(currentType);
+            } while (currentType != null);
+         }
+      }
+      return null;
+   }
+
+   public Object findMethod(String name, List<? extends Object> params, Object fromChild, Object refType, boolean staticOnly, Object inferredType) {
+      Object res = super.findMethod(name, params, fromChild, refType, staticOnly, inferredType);
+      if (res != null)
+         return res;
+
+      if ((res = getCmdObject().definesMethod(name, params, null, refType, false, staticOnly, inferredType, null)) != null)
+         return res;
+
+      if (commands != null) {
+         int fromIx;
+         if (fromChild != null) {
+            fromIx = commands.indexOf(fromChild);
+            if (fromIx == -1)
+               return null;
+         }
+         else
+            fromIx = commands.size();
+
+         IncludeCommand nextInclude = getNextIncludeIx(fromIx);
+
+         for (int i = fromIx - 1; i >= 0; i--) {
+            if (nextInclude != null && i == nextInclude.commandIx) {
+               res = nextInclude.includedModel.findMethod(name, params, null, refType, staticOnly, inferredType);
+               if (res != null)
+                  return res;
+            }
+
+            Object command = commands.get(i);
+            if (command instanceof JavaSemanticNode) {
+               JavaSemanticNode javaSemNode = (JavaSemanticNode) command;
+               res = javaSemNode.definesMethod(name, params, null, refType, false, staticOnly, inferredType, null);
+               if (res != null)
+                  return res;
+            }
+         }
+
+         LayeredSystem sys = getLayeredSystem();
+         Object currentType = getCurrentTypeAt(fromIx);
+         if (currentType != null) {
+            do {
+               res = ModelUtil.definesMethod(currentType, name, params, null, refType, false, staticOnly, inferredType, null, sys);
+               if (res != null)
+                  return res;
+               currentType = ModelUtil.getEnclosingType(currentType);
+            } while (currentType != null);
+         }
+      }
+      return null;
+   }
+
+   public Object findType(String name, Object refType, TypeContext ctx) {
+      Object res = super.findType(name, refType, ctx);
+      if (res != null)
+         return res;
+
+      if ((res = getCmdObject().definesType(name, ctx)) != null)
+         return res;
+
+      if (commands != null) {
+         // TODO: would it be helpful to pass fromChild to findType so we can be more accurate here?
+         int fromIx = commands.size();
+
+         IncludeCommand nextInclude = getNextIncludeIx(fromIx);
+
+         for (int i = fromIx - 1; i >= 0; i--) {
+            if (nextInclude != null && i == nextInclude.commandIx) {
+               res = nextInclude.includedModel.findType(name, refType, ctx);
+               if (res != null)
+                  return res;
+            }
+
+            Object command = commands.get(i);
+            if (command instanceof JavaSemanticNode) {
+               JavaSemanticNode javaSemNode = (JavaSemanticNode) command;
+               res = javaSemNode.definesType(name, ctx);
+               if (res != null)
+                  return res;
+            }
+         }
+
+         LayeredSystem sys = getLayeredSystem();
+         Object currentType = getCurrentTypeAt(fromIx);
+         if (currentType != null) {
+            do {
+               res = ModelUtil.getInnerType(currentType, name, ctx);
                if (res != null)
                   return res;
                currentType = ModelUtil.getEnclosingType(currentType);
@@ -471,6 +539,17 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
          typeName.append(pathName);
       }
       return findTypeDeclaration(typeName.toString(), false);
+   }
+
+   public String getChildTypeName(BodyTypeDeclaration childType, String useTypeName) {
+      int fromIx = commands == null ? -1 : commands.indexOf(childType);
+      if (fromIx == -1)
+         return super.getChildTypeName(childType, useTypeName);
+      Object currentType = fromIx == 0 ? null : getCurrentTypeAt(fromIx);
+      if (currentType != null) {
+         return CTypeUtil.prefixPath(ModelUtil.getTypeName(currentType), useTypeName);
+      }
+      return super.getChildTypeName(childType, useTypeName);
    }
 
    public AbstractInterpreter.DefaultCmdClassDeclaration getCmdObject() {
@@ -512,5 +591,18 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
             incCmd.includedModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates);
          }
       }
+   }
+
+   public TypeDeclaration getPreviousDeclaration(String fullClassName) {
+      // For the command scripts, modify is used to just select the most-specific type so we are passing fromLayer = null and
+      return (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, null, prependLayerPackage, false, true, layer, isLayerModel);
+   }
+
+   public List<SrcEntry> getProcessedFiles(Layer buildLayer, String buildSrcDir, boolean generate) {
+      return getLanguage().getProcessedFiles(this, buildLayer, buildSrcDir, generate);
+   }
+
+   public CommandSCLanguage getLanguage() {
+      return CommandSCLanguage.getCommandSCLanguage();
    }
 }

@@ -18,6 +18,8 @@ public interface IFileProcessorResult {
    /** True if this result has errors - in that case, it will always be processed next compile */
    boolean hasErrors();
 
+   void setHasErrors(boolean val);
+
    /** True if this result needs to be compiled using javac */
    boolean needsCompile();
 

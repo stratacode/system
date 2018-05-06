@@ -954,6 +954,11 @@ public abstract class BaseLambdaExpression extends Expression {
       public ITypeDeclaration resolve(boolean modified) {
          return this;
       }
+
+      @Override
+      public boolean useDefaultModifier() {
+         return false;
+      }
    }
 
    /**
@@ -1276,6 +1281,11 @@ public abstract class BaseLambdaExpression extends Expression {
 
       public String toString() {
          return "<invalid-lambda-expression>";
+      }
+
+      @Override
+      public boolean useDefaultModifier() {
+         return false;
       }
    }
 }

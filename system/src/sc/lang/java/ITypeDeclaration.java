@@ -157,4 +157,7 @@ public interface ITypeDeclaration {
     * file system and refreshed.
     */
    ITypeDeclaration resolve(boolean modified);
+
+   /** Does this type use the layer level modifier */
+   boolean useDefaultModifier();
 }

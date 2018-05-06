@@ -4,11 +4,12 @@
 
 package sc.lang;
 
+import sc.layer.IFileProcessorResult;
 import sc.layer.Layer;
-import sc.parser.OrderedChoice;
-import sc.parser.ParseUtil;
-import sc.parser.Sequence;
-import sc.parser.Symbol;
+import sc.layer.SrcEntry;
+import sc.parser.*;
+
+import java.util.HashMap;
 
 /**
  * This class defines the grammar modifications to StrataCode for the command line interpreter and completion grammars
@@ -97,6 +98,7 @@ public class CommandSCLanguage extends SCLanguage {
       defaultExtension = SCR_SUFFIX;
       prependLayerPackage = false;
       useSrcDir = false;
+      fileIndex = new HashMap<String,IFileProcessorResult>();
    }
 
    private boolean _inited = false;
@@ -120,4 +122,23 @@ public class CommandSCLanguage extends SCLanguage {
    public boolean isParsed() {
       return false;
    }
+
+   /** This records the most specific file yet processed.  It goes along with logic in CmdScriptModel's getProcessedFiles - to select the most
+    * specific file to copy over */
+   public Object process(SrcEntry srcEnt, boolean enablePartialValues) {
+      Object resObj = super.process(srcEnt, enablePartialValues);
+      resObj = ParseUtil.nodeToSemanticValue(resObj);
+      if (!(resObj instanceof IFileProcessorResult))
+         return resObj; // ParseError
+      IFileProcessorResult res = (IFileProcessorResult) resObj;
+      IFileProcessorResult current = fileIndex.get(srcEnt.relFileName);
+      int cpos, spos;
+      if (current == null || (cpos = current.getSrcFile().layer.layerPosition) < (spos = srcEnt.layer.layerPosition) || (processInAllLayers && cpos == spos)) {
+         fileIndex.put(srcEnt.relFileName, res);
+         return res;
+      }
+      else
+         return res; //FILE_OVERRIDDEN_SENTINEL;
+   }
+
 }
