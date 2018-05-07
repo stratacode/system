@@ -17,6 +17,7 @@ import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.lang.java.*;
+import sc.util.StringUtil;
 
 import java.util.*;
 
@@ -573,33 +574,40 @@ public class ModifyDeclaration extends TypeDeclaration {
       initExtendsTypes();
 
       int lix;
-      if ((lix = typeName.lastIndexOf(".")) != -1 && !skipRoots && thisModel != null) {
+      if ((lix = typeName.lastIndexOf(".")) != -1 && !skipRoots && thisModel != null && !(thisModel instanceof CmdScriptModel)) {
          List<Object> rootTypes = new ArrayList<Object>();
 
          String rootName = typeName.substring(0,lix);
-         do {
-            TypeDeclaration enclosingType = getEnclosingType();
-            String parentPrefix;
-            if (enclosingType == null)
-               parentPrefix = thisModel.getPackagePrefix();
-            else
-               parentPrefix = enclosingType.getFullTypeName();
-            Object newRoot = thisModel.findTypeDeclaration(CTypeUtil.prefixPath(parentPrefix, rootName), false, true);
-            if (newRoot == null) {
-               if (!isLayerType && errorArgs == null && thisModel.layer != null && !thisModel.isLayerModel)
-                  displayTypeError("Unable to lookup root for modify: " + rootName + " ");
-            }
-            else
-               rootTypes.add(newRoot);
+         TypeDeclaration enclosingType = getEnclosingType();
+         String parentPrefix;
+         if (enclosingType == null)
+            parentPrefix = thisModel.getPackagePrefix();
+         else
+            parentPrefix = enclosingType.getFullTypeName();
 
-            lix = rootName.lastIndexOf(".");
-            if (lix == -1)
-               break;
-            else
-               rootName = rootName.substring(0, lix);
-         } while (true);
+         // From the command line script, we use modify types where the modify type may not match the Java models' package - i.e. it accepts absolute type names.  So we are going to also skip the
+         // implied roots if we are in that situation and there's not a match in the package
+         skipRoots = modifyTypeDecl != null && !StringUtil.equalStrings(modifyTypeDecl.getPackageName(), parentPrefix);
 
-         impliedRoots = rootTypes.toArray(new Object[rootTypes.size()]);
+         if (!skipRoots) {
+            do {
+               Object newRoot = thisModel.findTypeDeclaration(CTypeUtil.prefixPath(parentPrefix, rootName), false, true);
+               if (newRoot == null) {
+                  if (!isLayerType && errorArgs == null && thisModel.layer != null && !thisModel.isLayerModel)
+                     displayTypeError("Unable to lookup root for modify: " + rootName + " ");
+               }
+               else
+                  rootTypes.add(newRoot);
+
+               lix = rootName.lastIndexOf(".");
+               if (lix == -1)
+                  break;
+               else
+                  rootName = rootName.substring(0, lix);
+            } while (true);
+
+            impliedRoots = rootTypes.toArray(new Object[rootTypes.size()]);
+         }
       }
    }
 

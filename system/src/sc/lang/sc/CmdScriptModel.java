@@ -549,6 +549,16 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       if (currentType != null) {
          return CTypeUtil.prefixPath(ModelUtil.getTypeName(currentType), useTypeName);
       }
+      // The command line interface allows an absolute type reference in a modify declaration.  if we can resolve a type with the whole type name
+      // do not prepend the JavaModel's package like we do in the super.
+      else {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys != null) {
+            Object absType = sys.getTypeDeclaration(useTypeName, false, sys.buildLayer, false);
+            if (absType != null)
+               return useTypeName;
+         }
+      }
       return super.getChildTypeName(childType, useTypeName);
    }
 
