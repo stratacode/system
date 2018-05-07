@@ -143,4 +143,7 @@ public class CommandSCLanguage extends SCLanguage {
          return res; //FILE_OVERRIDDEN_SENTINEL;
    }
 
+   public boolean getNeedsCompile() {
+      return false;
+   }
 }
