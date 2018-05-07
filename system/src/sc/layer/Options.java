@@ -349,8 +349,10 @@ public class Options {
                      SyncManager.defaultLanguage = "stratacode";
                   else if (opt.equals("scr"))
                      scriptMode = true;
-                  else if (opt.equals("sw")) // show window
+                  else if (opt.equals("sw")) {
                      headlessSet = true;
+                     System.out.println("Warning - deprecated sw option - use tw instead of tv");
+                  }
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
@@ -531,9 +533,16 @@ public class Options {
                      testExit = true;
                      testMode = true;
                   }
+                  // Test in verify mode (headless)
                   else if (opt.equals("tv")) {
                      testVerifyMode = true;
                      testMode = true;
+                  }
+                  // Test in verify with window mode
+                  else if (opt.equals("tw")) {
+                     testVerifyMode = true;
+                     testMode = true;
+                     headlessSet = true;
                   }
                   else if (opt.equals("tdbg")) {
                      testDebugMode = true;

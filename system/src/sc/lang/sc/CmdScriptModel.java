@@ -615,4 +615,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
    public CommandSCLanguage getLanguage() {
       return CommandSCLanguage.getCommandSCLanguage();
    }
+
+   public boolean needsCompile() {
+      return false;
+   }
 }
