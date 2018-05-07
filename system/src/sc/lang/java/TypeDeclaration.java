@@ -522,6 +522,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public Object definesMemberInternal(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+      /* We support ObjectName.ObjectName resolution for the top-level object to mimic how the property model works.  Need to do this before we call super.definesMemberInternal because otherwise we'll find a modified object type first */
+      if (mtype.contains(MemberType.Field) && name.equals(typeName) && getDeclarationType() == DeclarationType.OBJECT && getEnclosingType() == null)
+         return this;
+
       Object v = super.definesMemberInternal(name, mtype, refType, ctx, skipIfaces, isTransformed);
       if (v != null)
          return v;
@@ -529,10 +533,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       v = definesPreviousMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
       if (v != null)
          return v;
-
-      /** We support ObjectName.ObjectName resolution for the top-level object to mimic how the property model works */
-      if (mtype.contains(MemberType.Field) && name.equals(typeName) && getDeclarationType() == DeclarationType.OBJECT && getEnclosingType() == null)
-         return this;
 
       if (modelType != null) {
          v = modelType.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);

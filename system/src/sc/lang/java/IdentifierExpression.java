@@ -404,8 +404,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                   idTypes[0] = IdentifierType.EnumName;
                   boundTypes[0] = typeObj;
                }
-               // In interpreted mode, CommandVModel will return the CommandInterpreter as kind of like a constant
                else if (typeObj != null) {
+                  // TODO: is this still used?
+                  System.err.println("*** Using BoundName use case..." + typeObj);
                   idTypes[0] = IdentifierType.BoundName;
                   boundTypes[0] = typeObj;
                }
