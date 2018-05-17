@@ -1920,7 +1920,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          Layer curLayer = includeLayer == null ? system.buildLayer : includeLayer;
          if (curLayer == null)
             throw new IllegalArgumentException("*** No current layer for includeSuper()");
-         SrcEntry srcEnt = curLayer.getBaseLayerFileFromRelName(inputRelName);
+         // Using the layer position for the runtime view - TODO: should this use byPosition = false?
+         SrcEntry srcEnt = curLayer.getBaseLayerFileFromRelName(inputRelName, true);
          if (srcEnt != null) {
             // Setting the currentLayer here because the includedScript has to expect the context of the layer in which it's defined, since it can be used from multiple places.
             // The normal include always picks a file that's defined in the context of the buildLayer.

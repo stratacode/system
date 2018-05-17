@@ -6,7 +6,7 @@ package sc.lang.java;
 
 import java.util.List;
 
-/** Used for a.b().<TypeParam>methodCall() */
+/** Used for a.b().&lt;TypeParam&gt;methodCall() */
 public class TypedMethodSelector extends VariableSelector {
    public List<JavaType> typeArguments;
 

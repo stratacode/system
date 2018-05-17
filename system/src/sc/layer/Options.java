@@ -162,7 +162,7 @@ public class Options {
    /** Test script to run as input to command line interpreter after execution.  */
    @Constant public String testScriptName = null;
 
-   /** When true, run the command interpreter after running the test script (-ti <scriptName)  */
+   /** When true, run the command interpreter after running the test script (-ti scriptName)  */
    @Constant public boolean includeTestScript = false;
 
    /** Directory to store test results */

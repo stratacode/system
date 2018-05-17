@@ -2594,6 +2594,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return layerPathName;
    }
 
+   public String getLayerDefFilePath() {
+      return FileUtil.concat(getLayerPathName(), layerBaseName);
+   }
+
    /** The vanilla name of the layer - no package prefix but does include the layer group */
    @Constant
    public String getLayerName() {
@@ -4572,7 +4576,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public String getProperty(String propertiesFile, String propName) {
-      SrcEntry propSrcEnt = getLayerFileFromRelName(FileUtil.addExtension(propertiesFile, "properties"), false);
+      SrcEntry propSrcEnt = getLayerFileFromRelName(FileUtil.addExtension(propertiesFile, "properties"), false, true);
       if (propSrcEnt != null) {
          if (propertiesCache == null)
             propertiesCache = new HashMap<String,Properties>();
@@ -4596,13 +4600,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public String findSrcFileNameFromRelName(String relName) {
-      SrcEntry ent = getLayerFileFromRelName(relName, true);
+      SrcEntry ent = getLayerFileFromRelName(relName, true, true);
       if (ent == null)
          return null;
       return ent.absFileName;
    }
 
-   public SrcEntry getLayerFileFromRelName(String relName, boolean checkBaseLayers) {
+   public SrcEntry getLayerFileFromRelName(String relName, boolean checkBaseLayers, boolean byPosition) {
       if (layerFileCache != null) {
          String absName = layerFileCache.get(relName);
          if (absName != null) {
@@ -4610,18 +4614,27 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       if (checkBaseLayers)
-         return getBaseLayerFileFromRelName(relName);
+         return getBaseLayerFileFromRelName(relName, byPosition);
       return null;
    }
 
-   public SrcEntry getBaseLayerFileFromRelName(String relName) {
+   public SrcEntry getBaseLayerFileFromRelName(String relName, boolean byPosition) {
       SrcEntry res;
       List<Layer> layersList = getLayersList();
-      if (layerPosition < layersList.size()) {
-         // Pick any layer before this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
-         for (int i = layerPosition - 1; i >= 0; i--) {
-            Layer baseLayer = layersList.get(i);
-            res = baseLayer.getLayerFileFromRelName(relName, false);
+      if (byPosition) {
+         if (layerPosition < layersList.size()) {
+            // Pick any layer before this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
+            for (int i = layerPosition - 1; i >= 0; i--) {
+               Layer baseLayer = layersList.get(i);
+               res = baseLayer.getLayerFileFromRelName(relName, false, true);
+               if (res != null)
+                  return res;
+            }
+         }
+      }
+      else if (baseLayers != null) {
+         for (Layer baseLayer:baseLayers) {
+            res = baseLayer.getLayerFileFromRelName(relName, true, false);
             if (res != null)
                return res;
          }

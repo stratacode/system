@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The companion to GlueStatement and GlueExpression.  This one is matched when we encounter %> templateBodyDeclarations %>
- * in the grammar.  This one is used when we encounter %> - i.e. exiting Java code - in the class body context of a <%!
+ * The companion to GlueStatement and GlueExpression.  This one is matched when we encounter %> templateBodyDeclarations %&gt;
+ * in the grammar.  This one is used when we encounter %&gt; - i.e. exiting Java code - in the class body context of a &lt;%!
  * This lets you mix in template strings along with methods etc.  I'm not sure how often this will be used and exactly
  * what to do with that text content... right now it gets put into the root template.
  */

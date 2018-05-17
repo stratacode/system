@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The cousin to GlueStatement.  This gets produced in the TemplateLanguage grammar by matching %> templateStuff <%.  It turns into one giant out.append(...) call effectively.
+ * The cousin to GlueStatement.  This gets produced in the TemplateLanguage grammar by matching %&gt; templateStuff &lt;%.  It turns into one giant out.append(...) call effectively.
  * We can then insert a GlueExpression into the "primary" grammar node as an option in the template language.  This allows us to break into template mode in place of a Java expression - e.g.
  * pass template strings as parameters to a method or compare or initialize variables etc.
  */

@@ -52,23 +52,26 @@ import static sc.type.RTypeUtil.systemClasses;
  * of application code - a single tree organized in a hierarchical name space of definitions.  Definitions
  * create classes, objects, or modify classes or objects.  These layers are merged together to create the
  * current application's program state.
- * <p/>
+ * <p>
  * The program state can be processed to produce Java code, then compiled to produce .class files.
  * This class has a main method which implements command line functionality to process and compile Java files.
- * <p/>
+ * </p>
+ * <p>
  * The last layer in the layer stack is considered the primary 'build layer', which is used to store the compiled result.  You can also
  * specify additional layers to include in the application ahead of the primary layer.  All of the layers
  * extended by these layers are expanded, duplicates are removed and the list is sorted into dependency order
  * producing the list of layers that define the application's initial state.  Typically the last layer is the last one you specify
  * on the command line, unless you specify an additional layer which depends on that layer (in this case, specifying the last layer
  * is redundant anyway since it's picked up automatically when you include a layer which extends it).
- * <p/>
+ * </p>
+ * <p>
  * The layered system is used at build time to
  * generate the class path for the compiler, find source files to be compiled, and manage the compilation
  * process.  Tools also use the layered system to read and manage program elements, and (eventually) interpret layers.
  * Generated applications typically do not depend on the layered system unless they need to interpret code,
  * use the command line interpreter, or other tools to edit the program.
- * <p/>
+ * </p>
+ * <p>
  * The layered system has a main for processing and compiling applications.  The processing phase generates Java
  * code as needed for any language extensions encountered and places these files into the build directory.  At
  * any given time, the layered system is modifying files in a single build directory.  By default, this is the
@@ -78,7 +81,8 @@ import static sc.type.RTypeUtil.systemClasses;
  * java projects, you can also build layers with traditional Java project file organizations.  The framework lets you
  * copy, override, and replace files and generates a corresponding traditional Java project.  It's straightforward to import
  * an existing project, and split it apart into more reusable layers which can then be reassembled into broader configurations.
- * <p/>
+ * </p>
+ * <p>
  * If a Java file does not use any language extensions
  * it can optionally be copied to the build directory along with the generated code so that you have one complete
  * source directory with all source, or it can be compiled directly from where it lives in the source tree.
@@ -103,6 +107,7 @@ import static sc.type.RTypeUtil.systemClasses;
  * versions when compiling the code - e.g. the initSyncProperties feature.
  * </p>
  *
+ * <p>
  *  TODO: this is a large class with potential for improved organization
  *  BuildConfig - stored as 'config' in both LayeredSystem and Layers.  So change system.registerFilePatternProcessor to config.register... same for addPostBuildCommand etc.
  *  TypeIndex (buildReverseTypeIndex and maybe more code related to this feature),
@@ -110,15 +115,20 @@ import static sc.type.RTypeUtil.systemClasses;
  *  TypeCache (typesByName, innerTypeCache, subTypesByType, ...),
  *  RuntimeState (instancesByType, objectNameIndex, )
  *  PackageIndex (packageIndex)
+ * </p>
  *
+ * <p>
  *  Unfortunately it's probably never going to be small... there's a lot of code to customize and manage at the system level.
  *  Once you understand the keywords to search for, you can find the chunks of code dealing with that feature as it's somewhat
  *  modularized by location in the file.  So far, it's been ok to maintain this way except when IntelliJ gets slow during editing.
+ * </p>
  *
+ * <p>
  *  If we required scc to build, we could separate aspects of the LayeredSystem into layers (e.g. sync, data binding,
  *  schtml support, inactive, active) and use StrataCode to build itself into different versions that support the same or subsets of the current public API.
  *  We could build up functionality via sub-classes like CoreSystem (for all of the basic info and apis used in the layer definition file), LayeredSystem
  *  for the rest.
+ * </p>
  */
 @sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {

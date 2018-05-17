@@ -11,7 +11,7 @@ import sc.layer.TypeIndexEntry;
 
 import java.util.EnumSet;
 
-/** Represents a fragment of template declarations in a template file, i.e. <%! */
+/** Represents a fragment of template declarations in a template file, i.e. &lt;%! */
 public class TemplateDeclaration extends TypeDeclaration {
    // During init, we convert the TemplateDeclaration into Java - we might move this as the rootType or we might move this into a method.  In that case, we need to track that method and use it to resolve things.
    Definition movedToDefinition;

@@ -278,7 +278,7 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
                         Expression fileArg = args.get(0);
                         String path = (String) fileArg.eval(String.class, null);
                         if (path != null) {
-                           SrcEntry includeSrcEnt = layer.getLayerFileFromRelName(path, true);
+                           SrcEntry includeSrcEnt = layer.getLayerFileFromRelName(path, true, false);
                            if (includeSrcEnt != null) {
                               addInclude(sys, ix, includeSrcEnt);
                            }
@@ -292,7 +292,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
                      SemanticNodeList<Expression> args = ie.arguments;
                      if (args != null && args.size() == 0) {
                         String srcFile = getSrcFile().baseFileName;
-                        SrcEntry includeSrcEnt = layer.getBaseLayerFileFromRelName(srcFile);
+                        // For the model/editor of the script, use the explicit baseLayers to resolve includes since the layer position would include lots of unrelated layers
+                        SrcEntry includeSrcEnt = layer.getBaseLayerFileFromRelName(srcFile, false);
                         if (includeSrcEnt != null) {
                            addInclude(sys, ix, includeSrcEnt);
                         }
@@ -390,6 +391,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
 
          for (int i = fromIx - 1; i >= 0; i--) {
             if (nextInclude != null && i == nextInclude.commandIx) {
+               if (!nextInclude.includedModel.isStarted())
+                  ParseUtil.initAndStartComponent(nextInclude.includedModel);
                res = nextInclude.includedModel.findMember(name, mtype, null, refType, ctx, skipIfaces);
                if (res != null)
                   return res;

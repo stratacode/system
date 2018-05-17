@@ -18,8 +18,8 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-/** Represents %> template declarations <% ).  This is one of the two most interesting elementss in the TemplateLanguage
- * Grammar.  It's used along with GlueExpression to stitch together markup and the code on either side of it.  We encounter a %>
+/** Represents %&gt; template declarations &lt;% ).  This is one of the two most interesting elements in the TemplateLanguage
+ * Grammar.  It's used along with GlueExpression to stitch together markup and the code on either side of it.  We encounter a %&gt;
  * in the template language in the context where we are expecting a Java statement.  We process template markup until we re-enter Java code.
  * We must reenter Java code to end the method or whatever.  To execute this markup, we effectively turn this into "out.append(x)" calls.
  */

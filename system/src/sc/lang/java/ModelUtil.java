@@ -4923,7 +4923,7 @@ public class ModelUtil {
     * TODO: this seems like the same thing as resolveTypeParameter - can we eliminate one implementation?
     *
     * Given a subType and baseType and the typeParameter in the base-type, returns the type or type parameter in the sub type.
-    * For example, given List<E> and MyList implements List<Integer> you provide subType = MyList, baseType = List and typeParam = E
+    * For example, given List&lt;E&gt; and MyList implements List&lt;Integer&gt; you provide subType = MyList, baseType = List and typeParam = E
     * and get back Integer.
     */
    public static Object resolveBaseTypeParameter(Object subType, Object baseType, Object typeParam) {
@@ -5100,7 +5100,7 @@ public class ModelUtil {
    /**
     * Computes the type parameter in type 'resultType' that corresponds to "typeParam" you provide for the base type srcType.
     * In other words, it lets you determine the value of a base type's type parameter when evaluated in the context of the sub-type.
-    * So List<E> - you provide List.class, E, and the resultType of MySubType implements List<Integer> and it will return Integer.class
+    * So List&lt;E&gt; - you provide List.class, E, and the resultType of MySubType implements List&lt;Integer&gt; and it will return Integer.class
     * This "typeParam" should be one of the type variables srcType was defined with, and srcType should be a baseType of resultType.
     */
    public static Object resolveTypeParameter(Object srcType, Object resultType, Object typeParam) {
@@ -7136,7 +7136,7 @@ public class ModelUtil {
       return null;
    }
 
-   /** Takes name of the form: typeName<paramType> and returns just the type object for "typeName", ignoring the parameters */
+   /** Takes name of the form: typeName&lt;paramType&gt; and returns just the type object for "typeName", ignoring the parameters */
    public static Object getTypeFromTypeOrParamName(BodyTypeDeclaration srcType, String fieldTypeName) {
       int ix = fieldTypeName.indexOf("<");
       String fieldBaseType;
@@ -7162,7 +7162,7 @@ public class ModelUtil {
       return fieldType;
    }
 
-   /** Takes name of the form: typeName<paramType> and returns the JavaType which represents that expression */
+   /** Takes name of the form: typeName&lt;paramType&gt; and returns the JavaType which represents that expression */
    public static JavaType getJavaTypeFromTypeOrParamName(BodyTypeDeclaration srcType, String fieldTypeName) {
       JavaModel model;
       int ix = fieldTypeName.indexOf("<");
