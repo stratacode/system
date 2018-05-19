@@ -8701,7 +8701,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // When dealing with the same system, we just process types that have @Sync explicitly set.  Otherwise, all types would overlap
          if (syncSys != sys) {
             Layer syncLayer = syncSys.getLayerByDirName(getLayer().getLayerName());
-            syncLayer.ensureStarted(true);
+            if (syncLayer != null)
+               syncLayer.ensureStarted(true);
             syncType = syncMode == SyncMode.Automatic? (TypeDeclaration) syncSys.getSrcTypeDeclaration(typeName, null, true, false, true, syncLayer, false) : null;
             if (syncType != null && syncType.isTransformed())
                System.err.println("*** Sync type has been transformed!");
