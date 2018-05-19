@@ -12,6 +12,8 @@ public class BooleanLiteral extends AbstractLiteral {
    }
 
    public Object getLiteralValue() {
+      if (!initialized)
+         init();
       return boolValue;
    }
 
