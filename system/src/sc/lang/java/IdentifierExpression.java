@@ -4387,8 +4387,18 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       IdentifierExpression origIdent = origNode instanceof IdentifierExpression ? (IdentifierExpression) origNode : null;
       // The origIdent inside of an Element tag will not have been started, but the replacedByStatement which represents in the objects is started
-      if (origIdent != null && origIdent.replacedByStatement instanceof IdentifierExpression)
+      if (origIdent != null && origIdent.replacedByStatement instanceof IdentifierExpression) {
          origIdent = (IdentifierExpression) origIdent.replacedByStatement;
+      }
+
+      if (origIdent != null) {
+         List<IString> origIdents = origIdent.getAllIdentifiers();
+         if (origIdents != null) {
+            if (!origIdents.equals(idents))
+               System.out.println("***");
+            idents = origIdents;
+         }
+      }
 
       boolean hasDummyPrefix = false;
       for (IString ident:idents) {
