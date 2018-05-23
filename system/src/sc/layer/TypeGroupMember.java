@@ -11,14 +11,16 @@ import sc.lang.java.TypeDeclaration;
 public class TypeGroupMember {
    public String typeName;
    public String groupName;
+   public String templatePathName;
 
    transient LayeredSystem system;
    transient Object type;
    transient boolean changed = false;
 
-   public TypeGroupMember(String typeName, String groupName) {
+   public TypeGroupMember(String typeName, String groupName, String templatePathName) {
       this.typeName = typeName;
       this.groupName = groupName;
+      this.templatePathName = templatePathName;
    }
 
    Object getType() {

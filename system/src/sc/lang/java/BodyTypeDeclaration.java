@@ -8014,12 +8014,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             BuildInfo bi = sys.buildInfo;
             Object createOnStartup = ModelUtil.getAnnotationValue(compilerSettings, "createOnStartup");
             if (createOnStartup != null && ((Boolean) createOnStartup) && !hasModifier("abstract")) {
-               bi.addTypeGroupMember(getFullTypeName(), BuildInfo.StartupGroupName);
+               bi.addTypeGroupMember(getFullTypeName(),  getTemplatePathName(), BuildInfo.StartupGroupName);
             }
 
             Object initOnStartup = ModelUtil.getAnnotationValue(compilerSettings, "initOnStartup");
             if (initOnStartup != null && ((Boolean) initOnStartup)) {
-               bi.addTypeGroupMember(getFullTypeName(), BuildInfo.InitGroupName);
+               bi.addTypeGroupMember(getFullTypeName(),  getTemplatePathName(), BuildInfo.InitGroupName);
             }
          }
       }

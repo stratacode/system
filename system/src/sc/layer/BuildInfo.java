@@ -216,11 +216,11 @@ public class BuildInfo {
          System.out.println("No main methods match pattern: " + runClass + " in: " + mainMethods);
    }
 
-   public void addTypeGroupMember(String typeName, String typeGroupName) {
+   public void addTypeGroupMember(String typeName, String templatePathName, String typeGroupName) {
       changed = true;
       if (typeGroupMembers == null)
          typeGroupMembers = new LinkedHashSet<TypeGroupMember>();
-      TypeGroupMember mem = new TypeGroupMember(typeName, typeGroupName);
+      TypeGroupMember mem = new TypeGroupMember(typeName, typeGroupName, templatePathName);
       // Remove the unchanged one so we can one which is changed
       if (typeGroupMembers.contains(mem))
          typeGroupMembers.remove(mem);
@@ -231,7 +231,7 @@ public class BuildInfo {
       if (system != null && system.buildInfo == this) {
          for (Layer l:system.layers) {
             if (needsBuildInfo(l)) {
-               l.buildInfo.addTypeGroupMember(typeName, typeGroupName);
+               l.buildInfo.addTypeGroupMember(typeName, templatePathName, typeGroupName);
             }
          }
       }
@@ -690,7 +690,7 @@ public class BuildInfo {
                // Skip mainInit types which also have URL since we'll process them below
                if (memb.hasAnnotation("sc.html.URL"))
                   continue;
-               URLPath path = new URLPath(memb.typeName);
+               URLPath path = new URLPath(memb.templatePathName);
                if (!res.contains(path))
                   res.add(path);
             }
@@ -708,7 +708,7 @@ public class BuildInfo {
                // Skip types which may not be loaded yet
                if (memb.getType() == null)
                   continue;
-               URLPath path = new URLPath(memb.typeName);
+               URLPath path = new URLPath(memb.templatePathName);
                // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
                // a form for testing the URL?
                String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");

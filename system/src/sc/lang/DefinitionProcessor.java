@@ -144,14 +144,15 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
          BuildInfo bi = sys.buildInfo;
          if (bi == null || (skipAbstract && ModelUtil.isAbstractType(def)))
             return;
+         TypeDeclaration td = (TypeDeclaration) def;
          if (typeGroupName != null) {
-            bi.addTypeGroupMember(ModelUtil.getTypeName(def), typeGroupName);
+            bi.addTypeGroupMember(ModelUtil.getTypeName(def), td.getTemplatePathName(),  typeGroupName);
          }
          if (initOnStartup) {
-            bi.addTypeGroupMember(ModelUtil.getTypeName(def), BuildInfo.InitGroupName);
+            bi.addTypeGroupMember(ModelUtil.getTypeName(def), td.getTemplatePathName(), BuildInfo.InitGroupName);
          }
          if (createOnStartup) {
-            bi.addTypeGroupMember(ModelUtil.getTypeName(def), BuildInfo.StartupGroupName);
+            bi.addTypeGroupMember(ModelUtil.getTypeName(def), td.getTemplatePathName(), BuildInfo.StartupGroupName);
          }
       }
       // For methods, fields, etc. we will add the enclosing type as the type group member.  We can then use the type
@@ -161,8 +162,8 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
          BuildInfo bi = sys.buildInfo;
          if (bi == null)
             return;
-         TypeDeclaration enclType = ((TypedDefinition) def).getEnclosingType();
-         bi.addTypeGroupMember(enclType.getFullTypeName(), typeGroupName);
+         TypeDeclaration enclType = def.getEnclosingType();
+         bi.addTypeGroupMember(enclType.getFullTypeName(), enclType.getTemplatePathName(), typeGroupName);
       }
    }
 

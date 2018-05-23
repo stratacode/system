@@ -824,7 +824,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       if (templateProcessor != null) {
          String typeGroupName = templateProcessor.getTypeGroupName();
          if (typeGroupName != null) {
-            getLayeredSystem().buildInfo.addTypeGroupMember(ModelUtil.getTypeName(types.get(0)), typeGroupName);
+            TypeDeclaration td = types.get(0);
+            getLayeredSystem().buildInfo.addTypeGroupMember(ModelUtil.getTypeName(td), td.getTemplatePathName(), typeGroupName);
          }
       }
 

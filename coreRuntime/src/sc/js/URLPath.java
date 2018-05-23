@@ -20,10 +20,20 @@ public class URLPath {
    @Constant
    public String keyName;
 
-   public URLPath(String typeName) {
-      keyName = typeName;
-      name = CTypeUtil.getClassName(typeName);
-      url = name + ".html";
+   public URLPath(String templatePathName) {
+      keyName = templatePathName;
+      name = templatePathName;
+
+      // Turn /path/foo.html into path/foo as a display name
+      if (name.startsWith("/"))
+         name = name.substring(1);
+      int lastSlashIx = name.lastIndexOf('/');
+      if (lastSlashIx == -1)
+         lastSlashIx = 0;
+      int dotIx = name.indexOf('.', lastSlashIx);
+      if (dotIx != -1)
+         name = name.substring(0, dotIx);
+      url = templatePathName;
    }
 
    public int hashCode() {
