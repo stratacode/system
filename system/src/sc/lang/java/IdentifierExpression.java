@@ -444,7 +444,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (idTypes[0] == IdentifierType.UnboundName) {
                   displayRangeError(0, 0, "No identifier: ", firstIdentifier, " in ");
 
-                  // TODO remove or keep commented out, this is for diagnostics, when this fails and we want to debug the code path
+                  // TODO remove or keep commented out, this is for debugging, so you can set a breakpoint here and walk through why it failed
                   EnumSet<MemberType> mTypes = isAssignment ? MemberType.PropertySetSet : MemberType.PropertyGetSet;
                   Object memb = findMember(firstIdentifier, mTypes, this, enclType, null, false);
                }
@@ -3831,8 +3831,17 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (thisObj == null)
          return null;
 
-      if (ModelUtil.isAssignableFrom(enclType, thisObj.getClass())) {
+      if (ModelUtil.isAssignableFrom(enclType, thisObj.getClass())) { // TODO: shouldn't this be DynUtil.getType(thisObj), not thisObj.getClass?
          String typeName = CTypeUtil.getClassName(ModelUtil.getTypeName(boundTypes[0]));
+         // Because we lower case an inner object's name via the getX transformation - i.e. foo.Bar becomes foo.getBar which is really foo.bar we need to make the lower case transformation during 'eval'
+         //if (enclType instanceof BodyTypeDeclaration && Character.isUpperCase(typeName.charAt(0))) {
+            /*
+            String lowerPropName = CTypeUtil.decapitalizePropertyName(typeName);
+            BodyTypeDeclaration enclBodyType = (BodyTypeDeclaration) enclType;
+            if (enclBodyType.getDynInstPropertyIndex(lowerPropName) != -1)
+               typeName = lowerPropName;
+            */
+         //}
          return DynUtil.getPropertyValue(thisObj, typeName);
       }
       return null;
@@ -4391,11 +4400,11 @@ public class IdentifierExpression extends ArgumentsExpression {
          origIdent = (IdentifierExpression) origIdent.replacedByStatement;
       }
 
+      // Use the version of the semantic node based on the offset in our definition, not intelliJ's because it 's parent hierarchy is not right.  In this case, we won't have
+      // the 'completionDummy' identifier in there.
       if (origIdent != null) {
          List<IString> origIdents = origIdent.getAllIdentifiers();
          if (origIdents != null) {
-            if (!origIdents.equals(idents))
-               System.out.println("***");
             idents = origIdents;
          }
       }

@@ -463,8 +463,10 @@ public class BinaryExpression extends Expression {
          return initBinding(expectedType, ctx);
 
       OperatorType opType = getOperatorType(operator);
-      if (opType == OperatorType.Arithmetic || opType == OperatorType.BooleanArithmetic)
-         return DynUtil.evalArithmeticExpression(operator, expectedType, lhs.eval(expectedType, ctx), getRhsExpr().eval(expectedType, ctx));
+      if (opType == OperatorType.Arithmetic || opType == OperatorType.BooleanArithmetic) {
+         // Passing null for expected type to the lhs and rhs since we may have to do a conversion from number to string
+         return DynUtil.evalArithmeticExpression(operator, expectedType, lhs.eval(null, ctx), getRhsExpr().eval(null, ctx));
+      }
       else if (opType == OperatorType.Conditional) {
          Object lhsVal;
          Object res = DynUtil.evalPreConditionalExpression(operator, lhsVal = lhs.eval(null, ctx));

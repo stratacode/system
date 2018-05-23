@@ -469,9 +469,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                   // the initOnStartup code?  But then web.xml would not be generated soon enough?
                }
 
-               String pathInfo = src.relFileName; // TODO - should this use the pattern in the URL annotation above?  What if it has parameters?
-               if (resultSuffix != null)
-                  pathInfo = FileUtil.replaceExtension(pathInfo, resultSuffix);
+               String pathInfo = template.getPathInfo();
 
                // This lets templates find their URL using the Window.location object
                // TODO: maybe this should be moved into a hook added by the HTML language?  I don't see it hurting anything in other frameworks but it really belongs in an HTML specific class.

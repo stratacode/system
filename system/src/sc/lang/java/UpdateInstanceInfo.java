@@ -65,7 +65,10 @@ public class UpdateInstanceInfo {
 
          LayeredSystem sys = newType.getLayeredSystem();
          for (ITypeChangeListener tcl:sys.getTypeChangeListeners()) {
-            tcl.updateType(oldType, newType);
+            // We are only notifing if the type being updated is a dynamic type.  We don't yet have a way to replace the class itself though this might
+            // be a place where we could integrate another class-patching strategy.
+            if (newType.isDynamicType() || newType.isDynamicNew())
+               tcl.updateType(oldType, newType);
          }
       }
 

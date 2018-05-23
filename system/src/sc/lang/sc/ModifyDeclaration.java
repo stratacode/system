@@ -74,7 +74,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    protected void updateBoundExtendsType(Object extType, Object oldType) {
-      if (modifyTypeDecl != oldType)
+      if (modifyTypeDecl != oldType && modifyTypeDecl != null)
          System.out.println("*** Warning - updating modify with inconsistent type?");
       if (extType instanceof BodyTypeDeclaration) {
          modifyTypeDecl = (BodyTypeDeclaration) extType;

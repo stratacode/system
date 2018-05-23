@@ -12,6 +12,7 @@ import sc.dyn.DynRemoteMethod;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.html.Attr;
+import sc.lang.html.Body;
 import sc.lang.html.Element;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.ModifyDeclaration;
@@ -3524,10 +3525,35 @@ public class ModelUtil {
             ModelUtil.execStatements(ctx, ((TemplateStatement) def).statements);
          }
          else if (def instanceof Element) {
-            // Typically we transform templates and eval the transformed version so should not hit this?
-            System.out.println("*** Error not evaluating HTML elements");
-            // TODO: should be evaluating the template declarations nested inside of this element - in attributes or in the body
-            sb.append(def.toString());
+            // In dynamic model, a glue expression may not have been transformed so it will still have references to Elements.  We'll get the output expression here which creates the tag type
+            // if needed.  TODO: maybe we should split GlueExpression.transformTemplate into two steps - one to produce the expression and the other to replace and then we would skip the eval here?
+            Element elem = (Element) def;
+            Expression outExpr = elem.getOutputExpression();
+            Object exprRes = outExpr.eval(String.class, ctx);
+            if (exprRes != null)
+               sb.append(exprRes.toString());
+
+            /*
+            sb.append("<");
+            sb.append(elem.tagName);
+            if (elem.attributeList != null) {
+               for (int ai = 0; ai < elem.attributeList.size(); ai++) {
+                  Attr att = (Attr) elem.attributeList.get(ai);
+                  sb.append(" ");
+                  sb.append(att.name);
+                  if (att.value != null) {
+
+                  }
+
+               }
+            }
+            if (elem.selfClose != null)
+               sb.append("/");
+            sb.append(">");
+            if (elem.children != null) {
+
+            }
+            */
          }
       }
    }
@@ -8798,6 +8824,23 @@ public class ModelUtil {
       else {
          return ModelUtil.getPropertyType(prop);
       }
+   }
+
+   public static String getTemplatePathName(Object objType) {
+      if (objType instanceof BodyTypeDeclaration)
+         return ((BodyTypeDeclaration) objType).getTemplatePathName();
+      else
+         throw new UnsupportedOperationException(); // don't believe we need this for compiled types but if we do, we'll need to generate an annotation and stuff it into the class.
+   }
+
+   /** The equals operator on TypeDeclaration is to compare the files so that's not a good test.  This prevents the same type-name/layer-name combo from being added to the list */
+   public static boolean addUniqueLayerType(LayeredSystem sys, List<TypeDeclaration> result, TypeDeclaration res) {
+      for (int i = 0; i < result.size(); i++) {
+         if (ModelUtil.sameTypesAndLayers(sys, result.get(i), res))
+            return false;
+      }
+      result.add(res);
+      return true;
    }
 
 }

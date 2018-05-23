@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
+import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
@@ -779,6 +780,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             else if (lastModified > typeIndexFileLastModified)
                typeIndexFileLastModified = lastModified;
          }
+
+         SysTypeIndex sysIndex = layeredSystem.typeIndex;
+         if (sysIndex != null) {
+            LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
+            useTypeIndex.layerTypeIndexChanged();
+         }
       }
    }
 
@@ -1286,12 +1293,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          initFailed = layeredSystem.cleanupLayers(baseLayers) || initFailed;
          lpi.activate = activated;
          // TODO: we are resetting the Layer properties based on the new model but really need to first reset them to the defaults.
+         // Reinit the dynamic object's state
+         //if (dynObj != null)
+         //   DynUtil.dispose(dynObj);
+         dynObj = null;
+         initDynObj();
          // or should we just create a new Layer instance and then update the Layer object references in all of the dependent models, or use a "removeLayer" and "removed" flag?
          String prefix = model.getPackagePrefix();
-         // Reinit the dynamic object's state
-         dynObj = null; // TODO: should we dispose the old one?
-         initDynObj();
-         layerModel.initLayerInstance(this, prefix, getInheritedPrefix(baseLayers, prefix, newModel));
+         boolean inheritedPrefix = getInheritedPrefix(baseLayers, prefix, newModel);
+         prefix = model.getPackagePrefix();
+         layerModel.initLayerInstance(this, prefix, inheritedPrefix);
          //modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
          initImports();
@@ -2318,7 +2329,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
 
       if (layerName != null && addIndexEntry) {
-         useTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+         useTypeIndex.addLayerTypeIndex(layerName, layerTypeIndex);
       }
       layerTypeIndex.baseLayerNames = baseLayerNames == null ? null : baseLayerNames.toArray(new String[baseLayerNames.size()]);
    }
@@ -2328,7 +2339,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (sysIndex != null) {
          LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
          String layerName = getLayerName();
-         useTypeIndex.typeIndex.remove(layerName);
+         useTypeIndex.removeLayerTypeIndex(layerName);
       }
    }
 
@@ -4194,7 +4205,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       LayerListTypeIndex listTypeIndex = activated ? layeredSystem.typeIndex.activeTypeIndex : layeredSystem.typeIndex.inactiveTypeIndex;
       String name = getLayerName();
       if (name != null) {
-         listTypeIndex.typeIndex.put(name, layerTypeIndex);
+         listTypeIndex.addLayerTypeIndex(name, layerTypeIndex);
       }
    }
 

@@ -35,9 +35,14 @@ public class SysTypeIndex {
          }
       }
 
-      // TODO: not using the activeTypeIndex now... maybe just remove it?  We have this same info maintained in separate apis stored on the layered system.
+      // TODO: not using the activeTypeIndex now - but we might want to use active index in the future to persist the type-index for any given stack of layers, e.g. to support layers view with
+      // more than one active runtime.
       //activeTypeIndex.buildReverseTypeIndex();
       inactiveTypeIndex.buildReverseTypeIndex(sys);
+   }
+
+   public void refreshReverseTypeIndex(LayeredSystem sys) {
+      inactiveTypeIndex.refreshReverseTypeIndex(sys);
    }
 
    public boolean loadFromDir(String typeIndexDir) {

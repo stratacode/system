@@ -2816,7 +2816,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (dynInstFieldMap == null) {
          initDynInstFieldMap();
       }
-      return dynInstFieldMap.get(propName);
+      int res = dynInstFieldMap.get(propName);
+      // Because we take a.B and turn it into a.getB which is really a.b we need to do this test here
+      if (res == -1 && propName.length() > 1 && Character.isUpperCase(propName.charAt(0))) {
+         res = dynInstFieldMap.get(CTypeUtil.decapitalizePropertyName(propName));
+      }
+      return res;
    }
 
    public int getDynStaticFieldIndex(String propName) {
@@ -9637,4 +9642,25 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return initMethod;
    }
 
+   public String getTemplatePathName() {
+      JavaModel model = getJavaModel();
+      String templatePathName = null;
+      String ext = null;
+      if (model != null) {
+         ext = model.getResultSuffix();
+         SrcEntry srcEnt = model.getSrcFile();
+         if (srcEnt != null) {
+            String relDir = srcEnt.getRelDir();
+            if (relDir != null && relDir.length() > 0)
+               templatePathName = "/" + relDir + '/' + getInnerTypeName();
+            else
+               templatePathName = "/" + getInnerTypeName();
+         }
+      }
+      if (templatePathName == null)
+         templatePathName = "/" + getTypeName();
+      if (ext != null)
+         templatePathName = FileUtil.addExtension(templatePathName, ext);
+      return templatePathName;
+   }
 }

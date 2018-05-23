@@ -5,8 +5,7 @@
 package sc.obj;
 
 /**
- * This method is called for an instance whose type has been modified
- * in the dynamic runtime.
+ * Implement this interface and method to be notified when your instance's type has been updated in the dynamic runtime.
  */
 public interface ITypeUpdateHandler {
    public void _updateInst();

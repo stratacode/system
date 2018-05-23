@@ -72,7 +72,7 @@ public class Window {
       }
       loc.hostname = serverName;
       loc.href = requestURL;
-      loc.pathname = pathInfo;
+      loc.pathname = requestURI;
       int hashIx = requestURL.lastIndexOf("#");
       if (hashIx != -1)
          loc.hash = requestURL.substring(hashIx+1);

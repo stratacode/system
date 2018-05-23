@@ -2934,6 +2934,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("orderValue");
       behaviorAttributes.add("noCache");
       behaviorAttributes.add("scope");
+      behaviorAttributes.add("needsRefresh");
       behaviorAttributes.add(ALT_ID);
 
       // For select only

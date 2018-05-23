@@ -26,6 +26,7 @@ public class LayerListTypeIndex {
    HashMap<String, ArrayList<TypeIndexEntry>> modifyTypeIndex = new HashMap<String,ArrayList<TypeIndexEntry>>();
 
    private boolean reverseIndexBuilt = false;
+   private boolean reverseIndexValid = false;
 
    LayerOrderIndex orderIndex;
 
@@ -44,6 +45,7 @@ public class LayerListTypeIndex {
       subTypeIndex.clear();
       modifyTypeIndex.clear();
       reverseIndexBuilt = false;
+      reverseIndexValid = false;
    }
 
    public void clearTypeIndex() {
@@ -146,6 +148,12 @@ public class LayerListTypeIndex {
       }
    }
 
+   public void refreshReverseTypeIndex(LayeredSystem sys) {
+      if (reverseIndexValid)
+         return;
+      buildReverseTypeIndex(sys);
+   }
+
    /** Optional layered system - used to determined the layer positions used for the type index if present */
    public void buildReverseTypeIndex(LayeredSystem sys) {
       if (reverseIndexBuilt)
@@ -166,6 +174,7 @@ public class LayerListTypeIndex {
          }
          visitIndexEntry(layerName, lti, visitedLayers, sys);
       }
+      reverseIndexValid = true;
    }
 
    public void clear() {
@@ -199,6 +208,7 @@ public class LayerListTypeIndex {
          }
       }
       saveLayerTypeIndexes(layerNamesToSave);
+      reverseIndexValid = false;
    }
 
    public void updateFileName(String oldFileName, String newFileName) {
@@ -210,6 +220,7 @@ public class LayerListTypeIndex {
          }
       }
       saveLayerTypeIndexes(layerNamesToSave);
+      reverseIndexValid = false;
    }
 
    private void saveLayerTypeIndexes(TreeSet<String> layerNamesToSave) {
@@ -238,5 +249,19 @@ public class LayerListTypeIndex {
          }
       }
       return null;
+   }
+
+   public void addLayerTypeIndex(String layerName, LayerTypeIndex layerTypeIndex) {
+      typeIndex.put(layerName, layerTypeIndex);
+      reverseIndexValid = false;
+   }
+
+   public void removeLayerTypeIndex(String layerName) {
+      typeIndex.remove(layerName);
+      reverseIndexValid = false;
+   }
+
+   public void layerTypeIndexChanged() {
+      reverseIndexValid = false;
    }
 }

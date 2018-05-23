@@ -65,6 +65,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    transient public boolean removed;
 
+   /** Has this model been reparsed since this flag was last checked */
+   transient public boolean reparsed = false;
+
    // If not null, the package prefix we should set when we transform.  If it is null, package prefix
    // is defined as normal.
    transient private String computedPackagePrefix;
@@ -1108,6 +1111,13 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       String s = srcFiles.get(0).getRelDir();
       if (s != null) return s.replace(FileUtil.FILE_SEPARATOR, ".");
       return null;
+   }
+
+   public String getPathInfo() {
+      String pathInfo = getSrcFile().relFileName; // TODO - should this use the pattern in the URL annotation above?  What if it has parameters?
+      if (resultSuffix != null)
+         pathInfo = FileUtil.replaceExtension(pathInfo, resultSuffix);
+      return pathInfo;
    }
 
    public TypeDeclaration getUnresolvedModelTypeDeclaration() {
@@ -3259,6 +3269,17 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public Object getModelDefaultModifier() {
       return null;
+   }
+
+   public boolean isReplacedModel() {
+      if (replacedByModel != null)
+         return true;
+      if (types != null) {
+         for (TypeDeclaration type:types)
+            if (type.replaced)
+               return true;
+      }
+      return false;
    }
 }
 

@@ -101,4 +101,6 @@ public interface ILanguageModel extends IFileProcessorResult {
    boolean isUnsavedModel();
 
    EditorContext getEditorContext();
+
+   public boolean isReplacedModel();
 }

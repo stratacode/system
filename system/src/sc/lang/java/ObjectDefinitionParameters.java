@@ -5,9 +5,11 @@
 package sc.lang.java;
 
 import sc.layer.Layer;
+import sc.layer.SrcEntry;
 import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
+import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.util.*;
@@ -23,6 +25,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public String typeName;               // The full class name being instantiate with parameters
    public String typeBaseName;           // Excludes the package part of the typeName
    public String typeClassName;          // Excludes type parameters
+   public String templatePathName;       // For templates or types with @URL, the default URL pattern which is /relDir/TypeName/InnerType.templateSuffix
    public String variableTypeName;       // Type of the variable (often typeName)
    public String lowerClassName;         // The lower class version of the identifier name
    public String upperClassName;         // The upper class version of the identifier name
@@ -78,6 +81,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       getModifiers = TransformUtil.removeModifiers(fieldModifiers, TransformUtil.fieldOnlyModifiers);
       typeBaseName = CTypeUtil.getClassName(typeName);
       typeClassName = ModelUtil.getTypeName(ModelUtil.getAccessClass(compiledClass));
+      templatePathName = objType.getTemplatePathName();
 
       Object enclInstType = ModelUtil.getEnclosingInstType(compiledClass);
 

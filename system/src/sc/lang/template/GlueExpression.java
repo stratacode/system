@@ -29,6 +29,26 @@ import java.util.Set;
 public class GlueExpression extends Expression {
    public List<Object> expressions; // IStrings or expressions - all turn into "append" operations onto the StringBuffer
 
+   private transient Expression outExpr = null;
+
+   public void start() {
+      super.start();
+      if (outExpr != null)
+         outExpr.start();
+   }
+
+   public void validate() {
+      super.validate();
+      if (outExpr != null)
+         outExpr.validate();
+   }
+
+   public void process() {
+      super.process();
+      if (outExpr != null)
+         outExpr.process();
+   }
+
    public ExecResult exec(ExecutionContext ctx) {
       StringBuilder out = (StringBuilder) ctx.getVariable("out", true, true);
       ModelUtil.execTemplateDeclarations(out, ctx, expressions);
@@ -73,6 +93,11 @@ public class GlueExpression extends Expression {
 
    public Object eval(Class expectedType, ExecutionContext ctx) {
       StringBuilder sb = new StringBuilder();
+      initOutExpr();
+      if (outExpr != null)
+         return outExpr.eval(expectedType, ctx);
+      return null;
+      /*
       if (bindingDirection != null) {
          return initBinding(expectedType, ctx);
       }
@@ -83,6 +108,7 @@ public class GlueExpression extends Expression {
          else // trying to be efficient...
             return sb;
       }
+      */
    }
 
    public IBinding[] evalTemplateBindingParameters(Class expectedType, ExecutionContext ctx, List<Object> bindingParams) {
@@ -126,9 +152,10 @@ public class GlueExpression extends Expression {
       return transformTemplate(ix, null);
    }
 
-   public int transformTemplate(int ix, ILanguageModel.RuntimeType type) {
-      if (expressions == null)
-         return ix;
+   private void initOutExpr() {
+      if (expressions == null || outExpr != null)
+         return;
+
       SemanticNodeList<Expression> exprs = new SemanticNodeList<Expression>(expressions.size());
       for (Object expr:expressions) {
          if (expr instanceof IString) {
@@ -154,15 +181,31 @@ public class GlueExpression extends Expression {
          if (bindingDirection != null)
             res.setBindingInfo(bindingDirection, bindingStatement, nestedBinding);
          res.fromStatement = this;
+         res.parentNode = parentNode;
       }
-      if (parentNode.replaceChild(this, res) == -1) {
-         System.err.println("*** - unable to replace glue expreession child");
-      }
+      outExpr = res;
       if (initialized)
-         ParseUtil.initComponent(res);
-      ix = res.transformTemplate(ix, true);
-      if (type != null)
-         res.transform(type);
+         ParseUtil.initComponent(outExpr);
+      if (started)
+         ParseUtil.startComponent(outExpr);
+      if (validated)
+         ParseUtil.validateComponent(outExpr);
+   }
+
+   public int transformTemplate(int ix, ILanguageModel.RuntimeType type) {
+      if (expressions == null)
+         return ix;
+      initOutExpr();
+      if (outExpr != null) {
+         if (parentNode.replaceChild(this, outExpr) == -1) {
+            System.err.println("*** - unable to replace glue expression child");
+         }
+         if (initialized)
+            ParseUtil.initComponent(outExpr);
+         ix = outExpr.transformTemplate(ix, true);
+         if (type != null)
+            outExpr.transform(type);
+      }
       return ix;
    }
 

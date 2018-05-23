@@ -397,6 +397,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   public void refreshReverseTypeIndex() {
+      try {
+         acquireDynLock(false);
+
+         typeIndex.refreshReverseTypeIndex(this);
+
+         if (!peerMode && peerSystems != null) {
+            for (LayeredSystem peerSys: peerSystems) {
+               peerSys.refreshReverseTypeIndex();
+            }
+
+            // If we've already created a layered system for these type indexes, this will just return without
+            // doing it over again.
+            for (SysTypeIndex sti:typeIndexProcessMap.values()) {
+               sti.refreshReverseTypeIndex(null);
+            }
+         }
+      }
+      finally {
+         releaseDynLock(false);
+      }
+   }
+
    public void setMessageHandler(IMessageHandler handler) {
       messageHandler = handler;
       if (peerSystems != null && !peerMode) {
@@ -1123,7 +1146,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             strataCodeMainDir = mainDir;
             isStrataCodeDir = true;
             if (options.verbose)
-               verbose("StrataCode initialized with main directory: " + mainDir + " install directory: " + this.strataCodeInstallDir);
+               verbose("StrataCode initialized with main directory: " + mainDir + " install directory: " + this.strataCodeInstallDir + " current directory: " + System.getProperty("user.dir"));
          }
 
          disabledRuntimes = options.disabledRuntimes;
@@ -3495,15 +3518,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       setCurrent(sys);
 
-      // This will do any post-build processing such as generating static HTML files.  Only do it for the main runtime... otherwise, we'll do the .html files twice.
-      // This has to be done after the peerSystems are built so we have enough information to check the other runtime for the list of JS files the app depends on.
-      sys.initPostBuildModels();
-
       // Until this point, we have not started any threads or run anything else on the layered system but now we are about to
       // start the command interpreter so grab the global lock for write.   Before it prints it's prompt and starts looking
       // for commands, it will grab the global lock for read, just to do the prompt.   That ensures all of our main processing
       // is finished before we start running commands, and that the prompt is the last thing we output so it's visible.
       sys.acquireDynLock(false);
+
+      if (options.needsClassLoaderReset) {
+         // There are situations where we need to reset the class loader - i.e. we cannot use the layered class loaders
+         // for a runtime application.   The problem is that some layers included Java classes at runtime look at their
+         // own class loader to load other application classes that would be later in the classpath.  The compile time wants
+         // to add jars as soon as possible and does it with layered classpaths.  That's fine for compiling but when, For example,
+         // tomcat's connection pool implementation will load a jdbc driver that is in a subsequent layer's classpath.
+         // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
+         // dependency thing and work fine without the rest.  It means we have to reload all classes.
+         sys.resetClassLoader();
+         Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
+      }
+
+      // This will do any post-build processing such as generating static HTML files.  Only do it for the main runtime... otherwise, we'll do the .html files twice.
+      // This has to be done after the peerSystems are built so we have enough information to check the other runtime for the list of JS files the app depends on.
+      sys.initPostBuildModels();
 
       PerfMon.start("runMain");
       try {
@@ -3564,10 +3599,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          boolean haveReset = false;
 
          if (options.testPattern != null) {
-            if (!haveReset)
-               sys.resetClassLoader();
             // First run the unit tests which match (i.e. those installed with the @Test annotation)
-            Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
             if (sys.buildInfo == null)
                sys.error("No build - unable to run tests with pattern: " + options.testPattern);
             else
@@ -3583,16 +3615,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (runFromDir != null) {
                System.setProperty("user.dir", runFromDir);
             }
-            // There are situations where we need to reset the class loader - i.e. we cannot use the layered class loaders
-            // for a runtime application.   The problem is that some layers included Java classes at runtime look at their
-            // own class loader to load other application classes that would be later in the classpath.  The compile time wants
-            // to add jars as soon as possible and does it with layered classpaths.  That's fine for compiling but when, For example, 
-            // tomcat's connection pool implementation will load a jdbc driver that is in a subsequent layer's classpath.
-            // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
-            // dependency thing and work fine without the rest.  It means we hav eto reload all classes.
-            if (!haveReset)
-               sys.resetClassLoader();
-            haveReset = true;
+
             if (commandThread != null)
                commandThread.setContextClassLoader(sys.getSysClassLoader());
 
@@ -6459,7 +6482,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                      if (layer.layerTypeIndex == null)
                         layer.initTypeIndex();
-                     idx.typeIndex.put(layerName, layer.layerTypeIndex);
+                     idx.addLayerTypeIndex(layerName, layer.layerTypeIndex);
                      refreshedLayers.add(layerName);
                   }
                   finally {
@@ -6522,7 +6545,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          switch (options.typeIndexMode) {
             case Refresh:
                // need to put this here because we might initialize some layers during this process and need to make this index available to avoid a duplicate
-               refreshCtx.curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+               refreshCtx.curTypeIndex.inactiveTypeIndex.addLayerTypeIndex(layerName, layerTypeIndex);
                layerTypeIndex = layerTypeIndex.refreshLayerTypeIndex(this, layerName, new File(FileUtil.concat(refreshCtx.typeIndexDir.getPath(), indexFileName)).lastModified(), refreshCtx);
                refreshCtx.refreshedLayers.add(layerName);
                break;
@@ -6535,11 +6558,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          new Throwable().printStackTrace();
       }
       if (layerTypeIndex != null) {
-         refreshCtx.curTypeIndex.inactiveTypeIndex.typeIndex.put(layerName, layerTypeIndex);
+         refreshCtx.curTypeIndex.inactiveTypeIndex.addLayerTypeIndex(layerName, layerTypeIndex);
       }
       else {
          // The layer was removed - remove the type index entry and the file behind it to avoid this problem next itme
-         refreshCtx.curTypeIndex.inactiveTypeIndex.typeIndex.remove(layerName);
+         refreshCtx.curTypeIndex.inactiveTypeIndex.removeLayerTypeIndex(layerName);
          removeTypeIndexFile(refreshCtx.typeIndexIdent, layerName);
       }
       if (layerTypeIndex != null && layerTypeIndex.langExtensions != null)
@@ -9189,7 +9212,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          Map<String, ILanguageModel> oldInactiveModels = (Map<String, ILanguageModel>) inactiveModelIndex.clone();
          for (ILanguageModel oldModel:oldInactiveModels.values()) {
-            if (oldModel.isStarted())
+            if (oldModel.isStarted() && !oldModel.isReplacedModel())
                oldModel.refreshBoundTypes(flags);
          }
       }
@@ -10046,8 +10069,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    @Remote(remoteRuntimes="js")
-   public void rebuild() {
-      rebuild(false);
+   public boolean rebuild() {
+      return rebuild(false);
    }
 
    public void clearBuildAllFiles() {
@@ -10066,8 +10089,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    @Remote(remoteRuntimes="js")
-   public void rebuild(boolean forceBuild) {
+   public boolean rebuild(boolean forceBuild) {
       acquireDynLock(false);
+      boolean any = false;
 
       if (systemCompiled && !options.rebuildAllFiles) {
          clearBuildAllFiles();
@@ -10096,6 +10120,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // runtimes.  That way synchronization can be computed accurately for the new changes.
             sysInfo = refreshSystem(false, true);
             changes = sysInfo.changedModels;
+            any = changes != null && changes.size() > 0;
             peerRefreshInfos = !peerMode ? new ArrayList<SystemRefreshInfo>() : null;
             if (peerSystems != null && !peerMode) {
                for (LayeredSystem peer:peerSystems) {
@@ -10131,6 +10156,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                try {
                   SystemRefreshInfo peerSysInfo = peerRefreshInfos == null ? null : peerRefreshInfos.get(i);
                   List<Layer.ModelUpdate> peerChangedModels = peerSysInfo == null ? null : peerSysInfo.changedModels;
+                  any = any || (peerChangedModels != null && peerChangedModels.size() > 0);
                   if (initialBuild || peer.anyCompiledChanged(peerChangedModels) || forceBuild) {
                      if (!reset && !initialBuild)
                         peer.resetBuild(false);
@@ -10156,6 +10182,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          buildingSystem = false;
          releaseDynLock(false);
       }
+      return any;
    }
 
    private void completeRefresh(SystemRefreshInfo sysInfo, ArrayList<SystemRefreshInfo> peerChangedInfos, boolean active, boolean updateRuntime) {
@@ -11640,11 +11667,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return TransformUtil.parseTemplateResource(typeName, paramClass, getSysClassLoader());
    }
 
-   private boolean hasAnySrcForRootType(String typeName) {
+   private boolean hasAnySrcForRootType(String typeName, Layer refLayer) {
       do {
          String rootTypeName = CTypeUtil.getPackageName(typeName);
          if (rootTypeName != null) {
-            if (getSrcFileFromTypeName(rootTypeName, true, null, true, null) != null)
+            if (getSrcFileFromTypeName(rootTypeName, true, null, true, null, refLayer, false) != null)
                return true;
          }
          typeName = rootTypeName;
@@ -11678,7 +11705,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Object res = innerTypeCache.get(typeName);
          if (res != null) {
             if (srcOnly && ((res instanceof Class) || res instanceof CFClass)) {
-               if (!hasAnySrcForRootType(typeName))
+               if (!hasAnySrcForRootType(typeName, refLayer))
                   return null;
                else
                   removeFromInnerTypeCache(typeName);
@@ -11779,7 +11806,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   // not to do this if we already have the src because there are cases where we have the source for the outer class but not the inner.
                   else if (!ModelUtil.sameTypes(rootType, ModelUtil.getEnclosingType(declObj)) && subTypeName.indexOf(".") == -1) {
                      // Otherwise, this can infinite loop
-                     if (hasAnySrcForRootType(typeName)) {
+                     if (hasAnySrcForRootType(typeName, refLayer)) {
                         // TODO: remove this once we've figured out all of the cases properly.  At some point we need to verify that we've got the
                         // source for the parent types of declObj and tried to find the inner type on that.  When that returns null, we bail.
                         // One weird case is where the annotation layer is source but we don't have the source for the inner class.  That's handled by the
@@ -13485,7 +13512,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      if (res == type || ModelUtil.sameTypesAndLayers(this, type, res))
                         continue;
                      if (res.getFullTypeName().equals(subTypeName)) {
-                        addUniqueLayerType(result, res);
+                        ModelUtil.addUniqueLayerType(this, result, res);
 
                         // When we have A extends B - should we return all of the layered types that make up B or just the most specific
                         // But skip the modify inherited case, where we have an inner type which extends an inner type of the base class... it's a different class and
@@ -13496,7 +13523,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               // Stop once we run into this type - so we don't return a recursive result and don't keep going returning base-types of the current type
                               if (modType == type || ModelUtil.sameTypesAndLayers(this, type, modType))
                                  break;
-                              addUniqueLayerType(result, (TypeDeclaration) modType);
+                              ModelUtil.addUniqueLayerType(this, result, (TypeDeclaration) modType);
                            }
                         }
                      }
@@ -13523,14 +13550,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       return result.iterator();
-   }
-
-   private void addUniqueLayerType(ArrayList<TypeDeclaration> result, TypeDeclaration res) {
-      for (int i = 0; i < result.size(); i++) {
-         if (ModelUtil.sameTypesAndLayers(this, result.get(i), res))
-            return;
-      }
-      result.add(res);
    }
 
    public ArrayList<TypeDeclaration> getModifiedTypesOfType(TypeDeclaration type, boolean before, boolean checkPeers) {

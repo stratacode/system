@@ -11,6 +11,8 @@ import java.util.EnumSet;
  * Layers can set a codeFunction to help categorize the code it contains.
  */
 public enum CodeFunction {
+   // TODO: add Framework, and Persist.  Change Program to Application and add a new layer property called 'configLayer' that works a bit like annotationLayer but primarily as a way to sort
+   // configuration layers from layers with code.  Rename to CodeType and get rid of CodeType
    Model, UI, Style, Program, Admin, Deploy;
 
    public static EnumSet<CodeFunction> allSet = EnumSet.allOf(CodeFunction.class);

@@ -176,6 +176,7 @@ public class Options {
 
    @Constant public String classPath = null;
    @Constant public String layerPath = null;
+   @Constant public boolean needsClassLoaderReset;
 
    boolean restartArg = false;
    boolean headlessSet = false;
@@ -192,6 +193,7 @@ public class Options {
    TreeMap<String,Properties> layerProps = null;
 
    static final TreeMap<String,String> optionAliases = new TreeMap<String,String>();
+
    {
       optionAliases.put("-help", "-h");
       optionAliases.put("--help", "-h");
@@ -692,6 +694,10 @@ public class Options {
          if (testResultsDir == null)
             testResultsDir = "/tmp";
       }
+
+      // TODO: do we want to make this configurable?   The class loader reset is required in frameworks like with servlets where the layered classpath doesn't work - i.e. a downstream
+      // class needs to refer to an upstream one ala a JDBC connection pool.  Currently enabled whenever we are running something after the compile.
+      needsClassLoaderReset = runClass != null || testPattern != null;
 
       // When testing we don't want the normal run - open page to open - it's up to the test script to decide what to open to test
       if (testMode) {
