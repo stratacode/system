@@ -2846,4 +2846,13 @@ public class ModifyDeclaration extends TypeDeclaration {
       //   System.out.println("***");
       return res;
    }
+
+   public String getTemplatePathName() {
+      String ext = getJavaModel().getResultSuffix();
+      if (ext != null)
+         return super.getTemplatePathName();
+      if (modifyTypeDecl != null)
+         return modifyTypeDecl.getTemplatePathName();
+      return null;
+   }
 }
