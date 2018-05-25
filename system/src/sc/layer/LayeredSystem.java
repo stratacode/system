@@ -3228,8 +3228,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.getInheritedAnnotationValue(this, typeObj, annotName, valueName);
    }
 
+   /** Returns the scope name for this class, inherited from base-classes.  Use this method for runtime types only, not inactive types */
    public String getInheritedScopeName(Object typeObj) {
-      return ModelUtil.getInheritedScopeName(this, typeObj);
+      return ModelUtil.getInheritedScopeName(this, typeObj, null);
    }
 
    public void registerTypeChangeListener(ITypeChangeListener type) {
@@ -11832,7 +11833,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            loopCt = 0;
                            return null;
                         }
-                        Object newDeclObj = ModelUtil.resolveSrcTypeDeclaration(this, declObj);
+                        Object newDeclObj = ModelUtil.resolveSrcTypeDeclaration(this, declObj, false, true, refLayer);
                         loopCt--;
                         if (newDeclObj instanceof TypeDeclaration)
                            return newDeclObj;

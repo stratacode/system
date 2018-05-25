@@ -951,7 +951,7 @@ public class SelectorExpression extends ChainedExpression {
                   if (meth != null) {
                      JavaModel model = getJavaModel();
                      boolean cachedOnly = model.customResolver != null && model.customResolver.useRuntimeResolution();
-                     meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, cachedOnly, false);
+                     meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, cachedOnly, false, model.getLayer());
 
                      Object jsMethSettings = ModelUtil.getAnnotation(meth, "sc.js.JSMethodSettings");
                      if (jsMethSettings != null) {

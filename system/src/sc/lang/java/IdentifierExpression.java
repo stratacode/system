@@ -5010,7 +5010,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   System.out.println("*** No java model for transformToJS of: " + this);
                }
                else if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
-                  meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, true, false);
+                  meth = ModelUtil.resolveSrcMethod(getLayeredSystem(), meth, true, false, model.getLayer());
                Object jsMethSettings = ModelUtil.getAnnotation(meth, "sc.js.JSMethodSettings");
                if (jsMethSettings != null) {
                   String replaceWith = (String) ModelUtil.getAnnotationValue(jsMethSettings, "replaceWith");
@@ -5178,7 +5178,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   Object boundType = getTypeForIdentifier(i);
                   JavaModel model = getJavaModel();
                   if (model.customResolver == null || !model.customResolver.useRuntimeResolution())
-                     boundType = ModelUtil.resolveSrcTypeDeclaration(sys, boundType, false, false);
+                     boundType = ModelUtil.resolveSrcTypeDeclaration(sys, boundType, false, false, model.getLayer());
                   prefix = sys.runtimeProcessor.getStaticPrefix(boundType, this);
 
                   for (int j = 1; j <= i; j++) {

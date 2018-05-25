@@ -5567,7 +5567,7 @@ public class ModelUtil {
    }
 
    public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type) {
-      return resolveSrcTypeDeclaration(sys, type, false, true);
+      return resolveSrcTypeDeclaration(sys, type, false, true, null);
    }
 
    /**
@@ -5576,13 +5576,13 @@ public class ModelUtil {
     * do not load the src file just to retrieve the src description.  If you are using the runtime descriptions of the type
     * this can be a lot faster.  But if you have loaded the src, it's best to use the most accurate type.
     */
-   public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type, boolean cachedOnly, boolean srcOnly) {
+   public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type, boolean cachedOnly, boolean srcOnly, Layer refLayer) {
       if (type instanceof ParamTypeDeclaration)
          type = ((ParamTypeDeclaration) type).getBaseType();
       if (ModelUtil.isCompiledClass(type) || type instanceof ParameterizedType) {
          String typeName = ModelUtil.getTypeName(type);
          if (sys != null) {
-            Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true) : sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly);
+            Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true) : sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, false);
             if (res != null)
                return res;
          }
@@ -7149,10 +7149,10 @@ public class ModelUtil {
    }
 
    /** Returns any scope name set on this type or field.  Note that scopes can only be set on source descriptions.  If you need scope info for other than code generation, i.e. at runtime, you set the annotationName for the scope process and then check for the annotation at runtime. */
-   public static String getInheritedScopeName(LayeredSystem sys, Object def) {
+   public static String getInheritedScopeName(LayeredSystem sys, Object def, Layer refLayer) {
       if (sys == null)
          sys = LayeredSystem.getCurrent();
-      def = resolveSrcTypeDeclaration(sys, def, false, false);
+      def = resolveSrcTypeDeclaration(sys, def, false, false, refLayer);
       if (def instanceof BodyTypeDeclaration) {
          return ((BodyTypeDeclaration) def).getInheritedScopeName();
       }
@@ -8137,12 +8137,12 @@ public class ModelUtil {
       else throw new UnsupportedOperationException();
    }
 
-   public static Object resolveSrcMethod(LayeredSystem sys, Object meth, boolean cachedOnly, boolean srcOnly) {
+   public static Object resolveSrcMethod(LayeredSystem sys, Object meth, boolean cachedOnly, boolean srcOnly, Layer refLayer) {
       if (meth instanceof AbstractMethodDefinition)
          return meth;
 
       Object enclType = ModelUtil.getEnclosingType(meth);
-      enclType = ModelUtil.resolveSrcTypeDeclaration(sys, enclType, cachedOnly, srcOnly);
+      enclType = ModelUtil.resolveSrcTypeDeclaration(sys, enclType, cachedOnly, srcOnly, refLayer);
       // TODO performance: should have a way to do 'declaresMethod' here to avoid the 'sameTypes' call on the enclosing type.
       Object newMeth = ModelUtil.getMethod(sys, enclType, ModelUtil.getMethodName(meth), null, null, null, false, null, null, ModelUtil.getParameterTypes(meth));
       if (newMeth != null && ModelUtil.sameTypes(ModelUtil.getEnclosingType(newMeth), enclType))

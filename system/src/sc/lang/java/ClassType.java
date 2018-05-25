@@ -1143,7 +1143,8 @@ public class ClassType extends JavaType {
          if (type != null) {
             // TODO: not handling ParamTypeDeclaration - or ParameterizedType
             if (type instanceof Class) {
-               Object newType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), type);
+               JavaModel model = getJavaModel();
+               Object newType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), type, false, true, model == null ? null : model.getLayer());
                if (newType != null && newType instanceof BodyTypeDeclaration) {
                   type = newType;
                   return true;

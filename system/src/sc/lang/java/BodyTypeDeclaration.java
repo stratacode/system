@@ -1040,7 +1040,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return scopeName;
 
       Object superType = getDerivedTypeDeclaration();
-      scopeName  = ModelUtil.getInheritedScopeName(getLayeredSystem(), superType);
+      scopeName  = ModelUtil.getInheritedScopeName(getLayeredSystem(), superType, getLayer());
       if (scopeName != null)
          return scopeName;
 
@@ -1448,7 +1448,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             // for this type.  We may need it to modify this type downstream.  Annotation layers and modify declarations
             // should not do this update.
             if (srcOnly && layer != null && !layer.annotationLayer && !isLayerType) {
-               Object srcType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType);
+               Object srcType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType, false, true, getLayer());
                if (srcType instanceof BodyTypeDeclaration) {
                   updateBoundExtendsType(srcType, extendsType);
                   return getSimpleInnerTypeFromExtends(srcType, name, ctx, redirected, true);

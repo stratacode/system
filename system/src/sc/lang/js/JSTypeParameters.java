@@ -672,7 +672,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
       if (impls != null) {
          sb = new StringBuilder();
          for (Object impl:impls) {
-            impl = ModelUtil.resolveSrcTypeDeclaration(sys, impl, false, false);
+            impl = ModelUtil.resolveSrcTypeDeclaration(sys, impl, false, false, null);
             if (rp.needsClassInit(impl)) {
                sb.append("\n   sc_clInit(");
                sb.append(rp.getStaticPrefix(impl, type));

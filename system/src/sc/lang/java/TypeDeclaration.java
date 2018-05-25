@@ -641,7 +641,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          for (int i = 0; i < implementsBoundTypes.length; i++) {
             Object implType = implementsBoundTypes[i];
             if (implType instanceof Class)
-               implType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), implType, false, false);
+               implType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), implType, false, false, getLayer());
 
             if (implType instanceof ITypeDeclaration && ((ITypeDeclaration) implType).isAssignableTo(other))
                return true;

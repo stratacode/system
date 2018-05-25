@@ -1470,7 +1470,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (derivedType instanceof BodyTypeDeclaration)
                derivedTD = (BodyTypeDeclaration) derivedType;
             else {
-               derivedType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), derivedType);
+               derivedType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), derivedType, false, true, derivedTD.getLayer());
                if (derivedType instanceof BodyTypeDeclaration && derivedType != derivedTD) {
                   derivedTD = (BodyTypeDeclaration) derivedType;
                }
@@ -1478,7 +1478,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   derivedTD = null;
             }
             if (extendsType != derivedType && extendsType != null) {
-               extendsType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType);
+               extendsType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType, false, true, derivedTD.getLayer());
                if (extendsType instanceof BodyTypeDeclaration) {
                   derivedTD = (BodyTypeDeclaration) extendsType;
                }
@@ -2202,13 +2202,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Layer tagLayer = javaModel.getLayer();
 
       if (ModelUtil.isCompiledClass(extTypeDecl)) {
-         Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl);
+         Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl, false, true, tagLayer);
          if (newExtTypeDecl instanceof BodyTypeDeclaration)
             extTypeDecl = newExtTypeDecl;
       }
 
       if (existing != null && ModelUtil.isCompiledClass(existing)) {
-         Object newExisting = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), existing);
+         Object newExisting = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), existing, false, true, tagLayer);
          if (newExisting instanceof BodyTypeDeclaration) {
             existing = newExisting;
             if (ModelUtil.isCompiledClass(existing)) {

@@ -1536,7 +1536,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
       // for example when there's an annotation set on the annotation layer for java.lang.Object.
       if (resolve)
-         type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, true);
+         type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, true, null);
       Object settingsObj = inherited ? ModelUtil.getInheritedAnnotation(system, type, "sc.js.JSSettings") : ModelUtil.getAnnotation(type, "sc.js.JSSettings");
       if (settingsObj != null) {
          String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, attribute);
@@ -1611,7 +1611,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          else {
             // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
             // for example when there's an annotation set on the annotation layer for java.lang.Object.
-            type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, false);
+            type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, false, null);
             Object settingsObj = ModelUtil.getAnnotation(type, "sc.js.JSSettings");
             if (settingsObj != null) {
                String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, "jsLibFiles");
@@ -1930,11 +1930,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return "jv_Array" + typeNameSuffix;
 
       boolean useRuntime = model != null && model.customResolver != null && model.customResolver.useRuntimeResolution();
-      typeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, useRuntime, false);
+      typeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, useRuntime, false, null);
       if (!useRuntime) {
          if (!(typeObj instanceof BodyTypeDeclaration)) {
             if (!hasJSCompiled(typeObj)) {
-               typeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, useRuntime, true);
+               typeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, useRuntime, true, null);
                if (typeObj == null) {
                   String err = "Static reference to compiled type: " + typeObj + " with no JSSettings annotation: ";
                   if (refNode != null)
@@ -2435,7 +2435,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    Object resolveSrcTypeDeclaration(Object typeObj) {
       Object newTypeObj;
       // Force load the source
-      newTypeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, false, true);
+      newTypeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, false, true, null);
       // Need to resolve this again
       if (newTypeObj instanceof BodyTypeDeclaration)
          newTypeObj = resolveBaseType(newTypeObj);
@@ -2926,7 +2926,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public String replaceMethodName(LayeredSystem sys, Object methObj, String name) {
-      methObj = ModelUtil.resolveSrcMethod(sys, methObj, false, false);
+      methObj = ModelUtil.resolveSrcMethod(sys, methObj, false, false, null);
 
       Object jsMethSettings = ModelUtil.getAnnotation(methObj, "sc.js.JSMethodSettings");
       if (jsMethSettings != null) {

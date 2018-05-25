@@ -936,7 +936,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       String sn;
       if (extendsBoundTypes != null) {
          for (Object extBoundType:extendsBoundTypes) {
-            sn = ModelUtil.getInheritedScopeName(getJavaModel().getLayeredSystem(), extBoundType);
+            sn = ModelUtil.getInheritedScopeName(getJavaModel().getLayeredSystem(), extBoundType, getLayer());
             if (sn != null)
                return sn;
          }
@@ -945,7 +945,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       Object superType = getDerivedTypeDeclaration();
       if (superType instanceof BodyTypeDeclaration) {
          // We should not be modifying .classes so any annotation we pull off of a modified type should be in src
-         return ModelUtil.getInheritedScopeName(getLayeredSystem(), superType);
+         return ModelUtil.getInheritedScopeName(getLayeredSystem(), superType, getLayer());
       }
       return null;
    }
@@ -1712,7 +1712,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          for (int i = 0; i < implementsBoundTypes.length; i++) {
             Object implType = implementsBoundTypes[i];
             if (ModelUtil.isCompiledClass(implType))
-               implType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), implType, false, false);
+               implType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), implType, false, false, getLayer());
 
             if (implType instanceof ITypeDeclaration && ((ITypeDeclaration) implType).isAssignableTo(other))
                return true;
