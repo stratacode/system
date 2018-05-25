@@ -894,7 +894,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private static boolean containsAssign(ArrayList<PropertyAssignment> res, PropertyAssignment assign) {
       for (PropertyAssignment pa:res)
-         if (pa.propertyName.equals(assign.propertyName) && ModelUtil.sameTypes(pa.getEnclosingType(), assign.getEnclosingType()))
+         if (pa.propertyName.equals(assign.propertyName) && ModelUtil.sameTypesAndLayers(pa.getLayeredSystem(), pa.getEnclosingType(), assign.getEnclosingType()))
             return true;
       return false;
    }
@@ -7664,6 +7664,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Because we pull in dependent files into the 'toGenerate' list make sure we only add each SrcEntry once so we don't try
       // and transform it more than once.
       HashSet<SrcEntry> allGenerated = new HashSet<SrcEntry>();
+      HashSet<String> allGeneratedTypes = new HashSet<String>();
 
       // For each directory or src file we need to look at.  Top level directories are put into this list before we begin.
       // As we find a sub-directory we insert it into the list from inside the loop.
@@ -7696,7 +7697,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // No dependencies or the layer def file changed - just add all of the files in this directory for generation
          if (!incrCompile || !depFileExists || (lastBuildTime = depFile.lastModified()) == 0 ||
                  (lastBuildTime < srcEnt.layer.getLastModifiedTime())) {
-            addAllFiles(srcEnt.layer, toGenerate, allGenerated, srcDir, srcDirName, srcPath, phase, bd);
+            addAllFiles(srcEnt.layer, toGenerate, allGenerated, allGeneratedTypes, srcDir, srcDirName, srcPath, phase, bd);
             // Do a clean build the first time.  The second and subsequent times we need to load the existing deps file because we do not stop and restart all components even when build all is true.
             if (!systemCompiled || !depFileExists)
                deps = DependencyFile.create();
@@ -7712,7 +7713,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // Failed to read dependencies
             if (deps == null) {
-               addAllFiles(srcEnt.layer, toGenerate, allGenerated, srcDir, srcDirName, srcPath, phase, bd);
+               addAllFiles(srcEnt.layer, toGenerate, allGenerated, allGeneratedTypes, srcDir, srcDirName, srcPath, phase, bd);
                deps = new DependencyFile();
                deps.depList = new ArrayList<DependencyEntry>();
                depsChanged = true;
@@ -7760,6 +7761,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            if (!allGenerated.contains(newSrcEnt)) {
                               addToGenerateList(toGenerate, newSrcEnt, newSrcEnt.getTypeName());
                               allGenerated.add(newSrcEnt);
+                              allGeneratedTypes.add(newSrcEnt.getTypeName());
                               clearTransformedInLayer(newSrcEnt);
                            }
                         }
@@ -7794,6 +7796,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      long srcLastModified = srcFile.lastModified();
                      long genFileLastModified = 0;
                      boolean isModified = false;
+
+                     ArrayList<SrcEntry> missingGenFiles = null;
 
                      // We need to regenerate if any of the generated files are missing or earlier than the source
                      // We need to recompile if the .class file is earlier than the source
@@ -7898,8 +7902,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  // Class file is buildDir + relDirPath + srcFileName with ".class" on it
                                  File classFile = new File(FileUtil.concat(genLayer.getBuildClassesDir(), FileUtil.replaceExtension(genRelFileName, "class")));
                                  if (!needsGenerate && (!classFile.exists() || classFile.lastModified() < genFileLastModified)) {
-                                    bd.toCompile.add(new SrcEntry(srcEnt.layer,
-                                            FileUtil.concat(genLayer.buildSrcDir, genRelFileName), genRelFileName));
+                                    if (missingGenFiles == null)
+                                       missingGenFiles = new ArrayList<SrcEntry>();
+                                    missingGenFiles.add(new SrcEntry(srcEnt.layer, FileUtil.concat(genLayer.buildSrcDir, genRelFileName), genRelFileName));
                                  }
                               }
                               // Need to ensure there is a generated source file in a previous layer with this name.  If someone removes a build dir in the previous layer
@@ -7965,10 +7970,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               }
                            }
 
-                           // If we are already generating this, skip the file system check.
-                           if (toGenerate.contains(otherFileName)) {
+                           // We keep track of all types which have a file that is being generated and if our dependent file has a type which is being generated
+                           // we need to regenerate it.  Because we process layers top-down, we'll pick up the case where we're regenerating a file this type depends on - possibly making it
+                           // dynamic in the process which would affect the code for this type.
+                           if (allGeneratedTypes.contains(otherFileName.getTypeName())) {
                               if (traceNeedsGenerate) {
-                                 verbose("Generating: " + srcFileName + " because dependent file: " + otherFileName + " needs generation");
+                                 verbose("Generating: " + srcFileName + " because dependent type: " + otherFileName.getTypeName() + " needs generation");
                               }
                               needsGenerate = true;
                               break;
@@ -8028,6 +8035,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            addToGenerateList(toGenerate, newSrcEnt, srcTypeName);
                            clearTransformedInLayer(newSrcEnt);
                            allGenerated.add(newSrcEnt);
+                           allGeneratedTypes.add(newSrcEnt.getTypeName());
                         }
 
                         if (isModified)
@@ -8040,6 +8048,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                 FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath)), srcPath, srcFileName);
                         bd.toCompile.add(newCompEnt);
                      }
+
+                     // If we are generating this type don't add any missing gen-files to the compile list since we might be removing those files during the generate phase.
+                     if (!needsGenerate && missingGenFiles != null)
+                        bd.toCompile.addAll(missingGenFiles);
 
                      // If we've already loaded a version of this type in a previous layer, even if it's not changed we still need to
                      // start the overriding type so that it can update the previous types for the next build.
@@ -8054,6 +8066,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               addToGenerateList(toGenerate, newSrcEnt, srcTypeName);
                               clearTransformedInLayer(newSrcEnt);
                               allGenerated.add(newSrcEnt);
+                              allGeneratedTypes.add(newSrcEnt.getTypeName());
                            }
                         }
                      }
@@ -8685,7 +8698,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   deps.addDependencies(toGenEnt.baseFileName, generatedFiles, model.getDependentFiles());
                   depsChanged = true;
 
-                  boolean needsCompile = generate && model.needsCompile();
+                  // We might be generating a dynamic type which has no stub and so no runtimeFiles.
+                  boolean needsCompile = generate && runtimeFiles != null && runtimeFiles.size() > 0 && model.needsCompile();
 
                   if (generate) {
                      for (SrcEntry genFile:generatedFiles) {
@@ -9291,7 +9305,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return deps;
    }
 
-   public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, Set<SrcEntry> allGenerated, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd) {
+   public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, Set<SrcEntry> allGenerated, Set<String> allGeneratedTypes, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd) {
       String [] fileNames = srcDir.list();
       if (fileNames == null) {
          error("Invalid src directory: " + srcDir);
@@ -9312,6 +9326,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             if (!allGenerated.contains(newSrcEnt)) {
                allGenerated.add(newSrcEnt);
+               allGeneratedTypes.add(newSrcEnt.getTypeName());
                addToGenerateList(toGenerate, newSrcEnt, srcTypeName);
             }
          }
@@ -9322,6 +9337,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (!allGenerated.contains(newSrcDirEnt)) {
                   toGenerate.add(newSrcDirEnt); // Adding the directory here
                   allGenerated.add(newSrcDirEnt);
+                  allGeneratedTypes.add(newSrcDirEnt.getTypeName());
                }
             }
          }
