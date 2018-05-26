@@ -74,7 +74,7 @@ if [ -d "$RUN_DIR" ] ; then
    if [ -f "$RUN_DIR/failed" ] ; then
       echo "Passed: `wc -l < $RUN_DIR/passed | xargs` Errors: `wc -l < $RUN_DIR/failed | xargs` of total: `wc -l < $RUN_DIR/testsRun | xargs`"
       echo "Failed tests ---- :"
-      cat "$RUN_DIR/failedDetail"
+      cat "$RUN_DIR/failed"
 
       acceptYN=""
       while [[ ! $acceptYN =~ [aynsAYNS] ]] ; 
