@@ -3080,8 +3080,10 @@ public class SyncManager {
             }
          }
       }
-      if (!handled)
-         System.err.println("processMethodReturn called when no current sync layer is registered");
+      if (!handled) {
+         System.err.println("processMethodReturn called when no current sync layer is registered - " + (ctx == null ? "current sync layers" : " using ctx: " + ctx));
+         System.err.println("*** at stack: " + PTypeUtil.getStackTrace(new Throwable()));
+      }
    }
 
    /**

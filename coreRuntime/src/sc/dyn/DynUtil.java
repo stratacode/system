@@ -278,7 +278,7 @@ public class DynUtil {
          throw new IllegalArgumentException("invokeRemoteSync of method returns error: " + listener.errorCode);
       }
       else if (!listener.success) {
-         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " - timed out after: " + (now - startTime) + " millis");
+         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + "(" + Arrays.asList(paramValues) + ") - timed out after: " + (now - startTime) + " millis");
          throw new IllegalArgumentException("invokeRemoteSync of method timed out: " + listener.errorCode);
       }
       return evalRes;

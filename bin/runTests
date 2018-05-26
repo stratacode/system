@@ -77,15 +77,15 @@ if [ -d "$RUN_DIR" ] ; then
       cat "$RUN_DIR/failedDetail"
 
       acceptYN=""
-      while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+      while [[ ! $acceptYN =~ [aynsAYNS] ]] ; 
       do
-         read -p "Accept all new results? [yn] " acceptYN
-         if [[ ! "$acceptYN" =~ [yn] ]] ; then
-             echo "Invalid: $acceptYN - enter y or n"
+         read -p "Accept all/none/some changes? [ans] " acceptYN
+         if [[ ! $acceptYN =~ [aynsAYNS] ]] ; then
+             echo "Invalid: $acceptYN - enter a or y for all, n for none or s for some"
          fi
       done
 
-      if [ "$acceptYN" = "y" ] ; then 
+      if [[ $acceptYN =~ [yaYA] ]] ; then 
          testArray=($(cat ${RUN_DIR}/failed))
 
          for testName in "${testArray[@]}"
@@ -104,6 +104,75 @@ if [ -d "$RUN_DIR" ] ; then
                echo "Updated valid pages dir $VALID_DIR/pages"
             else 
                rm -rf "$VALID_DIR/pages" 
+            fi
+         done
+      elif [[ $acceptYN =~ [sS] ]] ; then
+         testArray=($(cat ${RUN_DIR}/failed))
+
+         failIdx=0
+         echo "Failed tests:"
+         for testName in "${testArray[@]}"
+         do
+             echo "${failIdx}: ${testName}"
+             let failIdx=${failIdx}+1
+         done
+         testAns=""
+         while [[ ! $testAns =~ [qQ] ]] ; 
+         do
+            read -p "Enter [q] to quit or [sad]<testIndex> with s: show, a: accept, d: diff: " testAns
+            if [[ $testAns =~ [sSaAdD][0-9]+ ]] ; then
+               testIndex=${testAns:1}
+               if [[ ( $testIndex > -1 ) ]] && [[ ( $testIndex < ${#testArray[@]} ) ]] ; then
+                  testName=${testArray[${testIndex}]}
+                  TEST_DIR="$RUN_DIR/$testName"
+                  VALID_DIR="$VALID_RESULTS/$testName"
+                  if [[ $testAns =~ [sS][0-9]+ ]] ; then
+                     echo "---- ${testName} cmd:"
+                     cat "$TEST_DIR/cmd"
+                     echo "---- output:"
+                     cat "$TEST_DIR/outf" 
+                     echo "----------"
+                  elif [[ $testAns =~ [dD][0-9]+ ]] ; then
+                     if ! diff "$TEST_DIR/cmd" "$VALID_DIR/cmd" > /dev/null ; then 
+                         echo "---- cmd changed:"
+                         diff "$TEST_DIR/cmd" "$VALID_DIR/cmd" || true
+                     fi
+                     if ! diff "$TEST_DIR/status" "$VALID_DIR/status" > /dev/null ; then 
+                         echo "---- exit status changed:"
+                         diff "$TEST_DIR/status" "$VALID_DIR/status" || true
+                     fi
+                     if ! diff "$TEST_DIR/outf" "$VALID_DIR/out" > /dev/null ; then 
+                         echo "---- output changed:"
+                         diff "$TEST_DIR/outf" "$VALID_DIR/out" || true
+                     fi
+                     if [[ -d "$TEST_DIR/pages" ]] || [[ -d "$VALID_DIR/pages" ]] ; then
+                        if ! diff -r "$TEST_DIR/pagesf" "$VALID_DIR/pages" > /dev/null ; then 
+                            echo "---- pages changed:"
+                            diff -r "$TEST_DIR/pagesf" "$VALID_DIR/pages" || true
+                        fi
+                     fi
+                     echo "----------"
+                  elif [[ $testAns =~ [aA][0-9]+ ]] ; then
+                     echo "Accepting new results for $testName"
+                     cp "$TEST_DIR/outf" "$VALID_DIR/out"
+                     cp "$TEST_DIR/status" "$VALID_DIR/status"
+                     cp "$TEST_DIR/cmd" "$VALID_DIR/cmd"
+                     if [ -d "$TEST_DIR/pages" ] ; then
+                        if [ -d "$VALID_DIR/pages" ] ; then
+                           rm -rf "$VALID_DIR/pages" 
+                        fi
+                        cp -r "$TEST_DIR/pagesf" "$VALID_DIR/pages"
+                        echo "Updated valid pages dir $VALID_DIR/pages"
+                     elif [ -d "$VALID_DIR/pages" ] ; then
+                        rm -rf "$VALID_DIR/pages" 
+                        echo "Warning: removed old valid pages dir $VALID_DIR/pages"
+                     fi
+                  fi
+               else 
+                  echo "Test index outside of the range 0-${#testArray[@]}"
+               fi
+            elif [[ ! $testAns =~ [qQ] ]] ; then
+                echo "Invalid: $testAns - enter s<n> to show, a<n> to accept, d<n> to diff, q to quit"
             fi
          done
       fi

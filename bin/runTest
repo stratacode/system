@@ -117,12 +117,14 @@ fi
 
 if [ -d "$PAGESP" ] ; then
    mkdir "$PAGES"
-   for PAGE_FILEP in "$PAGESP"/*
+   ALL_PAGES=`(cd $PAGESP; find . -type f -print)`
+   for PAGE_FILE in `echo $ALL_PAGES` 
    do
-      BASE_PAGE=`basename $PAGE_FILEP`
-      PAGE_FILE="$PAGES"/"$BASE_PAGE"
-      scc -q -ni sctest.logFilter < "$PAGE_FILEP" > "$PAGE_FILE"
-      echo "Filtered: `diff "$PAGE_FILEP" "$PAGE_FILE" | wc -l` page: $BASE_PAGE lines"
+      PAGEP_FILE="${PAGESP}/${PAGE_FILE}"
+      PAGE_FILE="${PAGES}/${PAGE_FILE}"
+      mkdir -p `dirname "$PAGE_FILE"`
+      scc -q -ni sctest.logFilter < "$PAGEP_FILE" > "$PAGE_FILE"
+      echo "Filtered: `diff "$PAGEP_FILE" "$PAGE_FILE" | wc -l` page: $PAGE_FILE lines"
    done
 fi
 
