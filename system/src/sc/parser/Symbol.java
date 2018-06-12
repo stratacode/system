@@ -22,23 +22,23 @@ public class Symbol extends Parselet {
    // Optional set of symbols that include the expectedValues but should not cause a match - e.g. %> for TemplateLanguage to not match the % for the modulo operator
    private HashSet<IString> excludedValues = null;
 
-   public Symbol(String id, int options, String ev) {
+   public Symbol(String id, int options, String symVal) {
       super(id, options);
-      initSymbol(ev);
+      initSymbol(symVal);
    }
 
-   public Symbol(int options, String ev) {
+   public Symbol(int options, String symVal) {
       super(options);
-      initSymbol(ev);
+      initSymbol(symVal);
    }
 
-   public Symbol(String ev) {
+   public Symbol(String symVal) {
       super();
-      initSymbol(ev);
+      initSymbol(symVal);
    }
 
-   private void initSymbol(String ev) {
-      expectedValue = ArrString.toArrString(ev);
+   private void initSymbol(String symVal) {
+      expectedValue = ArrString.toArrString(symVal);
       if (expectedValue != null)
          expectedValueLength = expectedValue.length();
       // For negated repeat we can only advance 1 char at a time or we'll only reject the symbol if we hit it on a boundary
