@@ -2028,6 +2028,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public BodyTypeDeclaration resolve(boolean modified) {
       if (replacedByType == null || (!modified && !replaced))
          return this;
+      if (replacedByType == this || replacedByType.replacedByType == this) {
+         System.err.println("*** Error - recursive replaced by type");
+         return this;
+      }
      return replacedByType.resolve(modified);
    }
 
@@ -5664,6 +5668,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       /** Does this type change introduce new constructors?  For dynamic stubs this introduces a compile time change */
       boolean newConstructors = false;
+
+      Object oldExtType;
    }
 
    UpdateTypeCtx buildUpdateTypeContext(BodyTypeDeclaration newType, TypeUpdateMode updateMode, UpdateInstanceInfo info) {
@@ -5675,6 +5681,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       tctx.dynamicType = isDynamicType();
       tctx.dynamicStub = isDynamicStub(false);
       tctx.dynamicNew = isDynamicNew();
+
+      tctx.oldExtType = getExtendsTypeDeclaration();
 
       // During initialization, this type might have been turned into a dynamic type from a subsequent layer.
       // Since we do not restart all of the other layers, we won't turn this new guy back into a dynamic type
@@ -6190,7 +6198,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Any change to the extends type will require a recompile if there are any instances of that type outstanding
       // Do this after we've added everybody to the tables
       Object compiledExtendsType = prevCompiledExtends;
-      Object oldExtType = getExtendsTypeDeclaration();
+      Object oldExtType = tctx.oldExtType;
       Object newExtType = newType.getExtendsTypeDeclaration();
       boolean prevExtends = false;
       if (compiledExtendsType != null) {
@@ -7809,6 +7817,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void start() {
+      if (!initialized)
+         System.err.println("*** Error - starting uninitialized type!");
       if (started)
          return;
 
@@ -9452,7 +9462,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void ensureExtendsAreSource() {
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       ModelUtil.suggestMembers(origModel, this, matchPrefix, candidates, true, true, true, true);
       return matchPrefix;
    }

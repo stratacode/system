@@ -5,11 +5,13 @@
 package sc.lang.java;
 
 import sc.lang.ILanguageModel;
+import sc.lang.ISemanticNode;
 import sc.lang.JavaLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSUtil;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
 import sc.type.Type;
@@ -961,7 +963,7 @@ public class ClassType extends JavaType {
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       String packagePrefix;
       boolean isQualifiedType = false;
       if (matchPrefix.contains(".")) {
@@ -975,8 +977,27 @@ public class ClassType extends JavaType {
       ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
-         if (currentType != null)
-            ModelUtil.suggestMembers(origModel, currentType, typeName, candidates, true, true, true, true);
+         if (currentType != null) {
+            String useTypeName = typeName;
+            int dummyIx = useTypeName.indexOf(dummyIdentifier);
+            if (dummyIx != -1)
+               useTypeName = useTypeName.substring(0, dummyIx);
+
+            ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true);
+         }
+      }
+      if (parentNode instanceof VariableStatement) {
+         VariableStatement varSt = (VariableStatement) parentNode;
+         String[] idents = StringUtil.split(getFullTypeName(), ".");
+         IdentifierExpression completeIdent = IdentifierExpression.create(idents);
+         completeIdent.parentNode = (ISemanticNode) varSt.getEnclosingBlockStatement();
+         // Strange case here - With text like System.ou^ System.out.println() we end up with System.ou System<....> error.  By disabling the VariableStatement, we won't resolve this one created by the bad parse
+         varSt.inactive = true;
+         ParseUtil.realInitAndStartComponent(completeIdent);
+         varSt.inactive = false;
+         String identMatchPrefix = completeIdent.addNodeCompletions(origModel, completeIdent, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+         if (identMatchPrefix != null && !identMatchPrefix.equals(matchPrefix))
+            System.out.println("*** match prefixes do not match?");
       }
       return matchPrefix;
    }

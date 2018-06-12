@@ -2034,7 +2034,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          return null;
       JavaModel toRet = modifiedModelType.getJavaModel();
       return toRet;
+   }
 
+   public boolean isModifyModel() {
+      return types != null && types.size() > 0 && types.get(0) instanceof ModifyDeclaration;
    }
 
    /** The autoImports get registered by all layered models with the same type.  Since we can only resolve imports in the layered structure, during transform we need to aggregate them all in the model so it can find any types that get merged into it */
@@ -2767,7 +2770,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          copy.definedTypesByName = (HashMap<String,TypeDeclaration>)definedTypesByName.clone();
          copy.typeIndex = typeIndex;
          copy.computedPackagePrefix = computedPackagePrefix;
-         copy.temporary = true;
+         //copy.temporary = true;
          copy.reverseDeps = reverseDeps;
 
          copy.prependLayerPackage = prependLayerPackage;

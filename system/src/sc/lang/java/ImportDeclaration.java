@@ -52,7 +52,7 @@ public class ImportDeclaration extends AbstractErrorNode {
    }
 
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       String packagePrefix;
       boolean isQualifiedType = false;
 

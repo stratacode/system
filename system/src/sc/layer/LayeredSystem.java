@@ -5673,20 +5673,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       layer.removed = true;
       // Start by invoking the dynamic stop... if it overrides something it will have to call the super.stop which might be in the interfaces
       String layerName = layer.getLayerName();
-      layerPathIndex.remove(layerName);
-      // Double register if you use "." or something that gets translated to the real name
-      if (layer.layerDirName != null && !layerName.equals(layer.layerDirName))
-         layerPathIndex.remove(layer.layerDirName);
-      layerIndex.remove(layer.layerUniqueName);
-      layerFileIndex.remove(layer.getLayerModelTypeName());
+      if (layer.activated) {
+         layerPathIndex.remove(layerName);
+         // Double register if you use "." or something that gets translated to the real name
+         if (layer.layerDirName != null && !layerName.equals(layer.layerDirName))
+            layerPathIndex.remove(layer.layerDirName);
+         layerIndex.remove(layer.layerUniqueName);
+         layerFileIndex.remove(layer.getLayerModelTypeName());
 
-      // Need to be careful here: packagePrefix is what will make the directory names unique
-      // so we need to avoid conflicting definitions and make sure this guy ends up registered
-      // under the right name.
-      globalObjects.remove(layer.layerUniqueName);
-      //removeTypeByName(layer, layer.layerUniqueName, layer.model.getModelTypeDeclaration(), null);
-      if (removeFromSpecified)
-         specifiedLayers.remove(layer);
+         // Need to be careful here: packagePrefix is what will make the directory names unique
+         // so we need to avoid conflicting definitions and make sure this guy ends up registered
+         // under the right name.
+         globalObjects.remove(layer.layerUniqueName);
+         //removeTypeByName(layer, layer.layerUniqueName, layer.model.getModelTypeDeclaration(), null);
+         if (removeFromSpecified)
+            specifiedLayers.remove(layer);
+      }
+      else {
+         inactiveLayerIndex.remove(layerName);
+      }
    }
 
    private List<Layer> findLayerCycle(Layer foundLayer) {
@@ -10613,25 +10618,37 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Checks if the directory has been removed and if so, updates the indexes */
    public boolean checkRemovedDirectory(String dirPath) {
-      File dir = new File(dirPath);
-      if (!dir.isDirectory()) {
-         boolean needsRefresh = false;
-         for (File layerPathDir:layerPathDirs) {
-            String layerPathFile = layerPathDir.getPath();
-            if (dirPath.startsWith(layerPathFile)) {
-               needsRefresh = true;
-               break;
+      try {
+         acquireDynLock(false);
+         File dir = new File(dirPath);
+         if (!dir.isDirectory()) {
+            boolean needsRefresh = false;
+            for (File layerPathDir:layerPathDirs) {
+               String layerPathFile = layerPathDir.getPath();
+               if (dirPath.startsWith(layerPathFile)) {
+                  needsRefresh = true;
+                  break;
+               }
+            }
+            if (!peerMode && peerSystems != null) {
+               for (LayeredSystem peerSys:peerSystems) {
+                  needsRefresh = peerSys.checkRemovedDirectory(dirPath) || needsRefresh;
+               }
+            }
+            if (needsRefresh) {
+               boolean dirRemoved;
+               dirRemoved = checkRemovedDirectoryList(layers, dirPath);
+               dirRemoved |= checkRemovedDirectoryList(inactiveLayers, dirPath);
+               return dirRemoved;
             }
          }
-         if (needsRefresh) {
-            boolean dirRemoved;
-            dirRemoved = checkRemovedDirectoryList(layers, dirPath);
-            dirRemoved |= checkRemovedDirectoryList(inactiveLayers, dirPath);
-            return dirRemoved;
-         }
+         else
+            System.out.println("*** checkRemovedDirectory called with directory that exists: " + dirPath);
+
       }
-      else
-         System.out.println("*** checkRemovedDirectory called with directory that exists: " + dirPath);
+      finally {
+         releaseDynLock(false);
+      }
       return false;
    }
 
@@ -10837,7 +10854,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (model instanceof JavaModel) {
          JavaModel javaModel = (JavaModel) model;
          // If we are removing a model which modifies another model we do not dispose the instances
-         if (javaModel.getModifiedModel() == null)
+         if (!javaModel.isModifyModel())
             javaModel.disposeInstances();
 
          if (removeTypes && !javaModel.isLayerModel)
@@ -11990,6 +12007,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                //ParseUtil.initAndStartComponent(model);
                if (model.getLayer() != null && model.getLayer().activated)
                   System.out.println("*** Error - renaming activated model to inactive index");
+               System.out.println("*** Updating model index for: " + srcEnt.absFileName + " to: " + System.identityHashCode(model));
                inactiveModelIndex.put(srcEnt.absFileName, model);
             }
          }
@@ -12811,6 +12829,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          modelType.typeName = expectedName;
          modelType.isLayerType = true;
          model.addTypeDeclaration(modelType);
+         if (model.isInitialized())
+            ParseUtil.initComponent(modelType);
          String err = "No layer definition in file: " + defFile + " exepcted file to contain: " + expectedName + " {  }";
          if (lpi.activate)
             throw new IllegalArgumentException(err);
@@ -13495,6 +13515,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!activeOnly) {
+         if (!cachedOnly)
+            typeIndex.refreshReverseTypeIndex(this);
          if (checkPeers && !peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
                LayeredSystem peerSys = peerSystems.get(i);

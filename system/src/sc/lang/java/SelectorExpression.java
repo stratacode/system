@@ -766,7 +766,7 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       if (selectors == null)
          return null;
       SelectorExpression origSel = origNode instanceof SelectorExpression ? (SelectorExpression) origNode : null;
@@ -786,11 +786,15 @@ public class SelectorExpression extends ChainedExpression {
                if (dummyIx != -1) {
                   String matchPrefix = ident.substring(0, dummyIx);
 
-                  Object curType = i == 0 ? (expression == null ? null :expression.getTypeDeclaration()) : getTypeDeclaration(i-1);
+                  int typeIx = nextNameInPath ? i : i - 1;
+
+                  Object curType = i == 0 ? (expression == null ? null :expression.getTypeDeclaration()) : getTypeDeclaration(typeIx);
                                             //(useTypes == null ? null : useTypes[i-1]);
 
                   if (curType != null)
                      ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false);
+                  else
+                     System.out.println("*** addNodeCompletions for selector expression - no cur type");
 
                   return matchPrefix;
                }

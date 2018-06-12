@@ -544,7 +544,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
-   public static String addStatementNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public static String addStatementNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       String packagePrefix;
       boolean isQualifiedType = false;
       if (matchPrefix.contains(".")) {
@@ -568,8 +568,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return matchPrefix;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
-      return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates);
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+      return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
    }
 
    /** When choosing in which runtimes to run this statement, returns the member or type of the method or field used in the expression.  Not always possible to determine so return null in those other cases. */

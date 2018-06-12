@@ -10,6 +10,7 @@ import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
+import sc.lang.html.Attr;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
 import sc.lang.sc.PropertyAssignment;
@@ -1669,7 +1670,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (meth != null) {
          LayeredSystem sys = expr.getLayeredSystem();
          ITypeDeclaration enclType = expr.getEnclosingIType();
-         if (enclType != null)
+         if (enclType != null && sys != null)
             remote = !ModelUtil.execForRuntime(sys, enclType.getLayer(), meth, sys);
       }
       return remote ? IdentifierType.RemoteMethodInvocation : IdentifierType.MethodInvocation;
@@ -4389,7 +4390,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       List<IString> idents = getAllIdentifiers();
       if (idents == null)
          return null;
@@ -4402,12 +4403,14 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       // Use the version of the semantic node based on the offset in our definition, not intelliJ's because it 's parent hierarchy is not right.  In this case, we won't have
       // the 'completionDummy' identifier in there.
+      /*
       if (origIdent != null) {
          List<IString> origIdents = origIdent.getAllIdentifiers();
          if (origIdents != null) {
             idents = origIdents;
          }
       }
+      */
 
       boolean hasDummyPrefix = false;
       for (IString ident:idents) {
@@ -4433,10 +4436,14 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (origIdent != null && !origIdent.isStarted())
                ParseUtil.initAndStartComponent(origIdent);
 
-            if (origIdent != null && i > 0 && origIdent.boundTypes != null && origIdent.boundTypes.length >= i) {
-               curType = origIdent.getTypeForIdentifier(i-1);
-               if (curType == null) // If we can't resolve the type for the previous we should restrict it to a type - not show global names
+            int typeIx = nextNameInPath ? i : i - 1;
+
+            if (origIdent != null && i > 0 && origIdent.boundTypes != null && origIdent.boundTypes.length > typeIx) {
+               curType = origIdent.getTypeForIdentifier(typeIx);
+               if (curType == null) { // If we can't resolve the type for the previous we should restrict it to a type - not show global names
+                  System.out.println("*** Using Object for curType in addNodeCompletions");
                   curType = Object.class;
+               }
             }
 
             boolean includeGlobals = idents.size() == 1;
@@ -4457,6 +4464,9 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             return matchPrefix;
          }
+         String identWithDot = identStr + ".";
+         if (!hasDummyPrefix && extMatchPrefix.startsWith(identWithDot))
+            extMatchPrefix = extMatchPrefix.substring(identWithDot.length());
          i++;
       }
       return null;

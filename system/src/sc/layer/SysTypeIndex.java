@@ -65,6 +65,8 @@ public class SysTypeIndex {
 
    /** Adds the TypeDeclarations of any matching types.  The LayeredSystem passed may be the system or the main system so be careful to use the system from the layer to retrieve the type. */
    public void addModifiedTypesOfType(String processIdent, LayeredSystem sys, TypeDeclaration type, boolean before, TreeSet<String> checkedTypes, ArrayList<TypeDeclaration> res) {
+      refreshReverseTypeIndex(sys);
+
       Layer typeLayer = type.getLayer();
       String typeName = type.getFullTypeName();
       ArrayList<TypeIndexEntry> indexEntries = inactiveTypeIndex.modifyTypeIndex.get(typeName);

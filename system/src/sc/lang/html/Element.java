@@ -3934,7 +3934,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       if (tagName == null)
          return null;
 
@@ -3947,7 +3947,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       else {
          if (attributeList != null) {
             for (Attr att:attributeList) {
-               String res = att.addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates);
+               String res = att.addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
                if (res != null)
                   return res;
             }

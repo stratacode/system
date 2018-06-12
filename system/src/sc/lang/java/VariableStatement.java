@@ -16,6 +16,9 @@ public class VariableStatement extends TypedDefinition implements IClassBodyStat
    public SemanticNodeList<Object> variableModifiers;
    public List<VariableDefinition> definitions;
 
+   // Used to disable so we do not resolve to this Statement
+   public transient boolean inactive = false;
+
    public static VariableStatement create(JavaType type, String variableName) {
       VariableStatement stmt = new VariableStatement();
       stmt.setProperty("type", type);
@@ -36,7 +39,7 @@ public class VariableStatement extends TypedDefinition implements IClassBodyStat
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
-      if (definitions != null && mtype.contains(MemberType.Variable)) {
+      if (definitions != null && mtype.contains(MemberType.Variable) && !inactive) {
          for (VariableDefinition v : definitions)
             if (v.variableName.equals(name))
                return v;

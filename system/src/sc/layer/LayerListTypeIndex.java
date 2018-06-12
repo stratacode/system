@@ -101,6 +101,10 @@ public class LayerListTypeIndex {
          int curPos = -1;
          for (ix = 0; ix < modifyTypes.size(); ix++) {
             TypeIndexEntry tind = modifyTypes.get(ix);
+            if (tind == null || tind.layerName == null || entry == null || tind.typeName == null) {
+               System.err.println("*** Invalid type index entry!");
+               continue;
+            }
             if (tind.layerName.equals(entry.layerName) && tind.typeName.equals(entry.typeName))
                break;
 
@@ -151,6 +155,7 @@ public class LayerListTypeIndex {
    public void refreshReverseTypeIndex(LayeredSystem sys) {
       if (reverseIndexValid)
          return;
+      reverseIndexBuilt = false;
       buildReverseTypeIndex(sys);
    }
 

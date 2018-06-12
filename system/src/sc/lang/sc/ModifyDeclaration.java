@@ -61,7 +61,11 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       if (modifyTypeDecl != null) {
          if (modifyTypeDecl == this || modifyTypeDecl.getUnresolvedModifiedType() == this) {
-            System.err.println("*** type modfies itself!");
+            System.err.println("*** Error! type modifies itself!");
+            return null;
+         }
+         if (modifyTypeDecl instanceof ModifyDeclaration && ((ModifyDeclaration) modifyTypeDecl).modifyTypeDecl == this) {
+            System.err.println("*** Error! type modifies a type which modifies it!");
             return null;
          }
          return modifyTypeDecl;

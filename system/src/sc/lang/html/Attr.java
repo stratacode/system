@@ -294,12 +294,15 @@ public class Attr extends Node implements ISrcStatement {
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       String matchPrefix = null;
       if (name != null) {
          int ix = name.indexOf(dummyIdentifier);
-         if (ix != -1) {
-            matchPrefix = name.substring(0, ix);
+         if (ix != -1 || value == null) {
+            if (ix != -1)
+               matchPrefix = name.substring(0, ix);
+            else
+               matchPrefix = extMatchPrefix;
             Element parent = getEnclosingTag();
             String tagName = "html";
             if (parent != null && parent.tagName != null) {
@@ -308,18 +311,28 @@ public class Attr extends Node implements ISrcStatement {
             Element.addMatchingAttributeNames(tagName, matchPrefix, candidates);
          }
          else {
-            if (value != null && isString()) {
+            if (isString()) {
                String valStr = value.toString();
                ix = valStr.indexOf(dummyIdentifier);
-               if (ix != -1) {
+               if (ix != -1)
                   matchPrefix = valStr.substring(0, ix);
-                  if (name.equals("extends") || name.equals("implements")) {
-                     ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, true);
-                  }
-                  else if (name.equals("tagMerge")) {
-                     MergeMode.addMatchingModes(matchPrefix, candidates);
-                  }
+               else
+                  matchPrefix = extMatchPrefix;
+
+               if (name.equals("extends") || name.equals("implements")) {
+                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, true);
                }
+               else if (name.equals("tagMerge")) {
+                  MergeMode.addMatchingModes(matchPrefix, candidates);
+               }
+            }
+            else if (value instanceof Expression) {
+               return ((Expression) value).addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+            }
+            else if (value instanceof AttrExpr) {
+               AttrExpr attExpr = ((AttrExpr) value);
+               if (attExpr.expr != null)
+                 return attExpr.expr.addNodeCompletions(origModel, attExpr.expr, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
             }
          }
       }

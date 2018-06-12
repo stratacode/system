@@ -484,7 +484,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
     * and have access (possibly) to the original model and original node which most closely approximates this node which is being parsed (so we can use more context to do a better
     * job of matching because those values are all resolved).
     */
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
       return null;
    }
 
