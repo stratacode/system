@@ -87,7 +87,9 @@ public class DiffContext {
    }
 
    public int getNewOffsetForOldPos(int pos) {
-      return pos >= endChangeOldOffset ? getDiffOffset() : 0;
+      // If we have a repeating character in the difference (e.g. a change from <!-- -> to <!-- -->), the endChangeOldOffset might be less than the startChangeOffset.  In this case,
+      // we are still not in the changed region if before the startChangeOffset
+      return pos >= endChangeOldOffset && pos >= startChangeOffset ? getDiffOffset() : 0;
    }
 
    public int getNewOffsetForNewPos(int pos) {

@@ -868,6 +868,9 @@ public class Sequence extends NestedParselet  {
             matches = false;
          }
       }
+      // If we did not match a required parselet we need to reparse
+      else if (oldChildParseNode == null && !childParselet.optional)
+         return false;
       return matches;
    }
 
