@@ -95,11 +95,14 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public Symbol endImportDelimiter = new KeywordSymbol(END_DELIMITER);
    public Symbol endDeclDelimiter = new KeywordSymbol(END_DELIMITER);
 
+   // TODO: This would be faster as an indexed choice - using '-' to match the first two children, the last two matched as default parselets
    OrderedChoice htmlCommentBody = new OrderedChoice("('','','')", REPEAT | OPTIONAL,
                    new Sequence("('',)", new Symbol("--"), new Symbol(NOT | LOOKAHEAD, ">")),
                    new Sequence("('',)", new Symbol("-"), new Symbol(NOT | LOOKAHEAD, "-")),
                    new Sequence("('',)", new Symbol(NOT, "-"), new Symbol(LOOKAHEAD, Symbol.ANYCHAR)));
-   public Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", new Symbol(START_HTML_COMMENT), htmlCommentBody, new Symbol(END_HTML_COMMENT));
+   public Symbol startHtmlComment = new Symbol(START_HTML_COMMENT);
+   public Symbol endHtmlComment = new Symbol(END_HTML_COMMENT);
+   public Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", startHtmlComment, htmlCommentBody, endHtmlComment);
    public SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
    {
       templateString.styleName = "templateString";
