@@ -102,6 +102,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                    new Sequence("('',)", new Symbol(NOT, "-"), new Symbol(LOOKAHEAD, Symbol.ANYCHAR)));
    public Symbol startHtmlComment = new Symbol(START_HTML_COMMENT);
    public Symbol endHtmlComment = new Symbol(END_HTML_COMMENT);
+   {
+      startHtmlComment.styleName = endHtmlComment.styleName = htmlCommentBody.styleName = "comment";
+   }
    public Sequence tagComment = new Sequence("HTMLComment(,commentBody,)", startHtmlComment, htmlCommentBody, endHtmlComment);
    public SymbolChoice templateString = new SymbolChoice(NOT | REPEAT, START_HTML_COMMENT, END_HTML_COMMENT, START_EXP_DELIMITER, START_CODE_DELIMITER, END_DELIMITER, EOF);
    {
