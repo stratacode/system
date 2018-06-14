@@ -750,6 +750,10 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return null;
    }
 
+   public boolean getNotFoundError() {
+      return false;
+   }
+
    public String getNodeWarningText() {
       return null;
    }

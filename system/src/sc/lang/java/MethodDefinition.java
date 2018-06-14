@@ -95,7 +95,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             if (!(last instanceof GlueStatement)) {
                if (ret == null || ret.size() == 0 || isEmptyReturn(ret.get(ret.size() - 1))) {
                   // The start and end index here are just stored in the ErrorRangeInfo and used by the IDE to mark the end of the method, rather than the name of the method
-                  displayRangeError(1, 1, "Missing return statement: ");
+                  displayRangeError(1, 1,  false,"Missing return statement: ");
                }
             }
          }

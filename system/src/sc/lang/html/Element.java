@@ -2067,6 +2067,35 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return sb.toString();
    }
 
+   // TODO: this method is probably not 100% yet - it mirrors the logic in convertToObject in reverse - so we can clone
+   // the Template and template's rootType, then reassign the Elements.  It's probably faster this way?  We could also just
+   // reinit the rootType from the cloned template when the init flags are set.
+   public void assignChildTagObjects(TypeDeclaration parentType) {
+      boolean isObject = needsObject();
+      if (isObject) {
+         tagObject = parentType;
+         parentType.element = this;
+      }
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Element) {
+               Element childElem = (Element) child;
+               String childName = childElem.getObjectName();
+               if (childElem.isRepeatElement()) {
+                  String repeatName = childElem.getRepeatObjectName();
+                  TypeDeclaration childRepeatType = (TypeDeclaration) parentType.getInnerType(repeatName, null);
+                  childElem.repeatWrapper = childRepeatType;
+                  childRepeatType.element = childElem;
+                  parentType = childRepeatType;
+               }
+               TypeDeclaration childType = !childElem.needsObject() ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null);
+               if (childType != null)
+                  childElem.assignChildTagObjects(childType);
+            }
+         }
+      }
+   }
+
    static class AddChildResult {
       boolean needsSuper = false;
       boolean needsBody = true;
@@ -4027,4 +4056,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void updateElementIndexes(int fromIx) {
    }
 
+   public Element deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
+      Element res = (Element) super.deepCopy(options, oldNewMap);
+      //if ((options & ISemanticNode.CopyInitLevels) != 0) {
+         // Not copying tagObject here - it needs to be cloned at the root and then tagObjects assigned as a second pass
+      //}
+      return res;
+   }
 }

@@ -211,7 +211,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             ITypeDeclaration thisType = enclType;
 
             if (thisType == null) {
-               displayRangeError(0, 0, "Invalid super expression - no enclosing type for: ");
+               displayRangeError(0, 0, false, "Invalid super expression - no enclosing type for: ");
             }
             else {
                Object superType = thisType.getDerivedTypeDeclaration();
@@ -329,7 +329,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   boundTypes[0] = findClosestMethod(enclType, firstIdentifier, arguments);
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier, false);
                   String message = isStatic ? "No static method named: " : "No method named: ";
-                  displayRangeError(0, 0, message, firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
+                  displayRangeError(0, 0, true, message, firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (idTypes[0] == null) {
@@ -443,7 +443,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   }
                }
                if (idTypes[0] == IdentifierType.UnboundName) {
-                  displayRangeError(0, 0, "No identifier: ", firstIdentifier, " in ");
+                  displayRangeError(0, 0, true,"No identifier: ", firstIdentifier, " in ");
 
                   // TODO remove or keep commented out, this is for debugging, so you can set a breakpoint here and walk through why it failed
                   EnumSet<MemberType> mTypes = isAssignment ? MemberType.PropertySetSet : MemberType.PropertyGetSet;
@@ -554,11 +554,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                            Object closest = findClosestIdentifier(firstIdentifier, enclType);
 
                            if (closest == null) {
-                              displayRangeError(0, 0, "No type or var: " + ident + " in ");
+                              displayRangeError(0, 0, true, "No type or var: " + ident + " in ");
                            }
                            else {
                               boundTypes[0] = closest;
-                              displayRangeError(0, 0, "Identifier: " + ident + " inaccessible ref to: " + closest + " with access: " + ModelUtil.getAccessLevelString(closest, false, null) + " for: ");
+                              displayRangeError(0, 0, true,"Identifier: " + ident + " inaccessible ref to: " + closest + " with access: " + ModelUtil.getAccessLevelString(closest, false, null) + " for: ");
                            }
                            break;
                         }
@@ -1486,7 +1486,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         Object inaccessible = currentTypeDecl.definesMethod(nextName, arguments, null, null, enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                         if (inaccessible != null) {
                            String modString = ModelUtil.getAccessLevelString(inaccessible, false, null);
-                           expr.displayRangeError(i, i, "Method: ", nextName, " with access " + modString + " not accessible from type: " + enclosingType.getFullTypeName() + " in: ");
+                           expr.displayRangeError(i, i, false, "Method: ", nextName, " with access " + modString + " not accessible from type: " + enclosingType.getFullTypeName() + " in: ");
                            boundTypes[i] = inaccessible;
                            handled = true;
                         }
@@ -1495,7 +1495,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
                         String otherMessage = getOtherMethodsMessage(currentType, nextName, isStatic);
                         String message = isStatic ? "No static method: " : "No method: ";
-                        expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                        expr.displayRangeError(i, i, true, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                         methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                      }
                   }
@@ -1545,10 +1545,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                         idTypes[i] = IdentifierType.UnboundName;
 
                         String message = "No nested property: ";
+                        boolean notFound = true;
                         String append = "";
                         // Check again but without a refType in case there's a member which is private
                         Object privRes = currentTypeDecl.definesMember(nextName, toFind, null, null);
                         if (privRes != null) {
+                           notFound = false;
                            String modStr = ModelUtil.modifiersToString(privRes, false, true, false, false, true, null);
                            if (modStr.trim().length() == 0)
                               modStr = "package-private";
@@ -1563,7 +1565,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                            if (setLast && model != null && model.enableExtensions() && currentTypeDecl.definesMember(nextName, MemberType.PropertyAssignmentSet, null, null) != null)
                               message = "Unable to assign read-only property: ";
                         }
-                        expr.displayRangeError(i, i, message, nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), append, " for ");
+                        expr.displayRangeError(i, i, notFound, message, nextName, " in type: ", ModelUtil.getTypeName(currentTypeDecl), append, " for ");
                      }
                   }
                }
@@ -1591,7 +1593,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         Object inaccessible = ModelUtil.definesMethod(currentClass, nextName, arguments, null, null, enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys);
                         if (inaccessible != null) {
                            String modString = ModelUtil.getAccessLevelString(inaccessible, false, null);
-                           expr.displayRangeError(i, i, "Method: ", nextName, " with access " + modString + " not accessible from type: " + enclosingType.getFullTypeName() + " in: ");
+                           expr.displayRangeError(i, i, false, "Method: ", nextName, " with access " + modString + " not accessible from type: " + enclosingType.getFullTypeName() + " in: ");
                            boundTypes[i] = inaccessible;
                            handled = true;
                         }
@@ -1600,7 +1602,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
                         String otherMethods = getOtherMethodsMessage(currentClass, nextName, isStatic);
                         String message = isStatic ? "No static method: " : "No method: ";
-                        expr.displayRangeError(i, i, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
+                        expr.displayRangeError(i, i, true, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
                         methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
                      }
                   }
@@ -1651,7 +1653,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      idTypes[i] = IdentifierType.EnumName;
                   else {
                      idTypes[i] = IdentifierType.UnboundName;
-                     expr.displayRangeError(i, i, "No property: ", nextName, " in type: ", ModelUtil.getTypeName(currentClass), " for ");
+                     expr.displayRangeError(i, i, true, "No property: ", nextName, " in type: ", ModelUtil.getTypeName(currentClass), " for ");
                   }
                }
             }
@@ -1660,7 +1662,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (currentType != null)
          System.err.println("*** Unrecognized type in bindNextIdentifier: " + currentType);
       if (isStatic && boundTypes[i] != null && idTypes[i] != IdentifierType.BoundTypeName && idTypes[i] != IdentifierType.EnumName && !ModelUtil.hasModifier(getMemberForIdentifier(expr, i, idTypes, boundTypes, model), "static")) {
-         expr.displayRangeError(i, i, "Non static ", idTypes[i] == IdentifierType.MethodInvocation ? "method " : "property ", nextName, " accessed from a static context in : ", nextName, " for ");
+         expr.displayRangeError(i, i, false, "Non static ", idTypes[i] == IdentifierType.MethodInvocation ? "method " : "property ", nextName, " accessed from a static context in : ", nextName, " for ");
          ModelUtil.hasModifier(getMemberForIdentifier(expr, i, idTypes, boundTypes, model), "static");
       }
    }
@@ -2665,7 +2667,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                VariableDefinition varDef = (VariableDefinition) boundTypes[i];
                if (!varDef.convertGetSet) {
                   // Happens during transform if we hit a setX of a non-bindable property.
-                  displayRangeError(i, i, "Reference to field ", varDef.toDefinitionString(), " as a get/set without a get/set conversion from: ");
+                  displayRangeError(i, i, false,"Reference to field ", varDef.toDefinitionString(), " as a get/set without a get/set conversion from: ");
                }
                break;
 

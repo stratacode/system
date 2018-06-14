@@ -1601,8 +1601,20 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             if (res.types.size() >= 1)
                res.rootType = res.types.get(0);
          }
-         else
+         else {
             res.rootType = rootType;
+            TypeDeclaration newType = null;
+            if (rootType instanceof TypeDeclaration) {
+               newType = ((TypeDeclaration) rootType).deepCopy(options, oldNewMap);
+               res.rootType = newType;
+               res.addTypeDeclaration(newType);
+            }
+            if (templateProcessor != null && templateProcessor.getCompressSingleElementTemplates()) {
+               Element elem = res.getSingleFileElement(null);
+               if (elem != null && newType != null)
+                  elem.assignChildTagObjects(newType);
+            }
+         }
 
          // A template by default defines a type with this name.  If the first definition in the template file modifies or
          // defines the type, that is the definition we use as this type's root.  Otherwise, we fabricate a class declaration

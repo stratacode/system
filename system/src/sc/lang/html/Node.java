@@ -15,7 +15,10 @@ import sc.type.TypeUtil;
 
 import java.util.List;
 
-/** Nodes extend IDynObject to avoid the need for dybamic stubs to interpret template pages */
+/**
+ * Node extends the IDynObject interface and optionally have a "dynObj" instance for dynamic behavior.
+ * This is an optimization to avoid the need for dynamic stubs to interpret template pages
+ */
 public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcStatement, INamedNode, IUserDataNode {
    protected sc.lang.DynObject dynObj;
    public transient Object[] errorArgs;

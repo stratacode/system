@@ -63,6 +63,9 @@ public interface ISemanticNode {
    /** Returns null or an error string for this node */
    public String getNodeErrorText();
 
+   /** Returns true if this is a special "not found" error */
+   public boolean getNotFoundError();
+
    public String getNodeWarningText();
 
    /** Returns null or the text describing a dependency which is disabled to augment the error - e.g. for when a Layer is disabled and you want to reflect that in the error message you give to the user. */

@@ -255,7 +255,7 @@ public class ParseUtil  {
       int pnLen = pn.length();
       int pnEnd = pnStart + pnLen;
 
-      if (pnStart > endIx || pnEnd < startIx)
+      if (pnStart > endIx || pnEnd < startIx) // TODO: shouldn't both these tests be >= and <=?
          return null;
 
       // NOTE: pn.isErrorNode() does not work here - we set the error node flag on the parent if any child has an error but the entire node is not an error node
@@ -273,6 +273,7 @@ public class ParseUtil  {
          ParentParseNode p = (ParentParseNode) pn;
          ParseRange errors = null;
          if (p.children != null) {
+            int curChildIndex = p.getStartIndex();
             for (int i = 0; i < p.children.size(); i++) {
                Object child = p.children.get(i);
                if (child instanceof IParseNode) {
@@ -287,6 +288,30 @@ public class ParseUtil  {
                         errors.mergeInto(range.startIx, range.endIx);
                      }
                   }
+                  curChildIndex += childPN.length();
+               }
+               else if (PString.isString(child)) {
+                  int childLen = ((CharSequence) child).length();
+                  int childEndIx = curChildIndex + childLen;
+                  if (curChildIndex < endIx && childEndIx > startIx) {
+                     String childStr;
+                     if (child.equals(";")) { // A semi-colon without a statement is legal syntactically but including it in errors here.  It's not ok to have non-whitespace not accounted - an exception is thrown in assertInvalidRanges.
+                        if (errors == null) {
+                           errors = new ParseRange(curChildIndex, childEndIx);
+                        }
+                        else
+                           errors.mergeInto(curChildIndex, childEndIx);
+                     }
+                     else if ((childStr = child.toString()).trim().length() > 0) {
+                        String childOverlapStr = childStr.substring(Math.max(0, startIx - curChildIndex), Math.min(endIx, childEndIx) - curChildIndex);
+                        if (childOverlapStr.trim().length() > 0)
+                           System.err.println("*** Unmatched text in findErrorsInRange!");
+                     }
+                  }
+                  curChildIndex = childEndIx;
+               }
+               else if (child != null) {
+                  System.out.println("*** Error - unrecognized child in find error range");
                }
             }
          }

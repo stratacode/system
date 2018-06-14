@@ -979,6 +979,10 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return null;
    }
 
+   public boolean getNotFoundError() {
+      return false;
+   }
+
    public boolean hasErrors() {
       return getNodeErrorText() != null;
    }

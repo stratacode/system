@@ -107,10 +107,12 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public static class ErrorRangeInfo {
       public int fromIx;
       public int toIx;
+      public boolean notFoundError = false;
 
-      public ErrorRangeInfo(int fromIx, int toIx) {
+      public ErrorRangeInfo(int fromIx, int toIx, boolean notFound) {
          this.fromIx = fromIx;
          this.toIx = toIx;
+         this.notFoundError = notFound;
       }
 
       public String toString() {
@@ -118,16 +120,27 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
-   void displayRangeError(int fromIx, int toIx, String...args) {
+   void displayRangeError(int fromIx, int toIx, boolean notFound, String...args) {
       displayTypeError(args);
       if (errorArgs != null) {
          ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
-         eargs.add(new ErrorRangeInfo(fromIx, toIx));
+         eargs.add(new ErrorRangeInfo(fromIx, toIx, notFound));
          errorArgs = eargs.toArray();
       }
    }
 
-   public void displayFormatatedError(String arg) {
+   public boolean getNotFoundError() {
+      if (errorArgs != null) {
+         for (Object earg:errorArgs) {
+            if (earg instanceof ErrorRangeInfo) {
+               return ((ErrorRangeInfo) earg).notFoundError;
+            }
+         }
+      }
+      return false;
+   }
+
+   public void displayFormattedError(String arg) {
       if (errorArgs == null) {
          super.displayFormattedError(arg);
          errorArgs = new Object[] {arg};
