@@ -2020,7 +2020,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    /**
-    * At this point, we've already assembled the generated JS files, and the entry points.  So now we have to go through each file, find the entry
+    * At this point, we've already created the JS files for each type in js/types/typeName.js, and computed the list of entry points.  So now we have to go through each file, find the entry
     * points that go into that file, and stitch together the JS files in proper dependency order.  We need to define base classes before sub-classes in particular for how the
     * current sccore.js newClass works.
     */
@@ -2541,10 +2541,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       ModelUtil.ensureStarted(type, true); // Coming from dependent types, we may not be started.
       boolean transformed;
 
-      String fullTypeName = type.getFullTypeName();
-      JSTypeInfo typeInfo = jsBuildInfo.jsTypeInfo.get(fullTypeName);
-      if (typeInfo != null && !typeInfo.execJS)
-         return;
+      // For some reason the original type - before the getTransformedResult test below - ends up with the tag name so we switched to using the fullTypeName from the transformedResult
+      // I think maybe in some cases the depTD in the call to addTypeToFile is not a 'real type' - maybe a type declaration that ends up getting the wrong type name here which caused
+      // duplicate types in a file.
+      //String origFullTypeName = type.getFullTypeName();
 
       BodyTypeDeclaration txtype = type.getTransformedResult();
       if (txtype != null && txtype != type) {
@@ -2558,6 +2558,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       else {
          transformed = type.isTransformed();
       }
+
+      String fullTypeName = type.getFullTypeName();
+
+      JSTypeInfo typeInfo = jsBuildInfo.jsTypeInfo.get(fullTypeName);
+      if (typeInfo != null && !typeInfo.execJS)
+         return;
 
       String typeLibFilesStr = getJSLibFiles(type);
       String[] typeLibFiles;
