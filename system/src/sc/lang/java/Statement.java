@@ -247,6 +247,9 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public Statement deepCopy(int options, IdentityHashMap<Object,Object> oldNewMap) {
       Statement res = (Statement) super.deepCopy(options, oldNewMap);
       res.fromStatement = this;
+      if ((options & CopyInitLevels) != 0) {
+         res.errorArgs = errorArgs;
+      }
       return res;
    }
 

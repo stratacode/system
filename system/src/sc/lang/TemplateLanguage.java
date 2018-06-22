@@ -72,7 +72,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    public final static String SCT_SUFFIX = "sct";
 
    // Start must chew up space following the delimiter since it is the start of a code construct.
-   public SymbolSpace startCodeDelimiter = new SymbolSpace(START_CODE_DELIMITER);
+   public SymbolSpace startCodeDelimiter = new KeywordSymbolSpace(START_CODE_DELIMITER);
    {
       // This constraints the symbol match so it will not inaccurately match these more specific tokens.
       // We don't require this for the grammar but it's helpful for reparsing - so we never match a code segment because it has

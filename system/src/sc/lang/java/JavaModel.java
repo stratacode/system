@@ -3227,7 +3227,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                if (model == null) {
                   SrcEntry srcEnt = sys.getSrcEntryForPath(ref.absFileName, false, true);
                   if (srcEnt != null) {
-                     Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false);
+                     Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false, false);
                      if (obj instanceof ILanguageModel)
                         model = (ILanguageModel) obj;
                      else

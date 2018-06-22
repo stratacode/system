@@ -408,6 +408,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public class KeywordSymbol extends Symbol {
       public KeywordSymbol(String ev) {
          super(ev);
+         styleName = "keyword";
       }
    }
 

@@ -329,7 +329,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   boundTypes[0] = findClosestMethod(enclType, firstIdentifier, arguments);
                   String otherMethods = enclType == null ? "" : getOtherMethodsMessage(enclType, firstIdentifier, false);
                   String message = isStatic ? "No static method named: " : "No method named: ";
-                  displayRangeError(0, 0, true, message, firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
+                  displayRangeError(0, 0, boundTypes[0] == null, message, firstIdentifier, ModelUtil.argumentsToString(arguments), otherMethods, " for: ");
                   foundMeth = findMethod(firstIdentifier, arguments, this, enclType, isStatic, inferredType);
                }
                if (idTypes[0] == null) {
@@ -558,7 +558,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                            }
                            else {
                               boundTypes[0] = closest;
-                              displayRangeError(0, 0, true,"Identifier: " + ident + " inaccessible ref to: " + closest + " with access: " + ModelUtil.getAccessLevelString(closest, false, null) + " for: ");
+                              displayRangeError(0, 0, false,"Identifier: " + ident + " inaccessible ref to: " + closest + " with access: " + ModelUtil.getAccessLevelString(closest, false, null) + " for: ");
                            }
                            break;
                         }
@@ -1495,7 +1495,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         boundTypes[i] = findClosestMethod(currentType, nextName, arguments); // For the IDE - map to something at least
                         String otherMessage = getOtherMethodsMessage(currentType, nextName, isStatic);
                         String message = isStatic ? "No static method: " : "No method: ";
-                        expr.displayRangeError(i, i, true, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
+                        expr.displayRangeError(i, i, boundTypes[i] == null, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentTypeDecl),otherMessage == null ? "" : otherMessage.toString(),  " for ");
                         methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
                      }
                   }
@@ -1602,7 +1602,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         boundTypes[i] = findClosestMethod(currentClass, nextName, arguments); // For the IDE - map to something at least
                         String otherMethods = getOtherMethodsMessage(currentClass, nextName, isStatic);
                         String message = isStatic ? "No static method: " : "No method: ";
-                        expr.displayRangeError(i, i, true, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
+                        expr.displayRangeError(i, i, boundTypes[i] == null, message, nextName, ModelUtil.argumentsToString(arguments), " in type: ", ModelUtil.getTypeName(currentClass), otherMethods, " for ");
                         methObj = ModelUtil.definesMethod(currentClass, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, sys); // TODO: remove - for debugging only
                      }
                   }

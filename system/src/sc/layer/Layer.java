@@ -1302,7 +1302,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          String prefix = model.getPackagePrefix();
          boolean inheritedPrefix = getInheritedPrefix(baseLayers, prefix, newModel);
          prefix = model.getPackagePrefix();
-         layerModel.initLayerInstance(this, prefix, inheritedPrefix);
+         if (!model.hasErrors())
+            layerModel.initLayerInstance(this, prefix, inheritedPrefix);
          //modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
          initImports();

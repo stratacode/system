@@ -927,7 +927,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    String origBuildDir; // Track the original build directory, where we do the full compile.  After the orig build layer is removed, this guy will still need to go into the class path because it contains all of the non-build layer compiled assets.
 
    private static final String[] defaultGlobalImports = {"sc.obj.AddBefore", "sc.obj.AddAfter", "sc.obj.Component", "sc.obj.IComponent",
-           "sc.obj.IAltComponent", "sc.obj.CompilerSettings", "sc.bind.Bindable"};
+           "sc.obj.IAltComponent", "sc.obj.CompilerSettings", "sc.bind.Bindable", "sc.bind.Bind"};
 
    // These imports are used for StrataCode files during the code-generation phase.  They are inserted into the generated Java file when used, like the import statements in layer definition files.
    private Map<String,ImportDeclaration> globalImports = new HashMap<String,ImportDeclaration>();
@@ -938,7 +938,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
       "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
-      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.layer.CodeFunction", "sc.obj.Sync", "sc.obj.SyncMode"};
+      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.layer.CodeFunction", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil"};
 
    // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
@@ -9515,7 +9515,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean reportErrors) {
-      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, reportErrors);
+      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, reportErrors, false);
    }
 
    /**
@@ -9640,7 +9640,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public Object parseSrcFile(SrcEntry srcEnt, boolean isLayer, boolean checkPeers, boolean enablePartialValues, boolean reportErrors) {
+   public Object parseSrcFile(SrcEntry srcEnt, boolean isLayer, boolean checkPeers, boolean enablePartialValues, boolean reportErrors, boolean temporary) {
       // Once we parse one source file that's not an annotation layer in java.util or java.lang we cannot by-pass the src mechanism for the final js.sys java.util or java.lang classes - they have interdependencies.
       if (srcEnt.layer != null && !srcEnt.layer.annotationLayer) {
          /*
@@ -9651,7 +9651,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          */
 
          String srcEntPkg = CTypeUtil.getPackageName(srcEnt.getTypeName());
-         if (srcEntPkg != null) {
+         if (srcEntPkg != null && !temporary) {
             if (allOrNoneFinalPackages.contains(srcEntPkg)) {
                overrideFinalPackages.addAll(allOrNoneFinalPackages);
             }
@@ -9700,7 +9700,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   return new ParseError("File changed during parsing", null, 0, 0);
                }
 
-               if (modelObj instanceof ILanguageModel) {
+               if (modelObj instanceof ILanguageModel && !temporary) {
                   ILanguageModel model = (ILanguageModel) modelObj;
 
                   markBeingLoadedModel(srcEnt, model);
@@ -9744,9 +9744,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                      if (clonedModels != null)
                         initClonedModels(clonedModels, srcEnt, modTimeStart, false);
-                  } finally {
+                  }
+                  finally {
                      beingLoaded.remove(srcEnt.absFileName);
                   }
+               }
+               else if (modelObj instanceof ILanguageModel && temporary) {
+                  initModel(srcEnt.layer, modTimeStart, (ILanguageModel) modelObj, isLayer, false);
                }
                return modelObj;
             }
@@ -10553,7 +10557,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public Object parseSrcType(SrcEntry srcEnt, Layer fromLayer, boolean isLayer, boolean reportErrors) {
-      Object result = parseSrcFile(srcEnt, isLayer, true, false, reportErrors);
+      Object result = parseSrcFile(srcEnt, isLayer, true, false, reportErrors, false);
       if (result instanceof ILanguageModel) {
          ILanguageModel model = (ILanguageModel) result;
 
@@ -10720,7 +10724,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       SrcEntry srcEnt = new SrcEntry(null, fileName, relFileName);
 
-      Object res = parseSrcFile(srcEnt, false, false, false, true);
+      Object res = parseSrcFile(srcEnt, false, false, false, true, false);
       if (res instanceof JavaModel) {
          JavaModel model = (JavaModel) res;
          ParseUtil.startComponent(model);
@@ -11970,13 +11974,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model != null)
             return model;
       }
-      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
+      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true, false);
    }
 
    public Object parseActiveFile(SrcEntry srcEnt) {
       ILanguageModel model = getCachedModel(srcEnt, true);
       if (model == null) {
-         return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true);
+         return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true, false);
       }
       return model;
    }
@@ -12016,7 +12020,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       model = inactiveModelIndex.get(srcEnt.absFileName);
       if (model == null) {
-         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !options.disableCommandLineErrors);
+         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !options.disableCommandLineErrors, false);
          // We might have to load files for inactive types which the IDE is not maintaining.  So we always cache these
          // models in the local index so we avoid loading them over and over again.
          if (result instanceof ILanguageModel) {
@@ -12772,7 +12776,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    JavaModel parseLayerModel(SrcEntry defFile, String expectedName, boolean addType, boolean reportErrors) {
-      Object modelObj = addType ? parseSrcType(defFile, null, true, reportErrors) : parseSrcFile(defFile, true, false, false, reportErrors);
+      Object modelObj = addType ? parseSrcType(defFile, null, true, reportErrors) : parseSrcFile(defFile, true, false, false, reportErrors, false);
       if (!(modelObj instanceof JavaModel))
          return null;
 
@@ -12984,8 +12988,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean inheritedPrefix = Layer.getInheritedPrefix(baseLayers, prefix, model);
 
       prefix = model.getPackagePrefix();
-      if (!lpi.activate)
-         model.setDisableTypeErrors(true);
+      //if (!lpi.activate)
+      //  model.setDisableTypeErrors(true);
 
       // Now that we've started the base layers and updated the prefix, it is safe to start the main layer
       boolean clearInitLayers = !initializingLayers;
@@ -13027,8 +13031,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       finally {
          if (clearInitLayers)
             initializingLayers = false;
-         if (!lpi.activate)
-            model.setDisableTypeErrors(false);
+         //if (!lpi.activate)
+         //   model.setDisableTypeErrors(false);
       }
       return null;
    }
@@ -14090,8 +14094,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          try {
             acquireDynLock(false);
             Layer layer = getInactiveLayerByPath(layerPath, prefix, true, true);
-            if (layer != null && layer.model != null)  // NOTE: this layer may not be from this layered system
-               return layer.layeredSystem.parseInactiveModel(layer.model.getSrcFile());
+            if (layer != null && layer.model != null) {  // NOTE: this layer may not be from this layered system
+               JavaModel annotModel;
+               if ((annotModel = layer.layeredSystem.parseInactiveModel(layer.model.getSrcFile())) == null)
+                  System.out.println("*** Error null annotated model!");
+               return annotModel;
+            }
          }
          finally {
             releaseDynLock(false);
