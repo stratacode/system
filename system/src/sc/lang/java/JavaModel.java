@@ -2755,6 +2755,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       JavaModel copy = (JavaModel) super.deepCopy(options, oldNewMap);
       copy.layeredSystem = layeredSystem;
       copy.layer = layer;
+      copy.isLayerModel = isLayerModel;
 
       // Need to clone this because we may change it when moving the model from one layered system to another
       copy.srcFiles = cloneSrcFiles();
