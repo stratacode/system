@@ -492,8 +492,8 @@ public class OrderedChoice extends NestedParselet  {
             }
             else {
                // Before we start parsing, we might need to skip some previously parsed content so we end up with the proper old node
-               oldParent.clearParsedOldNodes(parser, svCount, newChildCount, dctx);
-               if (oldParent.children.size() > newChildCount) {
+               oldParent = oldParent.clearParsedOldNodes(parser, svCount, newChildCount, dctx, forceReparse);
+               if (oldParent != null && oldParent.children.size() > newChildCount) {
                   oldChildParseNode = oldParent.children.get(newChildCount);
                }
                else {
@@ -548,7 +548,9 @@ public class OrderedChoice extends NestedParselet  {
             emptyMatch = nestedValue == null;
             if (!(nestedValue instanceof ParseError)) {
                if (value == null) {
-                  value = resetOldParseNode(oldParent, lastMatchStart, true, false);
+                  // Need to clone the oldParent here if we are reparsing a parent because the oldParent parse node could still be in used by a subsequent parse node in a parent.  If we
+                  // modify it here in place, we'll mess up the oldParent which we'll end up reusing.  This happens when special block of text is inserted - e.g. reparseTest/re80
+                  value = resetOldParseNode(oldParent, lastMatchStart, true, forceReparse);
                }
 
                if (nestedValue != null || parser.peekInputChar(0) != '\0') {
@@ -599,8 +601,8 @@ public class OrderedChoice extends NestedParselet  {
                }
                else {
                   // Before we start parsing, we might need to skip some previously parsed content so we end up with the proper old node
-                  oldParent.clearParsedOldNodes(parser, svCount, newChildCount, dctx);
-                  if (oldParent.children.size() > newChildCount) {
+                  oldParent = oldParent.clearParsedOldNodes(parser, svCount, newChildCount, dctx, forceReparse);
+                  if (oldParent != null && oldParent.children.size() > newChildCount) {
                      oldChildParseNode = oldParent.children.get(newChildCount);
                   }
                   else {

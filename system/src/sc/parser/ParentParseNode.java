@@ -103,7 +103,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
 
          if (removeExtraNodes) {
-            clearParsedOldNodes(parser, svIndex, childIndex + 1, dctx);
+            clearParsedOldNodes(parser, svIndex, childIndex + 1, dctx, false);
          }
 
          // Need to call this even if the parse node did not change.  A child of the parse-node might have changed.  This will
@@ -142,7 +142,7 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
-   public void clearParsedOldNodes(Parser parser, int svCount, int startIx, DiffContext dctx) {
+   public ParentParseNode clearParsedOldNodes(Parser parser, int svCount, int startIx, DiffContext dctx, boolean forceReparse) {
       int sz = children.size();
       for (int c = startIx; c < sz; c++) {
          Object oldChild = children.get(c);
@@ -168,6 +168,8 @@ public class ParentParseNode extends AbstractParseNode {
                   //break;
                }
                */
+               if (forceReparse) // When we are reparsing a parent element, do not modify the child because this child could still be used by a parent in a higher-up old parse node.
+                  return null;
                parselet.removeForReparse(parser, this, svCount, c);
                int newSz = children.size();
                // If we removed one readjust...
@@ -181,6 +183,7 @@ public class ParentParseNode extends AbstractParseNode {
          }
          // else - should we handle StringTokens here?  We could compute the startIndex relative to the parent and do the same thing?
       }
+      return this;
    }
 
 ;  public boolean removeForReparse(int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser) {
