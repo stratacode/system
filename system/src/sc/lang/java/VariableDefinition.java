@@ -841,5 +841,12 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public void setModifierFlags() {
       throw new UnsupportedOperationException();
    }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+      if (initializer != null) {
+         return initializer.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+      }
+      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+   }
 }
 
