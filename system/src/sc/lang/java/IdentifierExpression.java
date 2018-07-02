@@ -441,9 +441,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                         }
                      }
                   }
+                  else if (typeObj != null)
+                     boundTypes[0] = typeObj; // This is not a context where this type is suitable but we put it here for tooling - so we can navigate to the boundType in the IDE and not display a 'not found' error
                }
                if (idTypes[0] == IdentifierType.UnboundName) {
-                  displayRangeError(0, 0, true,"No identifier: ", firstIdentifier, " in ");
+                  displayRangeError(0, 0, boundTypes[0] == null,"No identifier: ", firstIdentifier, " in ");
 
                   // TODO remove or keep commented out, this is for debugging, so you can set a breakpoint here and walk through why it failed
                   EnumSet<MemberType> mTypes = isAssignment ? MemberType.PropertySetSet : MemberType.PropertyGetSet;
