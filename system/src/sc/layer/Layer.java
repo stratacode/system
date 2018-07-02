@@ -2562,6 +2562,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   exc.printStackTrace();
                errorsStarting();
             }
+            catch (Throwable exc) {
+               error("Error in layer's start method: ", exc.toString());
+               if (layeredSystem.options.verbose)
+                  exc.printStackTrace();
+               errorsStarting();
+            }
          }
       }
       else
