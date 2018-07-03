@@ -927,7 +927,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    String origBuildDir; // Track the original build directory, where we do the full compile.  After the orig build layer is removed, this guy will still need to go into the class path because it contains all of the non-build layer compiled assets.
 
    private static final String[] defaultGlobalImports = {"sc.obj.AddBefore", "sc.obj.AddAfter", "sc.obj.Component", "sc.obj.IComponent",
-           "sc.obj.IAltComponent", "sc.obj.CompilerSettings", "sc.bind.Bindable", "sc.bind.Bind"};
+           "sc.obj.IAltComponent", "sc.obj.CompilerSettings", "sc.bind.Bindable"}; // TODO: we'd like to add "sc.bind.Bind" here but this breaks JS where we need to use sc.js.bind.Bind
 
    // These imports are used for StrataCode files during the code-generation phase.  They are inserted into the generated Java file when used, like the import statements in layer definition files.
    private Map<String,ImportDeclaration> globalImports = new HashMap<String,ImportDeclaration>();
