@@ -1307,6 +1307,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          //modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
          initImports();
+         initGlobalImports();
          initImportCache();
 
          updateExcludedStatus();
@@ -1373,12 +1374,17 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          for (ImportDeclaration imp:imports) {
             if (!imp.staticImport) {
                String impStr = imp.identifier;
+               if (impStr == null) {
+                  System.err.println("*** Null identifier for import!");
+                  continue;
+               }
                String className = CTypeUtil.getClassName(impStr);
                if (className.equals("*")) {
                   String pkgName = CTypeUtil.getPackageName(impStr);
                   if (globalPackages == null)
                      globalPackages = new ArrayList<String>();
-                  globalPackages.add(pkgName);
+                  if (!globalPackages.contains(pkgName))
+                     globalPackages.add(pkgName);
                }
                else {
                   importsByName.put(className, imp);
@@ -1388,6 +1394,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
       else
          importsByName = null;
+   }
+
+   private void initGlobalImports() {
+      if (globalPackages != null) {
+         for (String pkg:globalPackages) {
+            Set<String> filesInPackage = layeredSystem.getFilesInPackage(pkg);
+            if (filesInPackage != null) {
+               for (String impName:filesInPackage) {
+                  importsByName.put(impName, ImportDeclaration.create(CTypeUtil.prefixPath(pkg, impName)));
+               }
+            }
+            else {
+               error("No files in global import: " + pkg);
+            }
+         }
+      }
    }
 
    public void ensureInitialized(boolean checkBaseLayers) {
@@ -1517,19 +1539,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             i--;
          }
       }
-      if (globalPackages != null) {
-         for (String pkg:globalPackages) {
-            Set<String> filesInPackage = layeredSystem.getFilesInPackage(pkg);
-            if (filesInPackage != null) {
-               for (String impName:filesInPackage) {
-                  importsByName.put(impName, ImportDeclaration.create(CTypeUtil.prefixPath(pkg, impName)));
-               }
-            }
-            else {
-               error("No files in global import: " + pkg);
-            }
-         }
-      }
+      initGlobalImports();
       if (preCompiledSrcPath != null) {
          String [] srcList = preCompiledSrcPath.split(FileUtil.PATH_SEPARATOR);
          List<String> preCompiledSrcDirs = Arrays.asList(srcList);

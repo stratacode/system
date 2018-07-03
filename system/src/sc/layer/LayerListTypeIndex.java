@@ -231,7 +231,7 @@ public class LayerListTypeIndex {
    private void saveLayerTypeIndexes(TreeSet<String> layerNamesToSave) {
       for (String layerNameToSave:layerNamesToSave) {
          Layer layerToSave = sys.lookupInactiveLayer(layerNameToSave, false, true);
-         if (layerToSave != null) {
+         if (layerToSave != null && layerToSave.isStarted()) {
             layerToSave.saveTypeIndex();
          }
       }
