@@ -248,7 +248,8 @@ public class ParseUtil  {
     * If there are multiple errors, the 'error region' inside of the specified startIx and endIx params
     * is returned.  This is used for identifying unparsed regions in building a formatting code model
     * for this file to capture errors that exist between recognized parsed types.  It's not OK to just treat
-    * them as whitespace since IntelliJ complains.
+    * them as whitespace since IntelliJ complains.  This also returns any text in comments or an extra ";" if that's
+    * in the text body.
     */
    public static ParseRange findErrorsInRange(IParseNode pn, int startIx, int endIx) {
       int pnStart = pn.getStartIndex();
@@ -304,8 +305,23 @@ public class ParseUtil  {
                      }
                      else if ((childStr = child.toString()).trim().length() > 0) {
                         String childOverlapStr = childStr.substring(Math.max(0, startIx - curChildIndex), Math.min(endIx, childEndIx) - curChildIndex);
-                        if (childOverlapStr.trim().length() > 0)
-                           System.err.println("*** Unmatched text in findErrorsInRange!");
+                        int childOverlapLen = childOverlapStr.length();
+                        int startCommentIx = 0, endCommentIx = childOverlapLen - 1;
+                        while (startCommentIx < childOverlapLen && Character.isWhitespace(childOverlapStr.charAt(startCommentIx)))
+                           startCommentIx++;
+                        while (endCommentIx >= startCommentIx && Character.isWhitespace(childOverlapStr.charAt(endCommentIx)))
+                           endCommentIx--;
+                        if (startCommentIx < endCommentIx) {
+                           if (childOverlapStr.indexOf("//") != -1 && childOverlapStr.indexOf("/*") != -1)
+                              System.err.println("*** Unmatched text in findErrorsInRange!");
+                           else {
+                              if (errors == null) {
+                                 errors = new ParseRange(curChildIndex + startCommentIx, curChildIndex + endCommentIx + 1);
+                              }
+                              else
+                                 errors.mergeInto(curChildIndex + startCommentIx, childEndIx + endCommentIx + 1);
+                           }
+                        }
                      }
                   }
                   curChildIndex = childEndIx;
