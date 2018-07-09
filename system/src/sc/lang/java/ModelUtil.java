@@ -738,6 +738,16 @@ public class ModelUtil {
          // All fields or methods defined in the cmd object are visible for everyone
          if (encType instanceof AbstractInterpreter.CmdClassDeclaration)
             return true;
+         // Special rule to allow a layer to see any package private values if it extends the other layer explicitly
+         if (ModelUtil.isLayerType(encType)) {
+            if (ModelUtil.isLayerType(refType)) {
+               Layer encLayer = ModelUtil.getLayerForType(null, encType);
+               Layer refLayer = ModelUtil.getLayerForType(null, refType);
+               if (encLayer != null && refLayer != null && refLayer.extendsOrIsLayer(encLayer)) {
+                  return true;
+               }
+            }
+         }
          return ModelUtil.samePackage(refType, encType);
       }
       switch (memberLevel) {
@@ -5480,10 +5490,11 @@ public class ModelUtil {
    public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       if (superType instanceof ITypeDeclaration)
          return ((ITypeDeclaration) superType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
-      else if (superType instanceof IBeanMapper || ModelUtil.isMethod(superType) || ModelUtil.isField(superType)) {
+      else if (superType instanceof IBeanMapper || ModelUtil.isMethod(superType) ||
+               ModelUtil.isField(superType) || superType instanceof PropertyAssignment) {
          return getAnnotation(superType, annotationName);
       }
-      else {
+      else if (superType instanceof Class) {
          Class superClass = (Class) superType;
          Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
@@ -5537,6 +5548,9 @@ public class ModelUtil {
             }
             superClass = next;
          }
+      }
+      else {
+         System.err.println("*** Unrecognized type in getInheritedAnnotation: " + superType);
       }
       return null;
    }
