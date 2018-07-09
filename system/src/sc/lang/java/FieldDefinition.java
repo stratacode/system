@@ -78,7 +78,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       super.start();
 
       JavaModel model = getJavaModel();
-      if (model != null && !model.mergeDeclaration) {
+      if (model != null && model.mergeDeclaration) {
          buildInitExpr = getBuildInitExpression(type.getTypeDeclaration());
 
          if (variableDefinitions.size() == 1) {
@@ -476,17 +476,18 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       if (super.transform(runtime))
          any = true;
 
-      /** When serializing a remote method call to the client */
       JavaModel model = getJavaModel();
 
-      if (model != null && !model.mergeDeclaration) {
-         if (variableDefinitions.size() == 1) {
-            VariableDefinition varDef = variableDefinitions.get(0);
-
+      if (model != null && variableDefinitions.size() == 1) {
+         VariableDefinition varDef = variableDefinitions.get(0);
+         if (model.mergeDeclaration) { // At build time
             if (buildInitExpr != null) {
+               varDef.setProperty("operator", "=");
                varDef.setProperty("initializer", buildInitExpr);
+               any = true;
             }
-
+         }
+         else { // Serializing a remote method call
             if (varDef.initializer instanceof IdentifierExpression) {
                IdentifierExpression expr = (IdentifierExpression) varDef.initializer;
 
