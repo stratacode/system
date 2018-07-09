@@ -982,7 +982,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return null;
       }
 
-      Object annotObj = !skipCompiled || superType instanceof BodyTypeDeclaration ? ModelUtil.getInheritedAnnotation(model.layeredSystem, superType, annotationName, skipCompiled, refLayer, layerResolve) : null;
+      Object annotObj = (!skipCompiled && superType != null) || superType instanceof BodyTypeDeclaration ? ModelUtil.getInheritedAnnotation(model.layeredSystem, superType, annotationName, skipCompiled, refLayer, layerResolve) : null;
       if (annotObj != null)
          return annotObj;
 
