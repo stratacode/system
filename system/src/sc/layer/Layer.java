@@ -50,6 +50,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public final static Layer ANY_LAYER = new Layer();
    public final static Layer ANY_INACTIVE_LAYER = new Layer();
    public final static Layer ANY_OPEN_INACTIVE_LAYER = new Layer();
+   static {
+      ANY_INACTIVE_LAYER.activated = false;
+      ANY_OPEN_INACTIVE_LAYER.activated = false;
+   }
 
    public final static String INVALID_LAYER_PATH = "invalid-layer-file";
 
