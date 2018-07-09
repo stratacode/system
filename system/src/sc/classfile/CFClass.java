@@ -854,17 +854,19 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
 
       Object superType = getDerivedTypeDeclaration();
       // Look for an annotation layer that might be registered for this compiled class
-      if (superType != null && ModelUtil.isCompiledClass(superType)) {
-         Object srcSuperType = ModelUtil.findTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeName(superType), refLayer, layerResolve);
-         if (srcSuperType != null && srcSuperType != superType) {
-            annot = ModelUtil.getInheritedAnnotation(system, srcSuperType, annotationName, skipCompiled, refLayer, layerResolve);
-            if (annot != null)
-               return annot;
+      if (superType != null) {
+         if (ModelUtil.isCompiledClass(superType)) {
+            Object srcSuperType = ModelUtil.findTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeName(superType), refLayer, layerResolve);
+            if (srcSuperType != null && srcSuperType != superType) {
+               annot = ModelUtil.getInheritedAnnotation(system, srcSuperType, annotationName, skipCompiled, refLayer, layerResolve);
+               if (annot != null)
+                  return annot;
+            }
          }
+         annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
+         if (annot != null)
+            return annot;
       }
-      annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
-      if (annot != null)
-         return annot;
 
       if (implementsTypes != null) {
          int numInterfaces = implementsTypes.size();
