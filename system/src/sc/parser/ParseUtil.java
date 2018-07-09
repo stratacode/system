@@ -311,7 +311,7 @@ public class ParseUtil  {
                            startCommentIx++;
                         while (endCommentIx >= startCommentIx && Character.isWhitespace(childOverlapStr.charAt(endCommentIx)))
                            endCommentIx--;
-                        if (startCommentIx < endCommentIx) {
+                        if (startCommentIx <= endCommentIx) {
                            if (childOverlapStr.indexOf("//") != -1 && childOverlapStr.indexOf("/*") != -1)
                               System.err.println("*** Unmatched text in findErrorsInRange!");
                            else {
