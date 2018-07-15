@@ -966,9 +966,11 @@ public class ModifyDeclaration extends TypeDeclaration {
       Object annotObj;
       if (extendsBoundTypes != null) {
          for (Object extBoundType:extendsBoundTypes) {
-            annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled, refLayer, layerResolve);
-            if (annotObj != null)
-               return annotObj;
+            if (extBoundType != null) {
+               annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled, refLayer, layerResolve);
+               if (annotObj != null)
+                  return annotObj;
+            }
          }
       }
       // Then the modified type
