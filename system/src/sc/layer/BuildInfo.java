@@ -730,8 +730,9 @@ public class BuildInfo {
       return res;
    }
 
-   private void addInitTypes(List<InitTypeInfo> res, String groupName, boolean doStartup) {
+   private ArrayList<InitTypeInfo> getInitTypes(String groupName, boolean doStartup) {
       List<TypeGroupMember> initTypes = getTypeGroupMembers(groupName);
+      ArrayList<InitTypeInfo> res = new ArrayList<InitTypeInfo>();
       if (initTypes != null) {
          for (TypeGroupMember memb:initTypes) {
             Object type = memb.getType();
@@ -748,17 +749,17 @@ public class BuildInfo {
             res.add(it);
          }
       }
+      Collections.sort(res, Collections.reverseOrder());
+      return res;
    }
 
    /** Returns the types that need to be started in the proper order */
    public List<InitTypeInfo> getInitTypes() {
-      ArrayList<InitTypeInfo> res = new ArrayList<InitTypeInfo>();
-
-      addInitTypes(res, "_init", false);
-      addInitTypes(res, "_startup", true);
-
-      // Want them to go from high to low as higher priority should go first right?
-      Collections.reverse(res);
+      ArrayList<InitTypeInfo> res = getInitTypes("_init", false);
+      ArrayList<InitTypeInfo> startRes = getInitTypes("_startup", true);
+      if (startRes != null) {
+         res.addAll(startRes);
+      }
       return res;
    }
 
