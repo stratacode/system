@@ -467,10 +467,8 @@ public class OrderedChoice extends NestedParselet  {
       if (oldParent != null && !producesParselet(oldParent.getParselet()))
          oldParent = null;
 
-      boolean emptyMatch = false;
-
-      int newChildCount = 0;
-      int svCount = 0;
+      boolean emptyMatch = false, valueCloned = false;
+      int newChildCount = 0, svCount = 0;
 
       do {
          matched = false;
@@ -550,7 +548,8 @@ public class OrderedChoice extends NestedParselet  {
                if (value == null) {
                   // Need to clone the oldParent here if we are reparsing a parent because the oldParent parse node could still be in used by a subsequent parse node in a parent.  If we
                   // modify it here in place, we'll mess up the oldParent which we'll end up reusing.  This happens when special block of text is inserted - e.g. reparseTest/re80
-                  value = resetOldParseNode(oldParent, lastMatchStart, true, forceReparse);
+                  valueCloned = forceReparse;
+                  value = resetOldParseNode(oldParent, lastMatchStart, true, valueCloned);
                }
 
                if (nestedValue != null || parser.peekInputChar(0) != '\0') {
@@ -749,7 +748,7 @@ public class OrderedChoice extends NestedParselet  {
       }
       else {
          // If we are reparsing, we might have produced fewer children than before.  if so, we need to pull them off the the end.
-         if (oldParent == value) {
+         if (oldParent == value || valueCloned) {
             removeChildrenForReparse(parser, value, svCount, newChildCount);
          }
          // If we are producing a smaller result than we did in the previous result, and we are at the end of the
