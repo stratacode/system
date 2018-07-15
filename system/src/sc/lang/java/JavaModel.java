@@ -3221,19 +3221,20 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          FileRangeRef ref = idx.getSrcFileForGenLine(lineNum);
          if (ref != null) {
             LayeredSystem sys = getLayeredSystem();
-            // If there's already an inactive model, grab it.
-            ILanguageModel model = sys.getCachedModelByPath(ref.absFileName, true);
+
+            // Used to use 'active' here but for the IDE when not using the internal build, we do not have logic to refresh the active models anymore.  There might
+            // a way that we could use the active models to represent the version that was last compiled so it's more accurate but that would require probably caching
+            // all active models at the time we active the layers which will take up a lot of memory.  Right now, I'm not sure we should bring in any active models unless
+            // using the internal build.
+            ILanguageModel model = sys.getCachedModelByPath(ref.absFileName, false);
             if (model == null) {
-               model = sys.getCachedModelByPath(ref.absFileName, false);
-               if (model == null) {
-                  SrcEntry srcEnt = sys.getSrcEntryForPath(ref.absFileName, false, true);
-                  if (srcEnt != null) {
-                     Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false, false);
-                     if (obj instanceof ILanguageModel)
-                        model = (ILanguageModel) obj;
-                     else
-                        System.out.println("*** Errors in model to get src statement for line?");
-                  }
+               SrcEntry srcEnt = sys.getSrcEntryForPath(ref.absFileName, false, true);
+               if (srcEnt != null) {
+                  Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false, false);
+                  if (obj instanceof ILanguageModel)
+                     model = (ILanguageModel) obj;
+                  else
+                     System.out.println("*** Errors in model to get src statement for line?");
                }
             }
             if (model != null) {
