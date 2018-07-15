@@ -12593,8 +12593,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   String scopeName = rootType.getInheritedScopeName();
                   if (scopeName == null || scopeName.equals("global")) {
                      nextObj = globalObjects.get(rootType.getFullTypeName());
-                     if (nextObj == null)
+                     if (nextObj == null) {
                         nextObj = rootType.createInstance();
+                        if (nextObj != null)
+                           globalObjects.put(rootType.getFullTypeName(), nextObj);
+                     }
                   }
                   else {
                      String typeName = rootType.getFullTypeName();
