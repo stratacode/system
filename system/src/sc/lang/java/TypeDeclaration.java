@@ -172,16 +172,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // Snag a copy of the TypeDeclarations which are inner objects.  Because we may remove these during transform
       // we need to keep a copy so we can consistently find them.
       if (body != null) {
-         ArrayList<Object> objList = null;
+         ArrayList<TypeDeclaration> objList = null;
          for (Statement st:body) {
-            if (st instanceof TypeDeclaration && ((TypeDeclaration) st).getDeclarationType() == DeclarationType.OBJECT) {
-               if (objList == null)
-                  objList = new ArrayList<Object>();
-               objList.add(st);
+            if (st instanceof TypeDeclaration) {
+               TypeDeclaration innerTD = (TypeDeclaration) st;
+               if (innerTD.getDeclarationType() == DeclarationType.OBJECT) {
+                  if (objList == null)
+                     objList = new ArrayList<TypeDeclaration>();
+                  objList.add(innerTD);
+               }
             }
          }
          if (objList != null)
-            innerObjs = objList.toArray();
+            innerObjs = objList.toArray(new TypeDeclaration[objList.size()]);
       }
       super.start();
    }
