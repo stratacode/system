@@ -155,7 +155,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private transient IDynObjManager dynObjManager;
 
    /** The list of inner types for this type only.  Because we may remove these during transformation, we need to grab a copy up front so the type system doesn't change after transform */
-   protected transient Object[] innerObjs;
+   protected transient TypeDeclaration[] innerObjs;
 
    /** In case we need a ConstructorDefinition to stub in for the implicitly defined zero arg constructor */
    private transient ConstructorDefinition defaultConstructor;
@@ -503,6 +503,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          else
             st.addMembersByName(membersByName);
       }
+   }
+
+   public boolean conflictsWith(Statement other, String memberName) {
+      if (other instanceof BodyTypeDeclaration) {
+         return true;
+      }
+      return false;
    }
 
    public Object definesPreviousMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
@@ -7926,6 +7933,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
+      // Need to do this so that we detect duplicate method errors
+      if (methodsByName == null)
+         initMethodsByName();
+
+      // Need this for duplicate fields, classes and objects
+      if (membersByName == null) {
+         initMembersByName();
+      }
    }
 
    public TypeIndexEntry createTypeIndex() {
