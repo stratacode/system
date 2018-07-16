@@ -4765,10 +4765,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                continue;
             }
          }
-         boolean handled = false;
 
          if (idTypes == null) {
-            System.err.println("*** styling identifier expression that has not been initializd?");
+            System.err.println("*** styling identifier expression that has not been initialized?");
          }
 
          String styleName = null;
@@ -4782,7 +4781,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                case GetVariable:
                case IsVariable:
                case BoundObjectName:
-                  styleName = isStaticTarget(i) ? "staticMember" : "member";
+                  // Don't use 'member' until we've got a member definition that has no errors
+                  if (errorArgs == null && !getParseNode().isErrorNode())
+                     styleName = isStaticTarget(i) ? "staticMember" : "member";
+                  else
+                     styleName = isStaticTarget(i) ? "staticMember" : "member"; // TODO: should we do no style here?
                   break;
                case EnumName:
                   styleName = "constant";

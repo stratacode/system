@@ -703,7 +703,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    public void styleNode(IStyleAdapter adapter) {
       ParentParseNode pnode = (ParentParseNode) parseNode;
-      ParseUtil.styleString(adapter, "member", pnode.children.get(0).toString(), false);
+      if (!pnode.isErrorNode() && errorArgs == null)
+         ParseUtil.styleString(adapter, "member", pnode.children.get(0).toString(), false);
+      else
+         ParseUtil.toStyledString(adapter, pnode.children.get(0));
       for (int i = 1; i < pnode.children.size(); i++) {
          Object childNode = pnode.children.get(i);
          if (childNode instanceof IParseNode && ((IParseNode) childNode).getSemanticValue() == initializer && initializer != null)

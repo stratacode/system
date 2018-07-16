@@ -573,7 +573,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
 
       ParentParseNode pnode = (ParentParseNode) parseNode;
-      ParseUtil.styleString(adapter, isStatic() ? "staticMember" : "member", (ParentParseNode) pnode.children.get(0), false);
+      if (errorArgs == null && !getParseNode().isErrorNode())
+         ParseUtil.styleString(adapter, isStatic() ? "staticMember" : "member", (ParentParseNode) pnode.children.get(0), false);
+      else
+         ParseUtil.toStyledString(adapter, pnode.children.get(0));
       for (int i = 1; i < pnode.children.size(); i++)
          ParseUtil.toStyledString(adapter, pnode.children.get(i));
    }
