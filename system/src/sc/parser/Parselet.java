@@ -937,6 +937,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          if (resVal instanceof ISemanticNode) {
             ((ISemanticNode) resVal).setParseNode(resNode);
          }
+         ((IParseNode) res).setErrorNode(false);
       }
    }
 
