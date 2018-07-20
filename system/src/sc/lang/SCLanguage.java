@@ -83,6 +83,9 @@ public class SCLanguage extends JavaLanguage {
    }
 
    Sequence propertyAssignment = new Sequence("PropertyAssignment(propertyName,operator,initializer,)", identifierSp, assignmentOperator, variableInitializer, semicolonEOL);
+   {
+      propertyAssignment.minContentSlot = 1;
+   }
 
    // This definition lets you override a field/property to attach annotations, change modifiers etc.
    Sequence overrideProperty = new Sequence("OverrideAssignment(, modifiers, propertyName,*,)", new SymbolSpace("override"), modifiers, identifierSp,
