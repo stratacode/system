@@ -664,13 +664,27 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (old.equals(name))
             return;
       }
-      List imp = imports;
+      List<ImportDeclaration> imp = imports;
       boolean setImports = false;
       if (imp == null) {
          imp = new SemanticNodeList<ImportDeclaration>();
          setImports = true;
       }
-      imp.add(ImportDeclaration.create(name));
+      // TODO: when adding at the end, we should ideally move the getComment str after the added import
+      ImportDeclaration newImport = ImportDeclaration.create(name);
+      if (imp.size() == 0)
+         imp.add(newImport);
+      else {
+         int i;
+         for (i = 0; i < imp.size(); i++) {
+            int cmp = imp.get(i).identifier.compareTo(name);
+            if (cmp == 0)
+               return;
+            if (cmp < 0)
+               break;
+         }
+         imp.add(i, newImport);
+      }
 
       // Imports can't be an empty list when we set it or the model is temporarily invalid
       if (setImports)
@@ -3157,6 +3171,32 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             child = pn.children.get(2);
             if (child != null)
                res.append(ParseUtil.getTrailingSpaceForNode(child));
+         }
+      }
+      return res.toString();
+   }
+
+   public String getClassComment() {
+      StringBuilder res = new StringBuilder();
+      if (parseNode != null) {
+         ParentParseNode pn = (ParentParseNode) parseNode;
+         if (pn.children != null) {
+            // Spacing after imports
+            Object child = pn.children.get(2);
+            if (child != null)
+               res.append(ParseUtil.getTrailingSpaceForNode(child));
+            else {
+               // Spacing after package
+               child = pn.children.get(1);
+               if (child != null)
+                  res.append(ParseUtil.getTrailingSpaceForNode(child));
+               else {
+                  // Spacing before package
+                  child = pn.children.get(0);
+                  if (child != null)
+                     res.append(child.toString());
+               }
+            }
          }
       }
       return res.toString();

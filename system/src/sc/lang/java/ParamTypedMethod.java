@@ -796,6 +796,11 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.getTypeSignature(method);
    }
 
+   public String getParameterString() {
+      // Assuming we do not have to do anything here since we want the type sig of the method in the class format.
+      return ModelUtil.getParameterString(method);
+   }
+
    public Object[] getExceptionTypes() {
       return ModelUtil.getExceptionTypes(method);
    }

@@ -137,13 +137,15 @@ public class IndexedChoice extends OrderedChoice {
    /** When modifying an inherited grammar, you might need to remove a child parselet from the IndexedChoice */
    public void removeParselet(Parselet oldParselet) {
       int oldIx;
+      boolean removed = false;
       for (oldIx = 0; oldIx < parselets.size(); oldIx++) {
          if (parselets.get(oldIx) == oldParselet) {
             super.remove(oldIx);
+            removed = true;
             break;
          }
       }
-      if (oldIx == parselets.size()) {
+      if (!removed) {
          System.err.println("*** removeParselet for: " + this + " not found");
          return;
       }

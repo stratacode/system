@@ -349,6 +349,9 @@ public class Parser implements IString {
          }
       }
 
+      if (!enablePartialValues && parselet.partialValuesOnly)
+         return PARSELET_DISABLED;
+
       /*
       if ((language.debug || parselet.trace) && !language.debugSuccessOnly)
          System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
@@ -698,6 +701,7 @@ public class Parser implements IString {
 
    static final ParseError PARSE_ERROR_OVERRIDDEN = new StaticParseError("Error less specific than previous error");
    static final ParseError PARSE_NEGATED_ERROR = new StaticParseError("Match failed while negated");
+   static final ParseError PARSELET_DISABLED = new StaticParseError("Parselet not enabled in this mode");
 
    public void getChars(int srcBegin, int srcEnd, char dst[], int dstBegin) {
       int dstOffset = dstBegin - srcBegin;

@@ -13,9 +13,15 @@ import java.util.IdentityHashMap;
 public class NewlineParseNode extends FormattingParseNode {
    private String terminator;
    public boolean needsIndent = false;
+   private Parselet parselet;
 
-   public NewlineParseNode(String term) {
+   public NewlineParseNode(Parselet parselet, String term) {
+      this.parselet = parselet;
       terminator = term;
+   }
+
+   public Parselet getParselet() {
+      return parselet;
    }
 
    public int firstChar() {

@@ -239,7 +239,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    public Sequence tagSpacingEOL = new Sequence("('')", tagSpacing) {
       {
-         generateParseNode = new NewlineParseNode(" ") {
+         generateParseNode = new NewlineParseNode(tagSpacingEOL, " ") {
             public void format(FormatContext ctx) {
                // Only add the newline if we are indenting for this tag
                if (isIndentedTag(ctx))

@@ -165,4 +165,10 @@ public interface ISemanticNode {
    /** Most statements if started before the newline that signals a breakpoint should be considered the 'source statement' for that line.  Block statement is used to signal the end of the statement and is an exception.  */
    public boolean isTrailingSrcStatement();
 
+   /** If we failed to parse this node and instead parsed this node as an incomplete token (e.g. a ClassType as part of a classBodyDeclarations), this method is called with 'true'. */
+   public void setParseErrorNode(boolean v);
+
+   /** Returns the value of the parse error node flag.  If your semantic value is used in a skipOnErrorParselet, you can implement this to differentiate error nodes from regularly parsed nodes */
+   public boolean getParseErrorNode();
+
 }

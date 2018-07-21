@@ -78,6 +78,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getTypeSignature(wrapped);
    }
 
+   public String getParameterString() {
+      return ModelUtil.getParameterString(wrapped);
+   }
+
    public Object[] getExceptionTypes() {
       return ModelUtil.getExceptionTypes(wrapped);
    }

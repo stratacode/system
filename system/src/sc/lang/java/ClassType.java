@@ -1187,4 +1187,26 @@ public class ClassType extends JavaType {
       return boundType;
    }
 
+   public boolean getNotFoundError() {
+      return type == FAILED_TO_INIT_SENTINEL;
+   }
+
+/* used to be used when we created a ClassType as part of the skipOnErrorParselet but this ClassType could not be started
+   because it's parent was not set.  Instead, use incompleteStatement to parse chunks in partial values parse only
+   public void setParseErrorNode(boolean v) {
+      if (v) {
+         displayError("Type missing declaration: " + getFullBaseTypeName() + " for: ");
+      }
+   }
+
+   public boolean getParseErrorNode() {
+      if (errorArgs != null) {
+         for (Object arg:errorArgs)
+            if (arg instanceof String && ((String) arg).contains("Type missing declaration"))
+               return true;
+      }
+      return false;
+   }
+*/
+
 }

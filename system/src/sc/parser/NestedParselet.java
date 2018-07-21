@@ -168,6 +168,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
    }
 
+   public void removeParselet(Parselet p) {
+      int ix = parselets.indexOf(p);
+      if (ix != -1)
+         remove(ix);
+      else
+         System.err.println("*** removeParselet failed to find parselet to remove");
+   }
+
    protected void clear() {
       parselets.clear();
    }
@@ -2073,7 +2081,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     * @param parent the parent parse node we are added this result into.
     * @param index  the position of this parselet in the parent's sequence
     * @return true if we are to add "node" directly to the parent and false if this method took
-    * care already of propgating node to the parent.
+    * care already of propagating node to the parent.
     */
    public boolean addResultToParent(Object node, ParentParseNode parent, int index, Parser parser) {
       // Exclude this entirely from the result

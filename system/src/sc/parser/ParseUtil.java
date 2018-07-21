@@ -319,7 +319,7 @@ public class ParseUtil  {
                                  errors = new ParseRange(curChildIndex + startCommentIx, curChildIndex + endCommentIx + 1);
                               }
                               else
-                                 errors.mergeInto(curChildIndex + startCommentIx, childEndIx + endCommentIx + 1);
+                                 errors.mergeInto(curChildIndex + startCommentIx, curChildIndex + endCommentIx + 1);
                            }
                         }
                      }
@@ -860,6 +860,15 @@ public class ParseUtil  {
       int endIx = rootParseNode.resetStartIndex(0, false, false);
       //if (endIx != rootParseNode.length())
      //    System.out.println("*** End index does not match after resetStartIndex");
+   }
+
+   public static void refreshParseNodeTree(ISemanticNode semNode) {
+      semNode.validateParseNode(false);
+      ISemanticNode rootNode = semNode.getRootNode();
+      // TODO: Do we need to reformat from the root on down or just this node?
+      //ParseUtil.reformatParseNode(semNode.getParseNode());
+      ParseUtil.reformatParseNode(rootNode.getParseNode());
+      ParseUtil.resetStartIndexes(rootNode);
    }
 
    /** Handles the case where there is a primitive boolean property.  Each getX call on that property will return a new Boolean instance.  During updateParseNode, we have a test to stop updating when we find a getX call that did not match from one to the next. */

@@ -477,6 +477,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    private CharSequence toMethodDeclString() {
       StringBuilder sb = new StringBuilder();
       sb.append(name);
+      sb.append(getParameterString());
+      return sb;
+   }
+
+   public String getParameterString() {
+      StringBuilder sb = new StringBuilder();
       if (parameters != null && parameters.getNumParameters() > 0) {
          //sb.append("("); part of language string
          sb.append(parameters.toLanguageString(SCLanguage.getSCLanguage().parameters));
@@ -484,7 +490,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       }
       else
          sb.append("()");
-      return sb;
+      return sb.toString();
    }
 
    public String toDeclarationString() {

@@ -6767,9 +6767,10 @@ public class ModelUtil {
             Object[] meths = getAllMethods(type, null, false, false, false);
             if (meths != null) {
                for (int i = 0; i < meths.length; i++) {
-                  String mname = ModelUtil.getMethodName(meths[i]);
+                  Object meth = meths[i];
+                  String mname = ModelUtil.getMethodName(meth);
                   if (mname.startsWith(prefix))
-                     addCompletionCandidate(candidates, mname);
+                     addCompletionCandidate(candidates, mname + ModelUtil.getParameterString(meth));
                }
             }
          }
@@ -8855,6 +8856,18 @@ public class ModelUtil {
       }
       result.add(res);
       return true;
+   }
+
+   public static String getParameterString(Object meth) {
+      if (meth instanceof IMethodDefinition) {
+         return ((IMethodDefinition) meth).getParameterString();
+      }
+      else if (meth instanceof Method) {
+         return RTypeUtil.getParameterString((Method) meth);
+      }
+      else {
+         throw new UnsupportedOperationException();
+      }
    }
 
 }

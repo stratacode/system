@@ -1029,4 +1029,13 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public boolean isTrailingSrcStatement() {
       return false;
    }
+
+   public boolean getParseErrorNode() {
+      return false;
+   }
+
+   /** Override this for types produced in the skipOnErrorParselet */
+   public void setParseErrorNode(boolean v) {
+      throw new UnsupportedOperationException();
+   }
 }

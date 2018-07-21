@@ -143,6 +143,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence optExpression = new Sequence("(.)", OPTIONAL, expression);
 
+   public Sequence qualifiedType =
+           new Sequence("ClassType(typeName, chainedTypes)", identifier,
+                   new Sequence("ClassType(,typeName)", OPTIONAL | REPEAT, period, identifier));
+   Sequence qualifiedTypeList =
+           new Sequence("([],[])", qualifiedType, new Sequence("(,[])", OPTIONAL | REPEAT, comma, qualifiedType));
+
    Parselet skipBodyError = createSkipOnErrorParselet("<skipBodyError>", "}", Symbol.EOF);
 
    // When parsing for errors with type declarations, we need to consume even the close } because we are looking for EOF as an exit parselet
@@ -492,11 +498,6 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence variableDeclaratorId = new Sequence("(variableName,arrayDimensions)", identifier, openCloseSqBrackets);
 
-   public Sequence qualifiedType =
-         new Sequence("ClassType(typeName, chainedTypes)", identifier,
-                      new Sequence("ClassType(,typeName)", OPTIONAL | REPEAT, period, identifier));
-   Sequence qualifiedTypeList =
-         new Sequence("([],[])", qualifiedType, new Sequence("(,[])", OPTIONAL | REPEAT, comma, qualifiedType));
    Sequence throwsNames = new Sequence("(,.)", OPTIONAL, new KeywordSpace("throws"), qualifiedTypeList);
    OrderedChoice variableModifiers = new OrderedChoice("<variableModifiers>([],[])", REPEAT | OPTIONAL, finalKeyword, annotation);
 
@@ -697,6 +698,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       constructorDeclaration.minContentSlot = 1;
    }
 
+   // Only parsed when we are in partial values mode - to improve the fidelity of the error model
+   Sequence incompleteStatement = new Sequence("IncompleteStatement(type)", PARTIAL_VALUES_ONLY, qualifiedType);
+
    public IndexedChoice memberDeclaration = new IndexedChoice("<memberDeclaration>");
    {
       memberDeclaration.put("class", classDeclarationWithoutModifiers); // Class is first because it's the most common
@@ -709,9 +713,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public Sequence memberDeclarationWithModifiers = new Sequence("<memberDeclarationWithModifiers>(modifiers,.)", modifiers, memberDeclaration);
 
    /** exposed as a hook point for parsing class member definitions */
-   public OrderedChoice classBodyDeclarations = new OrderedChoice("<classBodyDeclarations>([],[],)", OPTIONAL | REPEAT,
+   public OrderedChoice classBodyDeclarations = new OrderedChoice("<classBodyDeclarations>([],[],[],)", OPTIONAL | REPEAT,
                 memberDeclarationWithModifiers,
-                new Sequence("<classBodyBlock>(staticEnabled,.)", new SemanticToken("static", OPTIONAL), block), semicolonEOL);
+                new Sequence("<classBodyBlock>(staticEnabled,.)", new SemanticToken("static", OPTIONAL), block), incompleteStatement, semicolonEOL);
 
    {
       // One of the switch points from HTML spacing context to Java
@@ -947,5 +951,15 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public List<String> getClassLevelKeywords() {
       return CLASS_LEVEL_KEYWORDS;
    }
+
+   /**
+    * This used to override the default in BaseLanguage to create a ClassType instead of an ErrorParseNode with the matched string.  This preserved the ability to
+    * annotate it and complete it without having to sniff the ErrorParseNode out of the input and build a ClassType out of it.  But that node's parent was not getting
+    * set and it didn't show up in the body so caused too many changes elsewhere.  Instead, we added the incompleteStatement parselet which is only parsed in 'partial values' mode
+    * and always indicates an error when it's matched.
+   public Parselet createSkipOnErrorParselet(String name, String... exitSymbols) {
+      return new OrderedChoice(name + "(.,.)", qualifiedType, new Sequence(new SymbolChoice(NOT, exitSymbols), spacing));
+   }
+    */
 
 }

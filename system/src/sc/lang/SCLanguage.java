@@ -112,12 +112,13 @@ public class SCLanguage extends JavaLanguage {
 
       // Add this to the index to the indexed choice for the new "object" keyword
       memberDeclaration.put("object", classDeclarationWithoutModifiers);
-      // modify is a new default choice since there is no prefix to uniquely identify it
+      // modify is a new default choice since there is no prefix to uniquely identify it - but make sure to match it before incompleteStatement
       memberDeclaration.addDefault(modifyDeclarationWithoutModifiers);
 
-      classBodyDeclarations.setName("<classBodyDeclarations>([],[],,[],[],[])");
+      classBodyDeclarations.setName("<classBodyDeclarations>([],[],,[],[],[],[])");
+      classBodyDeclarations.removeParselet(incompleteStatement);
       // Method should be ahead of property here for partial results to work properly since a property is a subset of a method when you take away the ;
-      classBodyDeclarations.add(overrideMethod, overrideProperty, propertyAssignment);
+      classBodyDeclarations.add(overrideMethod, overrideProperty, propertyAssignment, incompleteStatement);
 
       // Overrides the result class name used for this grammar.
       compilationUnit.setResultClassName("SCModel");

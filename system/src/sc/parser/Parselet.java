@@ -82,6 +82,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
      */
    public boolean reparseable = true;
 
+   /** Match only in partial values mode - use for 'IncompleteStatement' - that you want in the IDE but not messing up the grammar for the compiled parse */
+   public boolean partialValuesOnly = false;
+
    // TODO: Ifdef "STATS_ENABLED"
    public int attemptCount, successCount;
    public int generatedBytes, failedProgressBytes;
@@ -247,6 +250,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       reportError = (options & NOERROR) == 0;
       trace = (options & TRACE) != 0;
       skipOnError = (options & SKIP_ON_ERROR) != 0;
+      partialValuesOnly = (options & PARTIAL_VALUES_ONLY) != 0;
       if (name == null || name.startsWith("<"))
          skip = true;
    }

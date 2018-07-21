@@ -2867,12 +2867,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                pkgName = pkgName == null ? null : pkgName.replace('/', '.');
 
                // If there's a pkg name for the prefix, and it matches the package, check the contents against
-               if (pkgName == prefixPkg || (prefixPkg != null && pkgName != null && pkgName.equals(prefixPkg))) {
+               if (pkgName == prefixPkg || prefixPkg == null || (pkgName != null && pkgName.equals(prefixPkg))) {
                   HashMap<String,PackageEntry> pkgTypes = piEnt.getValue();
                   for (Map.Entry<String,PackageEntry> pkgTypeEnt:pkgTypes.entrySet()) {
                      String typeInPkg = pkgTypeEnt.getKey();
                      if (typeInPkg.startsWith(prefixBaseName)) {
-                        addMatchingCandidate(candidates, prefixPkg, typeInPkg, retFullTypeName);
+                        addMatchingCandidate(candidates, pkgName, typeInPkg, retFullTypeName);
                         //candidates.add(CTypeUtil.prefixPath(prefixPkg, typeInPkg));
                         //candidates.add(typeInPkg);
                      }

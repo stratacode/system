@@ -1020,6 +1020,21 @@ public class RTypeUtil {
       return sb.toString();
    }
 
+   public static String getParameterString(Method meth) {
+      Class[] types = meth.getParameterTypes();
+      if (types == null)
+         return null;
+      StringBuilder sb = new StringBuilder();
+      boolean first = true;
+      for (Class pt:types) {
+         if (!first)
+            sb.append(", ");
+         sb.append(CTypeUtil.getClassName(pt.getName()));
+         first = false;
+      }
+      return sb.toString();
+   }
+
    public static String getSignature(Class theClass) {
       if (theClass.isArray()) {
          return "[" + getSignature(theClass.getComponentType());

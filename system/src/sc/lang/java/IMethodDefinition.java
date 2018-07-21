@@ -45,6 +45,9 @@ public interface IMethodDefinition extends IMember {
 
    String getTypeSignature();
 
+   /** Descriptive view of the parameters with parens - i.e. () for no params or (int foo) */
+   String getParameterString();
+
    Object[] getExceptionTypes();
 
    String getThrowsClause();

@@ -134,12 +134,12 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public Symbol period = new Symbol(".");
    public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
    {
-      semicolonEOL.generateParseNode = new NewlineParseNode(";");
+      semicolonEOL.generateParseNode = new NewlineParseNode(semicolonEOL, ";");
    }
    // A semicolon followed by 2 newlines for package, imports
    public SymbolSpace semicolonNewline = new SymbolSpace(";", SKIP_ON_ERROR);
    {
-      semicolonNewline.generateParseNode = new NewlineParseNode(";") {
+      semicolonNewline.generateParseNode = new NewlineParseNode(semicolonNewline, ";") {
          public String getNewlineSeparator() {
             return FileUtil.LINE_SEPARATOR + FileUtil.LINE_SEPARATOR;
          }
@@ -149,20 +149,20 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public SymbolSpace colon = new SymbolSpace(":");
    public SymbolSpace colonEOL = new SymbolSpace(":");
    {
-      colonEOL.generateParseNode = new NewlineParseNode(":");
+      colonEOL.generateParseNode = new NewlineParseNode(colonEOL, ":");
    }
    public Sequence optSemicolon = new Sequence(OPTIONAL, new Symbol(";"), spacing);
    public SymbolSpace comma = new SymbolSpace(",");
    public SymbolSpace openBrace = new SymbolSpace("{");
    public SymbolSpace openBraceEOL = new SymbolSpace("{");
    {
-      openBraceEOL.generateParseNode = new NewlineParseNode("{");
+      openBraceEOL.generateParseNode = new NewlineParseNode(openBraceEOL, "{");
       openBraceEOL.pushIndent = true;
    }
    public SymbolSpace closeBrace = new SymbolSpace("}");
    public SymbolSpace closeBraceEOL = new SymbolSpace("}", SKIP_ON_ERROR);
    {
-      closeBraceEOL.generateParseNode = new NewlineParseNode("}");
+      closeBraceEOL.generateParseNode = new NewlineParseNode(closeBraceEOL, "}");
       closeBraceEOL.popIndent = true;
    }
    public SymbolSpace openParen = new SymbolSpace("(");
@@ -172,12 +172,12 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    // Use this one for annotations
    public SymbolSpace closeParenEOL = new SymbolSpace(")", SKIP_ON_ERROR);
    {
-      closeParenEOL.generateParseNode = new NewlineParseNode(")");
+      closeParenEOL.generateParseNode = new NewlineParseNode(closeParenEOL, ")");
    }
    // and this one for if statements where we need to indent
    public SymbolSpace closeParenEOLIndent = new SymbolSpace(")", SKIP_ON_ERROR);
    {
-      NewlineParseNode pn = new NewlineParseNode(")");
+      NewlineParseNode pn = new NewlineParseNode(closeParenEOLIndent, ")");
       pn.needsIndent = true;
       closeParenEOLIndent.generateParseNode = pn;
    }

@@ -210,6 +210,29 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       */
    }
 
+   @Override
+   public String getParameterString() {
+      if (!started)
+         start();
+
+      if (typeSignature == null)
+         return null;
+
+      // When type parameters are involved, we need to expand the types here - otherwise, we could try to substring this from typeSignature
+      if (parameterJavaTypes != null) {
+         StringBuilder sb = new StringBuilder();
+         sb.append("(");
+         for (int i = 0; i < parameterJavaTypes.length; i++) {
+            if (i != 0)
+               sb.append(", ");
+            sb.append(parameterJavaTypes[i].toString());
+         }
+         sb.append(")");
+         return sb.toString();
+      }
+      return "()";
+   }
+
    public JavaType[] getExceptionTypes() {
       ClassFile.ExceptionsAttribute att = (ClassFile.ExceptionsAttribute) attributes.get("Exceptions");
       if (att == null || att.typeNames == null)

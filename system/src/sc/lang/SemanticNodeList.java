@@ -770,6 +770,16 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return false;
    }
 
+   @Override
+   public void setParseErrorNode(boolean v) {
+      throw new UnsupportedOperationException(); // No use case yet for setting this here
+   }
+
+   @Override
+   public boolean getParseErrorNode() {
+      return false;
+   }
+
    public int indexOf(Object elem) {
       return super.indexOf(elem);
    }

@@ -157,8 +157,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       statement.put(END_DELIMITER, glueStatement);
       statement.setName("<statement>(.,.,.,.,.,.,.,.,.,.,.,.,.,,.,.,.)"); // Forward
 
-      classBodyDeclarations.setName("<classBodyDeclarations>([],[],,[],[],[],[])");
-      classBodyDeclarations.add(glueDeclaration);
+      classBodyDeclarations.setName("<classBodyDeclarations>([],[],,[],[],[],[],[])");
+      classBodyDeclarations.removeParselet(incompleteStatement);
+      classBodyDeclarations.add(glueDeclaration, incompleteStatement);
 
       primary.put(END_DELIMITER, glueExpression);
 
