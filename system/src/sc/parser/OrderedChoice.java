@@ -651,8 +651,8 @@ public class OrderedChoice extends NestedParselet  {
                boolean useError = true;
                if (errorRes instanceof IParseNode) {
                   IParseNode errorNode = (IParseNode) errorRes;
-                  // If one of the partial value errors is better we can start the skip parse from that error preserving more of the model
-                  if (bestError != null && errorNode.length() < bestError.endIndex - bestError.startIndex && bestError.partialValue != null) {
+                  // If one of the partial value errors is longer (or as long) we can start the skip parse from that error preserving more of the model
+                  if (bestError != null && errorNode.length() <= bestError.endIndex - bestError.startIndex && bestError.partialValue != null) {
                      value = value == null ? resetOldParseNode(oldParent, bestError.startIndex, false, false) : value;
 
                      // Change the endIndex before we add the value because we use parser.currentIndex inside of value.addForReparse to determine how to cull old nodes.
@@ -853,8 +853,8 @@ public class OrderedChoice extends NestedParselet  {
                boolean useError = true;
                if (errorRes instanceof IParseNode) {
                   IParseNode errorNode = (IParseNode) errorRes;
-                  // If one of the partial value errors is better we can start the skip parse from that error preserving more of the model
-                  if (bestError != null && errorNode.length() < bestError.endIndex - bestError.startIndex && bestError.partialValue != null) {
+                  // If one of the partial value errors is longer (or as long) we can start the skip parse from that error preserving more of the model
+                  if (bestError != null && errorNode.length() <= bestError.endIndex - bestError.startIndex && bestError.partialValue != null) {
                      value = value == null ? (ParentParseNode) newParseNode(bestError.startIndex) : value;
                      value.add(bestError.partialValue, bestError.parselet, -1, bestErrorSlotIx, false, parser);
                      errorStart = bestError.endIndex;
@@ -870,7 +870,6 @@ public class OrderedChoice extends NestedParselet  {
                      errorRes = parser.parseNext(skipOnErrorParselet);
                      if (errorRes instanceof ParseError)
                         return value;
-
                   }
                }
 
