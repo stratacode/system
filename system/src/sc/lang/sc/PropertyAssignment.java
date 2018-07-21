@@ -412,7 +412,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
          // Reverse-only bindings do not replace the underlying assignment, they append to it.  So just add this statement to the base type.
          if (bindingDirection == BindingDirection.REVERSE) {
-            base.addBodyStatement(this);
+            base.addBodyStatementIndent(this);
             return this;
          }
          if (var instanceof VariableDefinition) {
@@ -512,7 +512,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             if (modifiers != null)
                displayError("Cannot modify property attributes. Property: " + propertyName + " no source definition for field definition " + var + ": ");
             // Just reinitialize the property since that's all we can do
-            base.addBodyStatement(this);
+            base.addBodyStatementIndent(this);
             return this;
          }
       }

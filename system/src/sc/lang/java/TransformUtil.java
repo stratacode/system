@@ -614,8 +614,32 @@ public class TransformUtil {
     * to stick in indentation.  But if the previous node is generated, we can just skip that.
     */
    public static void appendIndentIfNecessary(SemanticNodeList node) {
-      if (node == null || node.size() == 0)
+      if (node == null)
          return;
+      if (node.size() == 0) {
+         IParseNode listPN = node.getParseNode();
+         if (listPN instanceof ParentParseNode) {
+            ParentParseNode listPPN = (ParentParseNode) listPN;
+            if (listPPN.children != null && listPPN.children.size() > 0) {
+               Object symbolPN = listPPN.children.get(0);
+               if (symbolPN instanceof ParentParseNode) {
+                  ParentParseNode symbolPPN = (ParentParseNode) symbolPN;
+                  if (symbolPPN.children != null && symbolPPN.children.size() == 2) {
+                     Object spacePN = symbolPPN.children.get(1);
+                     if (spacePN instanceof ParentParseNode) {
+                        ParentParseNode spacePPN = (ParentParseNode) spacePN;
+                        if (spacePPN.children != null && spacePPN.children.size() == 1) {
+                           Object spaceChild = spacePPN.children.get(0);
+                           if (spaceChild == null || spaceChild.toString().equals("\n"))
+                              spacePPN.children.set(0, "\n" + FormatContext.INDENT_STR);
+                        }
+                     }
+                  }
+               }
+            }
+         }
+         return;
+      }
       int lastIx = node.size() - 1;
       appendIndentIfNecessary(node, lastIx);
    }

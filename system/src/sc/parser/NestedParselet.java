@@ -2728,8 +2728,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          oldTagMode = ctx.tagMode;
          ctx.tagMode = enableTagMode;
       }
-      if (pushIndent)
-         ctx.pushIndent();
+      boolean isGenNode = false;
+      if (pushIndent) {
+         isGenNode = node.isGeneratedTree();
+         if (!isGenNode)
+            ctx.pushIndent();
+      }
       try {
          super.format(ctx, node);
       }
@@ -2740,7 +2744,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             ctx.tagMode = oldTagMode;
          if (suppressNewlines)
             ctx.suppressNewlines = old;
-         if (popIndent) {
+         if (popIndent && !isGenNode) {
             ctx.autoPopIndent();
          }
       }

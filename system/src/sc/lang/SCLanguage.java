@@ -155,6 +155,7 @@ public class SCLanguage extends JavaLanguage {
       reqImport.setLanguage(this);
       reqClassBodyDeclaration.setLanguage(this);
       optOpenBraceEOL.setLanguage(this);
+      incompleteStatement.setLanguage(this);
    }
 
    @Constant
