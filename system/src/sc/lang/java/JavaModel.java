@@ -609,12 +609,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       findMatchingGlobalNames(prefix, CTypeUtil.getPackageName(prefix), CTypeUtil.getClassName(prefix), candidates);
    }
 
-   // TODO: should we use the Pattern stuff to make this much slower but more flexible?
+   // TODO: should we use Pattern matching to make this more flexible?  Or an index to make it faster?
    public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates) {
       initTypeInfo();
 
       if (layeredSystem != null) {
-         layeredSystem.addGlobalImports(isLayerModel, prefix, candidates);
+         layeredSystem.addGlobalImports(isLayerModel, prefixPkgName, prefixBaseName, candidates);
       }
       for (String ent:importsByName.keySet()) {
          if (ent.startsWith(prefix))
@@ -622,13 +622,24 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       if (staticImportMethods != null) {
          for (String ent:staticImportMethods.keySet()) {
-            if (ent.startsWith(prefix))
-               candidates.add(ent);
+            if (ent.startsWith(prefix)) {
+               List<Object> methTypes = staticImportMethods.get(ent);
+               if (methTypes != null) {
+                  for (Object methType:methTypes) {
+                     String methTypeName = ModelUtil.getTypeName(methType);
+                     if (prefixPkgName == null || methTypeName.equals(prefixPkgName)) {
+                        candidates.add(ent + "()"); // TODO: look up the methods here and use getParameterString so we describe them properly in the IDE
+                        break;
+                     }
+                  }
+               }
+            }
          }
       }
       if (staticImportProperties != null) {
          for (String ent:staticImportProperties.keySet()) {
-            if (ent.startsWith(prefix))
+            Object propObj = staticImportProperties.get(ent);
+            if (ent.startsWith(prefixBaseName) && (prefixPkgName == null || StringUtil.equalStrings(prefixPkgName, ModelUtil.getTypeName(ModelUtil.getEnclosingType(propObj)))))
                candidates.add(ent);
          }
       }

@@ -2791,11 +2791,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                        String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates, boolean retFullTypeName, boolean srcOnly) {
       acquireDynLock(false);
       try {
-         if (prefixPkg == null) {
+         if (prefixPkg == null || prefixPkg.equals("java.lang")) {
             if (systemClasses != null && !srcOnly) {
                for (String sysClass:systemClasses)
-                  if (sysClass.startsWith(prefix))
+                  if (sysClass.startsWith(prefix)) {
                      addMatchingCandidate(candidates, "java.lang", sysClass, retFullTypeName);
+                  }
             }
 
             // For global lookups if no layers have been activated, just search all of the inactive layers.  This will
@@ -2871,7 +2872,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   HashMap<String,PackageEntry> pkgTypes = piEnt.getValue();
                   for (Map.Entry<String,PackageEntry> pkgTypeEnt:pkgTypes.entrySet()) {
                      String typeInPkg = pkgTypeEnt.getKey();
-                     if (typeInPkg.startsWith(prefixBaseName)) {
+                     if (typeInPkg.startsWith(prefixBaseName) && !typeInPkg.contains("$")) {
                         addMatchingCandidate(candidates, pkgName, typeInPkg, retFullTypeName);
                         //candidates.add(CTypeUtil.prefixPath(prefixPkg, typeInPkg));
                         //candidates.add(typeInPkg);
@@ -2879,10 +2880,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
 
+               if (pkgName == null)
+                  continue;
+
                // Include the right part of the package name
-               if (pkgName != null && pkgName.startsWith(prefix)) {
-                  int len = prefix.length();
+               if (prefixPkg == null || pkgName.startsWith(prefix)) {
+                  String rootPkg;
                   boolean includeFirst = StringUtil.equalStrings(prefix, prefixPkg);
+                  // If the package prefix is "sc.uti" and the package name is "sc.util.zip" we need to walk up till we find pkgName = "sc.util"
+                  do {
+                     rootPkg = CTypeUtil.getPackageName(pkgName);
+                     if (rootPkg != null && rootPkg.startsWith(prefix) && (!includeFirst || prefix.length() > rootPkg.length()))
+                        pkgName = rootPkg;
+                     else
+                        break;
+                  } while (true);
+
+                  // We have "sc.util." and have hit the sc.util package - don't add it
+                  if (includeFirst && pkgName.equals(prefix))
+                     continue;
+
+                  int len = prefix.length();
                   // If we are matching the prefixPkg we include the package name itself.  Otherwise, we skip it
                   int matchEndIx = pkgName.indexOf(".", len + (includeFirst ? 1 : 0));
                   String headName;
@@ -2898,7 +2916,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         startIx = includeFirst ? len+1 : 0;
                      tailName = pkgName.substring(startIx, matchEndIx);
                   }
-                  if (tailName.length() > 0) {
+                  if (tailName.length() > 0 && tailName.startsWith(prefixBaseName)) {
                      addMatchingCandidate(candidates, headName, tailName, retFullTypeName);
                   }
                }
@@ -6996,6 +7014,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          cur = cur.prev;
       }
+      // NOTE: we do use this for file based lookups for inner classes with this index so adding those with $ in the name here
       PackageEntry newEnt = new PackageEntry(rootDir, isZip, isSrc, layer);
       newEnt.prev = packageEntry.put(fileName, newEnt);
    }
@@ -7098,7 +7117,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                ZipFile z = new ZipFile(layerDirName);
                for (Enumeration<? extends ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
                   ZipEntry ze = e.nextElement();
-                  if (!ze.isDirectory()) {
+                  if (!ze.isDirectory()) { // Note: we will include file names with $ as they are used for type name lookups for CFClasses
                      String zipPath = FileUtil.unnormalize(ze.getName());
                      String dirName = FileUtil.getParentPath(zipPath);
                      addToPackageIndex(layerDirName, layer, true, false, dirName, FileUtil.getFileName(zipPath));
@@ -14569,11 +14588,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return Language.isParseable(fileName);
    }
 
-   public void addGlobalImports(boolean isLayerModel, String prefix, Set<String> candidates) {
+   public void addGlobalImports(boolean isLayerModel, String prefixPackageName, String prefixBaseName, Set<String> candidates) {
       Map<String,ImportDeclaration> importMap = isLayerModel ? globalLayerImports : globalImports;
       for (String impName:importMap.keySet()) {
-         if (impName.startsWith(prefix))
-            candidates.add(impName);
+         ImportDeclaration impDecl = importMap.get(impName);
+         if ((prefixPackageName == null || impDecl.identifier.startsWith(prefixPackageName)) && impName.startsWith(prefixBaseName)) {
+            String impPkg = CTypeUtil.getPackageName(impDecl.identifier);
+            if (StringUtil.equalStrings(prefixPackageName, impPkg))
+               candidates.add(impName);
+         }
       }
    }
 

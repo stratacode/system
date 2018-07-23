@@ -1026,12 +1026,14 @@ public class RTypeUtil {
          return null;
       StringBuilder sb = new StringBuilder();
       boolean first = true;
+      sb.append("(");
       for (Class pt:types) {
          if (!first)
             sb.append(", ");
          sb.append(CTypeUtil.getClassName(pt.getName()));
          first = false;
       }
+      sb.append(")");
       return sb.toString();
    }
 

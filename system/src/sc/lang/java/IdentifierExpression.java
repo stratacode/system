@@ -4445,8 +4445,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (origIdent != null && i > 0 && origIdent.boundTypes != null && origIdent.boundTypes.length > typeIx) {
                curType = origIdent.getTypeForIdentifier(typeIx);
                if (curType == null) { // If we can't resolve the type for the previous we should restrict it to a type - not show global names
-                  System.out.println("*** Using Object for curType in addNodeCompletions");
-                  curType = Object.class;
+                  //System.out.println("*** Using Object for curType in addNodeCompletions");
+                  //curType = Object.class;
                }
             }
 
@@ -4456,9 +4456,12 @@ public class IdentifierExpression extends ArgumentsExpression {
                   ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
                   //System.out.println("*** SuggestMembers returns: " + candidates + " for type: " + curType);
                }
-               else if (origModel != null && i == 0) {
+               else if (i == 0) {
                   ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
                   //System.out.println("*** SuggestTypes returns: " + candidates);
+               }
+               else if (i > 0) {
+                  ModelUtil.suggestTypes(origModel, getQualifiedClassIdentifier(), matchPrefix, candidates, includeGlobals);
                }
             }
 

@@ -972,9 +972,21 @@ public class ClassType extends JavaType {
          isQualifiedType = true;
       }
       else {
-         packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
+         if (chainedTypes != null) {
+            String typeName = getFullBaseTypeName();
+            int ix = typeName.indexOf(dummyIdentifier);
+            if (ix != -1)
+               typeName = typeName.substring(0, ix);
+            if (typeName.endsWith(".") && typeName.length() > 1)
+               packagePrefix = typeName.substring(0, typeName.length() - 1);
+            else
+               packagePrefix = CTypeUtil.getPackageName(typeName);
+            isQualifiedType = true;
+         }
+         else
+            packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null);
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
          if (currentType != null) {

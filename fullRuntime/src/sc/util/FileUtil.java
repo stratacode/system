@@ -5,7 +5,6 @@
 package sc.util;
 
 import sc.util.zip.ExtraFieldUtils;
-import sc.util.zip.ZipExtraField;
 
 import java.io.*;
 import java.net.MalformedURLException;
