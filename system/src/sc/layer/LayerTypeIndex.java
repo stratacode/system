@@ -31,6 +31,10 @@ public class LayerTypeIndex implements Serializable {
       return false;
    }
 
+   public boolean removeTypeName(String typeName) {
+      return layerTypeIndex.remove(typeName) != null;
+   }
+
    public boolean updateFileName(String oldFileName, String newFileName) {
       TypeIndexEntry ent = fileIndex.remove(oldFileName);
       if (ent != null) {

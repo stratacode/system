@@ -209,6 +209,10 @@ public class SysTypeIndex {
       inactiveTypeIndex.updateTypeName(oldTypeName, newTypeName);
    }
 
+   public void removeTypeName(String oldTypeName) {
+      inactiveTypeIndex.removeTypeName(oldTypeName);
+   }
+
    public void fileRenamed(String oldFileName, String newFileName) {
       inactiveTypeIndex.updateFileName(oldFileName, newFileName);
    }

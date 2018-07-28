@@ -216,6 +216,20 @@ public class LayerListTypeIndex {
       reverseIndexValid = false;
    }
 
+   public void removeTypeName(String oldTypeName) {
+      TreeSet<String> layerNamesToSave = new TreeSet<String>();
+      for (Map.Entry<String, LayerTypeIndex> ent:typeIndex.entrySet()) {
+         LayerTypeIndex layerIndex = ent.getValue();
+         if (layerIndex.removeTypeName(oldTypeName)) {
+            layerNamesToSave.add(ent.getKey());
+         }
+      }
+      modifyTypeIndex.remove(oldTypeName);
+      subTypeIndex.remove(oldTypeName);
+      saveLayerTypeIndexes(layerNamesToSave);
+      reverseIndexValid = false;
+   }
+
    public void updateFileName(String oldFileName, String newFileName) {
       TreeSet<String> layerNamesToSave = new TreeSet<String>();
       for (Map.Entry<String,LayerTypeIndex> ent:typeIndex.entrySet()) {

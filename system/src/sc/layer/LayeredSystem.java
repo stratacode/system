@@ -808,6 +808,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   public void updateTypeNames(String packageName, Map<String,TypeDeclaration> oldDefinedTypes, Map<String,TypeDeclaration> newDefinedTypes) {
+      for (String oldTypeName:oldDefinedTypes.keySet()) {
+         if (newDefinedTypes.get(oldTypeName) == null) {
+            removeTypeName(CTypeUtil.prefixPath(packageName, oldTypeName), true);
+         }
+      }
+      // TODO: do we need to do more than this?  It seems like the new type will be added to the type index on it's own
+   }
+
    public void updateTypeName(String oldFullName, String newFullName, boolean updatePeers) {
       TypeDeclarationCacheEntry tds = typesByName.remove(oldFullName);
       if (tds != null)
@@ -828,6 +837,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int i = 0; i < peerSystems.size(); i++) {
             LayeredSystem peer = peerSystems.get(i);
             peer.updateTypeName(oldFullName, newFullName, false);
+         }
+      }
+   }
+
+   public void removeTypeName(String oldFullName, boolean updatePeers) {
+      typesByName.remove(oldFullName);
+
+      subTypesByType.remove(oldFullName);
+
+      Object inner = removeFromInnerTypeCache(oldFullName);
+
+      typeIndex.removeTypeName(oldFullName);
+
+      if (updatePeers && peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peer = peerSystems.get(i);
+            peer.removeTypeName(oldFullName,false);
          }
       }
    }

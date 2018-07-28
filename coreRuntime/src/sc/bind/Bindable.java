@@ -11,13 +11,14 @@ import java.lang.annotation.Target;
 
 /** 
  * Use this annotation to mark properties as "bindable" - i.e. sending change events so they can be used as a source variable in a data binding expression using
- * StrataCode's reactive programming system.
- * You can @Bindable at the class level to make all properties bindable by default
- * or on a field, getX or setX method.  When you set manual=true, the code-generation treats this property as Bindable
- * without further code-generation.  Usually this means you add calls to Bind.sendEvent in your code or perhaps the property
- * never changes but you want to allow binding expressions on that property without a warning.   When you do not use manual=true, the generated code
- * includes the Bind.sendEvent call so listeners are notified.  This call is placed at the end of a generated setX method.  If there already exists a setX
- * method, it is renamed and called by the generated setX method although the details of this implementation should not be relied upon.
+ * StrataCode's data binding libraries and the :=, =: and :=: operators.
+ * By default, the generated code includes a Bind.sendEvent to notify listeners when this property is used in a binding
+ * expression.  For fields, getX and setX methods are generated using customizable templates for defining a property.
+ * If there already exists a setX method, a different template is used which by default renames the existing method calls
+ * it from the generated setX method.  You can override either template to customize how events are sent.  For example,
+ * the getX method could be modified to recompute the value for lazy evaluation.
+ * You can set @Bindable at the class level to make all properties bindable by default
+ * or on a field, getX or setX method.
  */
 @Target({TYPE,FIELD,METHOD})
 @Retention(RetentionPolicy.RUNTIME)
@@ -29,7 +30,7 @@ public @interface Bindable {
    boolean crossScope() default false; // Set to true for those bindings where the changeEvents might come from some other thread operating in another context.  Adds extra thread-local lookup for the init and apply calls plus any necessary context switching overhead
    boolean queued() default false; // Set to true to force queued mode (default depends on BindingContext)
    boolean immediate() default false; // Set to true to force immediate mode (default depends on BindingContext)
-   // TODO: to-implement!
+   // TODO: the history, origin, delay, and doLater are not implemented yet
    boolean history() default false;  // Set to true to enable recording of the history of values.  APIs for diagnostics.  When combined
    boolean origin() default false;  // For trace or history include the origin - the stack trace and bindings leading up to this change.  If neither are set, both are enabled by default so origin=true by itself will provide the most diagnostics on this property.
    int delay() default -1;  // Set to 0 does the same thing as doLater=true.  Set to some number of milliseconds to run this binding with a delay.
