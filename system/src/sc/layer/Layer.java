@@ -1379,7 +1379,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             if (!imp.staticImport) {
                String impStr = imp.identifier;
                if (impStr == null) {
-                  System.err.println("*** Null identifier for import!");
                   continue;
                }
                String className = CTypeUtil.getClassName(impStr);

@@ -67,7 +67,7 @@ public class ImportDeclaration extends AbstractErrorNode {
       else {
          packagePrefix = origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, !isQualifiedType);
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
          if (currentType != null)

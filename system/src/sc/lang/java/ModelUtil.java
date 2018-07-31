@@ -829,6 +829,9 @@ public class ModelUtil {
          return ((Constructor) method).isVarArgs();
       else if (method instanceof IMethodDefinition)
          return ((IMethodDefinition) method).isVarArgs();
+      // a field that gets turned into a setX method
+      else if (method instanceof VariableDefinition)
+         return false;
       else
          throw new UnsupportedOperationException();
    }
@@ -6926,6 +6929,10 @@ public class ModelUtil {
       // It's a getX method for an object
       else if (method instanceof ITypeDeclaration) {
          return new Object[] {};
+      }
+      // It's a variable that will be turned into a getX/setX method so this must be the params of the setX method
+      else if (method instanceof VariableDefinition) {
+        return new Object[] {((VariableDefinition) method).getTypeDeclaration()};
       }
       else
          throw new UnsupportedOperationException();
