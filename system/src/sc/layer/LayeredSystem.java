@@ -6201,6 +6201,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return pkgEnt.keySet();
    }
 
+   public boolean isValidPackage(String packageName) {
+      return packageIndex.containsKey(packageName.replace('.', '/'));
+   }
+
    public Set<String> getPackageNames() {
       return packageIndex.keySet();
    }
@@ -7024,6 +7028,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (packageEntry == null) {
          packageEntry = new HashMap<String,PackageEntry>();
          packageIndex.put(relDir, packageEntry);
+         // Also create entries for any root packages - this is just so we can quickly identify a valid component of a package - i.e 'java' should not show 'red' in the IDE since we know it's is a valid package even though there are no classes in 'java' itself
+         String parRelDir = FileUtil.getParentPath(relDir);
+         while (parRelDir != null) {
+            if (packageIndex.get(parRelDir) == null)
+               packageIndex.put(parRelDir, new HashMap<String,PackageEntry>());
+            parRelDir = FileUtil.getParentPath(parRelDir);
+         }
       }
       PackageEntry cur = packageEntry.get(fileName);
       while (cur != null) {

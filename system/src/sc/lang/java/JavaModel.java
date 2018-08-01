@@ -393,7 +393,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             if (className.equals("*"))
                continue;
             if (findTypeDeclaration(imp.identifier, true) == null) {
-               imp.displayTypeError("No type: " + imp.identifier + " for: ");
+               String[] idents = imp.identifier.split("\\.");
+               int rangeMax = idents.length - 1;
+               int rangeMin = rangeMax;
+               String ident = imp.identifier;
+               while (rangeMin > 0) {
+                  ident = CTypeUtil.getPackageName(ident);
+                  if (layeredSystem.isValidPackage(ident)) {
+                     break;
+                  }
+                  rangeMin--;
+               }
+
+               imp.displayRangeError(rangeMin, rangeMax, true, "No type: " + imp.identifier + " for: ");
             }
          }
       }

@@ -1200,7 +1200,8 @@ public class ClassType extends JavaType {
    }
 
    public boolean getNotFoundError() {
-      return type == FAILED_TO_INIT_SENTINEL;
+      // Return a 'not found' error if we failed to find the type.  But for the case where it is a single name, suppress the not found if there's a member, variable etc. since we could be part of an IncompleteStatement and building up a PropertyAssignment or something else
+      return type == FAILED_TO_INIT_SENTINEL && (chainedTypes != null || findMember(typeName, MemberType.AllSet, null, null, null, false) == null);
    }
 
 /* used to be used when we created a ClassType as part of the skipOnErrorParselet but this ClassType could not be started

@@ -110,7 +110,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                displayTypeError("Inaccessible property: " + propertyName + " in type: " + ModelUtil.getTypeName(ModelUtil.getEnclosingType(errorProp)) + " has access level: " + ModelUtil.getAccessLevelString(errorProp, false, checkType) + " for: ");
             }
             else {
-               displayTypeError("No property: ", propertyName, " in type: ", getEnclosingType().getFullTypeName(), " for ");
+               displayRangeError(0, 0, true, "No property: ", propertyName, " in type: ", getEnclosingType().getFullTypeName(), " for ");
                errorProp = encType.definesMember(propertyName, mtype, null, null);
             }
          }

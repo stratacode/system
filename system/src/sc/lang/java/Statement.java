@@ -120,7 +120,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
-   void displayRangeError(int fromIx, int toIx, boolean notFound, String...args) {
+   public void displayRangeError(int fromIx, int toIx, boolean notFound, String...args) {
       displayTypeError(args);
       if (errorArgs != null) {
          ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));

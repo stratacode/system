@@ -39,7 +39,19 @@ public class UnaryBinding extends AbstractMethodBinding {
          return UNSET_VALUE_SENTINEL;
       if (value == PENDING_VALUE_SENTINEL)
          return value;
-      return DynUtil.evalInverseUnaryExpression(operator, null, value);
+      if (operator.equals("++") || operator.equals("--")) {
+         IBinding param = boundParams[0];
+         Object val = param.getPropertyValue(obj);
+         int ival = (Integer) val;
+         if (operator.charAt(0) == '+')
+            ival++;
+         else
+            ival--;
+         param.applyReverseBinding(obj, ival, this);
+         return ival;
+      }
+      else
+         return DynUtil.evalInverseUnaryExpression(operator, null, value);
    }
 
    @Override
