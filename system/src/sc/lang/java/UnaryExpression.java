@@ -31,8 +31,6 @@ public class UnaryExpression extends ChainedExpression {
 
    public Object eval(Class expectedType, ExecutionContext ctx) {
       if (bindingDirection != null) {
-         if (isIncrementOperator())
-            displayError("Invalid ", operator, " for data binding expression ");
          return initBinding(expectedType, ctx);
       }
       
