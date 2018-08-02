@@ -88,15 +88,19 @@ public class UnaryExpression extends ChainedExpression {
                if (expression.isSimpleReference()) {
                   Expression retVal = ArithmeticExpression.create((Expression) expression.deepCopy(CopyNormal, null), op, IntegerLiteral.create(1));
                   // Can't convert it to a set method when it is a child of the post/prefix unary
+                  retVal.fromStatement = this;
                   parentNode.replaceChild(this, expression);
                   removed = true;
                   expression.convertToSetMethod(retVal);
+                  expression.fromStatement = this;
                   retVal.transform(runtime);
                }
                else {
                   BlockStatement st = new BlockStatement();
-                  st.addStatementAt(0, VariableStatement.create(JavaType.createJavaTypeFromName(ModelUtil.getCompiledClassName(expression.getParentReferenceType())), "_refTmp",
-                                    "=", expression.getParentReferenceTypeExpression()));
+                  st.fromStatement = this;
+                  VariableStatement tempVar = VariableStatement.create(JavaType.createJavaTypeFromName(ModelUtil.getCompiledClassName(expression.getParentReferenceType())), "_refTmp", "=", expression.getParentReferenceTypeExpression());
+                  tempVar.fromStatement = this;
+                  st.addStatementAt(0, tempVar);
                   IdentifierExpression setCall;
                   String upperPropName = CTypeUtil.capitalizePropertyName(expression.getReferencePropertyName());
                   st.addStatementAt(1, setCall = IdentifierExpression.create("_refTmp", "set" + upperPropName));
@@ -106,6 +110,7 @@ public class UnaryExpression extends ChainedExpression {
                   setArgs.add(ArithmeticExpression.create(getCall, op, IntegerLiteral.create(1)));
                   setCall.setProperty("arguments", setArgs);
                   // Convert to { <referenceType _ref = <referenceExpr>; _ref.setX(_ref.getX()+/-1); }
+                  setCall.fromStatement = this;
                   parentNode.replaceChild(this, st);
                   st.transform(runtime);
                   removed = true;
@@ -125,6 +130,8 @@ public class UnaryExpression extends ChainedExpression {
                CastExpression castExpr = new CastExpression();
                castExpr.setProperty("type", JavaType.createObjectType(expression.getTypeDeclaration()));
                castExpr.setProperty("expression", call);
+               castExpr.fromStatement = this;
+               call.fromStatement = this;
                parentNode.replaceChild(this, castExpr);
                castExpr.transform(runtime);
                removed = true;

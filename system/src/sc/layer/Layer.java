@@ -1403,7 +1403,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (globalPackages != null) {
          for (String pkg:globalPackages) {
             Set<String> filesInPackage = layeredSystem.getFilesInPackage(pkg);
-            if (filesInPackage != null) {
+            if (filesInPackage != null && filesInPackage.size() > 0) {
                for (String impName:filesInPackage) {
                   importsByName.put(impName, ImportDeclaration.create(CTypeUtil.prefixPath(pkg, impName)));
                }
