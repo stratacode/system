@@ -8,6 +8,8 @@ import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.template.GlueStatement;
 import sc.layer.Layer;
+import sc.parser.GenFileLineIndex;
+import sc.parser.IParseNode;
 import sc.parser.ParseUtil;
 import sc.util.StringUtil;
 
@@ -850,6 +852,51 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
             remoteRuntimes = new ArrayList<String>();
          if (!remoteRuntimes.contains(remoteRuntimeName))
             remoteRuntimes.add(remoteRuntimeName);
+      }
+   }
+
+   /**
+    * Use the default implementation to register the method declaration line.  After that, we add one for the final close brace - where
+    * Java stops before exiting the method.
+    */
+   public void addToFileLineIndex(GenFileLineIndex idx, int rootStartGenLine) {
+      super.addToFileLineIndex(idx, rootStartGenLine);
+      ISrcStatement srcStatement = getSrcStatement(null);
+      if (body != null && srcStatement != null && srcStatement != this && srcStatement instanceof AbstractMethodDefinition) {
+         AbstractMethodDefinition srcMeth = (AbstractMethodDefinition) srcStatement;
+         if (srcMeth.body == null)
+            return;
+         ISemanticNode srcRoot = srcStatement.getRootNode();
+         if (srcRoot instanceof JavaModel) {
+            JavaModel srcModel = (JavaModel) srcRoot;
+            IParseNode genBodyPN = body.getParseNode();
+            int startGenOffset = genBodyPN.getStartIndex() + genBodyPN.lastIndexOf("}");
+            if (startGenOffset == -1) {
+               System.out.println("*** Attempt to add statement to genLine index with a parse-node that's missing a startIndex");
+               return;
+            }
+            int startGenLine;
+            if (rootStartGenLine == -1) {
+               startGenLine = idx.genFileLineIndex.getLineForOffset(startGenOffset);
+            }
+            else {
+               CharSequence cur = idx.currentStatement;
+               startGenLine = rootStartGenLine + ParseUtil.countCodeLinesInNode(cur, startGenOffset+1);
+            }
+            int endGenLine = startGenLine + 1;
+
+            IParseNode srcBodyPN = srcMeth.body.getParseNode();
+            int startSrcOffset = srcBodyPN.getStartIndex() + srcBodyPN.lastIndexOf("}");
+
+            //addMappingForSrcStatement(idx, srcModel, srcStatement, startGenLine, endGenLine);
+            int startSrcLine = idx.getSrcFileIndex(srcModel.getSrcFile()).srcFileLineIndex.getLineForOffset(startSrcOffset);
+            int endSrcLine = startSrcLine + 1;
+
+            idx.addMapping(srcModel.getSrcFile(), startGenLine, endGenLine, startSrcLine, endSrcLine);
+         }
+         else {
+            System.err.println("*** Unrecognized root node for src statement in generated model");
+         }
       }
    }
 }

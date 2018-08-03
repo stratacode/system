@@ -700,6 +700,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    // Only parsed when we are in partial values mode - to improve the fidelity of the error model
    Sequence incompleteStatement = new Sequence("IncompleteStatement(type)", PARTIAL_VALUES_ONLY, qualifiedType);
+   {
+      //incompleteStatement.alwaysReparse = true;
+   }
 
    public IndexedChoice memberDeclaration = new IndexedChoice("<memberDeclaration>");
    {

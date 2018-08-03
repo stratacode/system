@@ -82,7 +82,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
      */
    public boolean reparseable = true;
 
-   /** Match only in partial values mode - use for 'IncompleteStatement' - that you want in the IDE but not messing up the grammar for the compiled parse */
+   /**
+    * Match only in partial values mode - use for 'IncompleteStatement' - that you want in the IDE but not messing up the grammar for the compiled parse.  Parse nodes parsed by a partialValuesOnly parselet
+    * are marked as 'error nodes' so we know to extend the region for reparsing
+    */
    public boolean partialValuesOnly = false;
 
    // TODO: Ifdef "STATS_ENABLED"
@@ -527,10 +530,6 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return trace;
    }
 
-   public Class getParseNodeClass() {
-      return ParseNode.class;
-   }
-
 
    public IParseNode newParseNode() {
       return newParseNode(-1);
@@ -541,9 +540,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    public IParseNode newParseNode(int ix) {
-      IParseNode node = (IParseNode) RTypeUtil.createInstance(getParseNodeClass());
-      node.setParselet(this);
+      ParseNode node = new ParseNode(this);
       node.setStartIndex(ix);
+      if (partialValuesOnly)
+         node.setErrorNode(true);
       return node;
    }
 

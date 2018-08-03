@@ -189,7 +189,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                   displayTypeError("this() must be inside of a constructor: ");
                }
                else {
-                  Object constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
+                  LayeredSystem sys = getLayeredSystem();
+                  Object constr = ModelUtil.declaresConstructor(sys, enclType, arguments, null);
                   if (constr == null) {
                      if (model != null && !model.disableTypeErrors && isInferredFinal() && isInferredSet()) {
                         String othersMessage = getOtherConstructorsMessage(enclType, "\n   Did you mean:\n");
@@ -198,7 +199,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   }
                   else if (constr == enclMeth) {
                      displayTypeError("Illegal recursive this", ModelUtil.argumentsToString(arguments), " method call for: ");
-                     constr = ModelUtil.declaresConstructor(getLayeredSystem(), enclType, arguments, null);
+                     constr = ModelUtil.declaresConstructor(sys, enclType, arguments, null);
                   }
                   else
                      boundTypes[0] = constr;
@@ -556,7 +557,22 @@ public class IdentifierExpression extends ArgumentsExpression {
                            Object closest = findClosestIdentifier(firstIdentifier, enclType);
 
                            if (closest == null) {
-                              displayRangeError(0, 0, true, "No type or var: " + ident + " in ");
+                              int startErrIx = 0;
+                              int endErrIx = idents.size()-1;
+                              String prefix = idents.get(0).toString();
+                              int prefixIx = 0;
+                              LayeredSystem sys = getLayeredSystem();
+                              if (sys != null) {
+                                 do {
+                                    if (sys.isValidPackage(prefix))
+                                       startErrIx++;
+                                    else
+                                       break;
+                                    prefixIx++;
+                                    prefix += "." + idents.get(prefixIx);
+                                 } while (startErrIx < endErrIx);
+                              }
+                              displayRangeError(startErrIx, endErrIx, true, "No type or var: " + ident + " in ");
                            }
                            else {
                               boundTypes[0] = closest;

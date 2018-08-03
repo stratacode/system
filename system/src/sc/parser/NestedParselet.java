@@ -2280,9 +2280,12 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return null;
    }
 
-
-   public Class getParseNodeClass() {
-      return ParentParseNode.class;
+   public ParentParseNode newParseNode(int ix) {
+      ParentParseNode pnode = new ParentParseNode(this);
+      pnode.setStartIndex(ix);
+      if (partialValuesOnly)
+         pnode.setErrorNode(true);
+      return pnode;
    }
 
    public boolean needsChildren() {

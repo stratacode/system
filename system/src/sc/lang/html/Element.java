@@ -1477,7 +1477,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                else
                   derivedTD = null;
             }
-            if (extendsType != derivedType && extendsType != null) {
+            if (extendsType != derivedType && extendsType != null && derivedTD != null) {
                extendsType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType, false, true, derivedTD.getLayer());
                if (extendsType instanceof BodyTypeDeclaration) {
                   derivedTD = (BodyTypeDeclaration) extendsType;

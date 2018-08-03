@@ -399,7 +399,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                String ident = imp.identifier;
                while (rangeMin > 0) {
                   ident = CTypeUtil.getPackageName(ident);
-                  if (layeredSystem.isValidPackage(ident)) {
+                  if (layeredSystem == null || layeredSystem.isValidPackage(ident)) {
                      break;
                   }
                   rangeMin--;
