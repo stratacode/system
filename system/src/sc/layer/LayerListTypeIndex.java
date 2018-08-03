@@ -17,6 +17,9 @@ public class LayerListTypeIndex {
    // NOTE: this points directly to either LayeredSystem.layers or LayeredSystem.inactiveLayers - it's not a copy
    List<Layer> layersList;
 
+   // A list of Layer objects that are not initialized, started or anything - just basic properties are set - such as layerPathName, etc. derived from the index - used for tooling that want to display a combination of loaded inactive layers and layers in the inactive index
+   transient List<Layer> indexLayers;
+
    /** Global typeIndex which maps from layerName to the Map of typeName to TypeIndexEntry entries each of which maps to the Layer.layerTypeIndex map in each layer.  We'll accumulate type index's over both active and inactive layers */
    HashMap<String, LayerTypeIndex> typeIndex;
 
@@ -282,5 +285,33 @@ public class LayerListTypeIndex {
 
    public void layerTypeIndexChanged() {
       reverseIndexValid = false;
+   }
+
+   /**
+    * Returns the list of all layers in this type index.  If sys is not-null, any normal inactiveLayers
+    * defined there are returned before we return the IndexLayer defined by the info we keep in the type
+    * index.
+    */
+   public List<Layer> getIndexLayers(LayeredSystem sys) {
+      if (indexLayers != null)
+         return indexLayers;
+
+      ArrayList<String> indexNames = orderIndex.inactiveLayerNames;
+      indexLayers = new ArrayList<Layer>(indexNames.size());
+      for (String indexName:indexNames) {
+         Layer layer = null;
+         if (sys != null) {
+            layer = sys.lookupInactiveLayer(indexName, false, true);
+         }
+         if (layer == null) {
+            LayerTypeIndex layerIndexInfo = typeIndex.get(indexName);
+            if (layerIndexInfo != null) {
+               layer = layerIndexInfo.getIndexLayer();
+            }
+         }
+         if (layer != null)
+            indexLayers.add(layer);
+      }
+      return indexLayers;
    }
 }

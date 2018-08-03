@@ -712,39 +712,12 @@ public class LayerUtil implements LayerConstants {
          sb.append("      ");
          boolean hidden = !l.getVisibleInEditor();
          sb.append(l);
-         boolean first = true;
-         if (hidden)
-            first = opAppend(sb, "hidden", first);
-         if (l.buildSeparate)
-            first = opAppend(sb, "build separate", first);
-         if (l.isBuildLayer())
-            first = opAppend(sb, "build", first);
-         if (l.annotationLayer)
-            first = opAppend(sb, "annotation", first);
-         if (l.finalLayer)
-            first = opAppend(sb, "finalLayer", first);
-         if (l.excludeRuntimes != null)
-            first = opAppend(sb, " excludes: " + l.excludeRuntimes, first);
-         if (l.hasDefinedRuntime)
-            first = opAppend(sb, " only: " + (l.definedRuntime == null ? "java" : l.definedRuntime), first);
-         if (l.excludeProcesses != null)
-            first = opAppend(sb, " excludes: " + l.excludeProcesses, first);
-         if (l.hasDefinedProcess)
-            first = opAppend(sb, " only: " + (l.definedProcess == null ? "<default>" : l.definedProcess), first);
-         if (l.defaultSyncMode == SyncMode.Automatic)
-            first = opAppend(sb, " auto-sync", first);
-         Object syncAnnot = ModelUtil.getLayerAnnotation(l, "sc.obj.Sync");
-         if (syncAnnot != null) {
-            SyncMode mode = (SyncMode) ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
-            if (mode == null)
-               mode = SyncMode.Enabled;
-            first = opAppend(sb, " syncMode=" + mode.toString(), first);
-         }
+         l.appendDetailString(sb, true, true, true, true);
          sb.append("\n");
       }
    }
 
-   private static boolean opAppend(StringBuilder sb, String opt, boolean first) {
+   public static boolean opAppend(StringBuilder sb, String opt, boolean first) {
       if (first)
          sb.append(":");
       sb.append(" ");

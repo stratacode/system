@@ -5,7 +5,6 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
-import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
@@ -30,6 +29,8 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import static sc.layer.LayerUtil.opAppend;
 
 /** 
  * The main implementation class for a Layer.  There's one instance of this class for
@@ -147,6 +148,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** True if this layer just sets annotations and does not generate classes */
    public boolean annotationLayer;
 
+   /** True if this layer is designed as a declarative layer */
+   public boolean configLayer;
+
    private Map<String,ImportDeclaration> importsByName;
 
    private Map<String,Object> staticImportTypes;
@@ -250,12 +254,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public boolean hasDefinedRuntime = false;
    public IRuntimeProcessor definedRuntime = null;
+   String definedRuntimeName;
 
    public boolean hasDefinedProcess = false;
    public IProcessDefinition definedProcess = null;
+   String definedProcessName;
 
    /** Enable or disable the default sync mode for types which are defined in this layer. TODO - deprecated.  Use @Sync on the layer */
    public SyncMode defaultSyncMode = SyncMode.Disabled;
+
+   public SyncMode syncMode = null;
 
    /**
     * Set this to true to disallow modification to any types defined in this layer from upstream layers.  In other words, when a layer is final, it's the last layer to modify those types.
@@ -360,6 +368,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** Set to true for layers that need to be saved the first time they are needed */
    public boolean tempLayer = false;
 
+   public boolean indexLayer = false;
+
    /** Each build layer has a buildInfo which stores global project info for that layer */
    public BuildInfo buildInfo;
 
@@ -368,9 +378,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    @Constant
    public CodeType codeType = CodeType.Application;
-
-   @Constant
-   public CodeFunction codeFunction = CodeFunction.Program;
 
    boolean newLayer = false;   // Set to true for layers which are created fresh
 
@@ -757,6 +764,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (packagePrefix == null) {
          packagePrefix = "";
       }
+      Object syncAnnot = ModelUtil.getLayerAnnotation(this, "sc.obj.Sync");
+      if (syncAnnot != null) {
+         syncMode = (SyncMode) ModelUtil.getAnnotationValue(syncAnnot, "syncMode");
+         if (syncMode == null)
+            syncMode = SyncMode.Enabled;
+      }
+      else // TODO: remove defaultSyncMode -  use the annotation instead
+         syncMode = defaultSyncMode;
+
+      if (definedRuntime != null)
+         definedRuntimeName = definedRuntime.getRuntimeName();
+      if (definedProcess != null)
+         definedProcessName = definedProcess.getProcessName();
    }
 
    public void updateTypeIndex(TypeIndexEntry typeIndexEntry, long lastModified) {
@@ -1306,8 +1326,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          String prefix = model.getPackagePrefix();
          boolean inheritedPrefix = getInheritedPrefix(baseLayers, prefix, newModel);
          prefix = model.getPackagePrefix();
-         if (!model.hasErrors())
-            layerModel.initLayerInstance(this, prefix, inheritedPrefix);
+         if (!model.hasErrors()) {
+            errorsStarting = false;
+            try {
+               layerModel.initLayerInstance(this, prefix, inheritedPrefix);
+            }
+            catch (IllegalArgumentException exc) {
+               System.err.println("*** Error updating layer mode: " + exc); // This can happen for certain syntax errors in the model
+               errorsStarting();
+            }
+            catch (RuntimeException exc) {
+               System.err.println("*** Runtime exception updating layer mode: " + exc); // This also can happen - e.g. a NullPointerException trying to evaluating an expression that failed to init
+               errorsStarting();
+            }
+         }
+         else
+            errorsStarting();
          //modelType.initDynamicInstance(this);
          initLayerModel((JavaModel) model, lpi, layerDirName, false, false, dynamic);
          initImports();
@@ -1878,7 +1912,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (layeredSystem.typeIndexEnabled) {
          if (layerTypeIndex == null)
             layerTypeIndex = new LayerTypeIndex();
-         layerTypeIndex.layerPathName = getLayerPathName();
+         layerTypeIndex.initFrom(this);
          if (layerTypeIndex.layerPathName == null)
             System.err.println("*** Missing layer path name for type index");
       }
@@ -2007,7 +2041,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public boolean isBuildLayer() {
-      return buildSeparate || layeredSystem.buildLayer == this || buildLayer;
+      return buildSeparate || (layeredSystem != null && layeredSystem.buildLayer == this) || buildLayer;
    }
 
    public void makeBuildLayer() {
@@ -2326,7 +2360,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          layerTypeIndex = new LayerTypeIndex();
          layerTypeIndex.langExtensions = langExtensions;
       }
-      layerTypeIndex.layerPathName = getLayerPathName();
+      layerTypeIndex.initFrom(this);
       if (layerTypeIndex.layerPathName == null)
          System.err.println("*** Missing layer path name for type index");
       // Always add the layer's type and layer components here since we've already started the layer's model and type.
@@ -3232,7 +3266,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public String toString() {
       String base = getLayerName();
       StringBuilder sb = new StringBuilder();
-      if (closed)
+      if (indexLayer)
+         sb.append(" *index");
+      else if (closed)
          sb.append(" *closed");
       if (excluded)
          sb.append(" *excluded");
@@ -3838,8 +3874,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public boolean matchesFilter(Collection<CodeType> codeTypes, Collection<CodeFunction> codeFunctions) {
-      return (codeTypes == null || codeTypes.contains(codeType)) && (codeFunctions == null || codeFunctions.contains(codeFunction));
+   public boolean matchesFilter(Collection<CodeType> codeTypes) {
+      return (codeTypes == null || codeTypes.contains(codeType));
    }
 
    public final static String BUILD_STATUS_FILE_BASE = "buildStatus.txt";
@@ -3923,12 +3959,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          return false;
 
       // TODO: call isSpecifiedLayer instead... even though its slightly different it probably will work the same.
-      for (int i = 0; i < layeredSystem.specifiedLayers.size(); i++) {
-         Layer specLayer = layeredSystem.specifiedLayers.get(i);
-         if (specLayer == this)
-            return true;
-         if (!specLayer.hidden && specLayer.extendsLayer(this))
-            return true;
+      if (layeredSystem != null) {
+         for (int i = 0; i < layeredSystem.specifiedLayers.size(); i++) {
+            Layer specLayer = layeredSystem.specifiedLayers.get(i);
+            if (specLayer == this)
+               return true;
+            if (!specLayer.hidden && specLayer.extendsLayer(this))
+               return true;
+         }
       }
       return false;
    }
@@ -3963,10 +4001,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          sb.append(codeType);
       }
 
-      if (codeFunction != null) {
-         sb.append(" codeFunction: ");
-         sb.append(codeType);
-      }
       sb.append("[");
       sb.append(layerPosition);
       sb.append("]");
@@ -4692,5 +4726,39 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       findRemovedFiles(changedModels);
    }
 
+
+   /** Used by both the command line and layers view to append a description for the layer based on what you are interested in */
+   public boolean appendDetailString(StringBuilder sb, boolean first, boolean details, boolean runtime, boolean sync) {
+      boolean useHidden = getVisibleInEditor();
+      if (details) {
+         if (useHidden)
+            first = opAppend(sb, "hidden", first);
+         if (buildSeparate)
+            first = opAppend(sb, "build separate", first);
+         if (isBuildLayer())
+            first = opAppend(sb, "build", first);
+         if (annotationLayer)
+            first = opAppend(sb, "annotation", first);
+         if (finalLayer)
+            first = opAppend(sb, "finalLayer", first);
+         if (codeType != CodeType.Application)
+            first = opAppend(sb, "codeType=" + codeType, first);
+      }
+      if (runtime) {
+         if (excludeRuntimes != null)
+            first = opAppend(sb, " excludes: " + excludeRuntimes, first);
+         if (hasDefinedRuntime)
+            first = opAppend(sb, " only: " + (definedRuntime == null ? "java" : definedRuntime), first);
+         if (excludeProcesses != null)
+            first = opAppend(sb, " excludes: " + excludeProcesses, first);
+         if (hasDefinedProcess)
+            first = opAppend(sb, " only: " + (definedProcess == null ? "<default>" : definedProcess), first);
+      }
+      if (sync) {
+         if (syncMode != SyncMode.Disabled && syncMode != null)
+            first = opAppend(sb, " syncMode=" + syncMode.toString(), first);
+      }
+      return first;
+   }
 }
 

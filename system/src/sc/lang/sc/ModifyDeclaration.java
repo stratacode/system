@@ -1652,8 +1652,13 @@ public class ModifyDeclaration extends TypeDeclaration {
             if (linst.inheritPackage || !inheritedPrefix) {
                linst.packagePrefix = prefix;
                String lname = linst.getLayerUniqueName();
-               if (!lname.startsWith(prefix)) {
-                  lname = CTypeUtil.prefixPath(prefix, lname);
+               if (lname == null || !lname.startsWith(prefix)) {
+                  if (lname == null)
+                     lname = ((JavaModel) linst.model).getModelTypeName(); // TODO: is this right
+                  else if (lname != null)
+                     lname = CTypeUtil.prefixPath(prefix, lname);
+                  else
+                     System.out.println("***");
                   linst.setLayerUniqueName(lname);
                }
             }

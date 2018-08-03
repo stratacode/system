@@ -964,7 +964,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
       "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
-      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.layer.CodeFunction", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil"};
+      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil"};
 
    // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
@@ -2787,27 +2787,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * for determining the icons in the file menu which happens early on in the initialization of the IDE.
     */
    public TypeIndexEntry getTypeIndexEntry(String filePath) {
-      if (inactiveLayers != null) {
-         for (int i = 0; i < inactiveLayers.size(); i++) {
-            Layer inactiveLayer = inactiveLayers.get(i);
-            TypeIndexEntry ent = inactiveLayer.getTypeIndexEntryForPath(filePath);
-            if (ent != null)
-               return ent;
+      acquireDynLock(false);
+      try {
+         if (inactiveLayers != null) {
+            for (int i = 0; i < inactiveLayers.size(); i++) {
+               Layer inactiveLayer = inactiveLayers.get(i);
+               TypeIndexEntry ent = inactiveLayer.getTypeIndexEntryForPath(filePath);
+               if (ent != null)
+                  return ent;
+            }
+            if (peerSystems != null && !peerMode) {
+               for (LayeredSystem peerSys:peerSystems) {
+                  TypeIndexEntry ent = peerSys.getTypeIndexEntry(filePath);
+                  if (ent != null)
+                     return ent;
+               }
+            }
          }
-         if (peerSystems != null && !peerMode) {
-            for (LayeredSystem peerSys:peerSystems) {
-               TypeIndexEntry ent = peerSys.getTypeIndexEntry(filePath);
+         if (typeIndexProcessMap != null) {
+            for (SysTypeIndex typeIndex:typeIndexProcessMap.values()) {
+               TypeIndexEntry ent = typeIndex.getTypeIndexEntryForPath(filePath);
                if (ent != null)
                   return ent;
             }
          }
       }
-      if (typeIndexProcessMap != null) {
-         for (SysTypeIndex typeIndex:typeIndexProcessMap.values()) {
-            TypeIndexEntry ent = typeIndex.getTypeIndexEntryForPath(filePath);
-            if (ent != null)
-               return ent;
-         }
+      finally {
+         releaseDynLock(false);
       }
       return null;
    }
@@ -3833,7 +3839,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                  new SyncProperties(null, null,
                          new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
                                  "baseLayerNames", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
-                                 "layerPosition", "codeType", "codeFunction", "dependentLayers"},
+                                 "layerPosition", "codeType", "dependentLayers"},
                          null, SyncOptions.SYNC_INIT_DEFAULT,  globalScopeId));
          for (Layer l:layers)
             l.initSync();
@@ -12884,6 +12890,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             stubLayer.layerPathName = defFile.absFileName;
             //stubLayer.layerBaseName = ...
             stubLayer.layerDirName = layerDirName;
+            if (stubLayer.layerUniqueName == null)
+               stubLayer.layerUniqueName = expectedName;
             return stubLayer;
          }
          return null;
@@ -13084,6 +13092,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             stubLayer.layerDirName = layerDirName;
             System.err.println("*** Failed to initialize inactive layer due to error initializing the layer: " + exc);
             if (options.verbose) exc.printStackTrace();
+            if (stubLayer.layerUniqueName == null)
+               stubLayer.layerUniqueName = expectedName;
             return stubLayer;
          }
          System.err.println("*** Failed to initialize layer: " + expectedName + " due to runtime error: " + exc);
@@ -14843,6 +14853,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return defaultLayeredSystem == this;
    }
 
+
+   /** Returns the complete set of inactive layers - returns the more complete inactiveLayer entry or the one from the type index if the inactive layer is not loaded yet */
+   public List<Layer> getInactiveIndexLayers() {
+      return typeIndex.inactiveTypeIndex.getIndexLayers(this);
+   }
 }
 
 

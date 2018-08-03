@@ -7859,23 +7859,22 @@ public class ModelUtil {
     * Used to filter objects in the UI.  Returns true if the type provided has any definitions in a layer with the
     * given code types and functions
     */
-   public static boolean matchesLayerFilter(Object type, Collection<CodeType> codeTypes, Collection<CodeFunction> codeFunctions) {
+   public static boolean matchesLayerFilter(Object type, Collection<CodeType> codeTypes) {
       if (!(type instanceof BodyTypeDeclaration))
-         return codeTypes.contains(CodeType.Framework) && codeFunctions.contains(CodeFunction.Program);
+         return codeTypes.contains(CodeType.Framework);
 
       BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
       while (typeDecl != null) {
-         if (typeDecl.getLayer().matchesFilter(codeTypes, codeFunctions))
+         if (typeDecl.getLayer().matchesFilter(codeTypes))
             return true;
          typeDecl = typeDecl.getModifiedType();
       }
       return false;
    }
 
-   public static void getFiltersForType(Object type, Collection<CodeType> codeTypes, Collection<CodeFunction> codeFunctions, boolean allLayers) {
+   public static void getFiltersForType(Object type, Collection<CodeType> codeTypes, boolean allLayers) {
       if (!(type instanceof BodyTypeDeclaration)) {
          codeTypes.add(CodeType.Framework);
-         codeFunctions.add(CodeFunction.Program);
          return;
       }
 
@@ -7884,8 +7883,6 @@ public class ModelUtil {
          Layer layer = typeDecl.getLayer();
          if (!codeTypes.contains(layer.codeType))
             codeTypes.add(layer.codeType);
-         if (!codeFunctions.contains(layer.codeFunction))
-            codeFunctions.add(layer.codeFunction);
          typeDecl = typeDecl.getModifiedType();
          if (!allLayers)
             break;

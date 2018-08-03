@@ -4,15 +4,30 @@
 
 package sc.layer;
 
+import sc.obj.SyncMode;
+
 import java.io.File;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 
 /**
  * Stores the information we persist in the type-index for a given layer.
 */
 public class LayerTypeIndex implements Serializable {
    String layerPathName; // Path to layer directory
+   String layerDirName; // the layer name
+   String layerBaseName; // base name of layer definition file
+   String packagePrefix;
+   CodeType codeType;
+   SyncMode syncMode;
+   boolean finalLayer;
+   boolean buildSeparate;
+   boolean buildLayer;
+   boolean annotationLayer;
+   String defaultModifier;
    String[] baseLayerNames; // List of base layer names for this layer
    String[] topLevelSrcDirs; // Top-level srcDirs as registered after starting the layer
    /** Type name to the type index information we store for that type */
@@ -20,6 +35,20 @@ public class LayerTypeIndex implements Serializable {
    /** File name to the type index info we store for that file */
    HashMap<String,TypeIndexEntry> fileIndex = new HashMap<String,TypeIndexEntry>();
    String[] langExtensions; // Any languages registered by this layer - need to know these are source
+
+   public List<String> excludeRuntimes = null;
+   public List<String> includeRuntimes = null;
+
+   public List<String> excludeProcesses = null;
+   public List<String> includeProcesses = null;
+
+   public boolean hasDefinedRuntime = false;
+   String definedRuntimeName;
+
+   public boolean hasDefinedProcess = false;
+   String definedProcessName;
+
+   transient Layer indexLayer;
 
    public boolean updateTypeName(String oldTypeName, String newTypeName) {
       TypeIndexEntry ent = layerTypeIndex.remove(oldTypeName);
@@ -100,5 +129,52 @@ public class LayerTypeIndex implements Serializable {
          }
       }
       return null;
+   }
+
+   public Layer getIndexLayer() {
+      if (indexLayer != null)
+         return indexLayer;
+
+      indexLayer = new Layer();
+      indexLayer.indexLayer = true;
+      indexLayer.layerPathName = layerPathName;
+      indexLayer.baseLayerNames = baseLayerNames == null ? null : new ArrayList<String>(Arrays.asList(baseLayerNames));
+      indexLayer.layerDirName = layerDirName;
+      indexLayer.layerBaseName = layerBaseName;
+      indexLayer.codeType = codeType;
+      indexLayer.syncMode = syncMode;
+      indexLayer.finalLayer = finalLayer;
+      indexLayer.defaultModifier = defaultModifier;
+      indexLayer.hasDefinedRuntime = hasDefinedRuntime;
+      indexLayer.hasDefinedProcess = hasDefinedProcess;
+      indexLayer.definedRuntimeName = definedRuntimeName;
+      indexLayer.definedProcessName = definedProcessName;
+      indexLayer.excludeRuntimes = excludeRuntimes;
+      indexLayer.excludeProcesses = excludeProcesses;
+      indexLayer.buildSeparate = buildSeparate;
+      indexLayer.buildLayer = buildLayer;
+
+      // Index layers are closed for the icon
+      indexLayer.closed = true;
+
+      return indexLayer;
+   }
+
+   public void initFrom(Layer layer) {
+      layerPathName = layer.getLayerPathName();
+      layerDirName = layer.layerDirName;
+      baseLayerNames = layer.baseLayerNames == null ? null : layer.baseLayerNames.toArray(new String[layer.baseLayerNames.size()]);
+      layerBaseName = layer.layerBaseName;
+      packagePrefix = layer.packagePrefix;
+      codeType = layer.codeType;
+      syncMode = layer.syncMode;
+      finalLayer = layer.finalLayer;
+      defaultModifier = layer.defaultModifier;
+      hasDefinedRuntime = layer.hasDefinedRuntime;
+      hasDefinedProcess = layer.hasDefinedProcess;
+      definedRuntimeName = layer.definedRuntimeName;
+      definedProcessName = layer.definedProcessName;
+      excludeRuntimes = layer.excludeRuntimes;
+      excludeProcesses = layer.excludeProcesses;
    }
 }

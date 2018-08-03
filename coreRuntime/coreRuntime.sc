@@ -1,6 +1,5 @@
 coreRuntime {
-   codeType = sc.layer.CodeType.Framework;
-   codeFunction = sc.layer.CodeFunction.Program;
+   codeType = CodeType.Framework;
 
    srcPath = "src";
 
