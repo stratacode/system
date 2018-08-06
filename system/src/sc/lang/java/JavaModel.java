@@ -523,12 +523,21 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    void initTypeInfo() {
       if (typeInfoInited)
          return;
-      if (imports != null && layer != null) {
+      boolean canFullyInit = true;
+      // For the layer model itself, we might be initializing the layer itself - i.e. resolving types in the layer model.  We can't init static
+      // imports here yet because they will depend on source files in the layer itself which are not fully resolved yet.  But since we do not refer
+      // to static imports in the layer definition file, we'll just init the model type again sometime when the layer is initialized to find the static
+      // global imports
+      if (imports != null && layer != null && layer.isInitialized()) {
          for (ImportDeclaration imp:imports) {
-            addStaticImportInternal(imp);
+            if (imp.staticImport && !layer.isInitialized())
+               canFullyInit = false;
+            else
+               addStaticImportInternal(imp);
          }
       }
-      typeInfoInited = true;
+      if (canFullyInit)
+         typeInfoInited = true;
 
       // For inactive types, when starting the model we need to make sure we've started the most specific type in the model
       // so we don't rely on stale data.  We check by getting the current model type if it's in a layer after this one
