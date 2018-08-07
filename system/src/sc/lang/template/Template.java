@@ -1600,12 +1600,21 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                res.rootType = res.types.get(0);
          }
          else {
-            res.rootType = rootType;
             TypeDeclaration newType = null;
-            if (rootType instanceof TypeDeclaration) {
-               newType = ((TypeDeclaration) rootType).deepCopy(options, oldNewMap);
-               res.rootType = newType;
-               res.addTypeDeclaration(newType);
+            // Because the deepCopy here will copy the types already, for the case where the source has a rootType, the types will already have it
+            // so calling deepCopy is an unnecessary call and the addTypeDeclaration adds it twice.
+            if (rootType != null && res.types != null && res.types.size() == 1) {
+               res.rootType = res.types.get(0);
+               newType = (TypeDeclaration) res.rootType;
+            }
+            else {
+               res.rootType = rootType;
+               if (rootType instanceof TypeDeclaration) {
+                  newType = ((TypeDeclaration) rootType).deepCopy(options, oldNewMap);
+                  res.rootType = newType;
+                  res.types.clear();
+                  res.addTypeDeclaration(newType);
+               }
             }
             if (templateProcessor != null && templateProcessor.getCompressSingleElementTemplates()) {
                Element elem = res.getSingleFileElement(null);

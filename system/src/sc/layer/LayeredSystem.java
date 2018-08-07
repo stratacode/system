@@ -2935,6 +2935,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   int len = prefix.length();
                   // If we are matching the prefixPkg we include the package name itself.  Otherwise, we skip it
                   int matchEndIx = pkgName.indexOf(".", len + (includeFirst ? 1 : 0));
+                  boolean emptyBaseName = prefixBaseName.equals("");
                   String headName;
                   String tailName;
                   if (matchEndIx == -1) {
@@ -2942,10 +2943,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      tailName = CTypeUtil.getClassName(pkgName);
                   }
                   else {
-                     headName = pkgName.substring(0, len);
-                     int startIx = headName.lastIndexOf(".");
-                     if (startIx == -1)
-                        startIx = includeFirst ? len+1 : 0;
+                     int startIx;
+                     if (includeFirst && emptyBaseName) {
+                        headName = prefixPkg;
+                        startIx = prefixPkg.length() + 1;
+                     }
+                     else {
+                        headName = pkgName.substring(0, len);
+                        startIx = headName.lastIndexOf(".");
+                        if (startIx == -1)
+                           startIx = includeFirst ? len+1 : 0;
+                     }
                      tailName = pkgName.substring(startIx, matchEndIx);
                   }
                   if (tailName.length() > 0 && tailName.startsWith(prefixBaseName)) {

@@ -1657,8 +1657,6 @@ public class ModifyDeclaration extends TypeDeclaration {
                      lname = ((JavaModel) linst.model).getModelTypeName(); // TODO: is this right
                   else if (lname != null)
                      lname = CTypeUtil.prefixPath(prefix, lname);
-                  else
-                     System.out.println("***");
                   linst.setLayerUniqueName(lname);
                }
             }
