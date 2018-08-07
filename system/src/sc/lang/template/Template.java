@@ -182,14 +182,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             }
          }
       }
-      /*
       if (rootType instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration btd = (BodyTypeDeclaration) rootType;
          o = btd.definesType(typeName, ctx);
          if (o != null)
             return o;
       }
-      */
       return super.definesType(typeName, ctx);
    }
 
