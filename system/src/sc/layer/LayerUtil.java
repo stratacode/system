@@ -353,8 +353,8 @@ public class LayerUtil implements LayerConstants {
 
    // TODO: Write a FilenameFilter which uses the logic in the IFileProcessor's to match class and source files.  We might need a new flag in there when the default is not accurate but we already know whether a file goes into the buildSrc or buildClasses folders.
    // Note: ft and html are here for the sc4idea plugin which uses those extensions to load resources from the classpath for the file templates.
-   public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp", "xml", "jpg", "gif", "png", "ft", "html", "dll"}), true);
-   public static final FilenameFilter SRC_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"java", "properties", "sctp", "xml"}), true);
+   public static final FilenameFilter CLASSES_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"class", "properties", "sctp", "sctd", "xml", "jpg", "gif", "png", "ft", "html", "dll"}), true);
+   public static final FilenameFilter SRC_JAR_FILTER = new ExtensionFilenameFilter(Arrays.asList(new String[]{"java", "properties", "sctp", "sctd", "xml"}), true);
 
    /**
     * Before creating a Jar file, we go through and order the files by directory name and include an entry for each directory.

@@ -94,7 +94,9 @@ public class IndexedChoice extends OrderedChoice {
          indexedKeys.add(key);
          l = new OrderedChoice.MatchResult();
          l.add(parselet);
-         l.addAll(defaultParselets); // Need to check the default parselets if the indexed choice fails
+         // TODO: performance.  This is not always the case - if we register for 'break' default parselet is identifier which matches 'breakfast' it should be added.
+         // But if we register for a key like %> which does not match the extra parselet, we should not add it here.  Can we match the key against the parselet and do this conditionally?
+         l.addAll(defaultParselets); // Sometimes need to check the default parselets if the indexed choice fails
          l.addSlotIndex(slotIx, 0);
          for (int i = 0; i < defaultParselets.size(); i++)
             l.addSlotIndex(defaultParselets.slotIndexes[i], 0);

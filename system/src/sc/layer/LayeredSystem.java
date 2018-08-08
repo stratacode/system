@@ -1215,6 +1215,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
       Language.registerLanguage(objDefTemplateLang, "sctd");
       Language.registerLanguage(TemplateLanguage.INSTANCE, TemplateLanguage.SCT_SUFFIX);
+      // TODO: Do not have a consistent defaultExtendsType based on how we use sctp but at least registering these as Templates for the IDE
+      Language.registerLanguage(TemplateLanguage.INSTANCE, "sctp");
       Language.registerLanguage(CommandSCLanguage.INSTANCE, CommandSCLanguage.SCR_SUFFIX);
 
       // Not registering Javascript yet because it is not complete.  In most projects we just copy the JS files as well so don't need to parse them as a language

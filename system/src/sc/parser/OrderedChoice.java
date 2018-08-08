@@ -548,7 +548,7 @@ public class OrderedChoice extends NestedParselet  {
                if (value == null) {
                   // Need to clone the oldParent here if we are reparsing a parent because the oldParent parse node could still be in used by a subsequent parse node in a parent.  If we
                   // modify it here in place, we'll mess up the oldParent which we'll end up reusing.  This happens when special block of text is inserted - e.g. reparseTest/re80
-                  valueCloned = forceReparse;
+                  valueCloned = forceReparse && oldParent != null;
                   value = resetOldParseNode(oldParent, lastMatchStart, true, valueCloned);
                }
 

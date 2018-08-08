@@ -662,21 +662,29 @@ public class TransformUtil {
 
    private final static HashMap<String,Template> templateResourceCache = new HashMap<String, Template>();
 
+   private final static String[] templateResourceExtensions = {"sctp", "sctd"};
+
    public static Template parseTemplateResource(String templateResourceTypeName, Class params, ClassLoader loader) {
       Template t = templateResourceCache.get(templateResourceTypeName);
       if (t != null)
          return t;
-      String resourcePath = FileUtil.addExtension(templateResourceTypeName.replace('.','/'), "sctp");
-      InputStream is = loader.getResourceAsStream(resourcePath);
-      if (is == null) {
-         return null;
+      InputStream is = null;
+      String resourcePath = null;
+      for (int i = 0; i < templateResourceExtensions.length; i++) {
+         String ext = templateResourceExtensions[i];
+         resourcePath = FileUtil.addExtension(templateResourceTypeName.replace('.','/'), ext);
+         is = loader.getResourceAsStream(resourcePath);
+         if (is != null) {
+            break;
+         }
       }
+      if (is == null)
+         return null;
       StringBuilder templateBuf = FileUtil.readInputStream(is);
       if (templateBuf == null) {
          System.err.println("*** Failed to read: " + templateResourceTypeName + " in system class path");
          return null;
       }
-
 
       Template res = TransformUtil.parseTemplate(templateBuf.toString(), params, false);
       res.setSrcFile(new SrcEntry(null, resourcePath, resourcePath, resourcePath));

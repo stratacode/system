@@ -308,6 +308,7 @@ public class TestUtil {
          Language.registerLanguage(objDefTemplateLang, "sctd");
          // This is a real template, treated as a regular type in the system, either dynamic or compiled
          Language.registerLanguage(TemplateLanguage.INSTANCE, "sct");
+         Language.registerLanguage(TemplateLanguage.INSTANCE, "sctjs");
          Language.registerLanguage(JSLanguage.INSTANCE, "js");
          Language.registerLanguage(HTMLLanguage.INSTANCE, "schtml");
          Language.registerLanguage(HTMLLanguage.INSTANCE, "html");

@@ -20,11 +20,11 @@ coreRuntime {
       extensions = {"xml", "properties"};
    }
 
-   object sctpFileProcessor extends LayerFileProcessor {
+   object sctFileProcessor extends LayerFileProcessor {
       prependLayerPackage = true;
       useSrcDir = false;
       useClassesDir = true;
       compiledLayersOnly = true;
-      extensions = {"sctp"};
+      extensions = {"sctp", "sctd"};
    }
 }
