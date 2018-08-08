@@ -150,8 +150,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    {
       // Disable partial values on exprStatement because of problems matching glueExpression in the template language in partial values mode.   In general though it seems like we may not want
       // to match an expression by itself since it might be a part of something larger?  We're doing this for now in TemplateLanguage.  To really fix the bug, ideally glueExpression would not be
-      // the expression used by templateStatement since the end of the templatestatement gets missparsed as the start of the glue.
+      // the expression used by TemplateStatement since the end of the TemplateStatement gets mis-parsed as the start of the glue.
       exprStatement.skipOnErrorSlot = 2;
+      exprStatement.minContentSlot = 1;
 
       // Add this to the regular Java grammar.  It recognizes the %> followed by text or <%= %> statements
       statement.put(END_DELIMITER, glueStatement);
