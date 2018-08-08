@@ -662,7 +662,7 @@ public class TransformUtil {
 
    private final static HashMap<String,Template> templateResourceCache = new HashMap<String, Template>();
 
-   private final static String[] templateResourceExtensions = {"sctp", "sctd"};
+   private final static String[] templateResourceExtensions = {"sctp", "sctd", "sctdynt"};
 
    public static Template parseTemplateResource(String templateResourceTypeName, Class params, ClassLoader loader) {
       Template t = templateResourceCache.get(templateResourceTypeName);

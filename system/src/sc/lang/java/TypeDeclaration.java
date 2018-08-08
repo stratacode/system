@@ -1538,8 +1538,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return params.getNumCompMethods() != 0 || params.getNumCompProps() != 0;
    }
 
-   private final static String DYN_TEMPLATE_FILE = "sc/lang/java/DynTypeTemplate.sctp";
-   private final static String STATIC_DYN_TEMPLATE_FILE = "sc/lang/java/StaticDynTypeTemplate.sctp";
+   private final static String DYN_TEMPLATE_FILE = "sc/lang/java/DynTypeTemplate.sctdynt";
+   private final static String STATIC_DYN_TEMPLATE_FILE = "sc/lang/java/StaticDynTypeTemplate.sctdynt";
 
    public void transformCompiledType() {
       // Do this for classes for which we're generating reflective dyn type info - don't do it for types for which there's no compiled class

@@ -1214,6 +1214,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       objDefTemplateLang.needsJavascript = false; // Because these templates affect code-generation, don't need to transform them to JS code
       // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
       Language.registerLanguage(objDefTemplateLang, "sctd");
+      TemplateLanguage dynTemplateLang = new TemplateLanguage();
+      dynTemplateLang.compiledTemplate = false;
+      dynTemplateLang.runtimeTemplate = true;
+      dynTemplateLang.defaultExtendsType = "sc.lang.java.DynStubParameters";
+      dynTemplateLang.needsJavascript = false; // Because these templates affect code-generation, don't need to transform them to JS code
+      Language.registerLanguage(dynTemplateLang, "sctdynt");
+      // This one is for object definition templates we process from Java code, i.e. as part of framework definitions from CompilerSettings, newTemplate, and objTemplate
       Language.registerLanguage(TemplateLanguage.INSTANCE, TemplateLanguage.SCT_SUFFIX);
       // TODO: Do not have a consistent defaultExtendsType based on how we use sctp but at least registering these as Templates for the IDE
       Language.registerLanguage(TemplateLanguage.INSTANCE, "sctp");

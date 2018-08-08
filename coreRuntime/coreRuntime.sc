@@ -25,6 +25,6 @@ coreRuntime {
       useSrcDir = false;
       useClassesDir = true;
       compiledLayersOnly = true;
-      extensions = {"sctp", "sctd"};
+      extensions = {"sctp", "sctd", "sctdynt"};
    }
 }
