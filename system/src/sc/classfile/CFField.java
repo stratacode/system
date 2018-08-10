@@ -68,4 +68,8 @@ public class CFField extends ClassFile.FieldMethodInfo implements IVariable, IFi
          return null;
       return ModelUtil.definesMember(rtType, name, MemberType.FieldEnumSet, null, null, getLayeredSystem());
    }
+
+   public String toDeclarationString() {
+      return (type == null ? "<null type>" : type.toString()) + " " + name;
+   }
 }

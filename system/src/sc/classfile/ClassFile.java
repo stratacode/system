@@ -171,7 +171,7 @@ public class ClassFile {
       String desc;
       CoalescedHashMap<String,Attribute> attributes;
 
-      CFClass ownerClass;
+      public CFClass ownerClass;
 
       public String getDescription() {
          ClassFile.SignatureAttribute sigAtt = (ClassFile.SignatureAttribute) attributes.get("Signature");

@@ -141,6 +141,7 @@ public class LayerTypeIndex implements Serializable {
       indexLayer.baseLayerNames = baseLayerNames == null ? null : new ArrayList<String>(Arrays.asList(baseLayerNames));
       indexLayer.layerDirName = layerDirName;
       indexLayer.layerBaseName = layerBaseName;
+      indexLayer.packagePrefix = packagePrefix;
       indexLayer.codeType = codeType;
       indexLayer.syncMode = syncMode;
       indexLayer.finalLayer = finalLayer;
@@ -176,5 +177,7 @@ public class LayerTypeIndex implements Serializable {
       definedProcessName = layer.definedProcessName;
       excludeRuntimes = layer.excludeRuntimes;
       excludeProcesses = layer.excludeProcesses;
+      buildSeparate = layer.buildSeparate;
+      buildLayer = layer.buildLayer;
    }
 }

@@ -5658,6 +5658,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             renumberInactiveLayers(posIx + 1);
          }
       }
+
+      // Rebuild the index layers in any listeners like the LayersView
+      typeIndex.inactiveTypeIndex.indexLayersCache = null;
+
       notifyLayerAdded(layer);
 
       checkLayerPosition();

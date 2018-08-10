@@ -210,6 +210,10 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       */
    }
 
+   public String toDeclarationString() {
+      return toString();
+   }
+
    @Override
    public String getParameterString() {
       if (!started)

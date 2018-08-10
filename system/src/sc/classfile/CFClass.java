@@ -25,7 +25,7 @@ import java.util.zip.ZipFile;
 
 /** The class defined from a ClassFile, i.e. read directly from the binary .class representation. */
 public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycle, IDefinition {
-   ClassFile classFile;
+   public ClassFile classFile;
    JavaType extendsJavaType;
    Object extendsType;
    List<JavaType> implJavaTypes;
@@ -124,7 +124,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                else
                   file = new ClassFile(input, layer);
                file.initialize();
-               file.classFileName = zipFile.getName() + "[pathInZip=" + classPathName + "]";
+               // This matches the rules for a file name with intelliJ's virtual file system so we don't have to convert it to hand it off (and it seems like as good as any)
+               file.classFileName = "jar://" + zipFile.getName() + "!/" + classPathName;
                return file.getCFClass();
             }
          }
@@ -1373,6 +1374,10 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (classFile != null)
          return getTypeName();
       return super.toString();
+   }
+
+   public String toDeclarationString() {
+      return getFullTypeName();
    }
 
    public ITypeDeclaration getEnclosingIType() {

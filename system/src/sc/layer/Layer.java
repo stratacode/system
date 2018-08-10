@@ -2481,8 +2481,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (codeType == CodeType.Framework)
          ct--;
 
-      if (ct == 0)
+      if (ct == 0) {
+         // for inactive layers, when we built the type index we created a master index of "an order" that satisfies dependencies.  As we restore layers, we want
+         // them to remain in this consistent order so we can display them cleanly in the UI.
+         if (!activated) {
+            LayeredSystem sys = layeredSystem;
+            if (sys.typeIndex != null) {
+               int oldPos = sys.typeIndex.inactiveTypeIndex.orderIndex.inactiveLayerNames.indexOf(getLayerName());
+               if (oldPos != -1)
+                  return oldPos;
+            }
+         }
          return DEFAULT_SORT_PRIORITY;
+      }
 
       return ct;
    }
