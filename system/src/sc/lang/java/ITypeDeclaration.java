@@ -98,10 +98,12 @@ public interface ITypeDeclaration {
 
    Object findTypeDeclaration(String typeName, boolean addExternalReference);
 
+   // Returns null if this is not a StrataCode Model type - e.g. for CFClass and externally defined types
    JavaModel getJavaModel();
 
    boolean isLayerType();
 
+   // Returns null if not in a layer
    Layer getLayer();
 
    LayeredSystem getLayeredSystem();

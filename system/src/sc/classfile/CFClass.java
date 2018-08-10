@@ -476,6 +476,9 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
             return true;
          if (extendsType instanceof ITypeDeclaration)
             return ((ITypeDeclaration) extendsType).isAssignableTo(other);
+         else if (extendsType instanceof Class && extendsType != Object.class) {
+            return ModelUtil.isAssignableFrom(other, extendsType);
+         }
          // else - java.lang.Class
          // Classes here should be only java.lang classes and so should not match from this point on
       }
