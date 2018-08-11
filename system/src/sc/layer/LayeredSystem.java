@@ -10120,7 +10120,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (active)
          cleanTypeCache();
 
-      // Clear out any compiled classes which might have changed as a result of being compiled elsewhere - this currently does not support .class files since that requires messing with class loaders and instances
+      // Clear out any compiled classes which might have changed as a result of being compiled elsewhere - this currently does not support java.lang.Class since that requires messing with class loaders and instances.  It only works with CFClass's.
       refreshClassCache();
 
       // We may start some new models here so reset this flag

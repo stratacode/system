@@ -58,6 +58,7 @@ public class ClassFile {
    int innerAccessFlags; // Access flags that are stored in theInnerClasses attribute for this class (e.g. 'static')
 
    public String classFileName;
+   public String zipFileName;
    public long lastModifiedTime;
 
    public ClassFile(InputStream is) {
@@ -878,6 +879,7 @@ public class ClassFile {
    }
 
    public boolean fileChanged() {
-      return new File(classFileName).lastModified() > lastModifiedTime;
+      String file = zipFileName != null ? zipFileName : classFileName;
+      return new File(file).lastModified() > lastModifiedTime;
    }
 }

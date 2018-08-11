@@ -2970,6 +2970,107 @@ public class ModelUtil {
       return definesConstructor(sys, td, parameters, ctx, null, false);
    }
 
+   // This version uses the getConstructors method to match methods generically using ITypeDeclaration implementations, IMethodDefinition etc.
+   public static Object definesConstructorFromList(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed) {
+      int argsLen = parameters == null ? 0 : parameters.size();
+      Object[] types = parametersToTypeArray(parameters, ctx);
+      Object[] list = getConstructors(td, null);
+      Object res = null;
+      Object[] prevExprTypes = null;
+      ArrayList<Expression> toClear = null;
+      for (int i = 0; i < list.length; i++) {
+         Object toCheck = list[i];
+         Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
+         int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
+         int last = paramLen - 1;
+         boolean isVarArgs = ModelUtil.isVarArgs(toCheck);
+         if (paramLen != argsLen) {
+            // If the last guy is not a repeating parameter, it can't match
+            if (last < 0 || !isVarArgs || !ModelUtil.isArray(parameterTypes[last]) || argsLen < last)
+               continue;
+         }
+
+         ParamTypedMethod paramMethod = null;
+         if (!(toCheck instanceof ParamTypedMethod) && ModelUtil.isParameterizedMethod(toCheck)) {
+
+            // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
+            paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
+
+            parameterTypes = paramMethod.getParameterTypes(true);
+            toCheck = paramMethod;
+            if (paramMethod.invalidTypeParameter)
+               continue;
+         }
+
+         if (paramLen == 0 && argsLen == 0) {
+            if (refType == null || checkAccess(refType, toCheck))
+               res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
+         }
+         else {
+            int j;
+            Object[] nextExprTypes = new Object[argsLen];
+            for (j = 0; j < argsLen; j++) {
+               Object paramType;
+               if (j > last) {
+                  if (!ModelUtil.isArray(paramType = parameterTypes[last]))
+                     break;
+               }
+               else
+                  paramType = parameterTypes[j];
+
+               Object exprType;
+               Object exprObj = parameters.get(j);
+
+               if (exprObj instanceof Expression) {
+                  Object infParamType = paramType;
+                  if (infParamType instanceof ParamTypeDeclaration)
+                     infParamType = ((ParamTypeDeclaration) infParamType).cloneForNewTypes();
+                  Expression paramExpr = (Expression) exprObj;
+                  if (isVarArgs && j >= last && ModelUtil.isArray(infParamType)) {
+                     infParamType = ModelUtil.getArrayComponentType(infParamType);
+                  }
+                  paramExpr.setInferredType(infParamType, false);
+                  if (toClear == null)
+                     toClear = new ArrayList<Expression>();
+                  toClear.add(paramExpr);
+               }
+               exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
+
+               // Lambda inferred type is not valid so can't be a match
+               if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
+                  break;
+
+               nextExprTypes[j] = exprType;
+
+               if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx)) {
+                  // Repeating parameters... if the last parameter is an array match if the component type matches
+                  if (j >= last && ModelUtil.isArray(paramType) && isVarArgs) {
+                     if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
+                        break;
+                     }
+                  }
+                  else
+                     break;
+               }
+            }
+            if (j == argsLen) {
+               if (refType == null || checkAccess(refType, toCheck)) {
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, parameters); // TODO separate types for each inferred type
+                  if (res == toCheck)
+                     prevExprTypes = nextExprTypes;
+               }
+            }
+            // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
+            if (toClear != null) {
+               for (Expression clearExpr:toClear)
+                  clearExpr.clearInferredType();
+               toClear = null;
+            }
+         }
+      }
+      return res;
+   }
+
    public static Object definesConstructor(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed) {
       Object res;
       if (td instanceof ITypeDeclaration && !(td instanceof CFClass)) {
@@ -2989,103 +3090,7 @@ public class ModelUtil {
       }
       */
       else if (td instanceof Class || td instanceof CFClass) {
-         int argsLen = parameters == null ? 0 : parameters.size();
-         Object[] types = parametersToTypeArray(parameters, ctx);
-         Object[] list = getConstructors(td, null);
-         res = null;
-         Object[] prevExprTypes = null;
-         ArrayList<Expression> toClear = null;
-         for (int i = 0; i < list.length; i++) {
-            Object toCheck = list[i];
-            Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
-            int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
-            int last = paramLen - 1;
-            boolean isVarArgs = ModelUtil.isVarArgs(toCheck);
-            if (paramLen != argsLen) {
-               // If the last guy is not a repeating parameter, it can't match
-               if (last < 0 || !isVarArgs || !ModelUtil.isArray(parameterTypes[last]) || argsLen < last)
-                  continue;
-            }
-
-            ParamTypedMethod paramMethod = null;
-            if (!(toCheck instanceof ParamTypedMethod) && ModelUtil.isParameterizedMethod(toCheck)) {
-
-               // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
-               paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
-
-               parameterTypes = paramMethod.getParameterTypes(true);
-               toCheck = paramMethod;
-               if (paramMethod.invalidTypeParameter)
-                  continue;
-            }
-
-            if (paramLen == 0 && argsLen == 0) {
-               if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
-            }
-            else {
-               int j;
-               Object[] nextExprTypes = new Object[argsLen];
-               for (j = 0; j < argsLen; j++) {
-                  Object paramType;
-                  if (j > last) {
-                     if (!ModelUtil.isArray(paramType = parameterTypes[last]))
-                        break;
-                  }
-                  else
-                     paramType = parameterTypes[j];
-
-                  Object exprType;
-                  Object exprObj = parameters.get(j);
-
-                  if (exprObj instanceof Expression) {
-                     Object infParamType = paramType;
-                     if (infParamType instanceof ParamTypeDeclaration)
-                        infParamType = ((ParamTypeDeclaration) infParamType).cloneForNewTypes();
-                     Expression paramExpr = (Expression) exprObj;
-                     if (isVarArgs && j >= last && ModelUtil.isArray(infParamType)) {
-                        infParamType = ModelUtil.getArrayComponentType(infParamType);
-                     }
-                     paramExpr.setInferredType(infParamType, false);
-                     if (toClear == null)
-                        toClear = new ArrayList<Expression>();
-                     toClear.add(paramExpr);
-                  }
-                  exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
-
-                  // Lambda inferred type is not valid so can't be a match
-                  if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
-                     break;
-
-                  nextExprTypes[j] = exprType;
-
-                  if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx)) {
-                     // Repeating parameters... if the last parameter is an array match if the component type matches
-                     if (j >= last && ModelUtil.isArray(paramType) && isVarArgs) {
-                        if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
-                           break;
-                        }
-                     }
-                     else
-                        break;
-                  }
-               }
-               if (j == argsLen) {
-                  if (refType == null || checkAccess(refType, toCheck)) {
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, parameters); // TODO separate types for each inferred type
-                     if (res == toCheck)
-                        prevExprTypes = nextExprTypes;
-                  }
-               }
-               // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
-               if (toClear != null) {
-                  for (Expression clearExpr:toClear)
-                     clearExpr.clearInferredType();
-                  toClear = null;
-               }
-            }
-         }
-         return res;
+         return definesConstructorFromList(sys, td, parameters, ctx, refType, isTransformed);
       }
       else
          throw new UnsupportedOperationException();
@@ -4248,6 +4253,20 @@ public class ModelUtil {
       }
    }
 
+   public static String isGetMethodImpl(Object meth) {
+      String name = ModelUtil.getMethodName(meth);
+      if (name.startsWith("get") || name.startsWith("is")) {
+         Object returnType = ModelUtil.getReturnJavaType(meth);
+         if (returnType != null && ModelUtil.typeIsVoid(returnType))
+            return null;
+         Object[] parameterTypes = ModelUtil.getParameterJavaTypes(meth, false);
+         if (parameterTypes == null || parameterTypes.length == 0 ||
+                 (parameterTypes.length == 1 && name.startsWith("get") && typeIsBoolean(parameterTypes[0])))
+            return CTypeUtil.decapitalizePropertyName(name.charAt(0) == 'g' ? name.substring(3) : name.substring(2));
+      }
+      return null;
+   }
+
    /**
     * These next three functions take info from a method and turn it into a property name if it is a property of
     * this type.  Note that we can't use getTypeDeclaration here since we need this info before we start the
@@ -4275,6 +4294,20 @@ public class ModelUtil {
       }
       if (rest != null && rest.length() > 0) {
          return CTypeUtil.decapitalizePropertyName(rest);
+      }
+      return null;
+   }
+
+   public static String isSetMethodImpl(Object meth) {
+      String name = ModelUtil.getMethodName(meth);
+      if (name.startsWith("set") && name.length() >= 4) {
+         Object returnType = ModelUtil.getReturnJavaType(meth);
+         if (returnType != null && !ModelUtil.typeIsVoid(returnType))
+            return null;
+         Object[] parameterTypes = ModelUtil.getParameterJavaTypes(meth, false);
+         if (parameterTypes != null && (parameterTypes.length == 1 || (parameterTypes.length == 2 && isInteger(parameterTypes[0])))) {
+            return CTypeUtil.decapitalizePropertyName(name.substring(3));
+         }
       }
       return null;
    }
@@ -4360,11 +4393,40 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   public static String isSetIndexMethodImpl(Object meth) {
+      String name = ModelUtil.getMethodName(meth);
+      if (name.startsWith("set")) {
+         Object returnType = ModelUtil.getReturnJavaType(meth);
+         if (returnType != null && !ModelUtil.typeIsVoid(returnType))
+            return null;
+         Object[] paramJavaTypes = ModelUtil.getParameterJavaTypes(meth, false);
+         if (paramJavaTypes != null && paramJavaTypes.length == 2 && ModelUtil.typeIsInteger(paramJavaTypes[0])) {
+              return CTypeUtil.decapitalizePropertyName(name.substring(3));
+         }
+      }
+      return null;
+   }
+
    public static String isSetIndexMethod(String name, Object[] paramJavaTypes, Object returnType) {
       if (name.startsWith("set") && paramJavaTypes != null && paramJavaTypes.length == 2 &&
           (returnType == null || ModelUtil.typeIsVoid(returnType)) &&
           ModelUtil.typeIsInteger(paramJavaTypes[0])) {
          return CTypeUtil.decapitalizePropertyName(name.substring(3));
+      }
+      return null;
+   }
+
+   public static String isGetIndexMethodImpl(Object meth) {
+      String name = ModelUtil.getMethodName(meth);
+      if (name.startsWith("get")) {
+         Object returnType = ModelUtil.getReturnJavaType(meth);
+         if (returnType != null && ModelUtil.typeIsVoid(returnType))
+            return null;
+         Object[] paramJavaTypes = ModelUtil.getParameterJavaTypes(meth, false);
+         if (paramJavaTypes != null && paramJavaTypes.length == 1 &&
+              ModelUtil.typeIsInteger(paramJavaTypes[0])) {
+            return CTypeUtil.decapitalizePropertyName(name.substring(3));
+         }
       }
       return null;
    }

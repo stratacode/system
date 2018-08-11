@@ -24,14 +24,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /** The class defined from a ClassFile, i.e. read directly from the binary .class representation. */
-public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycle, IDefinition {
+public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinition {
    public ClassFile classFile;
    JavaType extendsJavaType;
    Object extendsType;
    List<JavaType> implJavaTypes;
    List<Object> implementsTypes;
    Layer layer;
-   LayeredSystem system;
    public List<TypeParameter> typeParameters;
 
    CoalescedHashMap<String,Object[]> methodsByName;  // This does include super-type methods
@@ -45,14 +44,14 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
    static final int AccessFlagInterfaceMethod = Modifier.VOLATILE | SyntheticModifier; // Volatile & Synthetic appears to mean a method defined on the interface and inherited
 
    CFClass(ClassFile cl, Layer layer) {
+      super(layer.getLayeredSystem());
       classFile = cl;
       this.layer = layer;
-      this.system = layer.getLayeredSystem();
    }
 
    CFClass(ClassFile cl, LayeredSystem sys) {
+      super(sys);
       classFile = cl;
-      this.system = sys;
    }
 
    private static CFClass load(String classFileName, LayeredSystem system, Layer layer) {
@@ -125,7 +124,8 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
                   file = new ClassFile(input, layer);
                file.initialize();
                // This matches the rules for a file name with intelliJ's virtual file system so we don't have to convert it to hand it off (and it seems like as good as any)
-               file.classFileName = "jar://" + zipFile.getName() + "!/" + classPathName;
+               file.zipFileName = zipFile.getName();
+               file.classFileName = "jar://" + file.zipFileName + "!/" + classPathName;
                return file.getCFClass();
             }
          }
@@ -430,85 +430,12 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       }
    }
 
-   public boolean isAssignableFrom(ITypeDeclaration other, boolean assignmentSemantics) {
-      if (other instanceof ArrayTypeDeclaration)
-         return false;
-      return other.isAssignableTo(this);
+   public String getInterfaceName(int ix) {
+      return classFile.getInterfaceName(ix);
    }
 
-   public boolean isAssignableTo(ITypeDeclaration other) {
-      if (other instanceof ArrayTypeDeclaration)
-         return false;
-
-      if (!started)
-         start();
-
-      String otherName = other.getFullTypeName();
-
-      if (otherName.equals(getFullTypeName()))
-         return true;
-      
-      if (other instanceof ModifyDeclaration) {
-         Object newType = other.getDerivedTypeDeclaration();
-         if (this == newType)
-            return true;
-      }
-
-      if (implementsTypes != null) {
-         int numInterfaces = implementsTypes.size();
-         for (int i = 0; i < numInterfaces; i++) {
-            String interfaceName = classFile.getInterfaceName(i);
-            if (otherName.equals(interfaceName))
-               return true;
-            Object implType = implementsTypes.get(i);
-            if (implType instanceof ITypeDeclaration) {
-               if (((ITypeDeclaration) implType).isAssignableTo(other))
-                  return true;
-            }
-            // implType might be another Java class but how could a java class depend on a CFClass?
-            else if (implType != Object.class)
-               ;
-         }
-      }
-      if (extendsType != null) {
-         String extendsName = classFile.getExtendsTypeName();
-         if (extendsName.equals(otherName))
-            return true;
-         if (extendsType instanceof ITypeDeclaration)
-            return ((ITypeDeclaration) extendsType).isAssignableTo(other);
-         else if (extendsType instanceof Class && extendsType != Object.class) {
-            return ModelUtil.isAssignableFrom(other, extendsType);
-         }
-         // else - java.lang.Class
-         // Classes here should be only java.lang classes and so should not match from this point on
-      }
-      return false;
-   }
-
-   public boolean isAssignableFromClass(Class other) {
-      String otherName = TypeUtil.getTypeName(other, true);
-      if (otherName.equals(getFullTypeName()))
-         return true;
-      Class superType = other.getSuperclass();
-      if (superType != null && isAssignableFromClass(superType))
-         return true;
-      Class[] ifaces = other.getInterfaces();
-      if (ifaces != null) {
-         for (Class c:ifaces)
-            if (isAssignableFromClass(c))
-               return true;
-      }
-      // Handles the int implements Comparable when Comparable is a CFClass
-      if (other.isPrimitive()) {
-         Class clWrapper = sc.type.Type.get(other).getObjectClass();
-         if (isAssignableFromClass(clWrapper))
-            return true;
-      }
-      return false;
-   }
-
-   public String getTypeName() {
-      return CTypeUtil.getClassName(getFullTypeName());
+   public String getExtendsTypeName() {
+      return classFile.getExtendsTypeName();
    }
 
    public String getFullTypeName() {
@@ -521,23 +448,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return classFile.getCFClassName();
    }
 
-   private String stripInnerSeparators(String input) {
-      Object type = this, nextType;
-      while ((nextType = ModelUtil.getEnclosingType(type)) != null) {
-         int lastSepIx = input.lastIndexOf('$');
-         if (lastSepIx == -1 || lastSepIx == input.length() - 1) {
-            // This should not happen!  If it's an inner class, the name should have a trailing $
-            return input;
-         }
-         input = input.substring(0, lastSepIx) + "." + input.substring(lastSepIx+1);
-      }
-      return input;
-   }
-
-   public String getFullTypeName(boolean includeDims, boolean includeTypeParams) {
-      return getFullTypeName(); // Can't have dims or type parameters with bound values
-   }
-
    public String getFullBaseTypeName() {
       return classFile.getTypeName();
    }
@@ -546,182 +456,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return getTypeName(); // TODO: does this need to handle inner types
    }
 
-   public Class getCompiledClass() {
-      return system.getCompiledClassWithPathName(getFullTypeName());
-   }
-
-   public String getCompiledClassName() {
-      return getFullTypeName();
-   }
-
-   public String getCompiledTypeName() {
-      return getFullTypeName();
-   }
-
-   public Object getRuntimeType() {
-      return getCompiledClass();
-   }
-
-   public boolean isDynamicType() {
-      return false;
-   }
-
-   public boolean isDynamicStub(boolean includeExtends) {
-      return false;
-   }
-
-   public Object definesMethod(String name, List<?> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
-      if (!started)
-         start();
-
-      Object[] list = ModelUtil.getMethods(this, name, null);
-
-      Object meth = null;
-
-      if (list == null) {
-         // Interfaces don't inherit object methods in Java but an inteface type in this system needs to still
-         // implement methods like "toString" even if they are not on the interface.
-         if (ModelUtil.isInterface(this)) {
-            meth = ModelUtil.getMethod(system, Object.class, name, refType, null, inferredType, staticOnly, methodTypeArgs, parametersOrExpressions, null);
-            if (meth != null)
-               return meth;
-         }
-      }
-      else {
-         int typesLen = parametersOrExpressions == null ? 0 : parametersOrExpressions.size();
-         Object[] prevExprTypes = null;
-         ArrayList<Expression> toClear = null;
-         for (int i = 0; i < list.length; i++) {
-            Object toCheck = list[i];
-            if (ModelUtil.getMethodName(toCheck).equals(name)) {
-               Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
-
-               int paramLen = parameterTypes == null ? 0 : parameterTypes.length;
-               if (staticOnly && !ModelUtil.hasModifier(toCheck, "static"))
-                  continue;
-
-               int last = paramLen - 1;
-               if (paramLen != typesLen) {
-                  int j;
-                  // If the last guy is not a repeating parameter, it can't match
-                  if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || typesLen < last)
-                     continue;
-               }
-
-               ParamTypedMethod paramMethod = null;
-               if (ModelUtil.isParameterizedMethod(toCheck)) {
-
-                  Object definedInType = refType != null ? refType : this;
-                  if (ctx instanceof ParamTypeDeclaration) {
-                     ParamTypeDeclaration paramCtx = (ParamTypeDeclaration) ctx;
-                     if (paramCtx.getDefinedInType() != null)
-                        definedInType = paramCtx.getDefinedInType();
-                  }
-
-                  paramMethod = new ParamTypedMethod(system, toCheck, ctx, definedInType, parametersOrExpressions, inferredType, methodTypeArgs);
-
-                  parameterTypes = paramMethod.getParameterTypes(true);
-                  toCheck = paramMethod;
-
-                  // There was a conflict with the type parameters matching so the parameterTypes are not valid
-                  if (paramMethod.invalidTypeParameter)
-                     continue;
-               }
-
-               if (paramLen == 0 && typesLen == 0) {
-                  if (refType == null || ModelUtil.checkAccess(refType, toCheck))
-                     meth = ModelUtil.pickMoreSpecificMethod(meth, toCheck, null, null, null);
-               }
-               else {
-                  int j;
-                  Object[] nextExprTypes = new Object[typesLen];
-                  for (j = 0; j < typesLen; j++) {
-                     Object paramType;
-                     if (j > last) {
-                        if (!ModelUtil.isArray(paramType = parameterTypes[last]))
-                           break;
-                     }
-                     else
-                        paramType = parameterTypes[j];
-
-                     Object exprObj = parametersOrExpressions.get(j);
-
-                     if (exprObj instanceof Expression) {
-                        if (paramType instanceof ParamTypeDeclaration)
-                           paramType = ((ParamTypeDeclaration) paramType).cloneForNewTypes();
-                        Expression paramExpr = (Expression) exprObj;
-                        paramExpr.setInferredType(paramType, false);
-                        if (toClear == null)
-                           toClear = new ArrayList<Expression>();
-                        toClear.add(paramExpr);
-                     }
-
-                     Object exprType = ModelUtil.getVariableTypeDeclaration(exprObj);
-                     nextExprTypes[j] = exprType;
-
-                     // Lambda inferred type is not valid so can't be a match
-                     if (exprType instanceof BaseLambdaExpression.LambdaInvalidType)
-                        break;
-
-                     if (exprType != null && paramType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx, system)) {
-                        // Repeating parameters... if the last parameter is an array match if the component type matches
-                        if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
-                           if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), exprType, false, ctx)) {
-                              break;
-                           }
-                        }
-                        else
-                           break;
-                     }
-                  }
-                  if (j == typesLen) {
-                     if (refType == null || ModelUtil.checkAccess(refType, toCheck)) {
-                        Object newMeth = ModelUtil.pickMoreSpecificMethod(meth, toCheck, nextExprTypes, prevExprTypes, parametersOrExpressions);
-                        if (newMeth != meth)
-                           prevExprTypes = nextExprTypes;
-                        meth = newMeth;
-                     }
-                  }
-               }
-               // Don't leave the inferredType lying around in the parameter expressions for when we start matching the next method.
-               if (toClear != null) {
-                  for (Expression clearExpr:toClear)
-                     clearExpr.clearInferredType();
-                  toClear = null;
-               }
-            }
-         }
-         if (meth != null)
-            return meth;
-      }
-
-      Object superMeth = null;
-      if (extendsType != null) {
-         // If necessary map the type variables in the base-types' declaration based on the type params in the context
-         Object paramExtType = ParamTypeDeclaration.convertBaseTypeContext(ctx, extendsType);
-
-         superMeth = ModelUtil.definesMethod(paramExtType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
-      }
-      if (implementsTypes != null) {
-         int numInterfaces = implementsTypes.size();
-         for (int i = 0; i < numInterfaces; i++) {
-            Object implType = implementsTypes.get(i);
-            if (implType != null) {
-
-               implType = ParamTypeDeclaration.convertBaseTypeContext(ctx, implType);
-               meth = ModelUtil.definesMethod(implType, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());
-               if (meth != null) {
-                  superMeth = ModelUtil.pickMoreSpecificMethod(superMeth, meth, null, null, null);
-               }
-            }
-         }
-      }
-      return superMeth;
-   }
-
-   public Object declaresConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx) {
-      return definesConstructor(parametersOrExpressions, ctx, false);
-   }
 
    public Object definesConstructor(List<?> parametersOrExpressions, ITypeParamContext ctx, boolean isTransformed) {
       if (!started)
@@ -730,11 +464,7 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       if (meths == null)
          return null;
 
-      return ModelUtil.definesConstructor(system, this, parametersOrExpressions, ctx, this, isTransformed);
-   }
-
-   public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> mtype, Object refType, TypeContext ctx) {
-      return definesMember(name, mtype, refType, ctx, false, false);
+      return ModelUtil.definesConstructorFromList(system, this, parametersOrExpressions, ctx, this, isTransformed);
    }
 
    public Object definesMember(String name, EnumSet<JavaSemanticNode.MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
@@ -822,124 +552,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return null;
    }
 
-   public boolean implementsType(String otherName, boolean assignment, boolean allowUnbound) {
-      if (!started)
-         start();
-
-      otherName = otherName.replace('$', '.');
-
-      if (otherName.equals(getFullTypeName()))
-         return true;
-
-      if (implementsTypes != null) {
-         int numInterfaces = implementsTypes.size();
-         for (int i = 0; i < numInterfaces; i++) {
-            String interfaceName = classFile.getInterfaceName(i);
-            if (otherName.equals(interfaceName))
-               return true;
-            Object implType = implementsTypes.get(i);
-            if (implType != null && ModelUtil.implementsType(implType, otherName, assignment, allowUnbound))
-               return true;
-         }
-      }
-      if (extendsType != null) {
-         String extendsName = classFile.getExtendsTypeName();
-         if (extendsName.equals(otherName))
-            return true;
-         return ModelUtil.implementsType(extendsType, otherName, assignment, allowUnbound);
-      }
-      return false;
-   }
-
-   public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
-      Object annot = ModelUtil.getAnnotation(this, annotationName);
-      if (annot != null)
-         return annot;
-
-      Object superType = getDerivedTypeDeclaration();
-      // Look for an annotation layer that might be registered for this compiled class
-      if (superType != null) {
-         if (ModelUtil.isCompiledClass(superType)) {
-            Object srcSuperType = ModelUtil.findTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeName(superType), refLayer, layerResolve);
-            if (srcSuperType != null && srcSuperType != superType) {
-               annot = ModelUtil.getInheritedAnnotation(system, srcSuperType, annotationName, skipCompiled, refLayer, layerResolve);
-               if (annot != null)
-                  return annot;
-            }
-         }
-         annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
-         if (annot != null)
-            return annot;
-      }
-
-      if (implementsTypes != null) {
-         int numInterfaces = implementsTypes.size();
-         for (int i = 0; i < numInterfaces; i++) {
-            Object implType = implementsTypes.get(i);
-            if ((annot = ModelUtil.getInheritedAnnotation(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null)
-               return annot;
-         }
-      }
-      return null;
-   }
-
-   public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
-      Object annot = ModelUtil.getAnnotation(this, annotationName);
-      ArrayList<Object> res = null;
-      if (annot != null) {
-         res = new ArrayList<Object>(1);
-         res.add(annot);
-      }
-
-      Object superType = getDerivedTypeDeclaration();
-      if (superType != null) {
-         ArrayList<Object> superRes = ModelUtil.getAllInheritedAnnotations(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
-         if (superRes != null)
-            res = ModelUtil.appendLists(res, superRes);
-
-         String nextTypeName = ModelUtil.getTypeName(superType);
-         Object nextType = ModelUtil.findTypeDeclaration(system, nextTypeName, refLayer, layerResolve);
-         if (nextType != null && nextType instanceof TypeDeclaration && nextType != superType) {
-            if (nextType == superType) {
-               System.err.println("*** Loop in inheritance tree: " + nextTypeName);
-               return null;
-            }
-            ArrayList<Object> newRes = ((TypeDeclaration) nextType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
-            if (newRes != null)
-               res = ModelUtil.appendLists(res, newRes);
-         }
-      }
-
-      if (implementsTypes != null) {
-         int numInterfaces = implementsTypes.size();
-         for (int i = 0; i < numInterfaces; i++) {
-            Object implType = implementsTypes.get(i);
-            if (implType != null) {
-               ArrayList<Object> superRes;
-               if ((superRes = ModelUtil.getAllInheritedAnnotations(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null) {
-                  res = ModelUtil.appendLists(res, superRes);
-               }
-
-               String nextTypeName = ModelUtil.getTypeName(implType);
-               Object nextType = ModelUtil.findTypeDeclaration(system, nextTypeName, refLayer, layerResolve);
-               if (nextType != null && nextType instanceof TypeDeclaration && nextType != implType) {
-                  if (nextType == superType) {
-                     System.err.println("*** Loop in interface inheritance tree: " + nextTypeName);
-                     return null;
-                  }
-                  ArrayList<Object> newRes = ((TypeDeclaration) nextType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
-                  if (newRes != null)
-                     res = ModelUtil.appendLists(res, newRes);
-               }
-            }
-         }
-      }
-      return res;
-   }
-
-   public Object getDerivedTypeDeclaration() {
-      return extendsType;
-   }
 
    public Object getExtendsTypeDeclaration() {
 //      if (extendsType == null && isInterface() && implementsTypes != null && implementsTypes.size() > 0)
@@ -1081,7 +693,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return ModelUtil.mergeMethods(extMeths, res);
    }
 
-
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       CFField[] fields = classFile.fields;
       CFMethod[] methods = classFile.methods;
@@ -1155,16 +766,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return innerTypes;
    }
 
-   public DeclarationType getDeclarationType() {
-      if (ModelUtil.isObjectType(this))
-         return DeclarationType.OBJECT;
-      if (isInterface())
-         return DeclarationType.INTERFACE;
-      if (isEnum())
-         return DeclarationType.ENUM;
-      return DeclarationType.CLASS;
-   }
-
    public Object getClass(String className, boolean useImports) {
       return getTypeDeclaration(className);
    }
@@ -1181,22 +782,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return getTypeDeclaration(typeName);
    }
 
-   public JavaModel getJavaModel() {
-      return null;
-   }
-
-   public boolean isLayerType() {
-      return false;
-   }
-
-   public Layer getLayer() {
-      return null;
-   }
-
-   public LayeredSystem getLayeredSystem() {
-      return system;
-   }
-
    public List<TypeParameter> getClassTypeParameters() {
       if (!initialized)
          init();
@@ -1208,32 +793,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          start();
       // TODO: enforce ref type here?
       return methodsByName.get("<init>");
-   }
-
-   public boolean isComponentType() {
-      return implementsType("sc.obj.IComponent", false, false);
-   }
-
-   public DynType getPropertyCache() {
-      return TypeUtil.getPropertyCache(getCompiledClass());
-   }
-
-   public void validate() {
-   }
-
-   public boolean isInitialized() {
-      return initialized;
-   }
-
-   public boolean isStarted() {
-      return started;
-   }
-
-   public boolean isValidated() {
-      return true;
-   }
-
-   public void stop() {
    }
 
    public Object getTypeDeclaration(String name) {
@@ -1394,55 +953,14 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
       return "CFClass: " + getTypeName();
    }
 
-   public boolean isEnumeratedType() {
-      return isEnum();
-   }
-   
-   public Object getEnumConstant(String nextName) {
-      return RTypeUtil.getEnum(getCompiledClass(), nextName);
-   }
-
-   public boolean isCompiledProperty(String name, boolean fieldMode, boolean interfaceMode) {
-      return definesMember(name, JavaSemanticNode.MemberType.PropertyGetSetObj, null, null) != null;
-   }
-
-   public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
-      return typeArgs;
-   }
-
-   public boolean needsOwnClass(boolean checkComponents) {
-      return true;
-   }
-
-   public boolean isDynamicNew() {
-      return false;
-   }
-
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
-   }
-
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
-   }
-
    public Object[] getImplementsTypeDeclarations() {
       if (implementsTypes == null)
          return null;
       return implementsTypes.toArray();
    }
 
-   public Object[] getAllImplementsTypeDeclarations() {
-      return getImplementsTypeDeclarations();
-   }
-
-   public boolean isRealType() {
-      return true;
-   }
-
-   public void staticInit() {
-   }
-
-   public boolean isTransformedType() {
-      return false;
+   public List<Object> getImplementsList() {
+      return implementsTypes;
    }
 
    public Object getArrayComponentType() {
@@ -1457,15 +975,6 @@ public class CFClass extends SemanticNode implements ITypeDeclaration, ILifecycl
          }
       }
       return null;
-   }
-
-   @Override
-   public ITypeDeclaration resolve(boolean modified) {
-      return this; // TODO: should we support replacing these?
-   }
-
-   public boolean useDefaultModifier() {
-      return false;
    }
 
    public void error(CharSequence... args) {
