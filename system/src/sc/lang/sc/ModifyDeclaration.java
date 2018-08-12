@@ -100,7 +100,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    /** 
     * Here we are updating the 'replacedByType' on the modified type.  Since this is a
-    * structural part of the type system, that needs to be resolved during the initializae
+    * structural part of the type system, that needs to be resolved during the initialize
     * stage for the html Element convertToObject method, this section was broken out of the
     * start method - so it's done as soon as modifyTypeDecl is updated.
     */
@@ -500,15 +500,14 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyType == null) {
             String fullTypeName = getFullTypeName();
 
-            if (thisModel != null)
-               modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType);
+            modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType);
 
             // For the layer object, it is registered as a global object.  Look it up with resolveName and just assign
             // the class to avoid the error.
             if (modifyClass == null)  {
                TypeDeclaration enclType = getEnclosingType();
                // If this is the top-level type in the layer, resolve it as a layer
-               if (thisModel != null && thisModel.isLayerModel && enclType == null) {
+               if (thisModel.isLayerModel && enclType == null) {
                   Object obj = thisModel.resolveName(fullTypeName, false, true);
                   // Originally the layer is initially registered under its type name - it gets renamed once after init
                   if (obj == null)

@@ -542,6 +542,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // For inactive types, when starting the model we need to make sure we've started the most specific type in the model
       // so we don't rely on stale data.  We check by getting the current model type if it's in a layer after this one
       // we need to start it.
+      /* This code becomes problematic in the compileDoc example where we are in initTypeInfo for test/js/unitConverter/uiRules/UnitConverter which get's the previous type uiOnly which then
+         gets here and tries to start the jsui layer which refers to the model we have not yet initialized.   It's for the IDE only I think to eliminate the problem where we resolve a type
+         which depends on a model that's not yet started for us to get the correct reference.   Maybe this should be handled in ExternalModelIndex by having a "doLater" to init the type
+         and refresh any models which depend on the reference?
       if (layer != null && !layer.activated && !isLayerModel) {
          TypeDeclaration layerType = getLayerTypeDeclaration();
          if (layerType != null) {
@@ -563,6 +567,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             }
          }
       }
+      */
    }
 
    public String getImportedName(String name) {
