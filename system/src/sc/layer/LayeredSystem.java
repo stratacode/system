@@ -11422,10 +11422,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cl != null)
             return cl;
       }
-// This is a problem for when we use buildSeparate layers - in that case, it seems we need to resolve the source or maybe the class should be found?
-// sc.junit.JUnitTestProcessor defined in junit/lib (buildSeparate) and referenced in junit/main
-//      if (layerResolve) // For layers we don't want to resolve the source type when resolving a type reference
-//         return null;
       return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer, layerResolve);
    }
 
@@ -11557,7 +11553,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (srcFile != null) {
-         if (layerResolve)
+         if (layerResolve && !srcFile.layer.buildSeparate)
             return null;
          // When notHidden is set, we do not load types which are in hidden layers
          if (notHidden && !srcFile.layer.getVisibleInEditor())
