@@ -3209,7 +3209,7 @@ public class ModelUtil {
       if (varObj instanceof PropertyAssignment)
          return isField(((PropertyAssignment) varObj).assignedProperty);
       return varObj instanceof Field || (varObj instanceof IBeanMapper && isField(((IBeanMapper) varObj).getPropertyMember())) || varObj instanceof IFieldDefinition ||
-          (varObj instanceof VariableDefinition && (((VariableDefinition) varObj).getDefinition()) instanceof FieldDefinition);
+          varObj instanceof FieldDefinition || (varObj instanceof VariableDefinition && (((VariableDefinition) varObj).getDefinition()) instanceof FieldDefinition);
    }
 
    public static boolean hasField(Object varObj) {
