@@ -600,9 +600,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void clearCachedMemberInfo() {
-      LayeredSystem sys = getLayeredSystem();
-      if (sys != null)
-         sys.ensureLocked();
       membersByName = null;
       methodsByName = null;
       memberCache = null;
