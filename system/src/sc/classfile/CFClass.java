@@ -362,11 +362,11 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
             // Not using type declaration here as we cannot yet handle CFClasses referencing src-based TypeDeclarations.  There's at least
             // a request that we support the initMethodCache method on the ITypeDeclaration interface which is not yet done.   Note also
             // this change must be made above.
-            extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false);
+            extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false, true);
             if (extendsType == null) {
                if (extendsTypeName.contains(".."))
                   extendsTypeName = extendsTypeName.replace("..", ".$");
-               extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false);
+               extendsType = system.getClassWithPathName(extendsTypeName, null, false, true, false, true);
             }
             if (extendsType == null)
                error("No extends type: " + extendsTypeName);
@@ -583,35 +583,6 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return methodsByName;
    }
 
-   public Object getConstructorFromSignature(String sig) {
-      Object[] cstrs = getConstructors(null);
-      if (cstrs == null)
-         return null;
-      for (int i = 0; i < cstrs.length; i++) {
-         Object constr = cstrs[i];
-         if (StringUtil.equalStrings(((ConstructorDefinition) constr).getTypeSignature(), sig))
-            return constr;
-      }
-      return null;
-   }
-
-   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
-      List<Object> methods = getMethods(methodName, null, true);
-      if (methods == null) {
-         // Special case way to refer to the constructor
-         if (methodName.equals(getTypeName()))
-            return getConstructorFromSignature(signature);
-         // TODO: default constructor?
-         return null;
-      }
-      for (Object meth:methods) {
-         if (StringUtil.equalStrings(ModelUtil.getTypeSignature(meth), signature)) {
-            return meth;
-         }
-      }
-      return null;
-   }
-
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
       if (!started)
          start();
@@ -766,10 +737,6 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return innerTypes;
    }
 
-   public Object getClass(String className, boolean useImports) {
-      return getTypeDeclaration(className);
-   }
-
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
       if (typeParameters != null) {
          int sz = typeParameters.size();
@@ -779,7 +746,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
                return tp;
          }
       }
-      return getTypeDeclaration(typeName);
+      return getTypeDeclaration(typeName, true);
    }
 
    public List<TypeParameter> getClassTypeParameters() {
@@ -795,25 +762,6 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return methodsByName.get("<init>");
    }
 
-   public Object getTypeDeclaration(String name) {
-      if (system == null)
-         return RTypeUtil.loadClass(name);
-      Object res = system.getTypeDeclaration(name);
-      Object newRes = system.getClassWithPathName(name);
-      if (res != newRes) {
-         if (newRes == null) {
-            // TODO: Should we allow this case?  Normally a class file should resolve to another class file for it's dependencies
-            // A CFClass should not be able to resolve againt a src type.  And one big problem here is that we don't have a refLayer
-            // to specify for the getSrcTypeDeclaration made by getTypeDeclaration so it can end up caching even when the CFClass is loaded
-            // by an inactive type.
-            // Can't issue this warning because there are some places where this type is looked up from a broader context... either the definedInType is
-            // not correct or we are looking up in the wrong order?
-            //MessageHandler.warning(classFile.msg, "Class file: " + this.classFile + " depends on source type: " + res);
-            return res;
-         }
-      }
-      return newRes;
-   }
 
    public Object getAnnotation(String annotName) {
       return classFile.getAnnotation(annotName);
@@ -889,7 +837,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       String outer = classFile.getOuterClassName();
       if (outer == null)
          return null;
-      return getTypeDeclaration(outer);
+      return getTypeDeclaration(outer, true);
    }
 
    public boolean isString() {

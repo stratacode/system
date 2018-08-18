@@ -298,36 +298,44 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          JavaModel model = getJavaModel();
          ParseUtil.initComponent(model);
       }
-      typeInfoInitialized = true;
 
-      // Need to make sure the parent type is initialized before the sub-type since we need to search the parent types extends/implementBoundTypes to possibly find the implements types here
-      TypeDeclaration enclType = getEnclosingType();
-      if (enclType != null)
-         enclType.initTypeInfo();
+      try {
+         typeInfoInitialized = true;
 
-      JavaModel m = getJavaModel();
+         // Need to make sure the parent type is initialized before the sub-type since we need to search the parent types extends/implementBoundTypes to possibly find the implements types here
+         TypeDeclaration enclType = getEnclosingType();
+         if (enclType != null)
+            enclType.initTypeInfo();
 
-      if (implementsTypes != null && m != null) {
-         implementsBoundTypes = new Object[implementsTypes.size()];
-         int i = 0;
-         for (JavaType extendsType:implementsTypes) {
-            // Need to start the extends type as we need to dig into it
-            implementsBoundTypes[i++] = resolveExtendsType(extendsType);
+         JavaModel m = getJavaModel();
+
+         if (implementsTypes != null && m != null) {
+            implementsBoundTypes = new Object[implementsTypes.size()];
+            int i = 0;
+            for (JavaType extendsType:implementsTypes) {
+               // Need to start the extends type as we need to dig into it
+               implementsBoundTypes[i++] = resolveExtendsType(extendsType);
+            }
+         }
+
+         // Do any subclass type initialization before we apply the scope templates, so that we can get annotations, etc.
+         // down the derived type hierarchy.
+         completeInitTypeInfo();
+         typeInfoCompleted = true;
+
+         IScopeProcessor scopeProc = getScopeProcessor();
+         if (scopeProc != null) {
+            scopeProc.applyScopeTemplate(this);
+         }
+         if (m != null && m.getLayer() != null && m.getLayer().annotationLayer && !isAnnotationDefinition()) {
+            displayError("Annotation layers may only attach annotations onto definitions: ");
+            boolean dummy = isAnnotationDefinition();
          }
       }
-
-      // Do any subclass type initialization before we apply the scope templates, so that we can get annotations, etc.
-      // down the derived type hierarchy.
-      completeInitTypeInfo();
-      typeInfoCompleted = true;
-
-      IScopeProcessor scopeProc = getScopeProcessor();
-      if (scopeProc != null) {
-         scopeProc.applyScopeTemplate(this);
-      }
-      if (m != null && m.getLayer() != null && m.getLayer().annotationLayer && !isAnnotationDefinition()) {
-         displayError("Annotation layers may only attach annotations onto definitions: ");
-         boolean dummy = isAnnotationDefinition();
+      catch (RuntimeException exc) {
+         typeInfoInitialized = false;
+         typeInfoCompleted = false;
+         throw exc;
       }
    }
 

@@ -62,80 +62,87 @@ public class ClassDeclaration extends TypeDeclaration {
    public void start() {
       if (started) return;
 
-      if (!(this instanceof AnonClassDeclaration)) {
-         JavaModel thisModel = getJavaModel();
-         Layer layer = thisModel.getLayer();
-         // In the activated case, we have only one set of types we are really processing and we load from top-down.
-         // TODO: In the inactive case, we are really processing each layer individually.  What we really need in this case is to
-         // check the refLayer in the 'resolve' and walk up to find the valid type for that layer when a type is replaced.
-         // For incompatible changes, this will cause errors - e.g. coreRuntime PTypeUtil and fullRuntime PTypeUtil.
-         // This solution reuses replacedByType - which will resolve to the most specific type in the stack and use that to
-         // process all layers.  When incompatible changes are made to a type, this won't resolve the earlier references properly.
-         if (layer != null && !layer.activated) {
-            if (!thisModel.isLayerModel) {
-               String fullTypeName = getFullTypeName();
-               if (fullTypeName == null) {
-                  super.start();
-                  // Perhaps a model fragment or something we can't really start
-                  return;
+      try {
+         if (!(this instanceof AnonClassDeclaration)) {
+            JavaModel thisModel = getJavaModel();
+            Layer layer = thisModel.getLayer();
+            // In the activated case, we have only one set of types we are really processing and we load from top-down.
+            // TODO: In the inactive case, we are really processing each layer individually.  What we really need in this case is to
+            // check the refLayer in the 'resolve' and walk up to find the valid type for that layer when a type is replaced.
+            // For incompatible changes, this will cause errors - e.g. coreRuntime PTypeUtil and fullRuntime PTypeUtil.
+            // This solution reuses replacedByType - which will resolve to the most specific type in the stack and use that to
+            // process all layers.  When incompatible changes are made to a type, this won't resolve the earlier references properly.
+            if (layer != null && !layer.activated) {
+               if (!thisModel.isLayerModel) {
+                  String fullTypeName = getFullTypeName();
+                  if (fullTypeName == null) {
+                     super.start();
+                     // Perhaps a model fragment or something we can't really start
+                     return;
+                  }
+                  TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
+                  if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
+                     prevDecl.updateReplacedByType(this);
                }
-               TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
-               if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
-                  prevDecl.updateReplacedByType(this);
             }
          }
-      }
 
-      // Need to set this before we start the nested components of this class in super.start().
-      // We also could inject ourselves as the "resolver" node?  
-      if (extendsType != null) {
-         JavaModel m = getJavaModel();
+         // Need to set this before we start the nested components of this class in super.start().
+         // We also could inject ourselves as the "resolver" node?
+         if (extendsType != null) {
+            JavaModel m = getJavaModel();
 
-         if (m != null) {
-            // We don't want to resolve from this type cause we get into a recursive loop in findType.
-            JavaSemanticNode resolver = getEnclosingType();
-            if (resolver == null)
-               resolver = m;
-            if (!extendsType.isBound())
-               extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
-
-            // Need to start the extends type as we need to dig into it
-            Object extendsTypeDecl = getDerivedTypeDeclaration();
-            extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
-
-            if (extendsTypeDecl instanceof TypeDeclaration && !m.temporary) {
-               TypeDeclaration extTypeDecl = (TypeDeclaration) extendsTypeDecl;
-               if (extTypeDecl.getLayer() != null && getLayer() != null && extTypeDecl.getLayer().activated != getLayer().activated) {
-                  System.out.println("*** Mismatching activated/inactived for base and extends type");
-                  // TODO: DEBUG remove
+            if (m != null) {
+               // We don't want to resolve from this type cause we get into a recursive loop in findType.
+               JavaSemanticNode resolver = getEnclosingType();
+               if (resolver == null)
+                  resolver = m;
+               if (!extendsType.isBound())
                   extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
-               }
-            }
-            if (extendsTypeDecl instanceof TypeDeclaration) {
-               // When there's a custom resolver, we may be in a ModelStream which sets up a case where modify types in the same stream
-               if (m.customResolver == null && ModelUtil.sameTypes(extendsTypeDecl, this)) {
-                  displayTypeError("Cycle found in extends - class extends itself: ", extendsType.getFullTypeName(), " for ");
-                  extendsInvalid = true;
-               }
-               else {
-                  TypeDeclaration extendsTD = (TypeDeclaration) extendsTypeDecl;
-                  if (extendsTD.isDynamicType()) {
-                     setDynamicType(true);
-                     dynamicNew = false;
+
+               // Need to start the extends type as we need to dig into it
+               Object extendsTypeDecl = getDerivedTypeDeclaration();
+               extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
+
+               if (extendsTypeDecl instanceof TypeDeclaration && !m.temporary) {
+                  TypeDeclaration extTypeDecl = (TypeDeclaration) extendsTypeDecl;
+                  if (extTypeDecl.getLayer() != null && getLayer() != null && extTypeDecl.getLayer().activated != getLayer().activated) {
+                     System.out.println("*** Mismatching activated/inactived for base and extends type");
+                     // TODO: DEBUG remove
+                     extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
                   }
-                  if (extendsTD.dynamicNew)
-                     extendsTD.clearDynamicNew();
-                  if (m.layeredSystem != null) {
-                     m.layeredSystem.addSubType(extendsTD, this);
-                  }
-                  startExtendedType(extendsTD, "extended");
                }
+               if (extendsTypeDecl instanceof TypeDeclaration) {
+                  // When there's a custom resolver, we may be in a ModelStream which sets up a case where modify types in the same stream
+                  if (m.customResolver == null && ModelUtil.sameTypes(extendsTypeDecl, this)) {
+                     displayTypeError("Cycle found in extends - class extends itself: ", extendsType.getFullTypeName(), " for ");
+                     extendsInvalid = true;
+                  }
+                  else {
+                     TypeDeclaration extendsTD = (TypeDeclaration) extendsTypeDecl;
+                     if (extendsTD.isDynamicType()) {
+                        setDynamicType(true);
+                        dynamicNew = false;
+                     }
+                     if (extendsTD.dynamicNew)
+                        extendsTD.clearDynamicNew();
+                     if (m.layeredSystem != null) {
+                        m.layeredSystem.addSubType(extendsTD, this);
+                     }
+                     startExtendedType(extendsTD, "extended");
+                  }
+               }
+               else if (extendsTypeDecl == null)
+                  extendsType.displayTypeError("Extends class not found: ", extendsType.getFullTypeName(), " for ");
             }
-            else if (extendsTypeDecl == null)
-               extendsType.displayTypeError("Extends class not found: ", extendsType.getFullTypeName(), " for ");
          }
+         super.start();
       }
-      super.start();
+      catch (RuntimeException exc) {
+         typeInfoInitialized = false;
+         clearStarted();
+         throw exc;
+      }
    }
 
    public void validate() {

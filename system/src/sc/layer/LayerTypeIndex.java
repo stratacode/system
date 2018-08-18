@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import sc.lang.java.BodyTypeDeclaration;
 import sc.obj.SyncMode;
 
 import java.io.File;
@@ -49,6 +50,8 @@ public class LayerTypeIndex implements Serializable {
    String definedProcessName;
 
    transient Layer indexLayer;
+
+   transient List<BodyTypeDeclaration> toStartLaterTypes = null;
 
    public boolean updateTypeName(String oldTypeName, String newTypeName) {
       TypeIndexEntry ent = layerTypeIndex.remove(oldTypeName);
@@ -179,5 +182,11 @@ public class LayerTypeIndex implements Serializable {
       excludeProcesses = layer.excludeProcesses;
       buildSeparate = layer.buildSeparate;
       buildLayer = layer.buildLayer;
+   }
+
+   public void addTypeToStartLater(BodyTypeDeclaration toStartType) {
+      if (toStartLaterTypes == null)
+         toStartLaterTypes = new ArrayList<BodyTypeDeclaration>();
+      toStartLaterTypes.add(toStartType);
    }
 }

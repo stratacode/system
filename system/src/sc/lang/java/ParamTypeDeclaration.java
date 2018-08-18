@@ -411,11 +411,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.getDeclarationType(baseType);
    }
 
-   public Object getClass(String className, boolean useImports) {
+   public Object getClass(String className, boolean useImports, boolean compiledOnly) {
       if (definedInType != null)
-         return ModelUtil.getClassFromType(system, definedInType, className, useImports);
+         return ModelUtil.getClassFromType(system, definedInType, className, useImports, compiledOnly);
       else
-         return system.getClassWithPathName(className, null, false, false, false);
+         return system.getClassWithPathName(className, null, false, false, false, compiledOnly);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
@@ -438,8 +438,11 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return definedInType instanceof ITypeDeclaration ? ((ITypeDeclaration) definedInType).getJavaModel() : null;
    }
 
-   @Override
    public boolean isLayerType() {
+      return false;
+   }
+
+   public boolean isLayerComponent() {
       return false;
    }
 

@@ -1618,8 +1618,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             }
             if (templateProcessor != null && templateProcessor.getCompressSingleElementTemplates()) {
                Element elem = res.getSingleFileElement(null);
+               Element thisElem = getSingleFileElement(null);
                if (elem != null && newType != null)
-                  elem.assignChildTagObjects(newType);
+                  elem.assignChildTagObjects(newType, thisElem);
             }
          }
 
@@ -1712,6 +1713,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    */
 
    public boolean isLayerType() {
+      return false;
+   }
+
+   public boolean isLayerComponent() {
       return false;
    }
 

@@ -68,7 +68,7 @@ public class ModelUtil {
    private static Object mapClassToType(Class t, JavaModel model) {
       String name = t.getName();
       name = name.replace("$", ".");
-      if (model == null)
+      if (model == null || t.isPrimitive())
          return t;
       Object res = model.findTypeDeclaration(name, false);
       if (res != null) {
@@ -2972,9 +2972,12 @@ public class ModelUtil {
 
    // This version uses the getConstructors method to match methods generically using ITypeDeclaration implementations, IMethodDefinition etc.
    public static Object definesConstructorFromList(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx, Object refType, boolean isTransformed) {
+      Object[] list = getConstructors(td, null);
+      if (list == null)
+         return null;
+
       int argsLen = parameters == null ? 0 : parameters.size();
       Object[] types = parametersToTypeArray(parameters, ctx);
-      Object[] list = getConstructors(td, null);
       Object res = null;
       Object[] prevExprTypes = null;
       ArrayList<Expression> toClear = null;
@@ -3205,7 +3208,7 @@ public class ModelUtil {
          return isField(((ParamTypedMember) varObj).getMemberObject());
       if (varObj instanceof PropertyAssignment)
          return isField(((PropertyAssignment) varObj).assignedProperty);
-      return varObj instanceof Field || (varObj instanceof IBeanMapper && isField(((IBeanMapper) varObj).getPropertyMember())) || varObj instanceof FieldDefinition || varObj instanceof CFField ||
+      return varObj instanceof Field || (varObj instanceof IBeanMapper && isField(((IBeanMapper) varObj).getPropertyMember())) || varObj instanceof IFieldDefinition ||
           (varObj instanceof VariableDefinition && (((VariableDefinition) varObj).getDefinition()) instanceof FieldDefinition);
    }
 
@@ -4549,7 +4552,10 @@ public class ModelUtil {
          return returnType instanceof TypeVariable || returnType instanceof ParameterizedType || returnType instanceof GenericArrayType;
       }
       else if (method instanceof IMethodDefinition) {
-         Object retType = ((IMethodDefinition) method).getReturnType(false);
+         IMethodDefinition methDef = (IMethodDefinition) method;
+         if (methDef.isConstructor())
+            return false;
+         Object retType = methDef.getReturnType(false);
          return retType instanceof TypeParameter || ModelUtil.hasUnboundTypeParameters(retType);
       }
       else if (method instanceof Constructor)
@@ -7444,6 +7450,8 @@ public class ModelUtil {
             if (cl == null && (extType = itype.getExtendsTypeDeclaration()) != null) {
                return getPropertyMapping(extType, propName);
             }
+            if (cl == null)
+               return null;
             return PTypeUtil.getPropertyMapping(cl, propName);
          }
       }
@@ -8593,6 +8601,8 @@ public class ModelUtil {
                return true;
          }
       }
+      if (ModelUtil.isConstructor(method))
+         return false;
       Object returnType = ModelUtil.getReturnType(method, false);
       return ModelUtil.hasUnboundTypeParameters(returnType);
    }
@@ -8701,9 +8711,9 @@ public class ModelUtil {
          return type.toString();
    }
 
-   public static Object getClassFromType(LayeredSystem system, Object definedInType, String className, boolean useImports) {
+   public static Object getClassFromType(LayeredSystem system, Object definedInType, String className, boolean useImports, boolean compiledOnly) {
       if (definedInType instanceof ITypeDeclaration) {
-         return ((ITypeDeclaration) definedInType).getClass(className, useImports);
+         return ((ITypeDeclaration) definedInType).getClass(className, useImports, compiledOnly);
       }
       return system.getTypeDeclaration(className);
    }
@@ -8717,7 +8727,7 @@ public class ModelUtil {
             sys.error("Unable to resolve compiled interface for: " + fullTypeName);
       }
 
-      Object compiledType = sys.getClassWithPathName(fullTypeName, null, false, true, false);
+      Object compiledType = sys.getClassWithPathName(fullTypeName, null, false, true, false, true);
       // In some situations we might find a source file version of some class... the CFClass can only
       // point to the compiled class
       if (extendsType instanceof ParamTypeDeclaration) {

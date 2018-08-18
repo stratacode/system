@@ -130,4 +130,8 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getMethodTypeParameters(wrapped);
    }
 
+   public boolean isConstructor() {
+      return ModelUtil.isConstructor(wrapped);
+   }
+
 }

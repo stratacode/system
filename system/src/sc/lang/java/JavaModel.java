@@ -889,7 +889,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                            break;
                         }
                      }
-                     if ((td = getClass(globalName, false, layer, isLayerModel)) != null) {
+                     if ((td = getClass(globalName, false, layer, isLayerModel, false, isLayerModel)) != null) {
                         typeName = globalName;
                         break;
                      }
@@ -898,14 +898,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                // TODO:  Very likely simplify this inner class stuff with the
                // code in LayeredSystem as it seems like there is redundancy.
                if (td == null && !srcOnly)
-                  td = getClass(importedName, false, layer, isLayerModel);
+                  td = getClass(importedName, false, layer, isLayerModel, false, isLayerModel);
             }
             /* Only if we have not imported a class, try looking for a class in this package */
             if (td == null && importedName == typeName && !srcOnly) {
                String pref = getPackagePrefix();
                if (pref != null) {
                   String prefTypeName = pref + "." + typeName;
-                  td = getClass(prefTypeName, false, layer, isLayerModel);
+                  td = getClass(prefTypeName, false, layer, isLayerModel, false, isLayerModel);
                }
             }
          }
@@ -941,21 +941,17 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return td;
    }
 
-   public Object getClass(String className, boolean useImports) {
-      return getClass(className, useImports, null, false);
+   public Object getClass(String className, boolean useImports, boolean compiledOnly) {
+      return getClass(className, useImports, null, false, false, compiledOnly);
    }
 
-   public Object getClass(String className, boolean useImports, Layer refLayer, boolean layerResolve) {
-      return getClass(className, useImports, refLayer, layerResolve, false);
-   }
-
-   public Object getClass(String className, boolean useImports, Layer refLayer, boolean layerResolve, boolean forceClass) {
+   public Object getClass(String className, boolean useImports, Layer refLayer, boolean layerResolve, boolean forceClass, boolean compiledOnly) {
       if (layeredSystem != null) {
-         Object cl = layeredSystem.getClassWithPathName(className, refLayer, layerResolve, false, forceClass);
+         Object cl = layeredSystem.getClassWithPathName(className, refLayer, layerResolve, false, forceClass, compiledOnly);
          if (cl == null && useImports) {
             String impName = getImportedName(className);
             if (impName != null)
-               return layeredSystem.getClassWithPathName(impName, refLayer, layerResolve, false, forceClass);
+               return layeredSystem.getClassWithPathName(impName, refLayer, layerResolve, false, forceClass, compiledOnly);
          }
          return cl;
       }

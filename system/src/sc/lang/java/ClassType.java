@@ -121,13 +121,19 @@ public class ClassType extends JavaType {
    public void start() {
       if (started)
          return;
-      // Initialize our bound type to catch errors, register dependencies etc.  ClassDeclaration will already have
-      // initialized its extend type with a different resolver to eliminate recursive lookups (though I think the
-      // pre-init of the "type" will have fixed that already a different way).
-      ITypeDeclaration itype = getEnclosingIType();
-      if (itype != null && type == null)
-         initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
-      super.start();
+      try {
+         // Initialize our bound type to catch errors, register dependencies etc.  ClassDeclaration will already have
+         // initialized its extend type with a different resolver to eliminate recursive lookups (though I think the
+         // pre-init of the "type" will have fixed that already a different way).
+         ITypeDeclaration itype = getEnclosingIType();
+         if (itype != null && type == null)
+            initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
+         super.start();
+      }
+      catch (RuntimeException exc) {
+         clearStarted();
+         throw exc;
+      }
    }
 
    public void stop() {
@@ -217,7 +223,7 @@ public class ClassType extends JavaType {
          ITypeDeclaration itype = getEnclosingIType();
          if (itype == null)
             return null;
-         runtimeClass = itype.getClass(getFullBaseTypeName(), true);
+         runtimeClass = itype.getClass(getFullBaseTypeName(), true, true);
       }
       return runtimeClass instanceof Class ? (Class) runtimeClass : null;
    }

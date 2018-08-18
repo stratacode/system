@@ -2954,8 +2954,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   else {
                      int startIx;
                      if (includeFirst && emptyBaseName) {
-                        headName = prefixPkg;
-                        startIx = prefixPkg.length() + 1;
+                        if (prefixPkg == null) {
+                           headName = "";
+                           startIx = 0;
+                        }
+                        else {
+                           headName = prefixPkg ;
+                           startIx = prefixPkg.length() + 1;
+                        }
                      }
                      else {
                         headName = pkgName.substring(0, len);
@@ -6592,6 +6598,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
          rebuildLayersTypeIndex(refreshCtx.layersToRebuild);
+
+         for (LayerTypeIndex startIndex:refreshCtx.toStartLaterIndexes) {
+            for (BodyTypeDeclaration toStartLater:startIndex.toStartLaterTypes) {
+               JavaModel toStartModel = toStartLater.getJavaModel();
+               ParseUtil.initAndStartComponent(toStartModel);
+            }
+         }
       }
 
       /*
@@ -6628,6 +6641,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // need to put this here because we might initialize some layers during this process and need to make this index available to avoid a duplicate
                refreshCtx.curTypeIndex.inactiveTypeIndex.addLayerTypeIndex(layerName, layerTypeIndex);
                layerTypeIndex = layerTypeIndex.refreshLayerTypeIndex(this, layerName, new File(FileUtil.concat(refreshCtx.typeIndexDir.getPath(), indexFileName)).lastModified(), refreshCtx);
+               // We found new or changed types during the refresh - it's too early to start them now but we need to do that to update the type index
+               if (layerTypeIndex.toStartLaterTypes != null)
+                  refreshCtx.toStartLaterIndexes.add(layerTypeIndex);
                refreshCtx.refreshedLayers.add(layerName);
                break;
             default:
@@ -6821,6 +6837,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            String typeName = srcEnt.getTypeName();
                            TypeDeclaration newType = (TypeDeclaration) curSys.getSrcTypeDeclaration(typeName, newLayer.getNextLayer(), true, false, true, newLayer, curTypeIndexEntry != null && curTypeIndexEntry.isLayerType);
                            if (newType != null) {
+                              typeIndex.addTypeToStartLater(newType);
                               // It should already be in the type index, because it gets loaded when we do this type reference check from the lookup here.  We don't want to start anything until we've at least set up
                               // all of the layers we are going to load, so that we can start the most specific type first, so we can avoid refreshing when we add a subsequent layer
                               /*
@@ -11405,6 +11422,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cl != null)
             return cl;
       }
+      if (layerResolve) // For layers we don't want to resolve the source type when resolving a type reference
+         return null;
       return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer, layerResolve);
    }
 
@@ -11482,7 +11501,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       TypeDeclaration decl;
       Object skippedDecl = null;
 
-      // Do not resolve source files in the system layer package from the layer definition files.  Otherwise LayeredSystaem and other classes overridden in the layer can mess up the layer's definition
+      // Do not resolve source files in the system layer package from the layer definition files.  Otherwise LayeredSystem and other classes overridden in the layer can mess up the layer's definition
       if (layerResolve) {
          String pkgName = CTypeUtil.getPackageName(typeName);
          if (pkgName == null || systemLayerModelPackages.contains(pkgName))
@@ -11536,11 +11555,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (srcFile != null) {
+         if (layerResolve)
+            return null;
          // When notHidden is set, we do not load types which are in hidden layers
          if (notHidden && !srcFile.layer.getVisibleInEditor())
             return null;
 
-         if (!srcOnly) {
+         if (!srcOnly && (refLayer == null || refLayer.activated)) {
             // Now since the model is not changed, we'll use the class.  If at some point we need to change the compiled version - ie. to make a property bindable, we'll load the src at that time.
             Object cl = getCompiledType(typeName);
             if (cl != null)
@@ -11668,7 +11689,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       Object td = getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, layerResolve);
       if (td == null && !srcOnly)
-         return getClassWithPathName(typeName, refLayer, layerResolve, false, false);
+         return getClassWithPathName(typeName, refLayer, layerResolve, false, false, layerResolve);
       return td;
    }
 
@@ -12094,8 +12115,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                //ParseUtil.initAndStartComponent(model);
                if (model.getLayer() != null && model.getLayer().activated)
                   System.out.println("*** Error - renaming activated model to inactive index");
-               System.out.println("*** Updating model index for: " + srcEnt.absFileName + " to: " + System.identityHashCode(model));
-               inactiveModelIndex.put(srcEnt.absFileName, model);
+               if (inactiveModelIndex.put(srcEnt.absFileName, model) != model)
+                  System.out.println("*** Updating model index for: " + srcEnt.absFileName + " to: " + System.identityHashCode(model));
             }
          }
          if (model instanceof JavaModel)
@@ -12341,10 +12362,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getClassWithPathName(String pathName) {
-      return getClassWithPathName(pathName, null, false, false, false);
+      return getClassWithPathName(pathName, null, false, false, false, true);
    }
 
    public Object getClassWithPathName(String pathName, Layer refLayer, boolean layerResolve, boolean alwaysCheckInnerTypes, boolean forceClass) {
+      return getClassWithPathName(pathName, refLayer, layerResolve, alwaysCheckInnerTypes, forceClass, true);
+   }
+
+   public Object getClassWithPathName(String pathName, Layer refLayer, boolean layerResolve, boolean alwaysCheckInnerTypes, boolean forceClass, boolean compiledOnly) {
+      if (!compiledOnly && !forceClass && refLayer != null && !refLayer.activated && externalModelIndex != null) {
+         Object extClass = externalModelIndex.getTypeDeclaration(pathName);
+         if (extClass != null)
+            return extClass;
+      }
       Object c = getClass(pathName, layerResolve || forceClass);
       if (c != null)
          return c;
@@ -12789,7 +12819,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
 
-      Object c = getClassWithPathName(name, refLayer, layerResolve, false, false);
+      Object c = getClassWithPathName(name, refLayer, layerResolve, false, false, true);
       if (c != null)
          return c;
 
@@ -13277,6 +13307,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          readLocked--;
 
       lock.unlock();
+   }
+
+   public void ensureLocked() {
+      if (writeLocked == 0) {
+         System.err.println("*** Supposed to be locked at this code point");
+         new Throwable().printStackTrace();
+      }
    }
 
    public Lock getDynReadLock() {

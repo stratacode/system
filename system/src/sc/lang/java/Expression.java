@@ -1067,6 +1067,18 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
+   public String getNodeWarningText() {
+      String res = super.getNodeWarningText();
+      if (res != null)
+         return res;
+
+      // This handles template expressions and other cases where we don't start the element in the language... we transform it and
+      // start the element which replaces it.  So errors for those statements apply to this element in the source.
+      if (replacedByStatement != null)
+         return replacedByStatement.getNodeWarningText();
+      return null;
+   }
+
    public boolean isLeafStatement() {
       return getBodyStatements() == null;
    }

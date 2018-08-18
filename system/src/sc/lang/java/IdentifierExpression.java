@@ -766,9 +766,15 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (replacedByStatement != null)
          return;
 
-      super.start();
+      try {
+         super.start();
 
-      resolveTypeReference();
+         resolveTypeReference();
+      }
+      catch (RuntimeException exc) {
+         clearStarted();
+         throw exc;
+      }
    }
 
    public void validate() {
@@ -781,7 +787,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (idents == null || idTypes == null)
          return;
 
-      // No need to validate if we've been replaced - e.g. a Template may copy this guy into the output method.
+      // No need to validate if we've been replaced - e.g. this is the original statement in a Template's templateDeclarations.  When it copies this expression into it's output method it will be validated there -  TODO: do we really want to return here?  Will this hide errors in the IDE?
       if (replacedByStatement != null)
          return;
 
@@ -1208,7 +1214,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   referenceTD.addPropertyToMakeBindable(propertyName, boundType, expr.getJavaModel(), referenceOnly || ModelUtil.isManualBindable(setMethod), expr);
                }
             }
-            else if (encType instanceof CFClass) {
+            else if (encType instanceof ITypeDeclaration) {
                checkForBindableCompiledField(propertyName, boundType, annotType, referenceType, expr, referenceOnly, checkAnnotations);
             }
             else
@@ -1690,7 +1696,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (meth != null) {
          LayeredSystem sys = expr.getLayeredSystem();
          ITypeDeclaration enclType = expr.getEnclosingIType();
-         if (enclType != null && sys != null)
+         if (enclType != null && sys != null && !enclType.isLayerType() && !enclType.isLayerComponent())
             remote = !ModelUtil.execForRuntime(sys, enclType.getLayer(), meth, sys);
       }
       return remote ? IdentifierType.RemoteMethodInvocation : IdentifierType.MethodInvocation;
@@ -3600,7 +3606,13 @@ public class IdentifierExpression extends ArgumentsExpression {
       boundTypes = null;
       idTypes = null;
 
-      resolveTypeReference();
+      try {
+         resolveTypeReference();
+      }
+      catch (RuntimeException exc) {
+         clearStarted();
+         throw exc;
+      }
    }
 
    public void setBindingInfo(BindingDirection dir, Statement dest, boolean nested) {

@@ -17,6 +17,8 @@ public class RefreshTypeIndexContext {
    File typeIndexDir;
    SysTypeIndex curTypeIndex;
 
+   ArrayList<LayerTypeIndex> toStartLaterIndexes = new ArrayList<LayerTypeIndex>();
+
    public RefreshTypeIndexContext(String typeIndexIdent, HashMap<String, Boolean> filesToProcess, SysTypeIndex curTypeIndex, Set<String> refreshedLayers, File typeIndexDir) {
       this.typeIndexIdent = typeIndexIdent;
       this.filesToProcess = filesToProcess;

@@ -115,6 +115,8 @@ public interface ISemanticNode {
 
    public boolean isValidated();
 
+   public void clearStarted();
+
    /** Regenerates the parsed description for this node */
    public boolean regenerate(boolean finalGen);
 

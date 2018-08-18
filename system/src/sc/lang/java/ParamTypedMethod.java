@@ -791,6 +791,11 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.isVarArgs(method);
    }
 
+   @Override
+   public boolean isConstructor() {
+      return ModelUtil.isConstructor(method);
+   }
+
    public String getTypeSignature() {
       // Assuming we do not have to do anything here since we want the type sig of the method in the class format.
       return ModelUtil.getTypeSignature(method);

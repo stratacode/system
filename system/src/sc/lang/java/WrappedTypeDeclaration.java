@@ -212,7 +212,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.getDeclarationType(baseType);
    }
 
-   public Object getClass(String className, boolean useImports) {
+   public Object getClass(String className, boolean useImports, boolean compiledOnly) {
       throw new UnsupportedOperationException();
    }
 
@@ -362,6 +362,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public boolean isLayerType() {
+      return false;
+   }
+
+   public boolean isLayerComponent() {
       return false;
    }
 }

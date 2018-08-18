@@ -94,14 +94,18 @@ public interface ITypeDeclaration {
 
    DeclarationType getDeclarationType();
 
-   Object getClass(String className, boolean useImports);
+   Object getClass(String className, boolean useImports, boolean compiledOnly);
 
    Object findTypeDeclaration(String typeName, boolean addExternalReference);
 
    // Returns null if this is not a StrataCode Model type - e.g. for CFClass and externally defined types
    JavaModel getJavaModel();
 
+   /** Returns true if this is the root type for a layer definition */
    boolean isLayerType();
+
+   /** Returns true if this is a component defined as part of a layer definition */
+   boolean isLayerComponent();
 
    // Returns null if not in a layer
    Layer getLayer();

@@ -13,7 +13,10 @@ public class AnnotationValue extends JavaSemanticNode {
    // Expression, Annotation, List<elementValue>
    public Object elementValue;
 
-   /** To create an annotation value from a primitive value like String etc - use this create method - otherwise, see createFromAnnotValue below */
+   /**
+    * To create an annotation value from a java.lang.String, java.lang.Boolean, etc. use this create method.
+    * If you already have an Expression or Literal use createFromAnnotValue.
+    */
    public static AnnotationValue create(String id, Object val) {
       AnnotationValue res = new AnnotationValue();
       res.identifier = id;

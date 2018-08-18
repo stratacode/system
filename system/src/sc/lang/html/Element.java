@@ -83,6 +83,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient TreeMap<String,Element[]> childrenById = null;
 
+   private transient Object extendsTypeDecl;
+
    /**
     * Tags are rendered in two different phases - the start tag, which includes the attributes and the body.
     * These flags indicate if the current rendered version is known to be stale for each of these two phases
@@ -324,7 +326,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void start() {
-      super.start();
+      try {
+         super.start();
+         if (tagObject != null && !tagObject.isStarted())
+            tagObject.start();
+      }
+      catch (RuntimeException exc) {
+         clearStarted();
+         throw exc;
+      }
    }
 
    public int getDefinedExecFlags() {
@@ -1370,11 +1380,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public Object getExtendsTypeDeclaration() {
+      if (extendsTypeDecl != null)
+         return extendsTypeDecl;
       Object specType = getSpecifiedExtendsTypeDeclaration();
       if (specType != null)
-         return specType;
+         return extendsTypeDecl = specType;
       // Content tags default to HTMLElements
-      return HTMLElement.class;
+      return extendsTypeDecl = HTMLElement.class;
    }
 
    public TypeDeclaration getEnclosingType() {
@@ -2070,16 +2082,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // TODO: this method is probably not 100% yet - it mirrors the logic in convertToObject in reverse - so we can clone
    // the Template and template's rootType, then reassign the Elements.  It's probably faster this way?  We could also just
    // reinit the rootType from the cloned template when the init flags are set.
-   public void assignChildTagObjects(TypeDeclaration parentType) {
-      boolean isObject = needsObject();
-      if (isObject) {
+   public void assignChildTagObjects(TypeDeclaration parentType, Element oldElem) {
+      if (oldElem.tagObject != null) {
          tagObject = parentType;
          parentType.element = this;
       }
       if (children != null) {
+         // We just cloned oldElem to produce this one so these should match
+         if (oldElem == null || oldElem.children == null || oldElem.children.size() != children.size())
+            System.err.println("*** mismatch in cloned element children!");
+         Object oldChild = null;
+         int i = 0;
          for (Object child:children) {
+            oldChild = oldElem.children.get(i++);
             if (child instanceof Element) {
                Element childElem = (Element) child;
+               Element oldChildElem = (Element) oldChild;
                String childName = childElem.getObjectName();
                if (childElem.isRepeatElement()) {
                   String repeatName = childElem.getRepeatObjectName();
@@ -2088,9 +2106,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   childRepeatType.element = childElem;
                   parentType = childRepeatType;
                }
-               TypeDeclaration childType = !childElem.needsObject() ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null);
+               TypeDeclaration childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null);
                if (childType != null)
-                  childElem.assignChildTagObjects(childType);
+                  childElem.assignChildTagObjects(childType, oldChildElem);
             }
          }
       }
@@ -3989,6 +4007,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       setProperty("tagName", newName);
    }
 
+   // TODO: should this be the type name of the tag object? - i.e. the value of the id
    public String getNodeName() {
       return tagName;
    }
@@ -4018,6 +4037,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                ((ILifecycle) child).stop();
          }
       }
+      extendsTypeDecl = null;
       defaultExtendsType = null;
       cachedObjectName = null;
       childrenById = null;

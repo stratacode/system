@@ -230,6 +230,9 @@ public class Attr extends Node implements ISrcStatement {
 
    public Attr deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       Attr res = (Attr) super.deepCopy(options, oldNewMap);
+      res.valueProp = valueProp;
+      res.valueExpr = valueExpr;
+      res.op = op;
       return res;
    }
 

@@ -108,90 +108,96 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (typeInfoInitialized)
          return;
 
-      super.initTypeInfo();
+      try {
+         super.initTypeInfo();
 
-      if (modifyTypeDecl != null) {
-         if (layer != null) {
-            /*
-            * If the type we are modifying comes from a super type we need to treat it differently on transform.
-            * It's really a shortcut for class foo extends Super.foo
-            */
-            modifyInherited = !ModelUtil.sameTypes(this, modifyTypeDecl);
+         if (modifyTypeDecl != null) {
+            if (layer != null) {
+               /*
+               * If the type we are modifying comes from a super type we need to treat it differently on transform.
+               * It's really a shortcut for class foo extends Super.foo
+               */
+               modifyInherited = !ModelUtil.sameTypes(this, modifyTypeDecl);
 
-            if (modifyInherited && getEnclosingType() == null)
-               System.out.println("**** ERROR: modifyInherited occurs on top-level type!");
+               if (modifyInherited && getEnclosingType() == null)
+                  System.out.println("**** ERROR: modifyInherited occurs on top-level type!");
 
-            // For a normal modification, we end up getting the type in a previous layer.  But if we inherited this
-            // from another type, we want to get the most specific one, i.e. resolve the replaced type.
-            // The example is UCTest(extended) modifies UCtest(model).   UCTest(extended).converters will find UnitConverter.converters
-            // to modify it.  But we need to get the most specific one: UnitConverter(extended).converters.
-            if (modifyInherited && modifyTypeDecl.replacedByType != null) {
-               BodyTypeDeclaration resolvedDecl = modifyTypeDecl.resolve(true);
-               if (resolvedDecl != this) {
-                  modifyTypeDecl = resolvedDecl;
-                  checkModify();
+               // For a normal modification, we end up getting the type in a previous layer.  But if we inherited this
+               // from another type, we want to get the most specific one, i.e. resolve the replaced type.
+               // The example is UCTest(extended) modifies UCtest(model).   UCTest(extended).converters will find UnitConverter.converters
+               // to modify it.  But we need to get the most specific one: UnitConverter(extended).converters.
+               if (modifyInherited && modifyTypeDecl.replacedByType != null) {
+                  BodyTypeDeclaration resolvedDecl = modifyTypeDecl.resolve(true);
+                  if (resolvedDecl != this) {
+                     modifyTypeDecl = resolvedDecl;
+                     checkModify();
+                  }
+                  else
+                     System.err.println("*** Recursive modify in resolve");
                }
-               else
-                  System.err.println("*** Recursive modify in resolve");
-            }
 
-            if (modifyInherited && extendsTypes != null && extendsTypes.size() > 0) {
-               TypeDeclaration enclType = getEnclosingType();
-               if (enclType != null)
-                  displayError("Modifying inherited type: " + modifyTypeDecl.getFullTypeName() + " from: " + enclType.getFullTypeName() + " cannot extend another type: ");
-               else // This happens during editing in the IDE for some reason
-                  displayError("Modifying a type which is not the same: " + modifyTypeDecl.getFullTypeName());
-            }
+               if (modifyInherited && extendsTypes != null && extendsTypes.size() > 0) {
+                  TypeDeclaration enclType = getEnclosingType();
+                  if (enclType != null)
+                     displayError("Modifying inherited type: " + modifyTypeDecl.getFullTypeName() + " from: " + enclType.getFullTypeName() + " cannot extend another type: ");
+                  else // This happens during editing in the IDE for some reason
+                     displayError("Modifying a type which is not the same: " + modifyTypeDecl.getFullTypeName());
+               }
 
-            JavaModel thisModel = getJavaModel();
-            // Give the modified type a back pointer - its "find" operations will map back to us so it gets the most
-            // specific definition.  It does not matter much for most contracts given type compatibility but the
-            // assignment contract requires the most specific definition so we can detect cycles properly.
-            if (!inactiveType && !temporaryType && !thisModel.temporary) {
-               BodyTypeDeclaration modReplacedByType = modifyTypeDecl.replacedByType ;
-               if (modReplacedByType != null) {
-                  if (modReplacedByType == this) {
-                     System.out.println("*** Warning - already modified this type");
-                     modifyTypeDecl.replacedByType = null;
-                  }
-                  else if (modifyTypeDecl.replaced) {
-                     System.err.println("**** Error - modifying stale type");
-                     modifyTypeDecl.replacedByType = null;
-                  }
-                  // If we are in the same layer, we are just about to replace the type as part of updateType
-                  // Just don't update replacedByType in this case since we'll set that later on anyway.
-                  else if (modReplacedByType.getLayer() != getLayer()) {
-                     if (modReplacedByType.removed || modReplacedByType.getLayer().excluded)
+               JavaModel thisModel = getJavaModel();
+               // Give the modified type a back pointer - its "find" operations will map back to us so it gets the most
+               // specific definition.  It does not matter much for most contracts given type compatibility but the
+               // assignment contract requires the most specific definition so we can detect cycles properly.
+               if (!inactiveType && !temporaryType && !thisModel.temporary) {
+                  BodyTypeDeclaration modReplacedByType = modifyTypeDecl.replacedByType ;
+                  if (modReplacedByType != null) {
+                     if (modReplacedByType == this) {
+                        System.out.println("*** Warning - already modified this type");
                         modifyTypeDecl.replacedByType = null;
-                     else {
-                        // For layer components we might get the wrong type here - we use the baseLayers to do teh resolution so we may not find the
-                        // layer directly in front of us - instead we find the layer a couple of levels deeper in.
-                        if (!isLayerComponent()) {
-                           // TODO: we should accumulate all of these layers into an index.  It's quite possible in the IDE context for us to
-                           // find the same type modified by different layers... in that case representing the different possible stackings.
-                           System.out.println("**** Warning - modify declaration: " + typeName + " in layer: " + getLayer() + " not replacing upstream layer of: " + modifyTypeDecl.getLayer() + " since it's already modified by: " + modifyTypeDecl.replacedByType.getLayer());
-                        } else {
-                           // This layer should be in front of us -
-                           if (getLayer().layerPosition != -1 && getLayer().layerPosition < modReplacedByType.getLayer().layerPosition)
-                              System.out.println("*** Error - improper layer init ordering");
-                           else {
-                              while (modifyTypeDecl.replacedByType != null) {
-                                 modifyTypeDecl = modifyTypeDecl.replacedByType;
-                                 checkModify();
-                              }
+                     }
+                     else if (modifyTypeDecl.replaced) {
+                        System.err.println("**** Error - modifying stale type");
+                        modifyTypeDecl.replacedByType = null;
+                     }
+                     // If we are in the same layer, we are just about to replace the type as part of updateType
+                     // Just don't update replacedByType in this case since we'll set that later on anyway.
+                     else if (modReplacedByType.getLayer() != getLayer()) {
+                        if (modReplacedByType.removed || modReplacedByType.getLayer().excluded)
+                           modifyTypeDecl.replacedByType = null;
+                        else {
+                           // For layer components we might get the wrong type here - we use the baseLayers to do teh resolution so we may not find the
+                           // layer directly in front of us - instead we find the layer a couple of levels deeper in.
+                           if (!isLayerComponent()) {
+                              // TODO: we should accumulate all of these layers into an index.  It's quite possible in the IDE context for us to
+                              // find the same type modified by different layers... in that case representing the different possible stackings.
+                              System.out.println("**** Warning - modify declaration: " + typeName + " in layer: " + getLayer() + " not replacing upstream layer of: " + modifyTypeDecl.getLayer() + " since it's already modified by: " + modifyTypeDecl.replacedByType.getLayer());
+                           } else {
+                              // This layer should be in front of us -
+                              if (getLayer().layerPosition != -1 && getLayer().layerPosition < modReplacedByType.getLayer().layerPosition)
+                                 System.out.println("*** Error - improper layer init ordering");
+                              else {
+                                 while (modifyTypeDecl.replacedByType != null) {
+                                    modifyTypeDecl = modifyTypeDecl.replacedByType;
+                                    checkModify();
+                                 }
 
-                              modifyTypeDecl.replacedByType = null;
+                                 modifyTypeDecl.replacedByType = null;
+                              }
                            }
                         }
                      }
                   }
-               }
 
-               if (modifyTypeDecl.replacedByType == null && !modifyInherited && !(thisModel instanceof CmdScriptModel)) {
-                  modifyTypeDecl.updateReplacedByType(this);
+                  if (modifyTypeDecl.replacedByType == null && !modifyInherited && !(thisModel instanceof CmdScriptModel)) {
+                     modifyTypeDecl.updateReplacedByType(this);
+                  }
                }
             }
          }
+      }
+      catch (RuntimeException exc) {
+         typeInfoInitialized = false;
+         throw exc;
       }
    }
 
@@ -214,126 +220,133 @@ public class ModifyDeclaration extends TypeDeclaration {
          return;
       }
 
-      initTypeInfo();
+      try {
+         initTypeInfo();
 
-      // need to start the extends type before we go and start our children.  This ensures an independent layer
-      // gets started completely before the dependent layers.
-      if (modifyTypeDecl != null) {
-         startExtendedType(modifyTypeDecl, "modified");
+         // need to start the extends type before we go and start our children.  This ensures an independent layer
+         // gets started completely before the dependent layers.
+         if (modifyTypeDecl != null) {
+            startExtendedType(modifyTypeDecl, "modified");
 
-         if (!modifyTypeDecl.getJavaModel().isStarted())
-            System.out.println("*** Warning - modified model not started");
+            if (!modifyTypeDecl.getJavaModel().isStarted())
+               System.out.println("*** Warning - modified model not started");
 
-         // If our modifyTypeDeclaration is a dynamic new and we do not need a class, we start out as a dynamicNew as well
-         if (modifyTypeDecl.dynamicNew) {
-            dynamicNew = true;
-            dynamicType = false;
-         }
-         // then, if our modified type picks up the dynamic behavior because it extends a class which is dynamic,
-         // we need to inherit the dynamic behavior from that.
-         else if (modifyTypeDecl.isDynamicType()) {
-            dynamicNew = false;
-            dynamicType = true;
-         }
-         // Did not get this right in initDynamicType because we did not resolve the modifyTypeDecl
-         else if (dynamicNew && modifyTypeDecl.modifyNeedsClass()) {
-            // OUr mod-type explicitly is set to be compiled only so we are not dynamic at all.
-            if (modifyTypeDecl.compiledOnly) {
-               dynamicNew = false;
-            }
-            // This type is only setting properties but the base type needs a class so we do too.
-            else {
-               dynamicType = true;
-               dynamicNew = false;
-            }
-         }
-
-         boolean modifiedCompiledClassLoaded = false;
-         Layer modLayer = modifyTypeDecl.layer;
-         if (layer != null && modLayer != null) {
-
-            boolean modifiedFinalLayer = !isLayerType && !layer.annotationLayer && modLayer.finalLayer;
-            if (modifiedFinalLayer) {
-               displayError("Unable to modify type: " + typeName + " in final layer: " + modifyTypeDecl.layer + " for: ");
-            }
-
-            modifiedCompiledClassLoaded = !modifyTypeDecl.isDynamicType() && modLayer.compiledInClassPath && layer.layeredSystem.isClassLoaded(modifyTypeDecl.getCompiledClassName());
-         }
-
-         if (isDynamicType() && !dynamicNew) {
-            if (modifiedCompiledClassLoaded) {
-               staleClassName = modifyTypeDecl.getCompiledClassName();
-               dynamicType = false;
+            // If our modifyTypeDeclaration is a dynamic new and we do not need a class, we start out as a dynamicNew as well
+            if (modifyTypeDecl.dynamicNew) {
                dynamicNew = true;
+               dynamicType = false;
             }
-            else {
-               // If the modified type's layer has already been compiled into the classpath and loaded, we can't make it dynamic.  It's classes are in the
-               // classpath already and we can't replace them without a custom class loader.   Keeping this false lets us
-               // recognize and deal with this situation at runtime.
-               // If we are modifying a different type, i.e. modifyInherited = true, do not make it dynamic since that class is not dynamic.
-               if (!modifyInherited)
-                  modifyTypeDecl.setDynamicType(true);
-            }
-         }
-         else if (dynamicNew) {
-            if (modifyTypeDecl.isDynamicType() && !modifyTypeDecl.dynamicNew) {
+            // then, if our modified type picks up the dynamic behavior because it extends a class which is dynamic,
+            // we need to inherit the dynamic behavior from that.
+            else if (modifyTypeDecl.isDynamicType()) {
                dynamicNew = false;
                dynamicType = true;
             }
-            else {
-               /**
-                * When a "configure only" modify operation is in a dynamic layer, the modified type is compiled, we have an optimization.
-                * The type is not dynamic but but it gets its dynamicNew flag set.   Propagate the dynamicNew flag to the modified
-                * type so that any "new X" calls for that type are converted to dynamic calls.
-                */
-               modifyTypeDecl.setDynamicNew(true);
-            }
-         }
-
-         // Not registering enum constants in the sub-type table since they are only static classes.  Is that right?
-         // only registering sub-types for the modifyInherited case - i.e. where we are not the same type as the modified type
-         if (needsSubType())
-            thisModel.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
-     }
-
-     if (extendsBoundTypes != null) {
-         for (Object extendsTypeDecl:extendsBoundTypes) {
-            extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
-            if (extendsTypeDecl instanceof BodyTypeDeclaration) {
-               BodyTypeDeclaration extTD = (BodyTypeDeclaration) extendsTypeDecl;
-               startExtendedType(extTD, "extended");
-               if (extTD.isDynamicType()) {
+            // Did not get this right in initDynamicType because we did not resolve the modifyTypeDecl
+            else if (dynamicNew && modifyTypeDecl.modifyNeedsClass()) {
+               // OUr mod-type explicitly is set to be compiled only so we are not dynamic at all.
+               if (modifyTypeDecl.compiledOnly) {
+                  dynamicNew = false;
+               }
+               // This type is only setting properties but the base type needs a class so we do too.
+               else {
                   dynamicType = true;
                   dynamicNew = false;
                }
-               if (extTD instanceof TypeDeclaration) {
-                  if (thisModel.layeredSystem != null)
-                     thisModel.layeredSystem.addSubType((TypeDeclaration) extTD, this);
+            }
+
+            boolean modifiedCompiledClassLoaded = false;
+            Layer modLayer = modifyTypeDecl.layer;
+            if (layer != null && modLayer != null) {
+
+               boolean modifiedFinalLayer = !isLayerType && !layer.annotationLayer && modLayer.finalLayer;
+               if (modifiedFinalLayer) {
+                  displayError("Unable to modify type: " + typeName + " in final layer: " + modifyTypeDecl.layer + " for: ");
+               }
+
+               modifiedCompiledClassLoaded = !modifyTypeDecl.isDynamicType() && modLayer.compiledInClassPath && layer.layeredSystem.isClassLoaded(modifyTypeDecl.getCompiledClassName());
+            }
+
+            if (isDynamicType() && !dynamicNew) {
+               if (modifiedCompiledClassLoaded) {
+                  staleClassName = modifyTypeDecl.getCompiledClassName();
+                  dynamicType = false;
+                  dynamicNew = true;
+               }
+               else {
+                  // If the modified type's layer has already been compiled into the classpath and loaded, we can't make it dynamic.  It's classes are in the
+                  // classpath already and we can't replace them without a custom class loader.   Keeping this false lets us
+                  // recognize and deal with this situation at runtime.
+                  // If we are modifying a different type, i.e. modifyInherited = true, do not make it dynamic since that class is not dynamic.
+                  if (!modifyInherited)
+                     modifyTypeDecl.setDynamicType(true);
+               }
+            }
+            else if (dynamicNew) {
+               if (modifyTypeDecl.isDynamicType() && !modifyTypeDecl.dynamicNew) {
+                  dynamicNew = false;
+                  dynamicType = true;
+               }
+               else {
+                  /**
+                   * When a "configure only" modify operation is in a dynamic layer, the modified type is compiled, we have an optimization.
+                   * The type is not dynamic but but it gets its dynamicNew flag set.   Propagate the dynamicNew flag to the modified
+                   * type so that any "new X" calls for that type are converted to dynamic calls.
+                   */
+                  modifyTypeDecl.setDynamicNew(true);
+               }
+            }
+
+            // Not registering enum constants in the sub-type table since they are only static classes.  Is that right?
+            // only registering sub-types for the modifyInherited case - i.e. where we are not the same type as the modified type
+            if (needsSubType())
+               thisModel.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
+        }
+
+        if (extendsBoundTypes != null) {
+            for (Object extendsTypeDecl:extendsBoundTypes) {
+               extendsTypeDecl = ParamTypeDeclaration.toBaseType(extendsTypeDecl);
+               if (extendsTypeDecl instanceof BodyTypeDeclaration) {
+                  BodyTypeDeclaration extTD = (BodyTypeDeclaration) extendsTypeDecl;
+                  startExtendedType(extTD, "extended");
+                  if (extTD.isDynamicType()) {
+                     dynamicType = true;
+                     dynamicNew = false;
+                  }
+                  if (extTD instanceof TypeDeclaration) {
+                     if (thisModel.layeredSystem != null)
+                        thisModel.layeredSystem.addSubType((TypeDeclaration) extTD, this);
+                  }
                }
             }
          }
-      }
 
-      // After we've started the extends type, walk down the type hierarchy and collect dependencies we might have
-      // on models we inherited from.
-      BodyTypeDeclaration modifyType = modifyTypeDecl;
-      while (modifyType != null) {
-         JavaModel modifiedModel = modifyType.getJavaModel();
-         List<SrcEntry> srcFiles = modifiedModel.getSrcFiles();
-         if (srcFiles != null)
-            thisModel.addDependentFiles(modifiedModel.getSrcFiles());
-         Object modifyTypeObj = modifyType.getDerivedTypeDeclaration();
-         if (modifyTypeObj instanceof TypeDeclaration) {
-            modifyType = (TypeDeclaration) modifyTypeObj;
+         // After we've started the extends type, walk down the type hierarchy and collect dependencies we might have
+         // on models we inherited from.
+         BodyTypeDeclaration modifyType = modifyTypeDecl;
+         while (modifyType != null) {
+            JavaModel modifiedModel = modifyType.getJavaModel();
+            List<SrcEntry> srcFiles = modifiedModel.getSrcFiles();
+            if (srcFiles != null)
+               thisModel.addDependentFiles(modifiedModel.getSrcFiles());
+            Object modifyTypeObj = modifyType.getDerivedTypeDeclaration();
+            if (modifyTypeObj instanceof TypeDeclaration) {
+               modifyType = (TypeDeclaration) modifyTypeObj;
+            }
+            else
+               modifyType = null;
          }
-         else
-            modifyType = null;
+
+         // Need to start children after we've populated our extends type so we can get it.
+         super.start();
       }
-
-      // Need to start children after we've populated our extends type so we can get it.
-      super.start();
-
-      isStarting = false;
+      catch (RuntimeException exc) {
+         clearStarted();
+         throw exc;
+      }
+      finally {
+         isStarting = false;
+      }
    }
 
    public void stop() {
@@ -500,7 +513,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyType == null) {
             String fullTypeName = getFullTypeName();
 
-            modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType);
+            modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType, false, isLayerType);
 
             // For the layer object, it is registered as a global object.  Look it up with resolveName and just assign
             // the class to avoid the error.

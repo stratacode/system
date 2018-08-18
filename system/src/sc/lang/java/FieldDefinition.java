@@ -16,10 +16,7 @@ import sc.lang.js.JSUtil;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
-import sc.parser.IString;
-import sc.parser.PString;
-import sc.parser.ParseError;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
@@ -858,6 +855,12 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
    public FieldDefinition deepCopy(int options, IdentityHashMap<Object,Object> oldNewMap) {
       FieldDefinition res = (FieldDefinition) super.deepCopy(options, oldNewMap);
+      if (variableDefinitions != null && res.variableDefinitions != null) {
+         int sz = variableDefinitions.size();
+         for (int i = 0; i < sz; i++) {
+            res.variableDefinitions.get(i).fromStatement = variableDefinitions.get(i);
+         }
+      }
       if ((options & CopyInitLevels) != 0) {
          res.buildInitExpr = buildInitExpr;
       }

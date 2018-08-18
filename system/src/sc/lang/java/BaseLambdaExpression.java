@@ -13,7 +13,6 @@ import sc.layer.LayeredSystem;
 import sc.parser.IString;
 import sc.parser.PString;
 import sc.parser.ParseUtil;
-import sc.parser.StringToken;
 import sc.type.DynType;
 import sc.util.StringUtil;
 
@@ -831,7 +830,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object getClass(String className, boolean useImports) {
+      public Object getClass(String className, boolean useImports, boolean compiledOnly) {
          return null;
       }
 
@@ -847,6 +846,10 @@ public abstract class BaseLambdaExpression extends Expression {
 
       @Override
       public boolean isLayerType() {
+         return false;
+      }
+
+      public boolean isLayerComponent() {
          return false;
       }
 
@@ -1155,7 +1158,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object getClass(String className, boolean useImports) {
+      public Object getClass(String className, boolean useImports, boolean compiledOnly) {
          return null;
       }
 
@@ -1171,6 +1174,10 @@ public abstract class BaseLambdaExpression extends Expression {
 
       @Override
       public boolean isLayerType() {
+         return false;
+      }
+
+      public boolean isLayerComponent() {
          return false;
       }
 

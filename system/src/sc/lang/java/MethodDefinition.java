@@ -626,6 +626,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyMethodType == PropertyMethodType.SetIndexed;
    }
 
+   @Override
+   public boolean isConstructor() {
+      return false;
+   }
+
    public Object getReturnType(boolean boundParams) {
       return getTypeDeclaration(null, boundParams);
    }

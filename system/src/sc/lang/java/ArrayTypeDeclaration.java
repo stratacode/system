@@ -349,8 +349,8 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return arrayDimensions.length() >> 1;
    }
 
-   public Object getClass(String className, boolean useImports) {
-      return ((ITypeDeclaration) definedInType).getClass(className, useImports);
+   public Object getClass(String className, boolean useImports, boolean compiledOnly) {
+      return ((ITypeDeclaration) definedInType).getClass(className, useImports, compiledOnly);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
@@ -364,6 +364,10 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    public boolean isLayerType() {
+      return false;
+   }
+
+   public boolean isLayerComponent() {
       return false;
    }
 

@@ -22,8 +22,10 @@ public class TypeIndexEntry implements Serializable {
    public String fileName;
    public long lastModified;
    public boolean isLayerType;
+   public boolean isLayerComponent;
    public boolean isInnerType;
    public boolean isModify;
+   public boolean excluded;
 
    public String toString() {
       return "index: " + typeName + " (" + layerName + ")";

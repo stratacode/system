@@ -43,6 +43,8 @@ public interface IMethodDefinition extends IMember {
 
    boolean isVarArgs();
 
+   boolean isConstructor();
+
    String getTypeSignature();
 
    /** Descriptive view of the parameters with parens - i.e. () for no params or (int foo) */

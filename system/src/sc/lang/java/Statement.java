@@ -265,7 +265,13 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          sb.append(this.toString());
          return sb.toString();
       }
+      if (isIncompleteStatement())
+         return "Missing " + getStatementTerminator();
       return null;
+   }
+
+   public String getStatementTerminator() {
+      return ";";
    }
 
    public void setUserData(Object v)  {
@@ -645,4 +651,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return null;
    }
 
+
+   public boolean isIncompleteStatement() {
+      return parseNode != null && parseNode.isIncomplete();
+   }
 }

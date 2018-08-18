@@ -94,6 +94,11 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       return false;
    }
 
+   @Override
+   public boolean isConstructor() {
+      return true;
+   }
+
    public Object definesConstructor(List<?> methParams, ITypeParamContext ctx, boolean isTransformed) {
       return parametersMatch(methParams, ctx, null, null);
    }

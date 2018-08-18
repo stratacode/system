@@ -2544,7 +2544,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                //
                // Not using layerResolve here since this type is resolved for runtime, not for layer init time.
                if (typeObj == null)
-                  typeObj = layeredSystem.getClassWithPathName(typeName, this, false, true, false);
+                  typeObj = layeredSystem.getClassWithPathName(typeName, this, false, true, false, false);
                if (imp.hasWildcard()) {
                   boolean addedAny = false;
                   if (typeObj != null) {

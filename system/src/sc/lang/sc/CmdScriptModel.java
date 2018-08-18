@@ -161,6 +161,10 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return false;
    }
 
+   public boolean isLayerComponent() {
+      return false;
+   }
+
    public List<?> getClassTypeParameters() {
       return getCmdObject().getClassTypeParameters();
    }

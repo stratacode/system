@@ -5,11 +5,13 @@
 package sc.layer;
 
 import sc.lang.ILanguageModel;
+import sc.lang.java.ITypeDeclaration;
 
 /**
  * Used by the LayeredSystem to synchronize with an IDE or external system that wants to keep its own database of type
  * information.  It gives StrataCode the ability to use this external cache and keep it sync with it's own cache of types
- * that ie needs to parse and load for resolving dependencies.
+ * that ie needs to parse and load for resolving dependencies.  It also allows the IDE to supply it's own types via the
+ * getTypeDeclaration method.
  */
 public interface IExternalModelIndex {
    /** If you have your own cache of ILanguageModel objects, return your cached model.  If not, return null from this method and StrataCode will use it's own cache.
@@ -33,4 +35,6 @@ public interface IExternalModelIndex {
 
    /** Called to notify the index that a language model file was changed.  */
    public void modelChanged(ILanguageModel model, boolean modelChanged, Layer layer);
+
+   public ITypeDeclaration getTypeDeclaration(String typeName);
 }

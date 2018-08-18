@@ -280,8 +280,10 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
             else
                sb.append(typeParam.toString());
          }
-         sb.append(">");
+         sb.append("> ");
       }
+      sb.append(getReturnJavaType());
+      sb.append(" ");
       if (name != null)
          sb.append(name);
       else

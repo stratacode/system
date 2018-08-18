@@ -12,6 +12,7 @@ import sc.type.CTypeUtil;
 import sc.type.DynType;
 import sc.type.RTypeUtil;
 import sc.type.TypeUtil;
+import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -30,6 +31,10 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
    }
 
    public boolean isLayerType() {
+      return false;
+   }
+
+   public boolean isLayerComponent() {
       return false;
    }
 
@@ -445,18 +450,20 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
       if (annot != null)
          return annot;
 
+      LayeredSystem sys = refLayer == null ? getLayeredSystem() : refLayer.layeredSystem;
       Object superType = getDerivedTypeDeclaration();
       // Look for an annotation layer that might be registered for this compiled class
       if (superType != null) {
+         // In case we are using this type from a different layered system than it was created
          if (ModelUtil.isCompiledClass(superType)) {
-            Object srcSuperType = ModelUtil.findTypeDeclaration(getLayeredSystem(), ModelUtil.getTypeName(superType), refLayer, layerResolve);
+            Object srcSuperType = ModelUtil.findTypeDeclaration(sys, ModelUtil.getTypeName(superType), refLayer, layerResolve);
             if (srcSuperType != null && srcSuperType != superType) {
-               annot = ModelUtil.getInheritedAnnotation(system, srcSuperType, annotationName, skipCompiled, refLayer, layerResolve);
+               annot = ModelUtil.getInheritedAnnotation(sys, srcSuperType, annotationName, skipCompiled, refLayer, layerResolve);
                if (annot != null)
                   return annot;
             }
          }
-         annot = ModelUtil.getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
+         annot = ModelUtil.getInheritedAnnotation(sys, superType, annotationName, skipCompiled, refLayer, layerResolve);
          if (annot != null)
             return annot;
       }
@@ -466,7 +473,7 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
          int numInterfaces = implementsTypes.size();
          for (int i = 0; i < numInterfaces; i++) {
             Object implType = implementsTypes.get(i);
-            if ((annot = ModelUtil.getInheritedAnnotation(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null)
+            if ((annot = ModelUtil.getInheritedAnnotation(sys, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null)
                return annot;
          }
       }
@@ -481,14 +488,16 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
          res.add(annot);
       }
 
+      LayeredSystem sys = refLayer == null ? system : refLayer.layeredSystem;
+
       Object superType = getDerivedTypeDeclaration();
       if (superType != null) {
-         ArrayList<Object> superRes = ModelUtil.getAllInheritedAnnotations(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
+         ArrayList<Object> superRes = ModelUtil.getAllInheritedAnnotations(sys, superType, annotationName, skipCompiled, refLayer, layerResolve);
          if (superRes != null)
             res = ModelUtil.appendLists(res, superRes);
 
          String nextTypeName = ModelUtil.getTypeName(superType);
-         Object nextType = ModelUtil.findTypeDeclaration(system, nextTypeName, refLayer, layerResolve);
+         Object nextType = ModelUtil.findTypeDeclaration(sys, nextTypeName, refLayer, layerResolve);
          if (nextType != null && nextType instanceof TypeDeclaration && nextType != superType) {
             if (nextType == superType) {
                System.err.println("*** Loop in inheritance tree: " + nextTypeName);
@@ -507,12 +516,12 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
             Object implType = implementsTypes.get(i);
             if (implType != null) {
                ArrayList<Object> superRes;
-               if ((superRes = ModelUtil.getAllInheritedAnnotations(system, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null) {
+               if ((superRes = ModelUtil.getAllInheritedAnnotations(sys, implType, annotationName, skipCompiled, refLayer, layerResolve)) != null) {
                   res = ModelUtil.appendLists(res, superRes);
                }
 
                String nextTypeName = ModelUtil.getTypeName(implType);
-               Object nextType = ModelUtil.findTypeDeclaration(system, nextTypeName, refLayer, layerResolve);
+               Object nextType = ModelUtil.findTypeDeclaration(sys, nextTypeName, refLayer, layerResolve);
                if (nextType != null && nextType instanceof TypeDeclaration && nextType != implType) {
                   if (nextType == superType) {
                      System.err.println("*** Loop in interface inheritance tree: " + nextTypeName);
@@ -527,5 +536,46 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
       }
       return res;
    }
+
+   public Object getConstructorFromSignature(String sig) {
+      Object[] cstrs = getConstructors(null);
+      if (cstrs == null)
+         return null;
+      for (int i = 0; i < cstrs.length; i++) {
+         Object constr = cstrs[i];
+         if (StringUtil.equalStrings(((ConstructorDefinition) constr).getTypeSignature(), sig))
+            return constr;
+      }
+      return null;
+   }
+
+   public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
+      List<Object> methods = getMethods(methodName, null, true);
+      if (methods == null) {
+         // Special case way to refer to the constructor
+         if (methodName.equals(getTypeName()))
+            return getConstructorFromSignature(signature);
+         // TODO: default constructor?
+         return null;
+      }
+      for (Object meth:methods) {
+         if (StringUtil.equalStrings(ModelUtil.getTypeSignature(meth), signature)) {
+            return meth;
+         }
+      }
+      return null;
+   }
+
+   public Object getTypeDeclaration(String name, boolean compiledOnly) {
+      if (system == null)
+         return RTypeUtil.loadClass(name);
+      Object newRes = system.getClassWithPathName(name, null, false, false, false, compiledOnly);
+      return newRes;
+   }
+
+   public Object getClass(String className, boolean useImports, boolean compiledOnly) {
+      return getTypeDeclaration(className, compiledOnly);
+   }
+
 }
 

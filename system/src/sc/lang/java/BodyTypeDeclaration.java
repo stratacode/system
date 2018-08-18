@@ -60,7 +60,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public transient boolean replaced = false;  // Set to true when another type in the same layer has replaced this type
 
-   public transient boolean removed = false;  // Set to true when another type in the same layer has replaced this type
+   public transient boolean removed = false;  // Set to true when the source for this type has been removed from the system.
 
    /** Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime */
    transient protected boolean excluded = false;
@@ -600,6 +600,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void clearCachedMemberInfo() {
+      LayeredSystem sys = getLayeredSystem();
+      if (sys != null)
+         sys.ensureLocked();
       membersByName = null;
       methodsByName = null;
       memberCache = null;
@@ -1317,7 +1320,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object getInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
       int ix;
-      boolean origSameType = ctx != null && ctx.sameType; 
+      boolean origSameType = ctx != null && ctx.sameType;
       Object type = this;
       do {
          Object nextType;
@@ -1848,7 +1851,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                AbstractMethodDefinition methDef = (AbstractMethodDefinition) meth;
                AbstractMethodDefinition repl = methDef.replacedByMethod;
                // Currently a modify type does not update all references to the type it changes when it is added.
-               // So when we go to look up a method for the runtime, we need to 
+               // So when we go to look up a method for the runtime, we need to
                while ((methDef.replaced || resolveLayer) && (repl = methDef.replacedByMethod) != null) {
                   if (repl.replacedByMethod == null)
                      return repl;
@@ -1894,7 +1897,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       return getDeclaredProperties(modifier, includeAssigns, false);
    }
-   
+
    public static void addAllProperties(SemanticNodeList<Statement> body, List<Object> props, String modifier, boolean includeAssigns) {
       for (int i = 0; i < body.size(); i++) {
          Definition member = body.get(i);
@@ -2189,9 +2192,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return getDeclarationType().name;
    }
 
-   public Object getClass(String className, boolean useImports) {
+   public Object getClass(String className, boolean useImports, boolean compiledOnly) {
       JavaModel model = getJavaModel();
-      return model.getClass(className, useImports, model.getLayer(), model.isLayerModel);
+      return model.getClass(className, useImports, model.getLayer(), model.isLayerModel, false, compiledOnly);
    }
 
    public Object findTypeDeclaration(String typeName, boolean addExternalReference) {
@@ -7834,27 +7837,28 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (isLayerType && layer != null && layer.excluded) {
          excluded = true;
-         return;
       }
 
-      super.start();
+      if (!excluded)
+         super.start();
 
       // Need to do this after we start the @Exec annotation
-      if (!isLayerType && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
+      if (!isLayerType && !isLayerComponent() && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
          if (sys.options.verbose)
             sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
          excluded = true;
-         return;
       }
 
-      if (hiddenBody != null)
-         hiddenBody.start();
+      if (!excluded) {
+         if (hiddenBody != null)
+            hiddenBody.start();
 
-      if (sys != null) {
-         Layer layer = getLayer();
-         IRuntimeProcessor proc = sys.runtimeProcessor;
-         if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated)
-            proc.start(this);
+         if (sys != null) {
+            Layer layer = getLayer();
+            IRuntimeProcessor proc = sys.runtimeProcessor;
+            if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated)
+               proc.start(this);
+         }
       }
 
       // We should be able to do this right after we have the extends and implements stuff bound.  Maybe we could move it later but
@@ -7951,6 +7955,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = getLayeredSystem();
       idx.processIdent = sys == null ? null : sys.getProcessIdent();
       idx.layerPosition = layer == null ? -1 : layer.layerPosition;
+      idx.excluded = excluded;
       ArrayList<String> baseTypes = null;
       JavaModel model = getJavaModel();
       if (model != null && model.getSrcFile() != null) {
@@ -8002,6 +8007,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       idx.baseTypes = baseTypes;
       idx.declType = getDeclarationType();
       idx.isLayerType = isLayerType;
+      idx.isLayerComponent = isLayerComponent();
       idx.isInnerType = getEnclosingType() != null;
       idx.isModify = this instanceof ModifyDeclaration;
       // Inner types store their own index entries
