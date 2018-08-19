@@ -2765,12 +2765,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return systemClasses.contains(name) ? "java.lang." + name : null;
    }
 
-
-   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates, boolean retFullTypeName, boolean srcOnly) {
+   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates, boolean retFullTypeName, boolean srcOnly, boolean annotTypes) {
       String prefixPkg = CTypeUtil.getPackageName(prefix);
       String prefixBaseName = CTypeUtil.getClassName(prefix);
 
-      findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
+      findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly, annotTypes);
    }
 
    void addMatchingCandidate(Set<String> candidates, String pkgName, String baseName, boolean retFullTypeName) {
@@ -2829,7 +2828,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** This method is used by the IDE to retrieve names for code-completion, name-lookup, etc.  */
    public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer,
-                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates, boolean retFullTypeName, boolean srcOnly) {
+                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates, boolean retFullTypeName, boolean srcOnly, boolean annotTypes) {
       acquireDynLock(false);
       try {
          if (prefixPkg == null || prefixPkg.equals("java.lang")) {
@@ -2864,20 +2863,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
 
             if (refLayer == null || !refLayer.activated || refLayer == Layer.ANY_INACTIVE_LAYER) {
-               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer);
+               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes);
 
                if (!peerMode && peerSystems != null) {
                   for (int i = 0; i < peerSystems.size(); i++) {
                      LayeredSystem peerSys = peerSystems.get(i);
                      Layer peerRefLayer = refLayer == null ? null : refLayer.layeredSystem == peerSys ? refLayer : peerSys.getPeerLayerFromRemote(refLayer);
                      if ((peerRefLayer != Layer.ANY_INACTIVE_LAYER && peerRefLayer != null) || refLayer == null)
-                        peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly);
+                        peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly, annotTypes);
                   }
                }
                if (typeIndexProcessMap != null) {
                   for (Map.Entry<String,SysTypeIndex> typeIndexEntry:typeIndexProcessMap.entrySet()) {
                      SysTypeIndex idx = typeIndexEntry.getValue();
-                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer);
+                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes);
                   }
                }
             }

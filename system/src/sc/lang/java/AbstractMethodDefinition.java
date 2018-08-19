@@ -899,4 +899,10 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          }
       }
    }
+
+   public boolean isIncompleteStatement() {
+      if (body != null)
+         return false; // TODO: When we have a body this incorrectly reports errors because we fail to clear the 'errorNode' flag during a reparse... possibly need to restrict the cases where we propagate the errorNode flag down the tree?
+      return super.isIncompleteStatement();
+   }
 }

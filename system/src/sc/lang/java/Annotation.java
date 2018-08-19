@@ -9,10 +9,12 @@ import sc.lang.JavaLanguage;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.parser.ParseUtil;
+import sc.type.CTypeUtil;
 
 import java.lang.reflect.Array;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeMap;
 
 public class Annotation extends ErrorSemanticNode implements IAnnotation {
@@ -355,5 +357,31 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
             res.put(annot.getTypeName(), AnnotationValue.elemValToPrimitiveValue(annotVal));
          }
       }
+   }
+
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+      String packagePrefix;
+      if (typeName == null)
+         return matchPrefix;
+
+      if (matchPrefix.contains(".")) {
+         packagePrefix = CTypeUtil.getPackageName(matchPrefix);
+         matchPrefix = CTypeUtil.getClassName(matchPrefix);
+      }
+      else {
+         if (typeName.indexOf(".") != -1) {
+            int ix = typeName.indexOf(dummyIdentifier);
+            if (ix != -1)
+               typeName = typeName.substring(0, ix);
+            if (typeName.endsWith(".") && typeName.length() > 1)
+               packagePrefix = typeName.substring(0, typeName.length() - 1);
+            else
+               packagePrefix = CTypeUtil.getPackageName(typeName);
+         }
+         else
+            packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
+      }
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null);
+      return matchPrefix;
    }
 }

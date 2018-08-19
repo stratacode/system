@@ -6860,7 +6860,7 @@ public class ModelUtil {
          if (encType != null) // Include members that are visible in the namespace
             suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false);
          else if (model != null) // only for the root - search the global ones
-            model.findMatchingGlobalNames(prefix, candidates);
+            model.findMatchingGlobalNames(prefix, candidates, false);
       }
       if (includeClassBodyKeywords && model != null && model.getLanguage() instanceof JavaLanguage) {
          List<String> keywords = ((JavaLanguage) model.getLanguage()).getClassLevelKeywords();
@@ -6873,6 +6873,10 @@ public class ModelUtil {
    }
 
    public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals) {
+      suggestTypes(model, prefix, lastIdent, candidates, includeGlobals, false);
+   }
+
+   public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals, boolean annotTypes) {
       if (prefix == null)
          prefix = "";
       if (model == null)
@@ -6892,9 +6896,9 @@ public class ModelUtil {
       }
       if (includeGlobals) {
          if (lastIdent.equals(""))
-            model.findMatchingGlobalNames(prefix, candidates);
+            model.findMatchingGlobalNames(prefix, candidates, annotTypes);
          else
-            model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false);
+            model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false, annotTypes);
       }
 
       String absName, pkgName, baseName;
@@ -6909,8 +6913,8 @@ public class ModelUtil {
          baseName = lastIdent;
       }
 
-      model.findMatchingGlobalNames(absName, pkgName, baseName, candidates);
-      model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false);
+      model.findMatchingGlobalNames(absName, pkgName, baseName, candidates, annotTypes);
+      model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false, annotTypes);
    }
 
    public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates) {

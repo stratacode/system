@@ -581,22 +581,25 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return super.definesType(typeName, ctx);
    }
 
-   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates) {
-      super.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates);
-      // Also for the command line need to include any properties defined in the cmdObject
-      ModelUtil.suggestMembers(this, cmdObject, prefixBaseName, candidates, false, true, true, false);
+   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates, boolean annotTypes) {
+      super.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes);
 
-      if ("cmd".startsWith(prefixBaseName))
-         candidates.add("cmd");
+      if (!annotTypes) {
+         // Also for the command line need to include any properties defined in the cmdObject
+         ModelUtil.suggestMembers(this, cmdObject, prefixBaseName, candidates, false, true, true, false);
 
-      if (commands != null) {
-         for (Object command:commands) {
-            if (command instanceof FieldDefinition) {
-               FieldDefinition field = (FieldDefinition) command;
-               if (field.variableDefinitions != null) {
-                  for (VariableDefinition varDef:field.variableDefinitions) {
-                     if (varDef.variableName.startsWith(prefixBaseName))
-                        candidates.add(varDef.variableName);
+         if ("cmd".startsWith(prefixBaseName))
+            candidates.add("cmd");
+
+         if (commands != null) {
+            for (Object command:commands) {
+               if (command instanceof FieldDefinition) {
+                  FieldDefinition field = (FieldDefinition) command;
+                  if (field.variableDefinitions != null) {
+                     for (VariableDefinition varDef:field.variableDefinitions) {
+                        if (varDef.variableName.startsWith(prefixBaseName))
+                           candidates.add(varDef.variableName);
+                     }
                   }
                }
             }
@@ -605,7 +608,7 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       if (includeCommands != null) {
          for (int incIx = 0; incIx < includeCommands.size(); incIx++) {
             IncludeCommand incCmd = includeCommands.get(incIx);
-            incCmd.includedModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates);
+            incCmd.includedModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes);
          }
       }
    }

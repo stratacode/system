@@ -631,12 +631,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 
-   public void findMatchingGlobalNames(String prefix, Set<String> candidates) {
-      findMatchingGlobalNames(prefix, CTypeUtil.getPackageName(prefix), CTypeUtil.getClassName(prefix), candidates);
+   public void findMatchingGlobalNames(String prefix, Set<String> candidates, boolean annotTypes) {
+      findMatchingGlobalNames(prefix, CTypeUtil.getPackageName(prefix), CTypeUtil.getClassName(prefix), candidates, annotTypes);
    }
 
    // TODO: should we use Pattern matching to make this more flexible?  Or an index to make it faster?
-   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates) {
+   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates, boolean annotTypes) {
       initTypeInfo();
 
       if (layeredSystem != null) {
@@ -671,9 +671,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       JavaModel modModel = getModifiedModel();
       if (modModel != null)
-         modModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates);
+         modModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes);
       if (layeredSystem != null && layer != null) {
-         layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates, false, false);
+         layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates, false, false, annotTypes);
       }
    }
 

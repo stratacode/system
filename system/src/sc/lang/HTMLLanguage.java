@@ -228,11 +228,11 @@ public class HTMLLanguage extends TemplateLanguage {
 
    public IndexedChoice tagSpacing = new IndexedChoice(REPEAT | OPTIONAL | NOERROR);
    {
-      tagSpacing.put(" ", whiteSpace);
-      tagSpacing.put("\t", whiteSpace);
-      tagSpacing.put("\f", whiteSpace);
-      tagSpacing.put("\r", whiteSpace);
-      tagSpacing.put("\n", whiteSpace);
+      tagSpacing.put(" ", whiteSpaceChunk);
+      tagSpacing.put("\t", whiteSpaceChunk);
+      tagSpacing.put("\f", whiteSpaceChunk);
+      tagSpacing.put("\r", whiteSpaceChunk);
+      tagSpacing.put("\n", whiteSpaceChunk);
 
       tagSpacing.generateParseNode = new SpacingParseNode(tagSpacing, false);
    }

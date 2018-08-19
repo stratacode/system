@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import sc.lang.java.DeclarationType;
 import sc.lang.java.TypeDeclaration;
 import sc.type.CTypeUtil;
 import sc.util.StringUtil;
@@ -151,7 +152,7 @@ public class SysTypeIndex {
       return null;
    }
 
-   public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer) {
+   public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer, boolean annotTypes) {
       if (inactiveTypeIndex.sys.writeLocked == 0) {
          System.err.println("*** Modifying type index without write lock");
          new Throwable().printStackTrace();
@@ -179,6 +180,9 @@ public class SysTypeIndex {
             String typeName = typeEnt.getKey();
             String className = CTypeUtil.getClassName(typeName);
             if (className.startsWith(prefix)) {
+               TypeIndexEntry ent = typeEnt.getValue();
+               if (annotTypes != (ent.declType == DeclarationType.ANNOTATION))
+                  continue;
                if (retFullTypeName)
                   candidates.add(typeName);
                else
@@ -187,7 +191,7 @@ public class SysTypeIndex {
          }
       }
       // Indexing layers as types but only with the full type name
-      if (inactiveTypeIndex.layersList != null) {
+      if (inactiveTypeIndex.layersList != null && !annotTypes) {
          for (Layer inactiveLayer : inactiveTypeIndex.layersList) {
             String typeName = inactiveLayer.layerDirName;
             if (typeName.startsWith(prefix)) {

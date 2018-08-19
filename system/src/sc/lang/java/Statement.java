@@ -653,6 +653,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
 
    public boolean isIncompleteStatement() {
-      return parseNode != null && parseNode.isIncomplete();
+      if (parseNode != null && parseNode.isIncomplete()) {
+         boolean res = parseNode.isIncomplete();
+         return true;
+      }
+      return false;
    }
 }
