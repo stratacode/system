@@ -77,13 +77,19 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public SymbolChoice lineTerminator = new SymbolChoice(NOERROR, "\r\n", "\r", "\n");
    public SymbolChoice notLineTerminators = new SymbolChoice(NOT | REPEAT | OPTIONAL | NOERROR, "\r\n", "\r", "\n", Symbol.EOF);
 
-   public IndexedChoice whiteSpace = new IndexedChoice("<whitespace>", NOERROR | OPTIONAL);
+   IndexedChoice whiteSpaceChunk = new IndexedChoice("<whitespaceChunk>", NOERROR | OPTIONAL);
    {
-      whiteSpace.put(" ", new Symbol(REPEAT, " "));
-      whiteSpace.put("\t", new Symbol("\t"));
-      whiteSpace.put("\f", new Symbol("\f"));
-      whiteSpace.put("\r", lineTerminator);
-      whiteSpace.put("\n", lineTerminator);
+      whiteSpaceChunk.put(" ", new Symbol(REPEAT, " "));
+      whiteSpaceChunk.put("\t", new Symbol("\t"));
+      whiteSpaceChunk.put("\f", new Symbol("\f"));
+      whiteSpaceChunk.put("\r", lineTerminator);
+      whiteSpaceChunk.put("\n", lineTerminator);
+   }
+
+   public IndexedChoice whiteSpace = whiteSpaceChunk.clone();
+   {
+      whiteSpace.setName("<whiteSpace>");
+      whiteSpace.repeat = true;
    }
 
    public Sequence EOLComment = new Sequence("<eolComment>", NOERROR,
@@ -108,11 +114,11 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public IndexedChoice spacing = new IndexedChoice("<spacing>", REPEAT | OPTIONAL | NOERROR);
    {
-      spacing.put(" ", whiteSpace);
-      spacing.put("\t", whiteSpace);
-      spacing.put("\f", whiteSpace);
-      spacing.put("\r", whiteSpace);
-      spacing.put("\n", whiteSpace);
+      spacing.put(" ", whiteSpaceChunk);
+      spacing.put("\t", whiteSpaceChunk);
+      spacing.put("\f", whiteSpaceChunk);
+      spacing.put("\r", whiteSpaceChunk);
+      spacing.put("\n", whiteSpaceChunk);
       spacing.put("//", EOLComment);
       spacing.put("/*", blockComment);
 
