@@ -832,12 +832,15 @@ public class IdentifierExpression extends ArgumentsExpression {
          Object boundType = boundTypes == null ? null : boundTypes[boundTypes.length - 1];
          // A method which we could not resolve, so propagateInferredTypes never ran for the args - let them know there will not be an inferred type so we flush out suppressed errors
          if (boundType == null || errorArgs != null) { // TODO: should we add more state here to differentiate between
-            for (Expression argExpr: arguments) {
-               Object exprType = argExpr.getGenericType();
-               if (exprType == null)
-                  exprType = UnknownReferredType;
-               // else - might as well use the exprType in this case?
-               argExpr.setInferredType(exprType, true);
+            JavaModel model = getJavaModel();
+            if (!model.disableTypeErrors) { // During transform, we will have turned off type errors for expressions to JS methods and stuff - the resolve here will break those cases
+               for (Expression argExpr: arguments) {
+                  Object exprType = argExpr.getGenericType();
+                  if (exprType == null)
+                     exprType = UnknownReferredType;
+                  // else - might as well use the exprType in this case?
+                  argExpr.setInferredType(exprType, true);
+               }
             }
          }
       }
