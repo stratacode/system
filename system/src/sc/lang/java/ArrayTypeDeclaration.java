@@ -59,11 +59,13 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    /** Handles nested array inside of array */
    public static ArrayTypeDeclaration create(LayeredSystem sys, Object compType, String arrayDims, Object dit) {
-      if (compType instanceof ArrayTypeDeclaration) {
+      int numInnerDims = 0;
+      while (compType instanceof ArrayTypeDeclaration) {
          ArrayTypeDeclaration prevArr = (ArrayTypeDeclaration) compType;
-         arrayDims = prevArr.arrayDimensions + arrayDims;
          compType = prevArr.getComponentType();
+         numInnerDims++;
       }
+      arrayDims = arrayDims + StringUtil.repeat("[]", numInnerDims);
       return new ArrayTypeDeclaration(sys, dit, compType, arrayDims);
    }
 

@@ -273,6 +273,12 @@ public class LayerListTypeIndex {
       return null;
    }
 
+   public LayerTypeIndex getTypeIndex(String layerName) {
+      if (typeIndex != null)
+         return typeIndex.get(layerName);
+      return null;
+   }
+
    public void addLayerTypeIndex(String layerName, LayerTypeIndex layerTypeIndex) {
       typeIndex.put(layerName, layerTypeIndex);
       reverseIndexValid = false;

@@ -28,23 +28,31 @@ public class ArrayInitializer extends Expression {
    public boolean setInferredType(Object type, boolean finalType) {
       super.setInferredType(type, finalType);
 
-      inferredType = type;
-
-
-      if (type != null) {
-         Object componentType = ModelUtil.getArrayComponentType(type);
-         if (initializers != null && componentType != null) {
+      if (type == UnknownReferredType) {
+         if (initializers != null) {
             for (Expression init:initializers) {
-               init.setInferredType(componentType, finalType);
+               init.setInferredType(type, finalType);
             }
+         }
+      }
+      else {
+         inferredType = type;
 
-            for (Expression init:initializers) {
-               Object initType = init.getTypeDeclaration();
-               // Using assignment semantics to get more flexible type conversions
-               if (!ModelUtil.isAssignableFrom(componentType, initType, true, null, getLayeredSystem())) {
-                  displayError("Array element type mismatch - Expected " + ModelUtil.getTypeName(componentType) + " found: " + ModelUtil.getTypeName(initType) + " for: ");
-                  initType = init.getTypeDeclaration();
-                  boolean res = ModelUtil.isAssignableFrom(componentType, initType, true, null, getLayeredSystem());
+         if (type != null) {
+            Object componentType = ModelUtil.getArrayComponentType(type);
+            if (initializers != null && componentType != null) {
+               for (Expression init:initializers) {
+                  init.setInferredType(componentType, finalType);
+               }
+
+               for (Expression init:initializers) {
+                  Object initType = init.getTypeDeclaration();
+                  // Using assignment semantics to get more flexible type conversions
+                  if (!ModelUtil.isAssignableFrom(componentType, initType, true, null, getLayeredSystem())) {
+                     displayError("Array element type mismatch - Expected " + ModelUtil.getTypeName(componentType) + " found: " + ModelUtil.getTypeName(initType) + " for: ");
+                     initType = init.getTypeDeclaration();
+                     boolean res = ModelUtil.isAssignableFrom(componentType, initType, true, null, getLayeredSystem());
+                  }
                }
             }
          }

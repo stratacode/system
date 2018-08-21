@@ -564,6 +564,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       SrcEntry res = getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
       if (res != null)
          return res;
+
+      return getBaseLayerSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, proc, layerResolve);
+   }
+
+   public SrcEntry getBaseLayerSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, IProcessDefinition proc, boolean layerResolve) {
+      SrcEntry res = null;
       if (baseLayers != null) {
          for (Layer base:baseLayers) {
             res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, proc, layerResolve);
@@ -571,7 +577,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                return res;
          }
       }
-      return null;
+      return res;
    }
 
    public SrcEntry getSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, boolean layerResolve) {

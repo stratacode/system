@@ -1063,7 +1063,7 @@ public class SelectorExpression extends ChainedExpression {
    }
 
    public boolean setInferredType(Object inferredType, boolean finalType) {
-      this.inferredType = inferredType;
+      this.inferredType = inferredType == UnknownReferredType ? null : inferredType;
       this.inferredFinal = finalType;
       // Re-resolve this now that we have the inferred type
       resolveTypeDeclaration();

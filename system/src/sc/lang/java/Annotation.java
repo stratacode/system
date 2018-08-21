@@ -52,19 +52,25 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
 
    public void start() {
       if (started) return;
-      super.start();
+      try {
+         super.start();
 
-      if (typeName == null)
-         return;
+         if (typeName == null)
+            return;
 
-      boundType = findType(typeName);
-      JavaModel model = getJavaModel();
-      if (boundType == null && model != null) // Global type
-         boundType = model.findTypeDeclaration(typeName, true);
-      if (boundType == null) {
-         displayTypeError("No annotation: ", typeName, " ");
-         if (model != null)
+         boundType = findType(typeName);
+         JavaModel model = getJavaModel();
+         if (boundType == null && model != null) // Global type
             boundType = model.findTypeDeclaration(typeName, true);
+         if (boundType == null) {
+            displayTypeError("No annotation: ", typeName, " ");
+            if (model != null)
+               boundType = model.findTypeDeclaration(typeName, true);
+         }
+      }
+      catch (RuntimeException exc) {
+         clearStarted();
+         throw exc;
       }
 
       /* Debug code to test that we can retrieve annotation values from any annotation

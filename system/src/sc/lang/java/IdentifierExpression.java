@@ -75,8 +75,8 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    transient boolean jsTransformed = false;
 
-   transient Object inferredType;
-   transient boolean inferredFinal = true;
+   transient Object inferredType; // Set to the known type of the expected result of this expression when there is one
+   transient boolean inferredFinal = true; // When there is an expected result, set to false when inferredType represents a possibly incomplete type because it's based on an expression where the inferred type has not yet been set.
 
    public static IdentifierExpression create(IString... args) {
       IdentifierExpression ie = new IdentifierExpression();
@@ -750,12 +750,16 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       int len = idents.size();
 
-      Object boundType = boundTypes[len-1];
-      if (boundType != null && arguments != null) {
-         // This saves some time and is important for the case where boundType is a VariableDefinition - during transform we may
-         // return the VariableDefinition until we've created the getX method - but it looks like a method call.
-         if (arguments.size() > 0)
+      if (arguments != null && arguments.size() > 0) {
+         Object boundType = boundTypes[len-1];
+         if (boundType != null) {
+            // This saves some time and is important for the case where boundType is a VariableDefinition - during transform we may
+            // return the VariableDefinition until we've created the getX method - but it looks like a method call.
             propagateInferredArgs(this, boundType, arguments);
+         }
+         else {
+            // in validate, we'll re-resolve the type reference of these expressions so we trigger errors suppressed by isInferredSet returning false when we resolved them last time
+         }
       }
    }
 
@@ -822,6 +826,20 @@ public class IdentifierExpression extends ArgumentsExpression {
          // look for bindable annotations.  This means we cant' do this in the start process cause things back
          // there are still starting up.
          checkForBindableField(this, ident, idTypes, boundTypes, arguments, bindingDirection, i, null, inferredType);
+      }
+
+      if (arguments != null && arguments.size() > 0) {
+         Object boundType = boundTypes == null ? null : boundTypes[boundTypes.length - 1];
+         // A method which we could not resolve, so propagateInferredTypes never ran for the args - let them know there will not be an inferred type so we flush out suppressed errors
+         if (boundType == null || errorArgs != null) { // TODO: should we add more state here to differentiate between
+            for (Expression argExpr: arguments) {
+               Object exprType = argExpr.getGenericType();
+               if (exprType == null)
+                  exprType = UnknownReferredType;
+               // else - might as well use the exprType in this case?
+               argExpr.setInferredType(exprType, true);
+            }
+         }
       }
    }
 
@@ -5656,7 +5674,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public boolean setInferredType(Object inferredType, boolean finalType) {
-      this.inferredType = inferredType;
+      this.inferredType = inferredType == UnknownReferredType ? null : inferredType;
       this.inferredFinal = finalType;
 
       // TODO: do we need to re-resolve all type references now?
@@ -5687,6 +5705,8 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public boolean propagatesInferredType(Expression child) {
+      if (validated) // Once start is complete, children should not rely on setInferredType being called - we might not have resolved a method and so can't supply a type for our parameters
+         return false;
       return true;
    }
 

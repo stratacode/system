@@ -289,7 +289,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       else {
          TypedDefinition tdef = (TypedDefinition) def;
          if (tdef.type != null)
-            typeName = tdef.type.getFullTypeName();
+            typeName = tdef.type.toString(); // Used to use getFullTypeName here but for array types that returns the Class.getName() value - [[[i not int[][][]
          else
             typeName = "<no type>";
       }

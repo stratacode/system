@@ -528,36 +528,44 @@ public abstract class BaseLambdaExpression extends Expression {
    }
 
    public boolean setInferredType(Object parentType, boolean finalType) {
-      // Convert between the ParameterizedType and ParamTypeDeclaration
-      if (parentType instanceof ParameterizedType)
-         parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType());
+      if (parentType == UnknownReferredType) {
+         needsStart = true;
+         newExpr = null;
+      }
+      else {
+         // Convert between the ParameterizedType and ParamTypeDeclaration
+         if (parentType instanceof ParameterizedType)
+            parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType());
 
-      if (inferredType != null) {
-         if (ModelUtil.isAssignableFrom(parentType, inferredType)) {
-            // If these are exactly the same, no need to do anything except update the type parameters in the new parentType
-            if (ModelUtil.isAssignableFrom(inferredType, parentType)) {
-               updateInferredType(parentType);
-               // The last time we set newExpr it was during a parametersMatch - not final so reset the new expr so we propagate
-               // the final inferred type
-               if (!inferredFinal && finalType) {
+         if (inferredType != null) {
+            if (ModelUtil.isAssignableFrom(parentType, inferredType)) {
+               // If these are exactly the same, no need to do anything except update the type parameters in the new parentType
+               if (ModelUtil.isAssignableFrom(inferredType, parentType)) {
+                  updateInferredType(parentType);
+                  // The last time we set newExpr it was during a parametersMatch - not final so reset the new expr so we propagate
+                  // the final inferred type
+                  if (!inferredFinal && finalType) {
+                     needsStart = true;
+                     newExpr = null;
+                  }
+               }
+               else {
                   needsStart = true;
                   newExpr = null;
                }
             }
             else {
+               // Need to set the type parameters we set while building the new expression if we are not going to rebuild it
+               //updateInferredType(parentType);
                needsStart = true;
                newExpr = null;
             }
          }
-         else {
-            // Need to set the type parameters we set while building the new expression if we are not going to rebuild it
-            //updateInferredType(parentType);
-            needsStart = true;
-            newExpr = null;
-         }
+         inferredType = parentType;
       }
-      inferredType = parentType;
+
       inferredFinal = finalType;
+
       if (needsStart) {
          needsStart = false;
          if (newExpr == null) {

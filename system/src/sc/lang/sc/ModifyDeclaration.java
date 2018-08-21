@@ -457,8 +457,10 @@ public class ModifyDeclaration extends TypeDeclaration {
             // TODO: debug only
             Object modType = getModifyType();
          }
-         if (!temporaryType && !modifyInherited && ModelUtil.sameTypes(this, modifyTypeDecl) && getLayer().getLayerName().equals(modifyTypeDecl.getLayer().getLayerName()))
+         if (!temporaryType && !modifyInherited && ModelUtil.sameTypes(this, modifyTypeDecl) && getLayer().getLayerName().equals(modifyTypeDecl.getLayer().getLayerName())) {
             System.out.println("*** Warning modifying a type by the one in the same layer: " + modifyTypeDecl);
+            Object modType = getModifyType();
+         }
       }
    }
 
@@ -631,36 +633,43 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (extendsTypes != null && extendsBoundTypes == null && !extendsInvalid) {
          extendsBoundTypes = new Object[extendsTypes.size()];
          int i = 0;
-         for (JavaType extendsType:extendsTypes) {
-            // We don't want to resolve from this type cause we get into a recursive loop in findType.
-            JavaSemanticNode resolver = getEnclosingType();
-            if (resolver == null)
-               resolver = getJavaModel();
-            LayeredSystem sys = layer != null ? layer.layeredSystem : getLayeredSystem();
-            extendsType.initType(sys, this, resolver, null, false, isLayerType, null);
+         try {
+            for (JavaType extendsType:extendsTypes) {
+               // We don't want to resolve from this type cause we get into a recursive loop in findType.
+               JavaSemanticNode resolver = getEnclosingType();
+               if (resolver == null)
+                  resolver = getJavaModel();
+               LayeredSystem sys = layer != null ? layer.layeredSystem : getLayeredSystem();
+               extendsType.initType(sys, this, resolver, null, false, isLayerType, null);
 
-            // Need to start the extends type as we need to dig into it
-            Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
-            if (extendsTypeDecl == null) {
-               if (!isLayerType) {
-                  extendsType.displayTypeError("Extended class not found for type: ", getFullTypeName(), ": ");
-                  extendsInvalid = true;
-               }
-               else if (layer != null) {
-                  String layerTypeName = extendsType.getFullTypeName();
+               // Need to start the extends type as we need to dig into it
+               Object extendsTypeDecl = extendsBoundTypes[i++] = extendsType.getTypeDeclaration();
+               if (extendsTypeDecl == null) {
+                  if (!isLayerType) {
+                     extendsType.displayTypeError("Extended class not found for type: ", getFullTypeName(), ": ");
+                     extendsInvalid = true;
+                  }
+                  else if (layer != null) {
+                     String layerTypeName = extendsType.getFullTypeName();
 
-                  if ((layer.activated ? sys.getLayerByPath(layerTypeName, true) : sys.getInactiveLayer(layerTypeName, false, true, true, false)) == null) {
-                     // When we're activated and in a peer-system, we can't reliably look up the layers that are in other systems.   The 'check peers' flag does not work and we can't just look for these
-                     // on the main system because this is happening too early - before he main system has loaded these other layers.  But for activated mode, we should validate all of the layers existence on the main system.
-                     if (!sys.peerMode || !layer.activated)
-                        extendsType.displayTypeError("No layer: ");
+                     if ((layer.activated ? sys.getLayerByPath(layerTypeName, true) : sys.getInactiveLayer(layerTypeName, false, true, true, false)) == null) {
+                        // When we're activated and in a peer-system, we can't reliably look up the layers that are in other systems.   The 'check peers' flag does not work and we can't just look for these
+                        // on the main system because this is happening too early - before he main system has loaded these other layers.  But for activated mode, we should validate all of the layers existence on the main system.
+                        if (!sys.peerMode || !layer.activated)
+                           extendsType.displayTypeError("No layer: ");
+                     }
                   }
                }
+               if (extendsTypeDecl != null && ModelUtil.sameTypes(this, extendsTypeDecl)) {
+                  displayTypeError("Cycle found in extends - class extends itself: ", extendsType.getFullTypeName(), " for ");
+                  extendsInvalid = true;
+               }
             }
-            if (extendsTypeDecl != null && ModelUtil.sameTypes(this, extendsTypeDecl)) {
-               displayTypeError("Cycle found in extends - class extends itself: ", extendsType.getFullTypeName(), " for ");
-               extendsInvalid = true;
-            }
+         }
+         catch (RuntimeException exc) {
+            System.out.println("*** Caught runtime exception while starting extends for: " + typeName);
+            extendsBoundTypes = null;
+            throw exc;
          }
       }
 

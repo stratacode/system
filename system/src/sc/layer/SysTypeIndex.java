@@ -110,20 +110,19 @@ public class SysTypeIndex {
                      LayeredSystem peerSys = sys.getPeerLayeredSystem(processIdent);
                      if (peerSys == null)
                         continue;
-                     modLayer = typeLayerInSystem = peerSys.getPeerLayerFromRemote(modLayer);
+                     modLayer = typeLayerInSystem = peerSys.getSameLayerFromRemote(modLayer);
                      if (modLayer == null || modLayer == Layer.ANY_INACTIVE_LAYER)
                         continue;
                   }
                   else
                      typeLayerInSystem = sys.getActiveOrInactiveLayerByPath(type.getLayer().getLayerName(), null, false, true, true);
                   if (typeLayerInSystem != null) {
-                     Layer peerLayer = typeLayerInSystem.layeredSystem == modLayer.layeredSystem ? typeLayerInSystem : modLayer.layeredSystem.getPeerLayerFromRemote(typeLayerInSystem);
-                     if (peerLayer == null)
-                        System.err.println("*** Unable to find layer in layer in runtime: " + sys.getProcessIdent() + " for: " + typeLayerInSystem);
-                     else {
+                     Layer peerLayer = typeLayerInSystem.layeredSystem == modLayer.layeredSystem ? typeLayerInSystem : modLayer.layeredSystem.getSameLayerFromRemote(typeLayerInSystem);
+                     if (peerLayer != null) {
                         TypeDeclaration modType = (TypeDeclaration) modLayer.layeredSystem.getSrcTypeDeclaration(typeName, modLayer.getNextLayer(), true, false, true, peerLayer, type.isLayerType || type.isLayerComponent());
-                        if (modType != null) {
-                           res.add(modType);
+                        if (modType != null && modType.getLayer() != null) {
+                           if (modType.getLayer().getLayerPosition() > peerLayer.getLayerPosition())
+                              res.add(modType);
                         }
                      }
                   } else
@@ -149,6 +148,16 @@ public class SysTypeIndex {
          if (ent != null)
             return ent;
       }
+      return null;
+   }
+
+   public LayerTypeIndex getLayerTypeIndex(String layerName, boolean active) {
+      if (active) {
+         if (activeTypeIndex != null)
+            return activeTypeIndex.getTypeIndex(layerName);
+      }
+      else if (inactiveTypeIndex != null)
+         return inactiveTypeIndex.getTypeIndex(layerName);
       return null;
    }
 

@@ -10893,7 +10893,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       Layer layer = model.getLayer();
       updateModelIndex(layer, model, absName);
-      if (model instanceof JavaModel) {
+      if (model instanceof JavaModel && layer != null && layer.activated) {
          JavaModel newModel = (JavaModel) model;
          if (oldModel != null) {
             // TODO: should we be calling updateModel here?
@@ -10901,7 +10901,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!newModel.isLayerModel) {
                if (oldModel instanceof JavaModel && !batchingModelUpdates)
                   ((JavaModel) oldModel).updateModel(newModel, ctx, TypeUpdateMode.Replace, false, updateInfo);
-               else if (layer != null && layer.activated)
+               else
                   newModel.replacesModel = (JavaModel) oldModel;
             }
          }
@@ -11919,8 +11919,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                   // Only register this inner type if it's part of the direct type name space.  We might have inherited this from a base type
                   if (decl.getEnclosingType() == rootType) {
-                     // Replace this type if it has been modified by a component in a subsequent layer
-                     if (decl.replacedByType != null)
+                     // Replace this type if it has been modified by a component in a subsequent layer unless we have specified a 'fromLayer' filter in this search
+                     if (decl.replacedByType != null && (decl.replaced || fromLayer == null))
                         decl = (TypeDeclaration) decl.replacedByType;
                      // For type declarations that are in templates, the layer may not be initialized so do it here before
                      // we put it into the type system.
@@ -12282,8 +12282,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Should we check the inactiveLayers?  Only if we original the search from an inactive layer.  By default, don't look at inactiveLayers when we are building
       if (searchInactiveTypesForLayer(refLayer) || (fromLayer != null && !fromLayer.activated)) {
          startIx = inactiveLayers.size() - 1;
-         if (fromLayer != null && !fromLayer.activated && fromLayer.layerPosition - 1 < inactiveLayers.size())
+         if (fromLayer != null && !fromLayer.activated && fromLayer.layerPosition - 1 < inactiveLayers.size()) {
+            if (!layerResolve) {
+               // First we are going to check the baseLayers of the fromLayer - rather than just picking up the next layer in the stack.  That way, the type reference here is
+               // the one specified in the code dependencies.  Right now we are facing a problem where inserting 'unitConverter.coreui' inbetween unitConverter.extendedModel and model
+               // does not cause the UC in extendedModel to refresh it's modified type and so the jsui layer that's inserted after gets the extendedModel without the coreui layer
+               // in the stack.
+               SrcEntry ent = fromLayer.getBaseLayerSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, processDefinition, layerResolve);
+               if (ent != null)
+                  return ent;
+            }
             startIx = fromLayer.layerPosition - 1;
+         }
          for (int i = startIx; i >= 0; i--) {
             Layer inactiveLayer = inactiveLayers.get(i);
             //SrcEntry ent = inactiveLayer.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, processDefinition, layerResolve);
@@ -13615,32 +13625,40 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (!type.isRealType())
          return NO_TYPES;
       String typeName = type.getFullTypeName();
-      HashMap<String,Boolean> subTypesMap = subTypesByType.get(typeName);
-      if (activeOnly && subTypesMap == null)
-         return NO_TYPES;
-      ArrayList<TypeDeclaration> result = new ArrayList<TypeDeclaration>(subTypesMap == null ? 0 : subTypesMap.size());
 
-      if (subTypesMap != null) {
-         for (String subTypeName:subTypesMap.keySet()) {
-            if (type.isLayerType()) {
-               Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
-               if (layer != null && layer.model != null) {
-                  TypeDeclaration layerType = layer.model.getModelTypeDeclaration();
-                  if (layerType != null)
-                     result.add(layerType);
+      Layer typeLayer = type.getLayer();
+
+      ArrayList<TypeDeclaration> result = new ArrayList<TypeDeclaration>();
+      boolean checkThisSystem = type.isLayerType || typeLayer == null || typeLayer.layeredSystem == this || getSameLayerFromRemote(typeLayer) != null ||
+              typeIndex.getLayerTypeIndex(typeLayer.getLayerName(), typeLayer.activated) != null;
+      // Check sub-types in this layered system only if this type is from this system or the layer is also in that layer
+      if (checkThisSystem && (typeLayer == null || typeLayer.activated)) {
+            HashMap<String,Boolean> subTypesMap = subTypesByType.get(typeName);
+            if (activeOnly && subTypesMap == null)
+               return NO_TYPES;
+
+         if (subTypesMap != null) {
+            for (String subTypeName:subTypesMap.keySet()) {
+               if (type.isLayerType()) {
+                  Layer layer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
+                  if (layer != null && layer.model != null) {
+                     TypeDeclaration layerType = layer.model.getModelTypeDeclaration();
+                     if (layerType != null)
+                        result.add(layerType);
+                  }
                }
-            }
-            else {
-               Layer refLayer = type.getLayer();
-               if (refLayer == null)
-                  System.err.println("*** Error node without a parent layer");
-               if (refLayer != null && refLayer.layeredSystem != this)
-                  refLayer = getPeerLayerFromRemote(refLayer);
-               // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
-               TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
-               // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
-               if (res != null && res.getFullTypeName().equals(subTypeName))
-                  result.add(res);
+               else {
+                  Layer refLayer = type.getLayer();
+                  if (refLayer == null)
+                     System.err.println("*** Error node without a parent layer");
+                  if (refLayer != null && refLayer.layeredSystem != this)
+                     refLayer = getPeerLayerFromRemote(refLayer);
+                  // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
+                  TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                  // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
+                  if (res != null && res.getFullTypeName().equals(subTypeName))
+                     result.add(res);
+               }
             }
          }
       }
@@ -13658,60 +13676,62 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
          }
-         LinkedHashMap<String,TypeIndexEntry> subTypes = typeIndex.inactiveTypeIndex.subTypeIndex.get(typeName);
-         if (subTypes != null) {
-            for (Map.Entry<String,TypeIndexEntry> subTypeEnt:subTypes.entrySet()) {
-               String subTypeName = subTypeEnt.getKey();
-               TypeIndexEntry subTypeIndexEntry = subTypeEnt.getValue();
+         if (checkThisSystem) {
+            LinkedHashMap<String,TypeIndexEntry> subTypes = typeIndex.inactiveTypeIndex.subTypeIndex.get(typeName);
+            if (subTypes != null) {
+               for (Map.Entry<String,TypeIndexEntry> subTypeEnt:subTypes.entrySet()) {
+                  String subTypeName = subTypeEnt.getKey();
+                  TypeIndexEntry subTypeIndexEntry = subTypeEnt.getValue();
 
-               if (type.isLayerType) {
-                  Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
-                  if (subLayer != null && subLayer.model != null)
-                     result.add(subLayer.model.getModelTypeDeclaration());
-               }
-               else {
-                  Layer refLayer = type.getLayer();
-                  if (refLayer == null)
-                     System.err.println("*** Error node without a parent layer");
-                  if (refLayer != null && refLayer.layeredSystem != this)
-                     refLayer = getPeerLayerFromRemote(refLayer);
-                  TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
-                  // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
-                  if (res != null) {
-                     // Make sure we don't add any sub-types which are from the same layer as this one.
-                     if (res == type || ModelUtil.sameTypesAndLayers(this, type, res))
-                        continue;
-                     if (res.getFullTypeName().equals(subTypeName)) {
-                        ModelUtil.addUniqueLayerType(this, result, res);
+                  if (type.isLayerType) {
+                     Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
+                     if (subLayer != null && subLayer.model != null)
+                        result.add(subLayer.model.getModelTypeDeclaration());
+                  }
+                  else {
+                     Layer refLayer = type.getLayer();
+                     if (refLayer == null)
+                        System.err.println("*** Error node without a parent layer");
+                     if (refLayer != null && refLayer.layeredSystem != this)
+                        refLayer = getPeerLayerFromRemote(refLayer);
+                     TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                     // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
+                     if (res != null) {
+                        // Make sure we don't add any sub-types which are from the same layer as this one.
+                        if (res == type || ModelUtil.sameTypesAndLayers(this, type, res))
+                           continue;
+                        if (res.getFullTypeName().equals(subTypeName)) {
+                           ModelUtil.addUniqueLayerType(this, result, res);
 
-                        // When we have A extends B - should we return all of the layered types that make up B or just the most specific
-                        // But skip the modify inherited case, where we have an inner type which extends an inner type of the base class... it's a different class and
-                        // if we include them it causes us to include the original type
-                        if (includeModifiedTypes && res.getModifiedExtendsTypeDeclaration() == null) {
-                           BodyTypeDeclaration modType = res;
-                           while ((modType = modType.getModifiedType()) != null && modType instanceof TypeDeclaration) {
-                              // Stop once we run into this type - so we don't return a recursive result and don't keep going returning base-types of the current type
-                              if (modType == type || ModelUtil.sameTypesAndLayers(this, type, modType))
-                                 break;
-                              ModelUtil.addUniqueLayerType(this, result, (TypeDeclaration) modType);
+                           // When we have A extends B - should we return all of the layered types that make up B or just the most specific
+                           // But skip the modify inherited case, where we have an inner type which extends an inner type of the base class... it's a different class and
+                           // if we include them it causes us to include the original type
+                           if (includeModifiedTypes && res.getModifiedExtendsTypeDeclaration() == null) {
+                              BodyTypeDeclaration modType = res;
+                              while ((modType = modType.getModifiedType()) != null && modType instanceof TypeDeclaration) {
+                                 // Stop once we run into this type - so we don't return a recursive result and don't keep going returning base-types of the current type
+                                 if (modType == type || ModelUtil.sameTypesAndLayers(this, type, modType))
+                                    break;
+                                 ModelUtil.addUniqueLayerType(this, result, (TypeDeclaration) modType);
+                              }
                            }
                         }
-                     }
-                  } else {
-                     if (subTypeIndexEntry != null) {
-                        Layer subTypeLayer = getInactiveLayer(subTypeIndexEntry.layerName, openLayers, true, true, true);
+                     } else {
+                        if (subTypeIndexEntry != null) {
+                           Layer subTypeLayer = getInactiveLayer(subTypeIndexEntry.layerName, openLayers, true, true, true);
 
-                        if (subTypeLayer != null) {
-                           if (!subTypeLayer.closed) {
-                              // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
-                              // a different runtime.
-                              res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
-                              if (res != null && res.getFullTypeName().equals(subTypeName) && !ModelUtil.sameTypesAndLayers(this, type, res))
-                                 result.add(0, res);
+                           if (subTypeLayer != null) {
+                              if (!subTypeLayer.closed) {
+                                 // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
+                                 // a different runtime.
+                                 res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                                 if (res != null && res.getFullTypeName().equals(subTypeName) && !ModelUtil.sameTypesAndLayers(this, type, res))
+                                    result.add(0, res);
+                              }
+                           } else {
+                              // TODO: else cull this from the index?
+                              System.err.println("*** Warning: Layer removed: " + subTypeIndexEntry.layerName);
                            }
-                        } else {
-                           // TODO: else cull this from the index?
-                           System.err.println("*** Warning: Layer removed: " + subTypeIndexEntry.layerName);
                         }
                      }
                   }
@@ -14702,10 +14722,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public Layer getPeerLayerFromRemote(Layer layer) {
+   public Layer getSameLayerFromRemote(Layer layer) {
       if (layer.layeredSystem == this)
          System.err.println("*** Not from a remote system");
-      Layer res = layer.activated ? getLayerByName(layer.getLayerUniqueName()) : lookupInactiveLayer(layer.getLayerName(), false, true);
+      return layer.activated ? getLayerByName(layer.getLayerUniqueName()) : lookupInactiveLayer(layer.getLayerName(), false, true);
+   }
+
+   public Layer getPeerLayerFromRemote(Layer layer) {
+      Layer res = getSameLayerFromRemote(layer);
       if (res != null)
          return res;
       for (Layer nextLayer = layer.getNextLayer(); nextLayer != null; nextLayer = nextLayer.getNextLayer()) {
@@ -14833,6 +14857,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             ILanguageModel otherModel = peerSys.inactiveModelIndex.get(absFileName);
             if (otherModel instanceof JavaModel) {
                JavaModel otherJavaModel = (JavaModel) otherModel;
+               if (otherJavaModel.layeredSystem != peerSys)
+                  System.err.println("*** Mismatching system in index");
                Layer otherLayer = otherModel.getLayer();
                ILanguageModel clonedModel = peerSys.cloneModel(otherLayer, (JavaModel) model);
                peerSys.addNewModel(clonedModel, null, null, null, otherJavaModel.isLayerModel, false);

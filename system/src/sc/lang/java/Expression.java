@@ -1010,6 +1010,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return true;
    }
 
+   public final static String UnknownReferredType = "<unknown-referred-type-sentinel>";
+
+   /**
+    * Called once for each parent-child expression relationship during the start process to propagate the parent's inferredType to the child as we walk up the expression tree
+    * so that, for example, we know the initial information in the parameter type so we can find the right method, so the method's parameter types further refine types of the args.
+    * The last time we call it, finalType is set to true.  When an error occurs and the type becomes "unknown" - we call this with type = UnknownReferredType and finalType =true
+    */
    public boolean setInferredType(Object type, boolean finalType) {
       return false;
    }

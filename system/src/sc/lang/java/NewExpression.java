@@ -158,7 +158,7 @@ public class NewExpression extends IdentifierExpression {
    }
 
    public boolean setInferredType(Object inferredType, boolean finalType) {
-      if (constructor != null && arguments != null) {
+      if (constructor != null && arguments != null && inferredType != UnknownReferredType) {
          if (constructor instanceof ParamTypedMethod) {
             // Need to convert inferredType to an instance of boundType - which means mapping any type parameters
             if (boundType != null && !ModelUtil.sameTypes(inferredType, boundType)) {
