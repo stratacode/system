@@ -4976,8 +4976,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (last instanceof JavaModel) {
                JavaModel lastModel = (JavaModel) last;
                JavaModel newModel = (JavaModel) mtr.newModel;
-               lastModel.updateModel(newModel, ctx, TypeUpdateMode.Remove, true, updateInfo);
-               lastModel.completeUpdateModel(newModel, true);
+               boolean updateLiveRuntime = activated;
+               lastModel.updateModel(newModel, ctx, TypeUpdateMode.Remove, updateLiveRuntime, updateInfo);
+               lastModel.completeUpdateModel(newModel, updateLiveRuntime);
             }
 
             // Need to remove all of the models except for the last one which we just updated.  UpdateType right now updates the types in these models.

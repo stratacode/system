@@ -390,4 +390,8 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
       ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null);
       return matchPrefix;
    }
+
+   public boolean getNotFoundError() {
+      return errorArgs != null && boundType == null;
+   }
 }

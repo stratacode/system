@@ -1260,9 +1260,20 @@ public class Sequence extends NestedParselet  {
 
                if (dctx.sameAgain && oldChildParseNode instanceof IParseNode) {
                   IParseNode oldChildPN = (IParseNode) oldChildParseNode;
-                  if (oldChildPN.getOrigStartIndex() < dctx.endChangeOldOffset) {
+                  int oldOrigStartIx = oldChildPN.getOrigStartIndex();
+                  if (oldOrigStartIx < dctx.endChangeOldOffset) {
                      oldChildParseNode = null;
                      forceReparse = true;
+                  }
+                  // If we have an old node and we are back in the unchanged text, it's possible it starts after the current index - in which case we need to force a reparse
+                  // because otherwise when parsing it, if there's a false partial match with the old value we'll just accept it because we are not in the changed region.
+                  else {
+                     int oldChildLen = oldChildPN.length();
+                     int oldStartNew = oldOrigStartIx + dctx.getNewOffsetForOldPos(oldOrigStartIx + oldChildLen);
+                     if (oldStartNew > parser.currentIndex) {
+                        oldChildParseNode = null;
+                        forceReparse = true;
+                     }
                   }
                }
             }
