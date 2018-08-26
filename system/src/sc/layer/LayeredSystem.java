@@ -6642,7 +6642,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                refreshCtx.curTypeIndex.inactiveTypeIndex.addLayerTypeIndex(layerName, layerTypeIndex);
                layerTypeIndex = layerTypeIndex.refreshLayerTypeIndex(this, layerName, new File(FileUtil.concat(refreshCtx.typeIndexDir.getPath(), indexFileName)).lastModified(), refreshCtx);
                // We found new or changed types during the refresh - it's too early to start them now but we need to do that to update the type index
-               if (layerTypeIndex.toStartLaterTypes != null)
+               if (layerTypeIndex != null && layerTypeIndex.toStartLaterTypes != null)
                   refreshCtx.toStartLaterIndexes.add(layerTypeIndex);
                refreshCtx.refreshedLayers.add(layerName);
                break;
