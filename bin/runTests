@@ -134,21 +134,21 @@ if [ -d "$RUN_DIR" ] ; then
                      echo "----------"
                   elif [[ $testAns =~ [dD][0-9]+ ]] ; then
                      if ! diff "$TEST_DIR/cmd" "$VALID_DIR/cmd" > /dev/null ; then 
-                         echo "---- cmd changed:"
-                         diff "$TEST_DIR/cmd" "$VALID_DIR/cmd" || true
+                         echo "---- cmd changed < valid > new:"
+                         diff "$VALID_DIR/cmd" "$TEST_DIR/cmd"|| true
                      fi
                      if ! diff "$TEST_DIR/status" "$VALID_DIR/status" > /dev/null ; then 
-                         echo "---- exit status changed:"
-                         diff "$TEST_DIR/status" "$VALID_DIR/status" || true
+                         echo "---- exit status changed < valid > new:"
+                         diff "$VALID_DIR/status" "$TEST_DIR/status" || true
                      fi
-                     if ! diff "$TEST_DIR/outf" "$VALID_DIR/out" > /dev/null ; then 
-                         echo "---- output changed:"
-                         diff "$TEST_DIR/outf" "$VALID_DIR/out" || true
+                     if ! diff "$VALID_DIR/out" "$TEST_DIR/outf" > /dev/null ; then 
+                         echo "---- output changed < valid > new:"
+                         diff "$VALID_DIR/out" "$TEST_DIR/outf"|| true
                      fi
                      if [[ -d "$TEST_DIR/pages" ]] || [[ -d "$VALID_DIR/pages" ]] ; then
-                        if ! diff -r "$TEST_DIR/pagesf" "$VALID_DIR/pages" > /dev/null ; then 
-                            echo "---- pages changed:"
-                            diff -r "$TEST_DIR/pagesf" "$VALID_DIR/pages" || true
+                        if ! diff -r "$VALID_DIR/pages" "$TEST_DIR/pagesf" > /dev/null ; then 
+                            echo "---- pages changed < valid > new:"
+                            diff -r "$VALID_DIR/pages" "$TEST_DIR/pagesf" || true
                         fi
                      fi
                      echo "----------"
