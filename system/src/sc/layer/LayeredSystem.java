@@ -5843,6 +5843,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public Layer findInactiveLayerByName(String relPath, String layerName, boolean openLayers) {
+      for (int i = 0; i < inactiveLayers.size(); i++) {
+         Layer l = inactiveLayers.get(i);
+         if (l.getLayerName().equals(layerName))
+            return l;
+         if (relPath != null) {
+            String fullPath = CTypeUtil.prefixPath(relPath, layerName);
+            if (l.getLayerName().equals(fullPath))
+               return l;
+         }
+      }
+      Layer res = getInactiveLayer(layerName, openLayers, false, false, false);
+      if (res != null)
+         return res;
+      if (relPath != null) {
+         String fullLayerName = CTypeUtil.prefixPath(relPath, layerName);
+         res = getInactiveLayer(fullLayerName, openLayers, false, false, false);
+         if (res != null)
+            return res;
+      }
+      return null;
+   }
+
    public Layer getLayerByName(String layerName) {
       return layerIndex.get(layerName);
    }
@@ -12919,6 +12942,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return model;
    }
 
+   private Layer getPendingLayer(boolean activated, String layerName) {
+      return activated ? pendingActiveLayers.get(layerName) : pendingInactiveLayers.get(layerName);
+   }
+
+   private Layer getStubLayer(String expectedName, String layerPathName, String layerDirName) {
+      Layer stubLayer = getPendingLayer(false, expectedName);
+      if (stubLayer == null)
+         stubLayer = new Layer();
+      stubLayer.activated = false;
+      stubLayer.layeredSystem = this;
+      if (stubLayer.layerPathName == null)
+         stubLayer.layerPathName = layerPathName;
+      //stubLayer.layerBaseName = ...
+      stubLayer.layerDirName = layerDirName;
+      if (stubLayer.layerUniqueName == null)
+         stubLayer.layerUniqueName = expectedName;
+      return stubLayer;
+   }
+
    private Object loadLayerObject(SrcEntry defFile, Class expectedClass, String expectedName, String layerPrefix, String relDir, String relPath,
                                   boolean inLayerDir, boolean markDyn, String layerDirName, LayerParamInfo lpi) {
       // Layers are no longer in the typesByName list
@@ -12941,17 +12983,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (model == null) {
          // There's a layer definition file that cannot be parsed - just create a stub layer that represents that file
          if (!lpi.activate && defFile.canRead()) {
-            Layer stubLayer = lpi.activate ? pendingActiveLayers.get(expectedName) : pendingInactiveLayers.get(expectedName);
-            if (stubLayer == null)
-               stubLayer = new Layer();
-            stubLayer.activated = false;
-            stubLayer.layeredSystem = this;
-            stubLayer.layerPathName = defFile.absFileName;
-            //stubLayer.layerBaseName = ...
-            stubLayer.layerDirName = layerDirName;
-            if (stubLayer.layerUniqueName == null)
-               stubLayer.layerUniqueName = expectedName;
-            return stubLayer;
+            return getStubLayer(expectedName, defFile.absFileName, layerDirName);
          }
          return null;
       }
@@ -13071,12 +13103,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         throw new IllegalArgumentException("Layer definition file: " + defFile + " should not have an operator like 'class' or 'object'.  Just a name (i.e. a modify definition)");
+         if (lpi.activate)
+            throw new IllegalArgumentException("Layer definition file: " + defFile + " should not have an operator like 'class' or 'object'.  Just a name (i.e. a modify definition)");
+         return getStubLayer(expectedName, defFile.absFileName, layerDirName);
       }
 
       Class runtimeClass = decl.getCompiledClass();
-      if (runtimeClass != null && !expectedClass.isAssignableFrom(runtimeClass))
-         throw new IllegalArgumentException("Layer component file should modify the layer class with: '" + expectedName + " {'.  Found class: " + runtimeClass + " after parsing: " + defFile);
+      if (runtimeClass != null && !expectedClass.isAssignableFrom(runtimeClass)) {
+         if (lpi.activate)
+            throw new IllegalArgumentException("Layer component file should modify the layer class with: '" + expectedName + " {'.  Found class: " + runtimeClass + " after parsing: " + defFile);
+         return getStubLayer(expectedName, defFile.absFileName, layerDirName);
+      }
 
       List<Layer> baseLayers = null;
       boolean initFailed = false;
@@ -13140,20 +13177,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       catch (RuntimeException exc) {
          if (!lpi.activate) {
-            Layer stubLayer = lpi.activate ? pendingActiveLayers.get(expectedName) : pendingInactiveLayers.get(expectedName);
-            if (stubLayer == null)
-               stubLayer = new Layer();
-            stubLayer.activated = false;
-            stubLayer.layeredSystem = this;
-            if (stubLayer.layerPathName == null)
-               stubLayer.layerPathName = Layer.INVALID_LAYER_PATH;
-            //stubLayer.layerBaseName = ...
-            stubLayer.layerDirName = layerDirName;
             System.err.println("*** Failed to initialize inactive layer due to error initializing the layer: " + exc);
             if (options.verbose) exc.printStackTrace();
-            if (stubLayer.layerUniqueName == null)
-               stubLayer.layerUniqueName = expectedName;
-            return stubLayer;
+            return getStubLayer(expectedName, Layer.INVALID_LAYER_PATH, layerDirName);
          }
          System.err.println("*** Failed to initialize layer: " + expectedName + " due to runtime error: " + exc);
          if (options.verbose)
@@ -13174,10 +13200,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       for (int li = 0; li < baseLayerNames.size(); li++) {
          String baseLayerName = baseLayerNames.get(li);
-         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : getInactiveLayer(baseLayerName.replace('/', '.'), openLayers, false, false, false);
+         Layer bl = activated ? findLayerByName(relPath, baseLayerName) : findInactiveLayerByName(relPath, baseLayerName.replace('/', '.'), openLayers);
          if (bl != null)
             baseLayers.add(bl);
          else {
+            if (options.verbose)
+               System.out.println("No base layer: " + baseLayerName + " for: " + relPath + " in: " + getProcessIdent());
             // For this case we may be in the JS runtime and this layer is server specific...
             //baseLayers.add(null);
          }

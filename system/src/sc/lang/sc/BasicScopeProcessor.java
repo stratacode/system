@@ -9,7 +9,6 @@ import sc.lang.ILanguageModel;
 import sc.lang.java.*;
 
 public class BasicScopeProcessor extends DefinitionProcessor implements IScopeProcessor {
-
    public String scopeName;
 
    // Marker annotation to add to the transformed type
@@ -104,4 +103,10 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
       return temporaryScope;
    }
 
+   public void setProcessorName(String name) {
+      scopeName = name;
+   }
+   public String getProcessorName() {
+      return scopeName;
+   }
 }

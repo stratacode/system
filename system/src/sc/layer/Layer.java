@@ -1318,7 +1318,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (/*reInit &&*/ initialized && modelType instanceof ModifyDeclaration && !excluded) {
         ModifyDeclaration layerModel = (ModifyDeclaration) modelType;
          baseLayerNames = layerModel.getExtendsTypeNames();
-         baseLayers = layeredSystem.mapLayerNamesToLayers(model.getRelDirPath(), baseLayerNames, activated, !closed);
+
+         String layerPathPrefix = CTypeUtil.getPackageName(layerDirName);
+         baseLayers = layeredSystem.mapLayerNamesToLayers(layerPathPrefix, baseLayerNames, activated, !closed);
          LayerParamInfo lpi = new LayerParamInfo();
          initFailed = layeredSystem.cleanupLayers(baseLayers) || initFailed;
          lpi.activate = activated;
@@ -4199,6 +4201,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (annotationProcessors == null)
          annotationProcessors = new HashMap<String,IAnnotationProcessor>();
       IAnnotationProcessor old = annotationProcessors.put(annotationTypeName, processor);
+      if (processor.getProcessorName() == null)
+         processor.setProcessorName("@" + CTypeUtil.getClassName(annotationTypeName));
       if (old != null && layeredSystem.options.verbose) {
          System.out.println("Annotation processor for: " + annotationTypeName + " replaced: " + old + " with: " + processor);
       }

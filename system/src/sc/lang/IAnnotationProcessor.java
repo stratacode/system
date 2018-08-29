@@ -28,4 +28,5 @@ public interface IAnnotationProcessor extends IDefinitionProcessor {
    public boolean getInherited();
 
    public boolean getSubTypesOnly();
+
 }

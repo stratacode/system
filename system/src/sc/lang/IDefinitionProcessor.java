@@ -32,4 +32,8 @@ public interface IDefinitionProcessor {
 
    /** Returns a value of false for definitions which override the requirement of a field for an object definition. */
    public boolean getNeedsField();
+
+   public void setProcessorName(String name);
+
+   public String getProcessorName();
 }

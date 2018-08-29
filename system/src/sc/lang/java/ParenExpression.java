@@ -111,4 +111,8 @@ public class ParenExpression extends ChainedExpression {
       sb.append(")");
       return sb.toString();
    }
+
+   public boolean isIncompleteStatement() {
+      return false;
+   }
 }

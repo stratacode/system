@@ -34,6 +34,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    public transient boolean dynamicType;
    public transient boolean overridesCompiled;
    public transient boolean needsDynAccess = false;   // For properties defined via get/set, we still access them in the DynType as properties.
+   public transient Object mainSettings = null; // Value of the annotation if this is a MainSettings method
 
    public static SemanticNodeList MAIN_ARGS = new SemanticNodeList(1);
    static {
@@ -101,6 +102,26 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
       }
       super.start();
+
+      // If we've been replaced by another method on this same type, let that method do the processing since it will
+      // have the completed merged annotations
+      Object mainSettings = replacedByMethod == null ? getAnnotation("sc.obj.MainSettings") : null;
+      if (mainSettings != null) {
+         Boolean disabled = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "disabled");
+         if (disabled == null || !disabled) {
+            this.mainSettings = mainSettings;
+
+            TypeDeclaration enclType = getEnclosingType();
+            while (enclType != null) {
+               if (ModelUtil.getAccessLevel(enclType, false) != AccessLevel.Public) {
+                  enclType.displayError("Type with @MainSettings must be public");
+               }
+               enclType = enclType.getEnclosingType();
+            }
+            if (ModelUtil.getAccessLevel(this, false) != AccessLevel.Public)
+               displayError("Method with @MainSettings must be public");
+         }
+      }
    }
 
    private static boolean isEmptyReturn(Object retObj) {
@@ -442,11 +463,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       JavaModel model;
       if (isMain && (model = getJavaModel()) != null) {
          // If we've been replaced by another method on this same type, let that method do the processing since it will
-         // have the complete merged annotations
-         Object mainSettings = replacedByMethod == null ? getAnnotation("sc.obj.MainSettings") : null;
+         // have the completed merged annotations
          if (mainSettings != null) {
-            Boolean disabled = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "disabled");
-            if (disabled == null || !disabled) {
 
                LayeredSystem lsys = getJavaModel().getLayeredSystem();
 
@@ -566,7 +584,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                   new File(runBATFile).setExecutable(true, true);
 
                }
-            }
          }
       }
       else if (!isMain && getAnnotation("sc.obj.MainSettings") != null) {

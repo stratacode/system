@@ -9,6 +9,7 @@ import sc.lang.java.Definition;
 
 /** Extend the class to get default implementations of the IAnnotationProcessor interface */
 public class DefaultAnnotationProcessor extends DefinitionProcessor implements IAnnotationProcessor {
+   private String processorName;
    public boolean setOnField = true;
    public boolean setOnGetMethod = false;
    public boolean setOnSetMethod = false;
@@ -41,6 +42,14 @@ public class DefaultAnnotationProcessor extends DefinitionProcessor implements I
    }
 
    protected String toErrorString() {
-      return "Annotation ";
+      return "Type with annotation " + (processorName == null ? (typeGroupName != null ? " group: " + typeGroupName : getClass().getName()) : processorName);
+   }
+
+   public void setProcessorName(String pn) {
+      processorName = pn;
+   }
+
+   public String getProcessorName() {
+      return processorName;
    }
 }

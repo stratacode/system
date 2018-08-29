@@ -132,6 +132,9 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       if (needsCompiledClass && def instanceof BodyTypeDeclaration) {
          ((BodyTypeDeclaration) def).enableNeedsCompiledClass();
       }
+
+      if (createOnStartup || initOnStartup)
+         checkForPublicAccess((BodyTypeDeclaration) def);
    }
 
    protected void typeGroupMemberStarted(TypeDeclaration td) {
@@ -164,6 +167,12 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
             return;
          TypeDeclaration enclType = def.getEnclosingType();
          bi.addTypeGroupMember(enclType.getFullTypeName(), enclType.getTemplatePathName(), typeGroupName);
+      }
+   }
+
+   private void checkForPublicAccess(BodyTypeDeclaration td) {
+      if (td.getAccessLevel(false) != AccessLevel.Public) {
+         td.displayError(toErrorString() + " must be public for: ");
       }
    }
 

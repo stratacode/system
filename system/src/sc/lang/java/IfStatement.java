@@ -201,4 +201,9 @@ public class IfStatement extends NonIndentedStatement {
       if (falseStatement != null)
          falseStatement.addToFileLineIndex(idx, startGenLine);
    }
+
+   public boolean isIncompleteStatement() {
+      return false;
+   }
+
 }
