@@ -21,6 +21,10 @@ public class DefaultAnnotationProcessor extends DefinitionProcessor implements I
       super.start(def);
    }
 
+   public void validate(Definition def, Annotation annot) {
+      super.validate(def);
+   }
+
    public void process(Definition def, Annotation annot) {
       super.process(def);
    }

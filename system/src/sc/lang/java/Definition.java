@@ -135,6 +135,49 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       }
    }
 
+   public void validate() {
+      if (validated)
+         return;
+      super.validate();
+      LayeredSystem sys = null;
+
+      if (modifiers != null) {
+         for (int i = 0; i < modifiers.size(); i++) {
+            Object mod = modifiers.get(i);
+            if (mod instanceof Annotation) {
+               if (sys == null) {
+                  sys = getLayeredSystem();
+                  if (sys == null)
+                     return;
+               }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
+               Annotation annot = (Annotation) mod;
+               IAnnotationProcessor p = sys.getAnnotationProcessor(model.getLayer(), annot.getFullTypeName());
+               if (p != null) {
+                  p.validate(this, annot);
+               }
+            }
+            else if (mod instanceof ScopeModifier) {
+               if (sys == null) {
+                  sys = getLayeredSystem();
+                  if (sys == null)
+                     return;
+               }
+               JavaModel model = getJavaModel();
+               if (model == null)
+                  return;
+               ScopeModifier scope = (ScopeModifier) mod;
+               IScopeProcessor p = sys.getScopeProcessor(model.getLayer(), scope.scopeName);
+               if (p != null) {
+                  p.validate(this);
+               }
+            }
+         }
+      }
+   }
+
    /** Overridden  */
    protected void addInheritedAnnotationProcessor(IAnnotationProcessor process, String annotName) {
       System.err.println("*** No support for inherited annotations on: " + this.getClass() + ": " + this + " annotation: " + annotName);

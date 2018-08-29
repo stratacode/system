@@ -14,6 +14,8 @@ public interface IScopeProcessor extends IDefinitionProcessor {
 
    public void start(Definition def);
 
+   public void validate(Definition def);
+
    public void process(Definition def);
 
    public boolean transform(Definition def, ILanguageModel.RuntimeType type);

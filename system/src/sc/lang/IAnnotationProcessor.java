@@ -13,6 +13,8 @@ public interface IAnnotationProcessor extends IDefinitionProcessor {
 
    public void start(Definition def, Annotation annot);
 
+   public void validate(Definition def, Annotation annot);
+
    public void process(Definition def, Annotation annot);
 
    public boolean transform(Definition def, Annotation annot, ILanguageModel.RuntimeType type);

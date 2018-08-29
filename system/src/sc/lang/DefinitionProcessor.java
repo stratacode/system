@@ -133,6 +133,10 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
          ((BodyTypeDeclaration) def).enableNeedsCompiledClass();
       }
 
+   }
+
+   public void validate(Definition def) {
+      // This check needs to be done after we've definitely started 'def'.  We might be in the midst of starting it when we run the 'start' method
       if (createOnStartup || initOnStartup)
          checkForPublicAccess((BodyTypeDeclaration) def);
    }
@@ -171,13 +175,16 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    }
 
    private void checkForPublicAccess(BodyTypeDeclaration td) {
-      if (!td.hasModifier("public"))
+      if (!td.hasModifier("public")) {
          td.displayError(toErrorString() + " must be public for: ");
+         boolean res = td.hasModifier("public");
+      }
    }
 
    public boolean transform(Definition def, ILanguageModel.RuntimeType type) {
       return false;
    }
+
 
    protected abstract String toErrorString();
 
