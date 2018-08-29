@@ -171,9 +171,8 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    }
 
    private void checkForPublicAccess(BodyTypeDeclaration td) {
-      if (td.getAccessLevel(false) != AccessLevel.Public) {
+      if (!td.hasModifier("public"))
          td.displayError(toErrorString() + " must be public for: ");
-      }
    }
 
    public boolean transform(Definition def, ILanguageModel.RuntimeType type) {

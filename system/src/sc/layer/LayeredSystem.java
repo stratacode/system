@@ -13204,7 +13204,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (bl != null)
             baseLayers.add(bl);
          else {
-            if (options.verbose)
+            if (options.sysDetails)
                System.out.println("No base layer: " + baseLayerName + " for: " + relPath + " in: " + getProcessIdent());
             // For this case we may be in the JS runtime and this layer is server specific...
             //baseLayers.add(null);
