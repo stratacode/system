@@ -7829,9 +7829,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (started)
          return;
 
-      if (typeName != null && typeName.equals("menuStyle"))
-         System.out.println("***");
-
       // Don't start the model types for excluded layers - they'll be started in other runtimes
       LayeredSystem sys = getLayeredSystem();
 
