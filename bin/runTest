@@ -156,7 +156,7 @@ if [ -f "$VALID_FILE" ] ; then
       echo "$TEST_NAME" >> "${RUN_DIR}/passed"
    else
       if [ "$statusChanged" = "1" ] ; then
-         echo "*** Exit status changed: $TEST_NAME - diff $VALID_STATUS_FILE $STATUS_FILE"
+         echo "*** Exit status changed < valid > new: $TEST_NAME - diff $VALID_STATUS_FILE $STATUS_FILE"
          testFailed=1
          echo "$TEST_NAME - exit status : diff $VALID_STATUS_FILE $STATUS_FILE" >> "${RUN_DIR}/failedDetail"
          if [ "$ECHO_ERRORS" = "1" ] ; then
@@ -166,7 +166,7 @@ if [ -f "$VALID_FILE" ] ; then
 
       if [ "$outputChanged" = "1" ] ; then
          if [ "$IGNORE_ERRORS" == 0 ] ; then
-            echo "*** Output changed: $TEST_NAME - diff $VALID_FILE $OUT_FILE"
+            echo "*** Output changed < valid > new: $TEST_NAME - diff $VALID_FILE $OUT_FILE"
             testFailed=1
             echo "$TEST_NAME - diff $VALID_FILE $OUT_FILE " >> ${RUN_DIR}/failedDetail
             diff "$VALID_FILE" "$OUT_FILE" > "$DIFF_FILE"

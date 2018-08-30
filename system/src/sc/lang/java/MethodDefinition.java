@@ -111,15 +111,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (disabled == null || !disabled) {
             this.mainSettings = mainSettings;
 
-            TypeDeclaration enclType = getEnclosingType();
-            while (enclType != null) {
-               if (ModelUtil.getAccessLevel(enclType, false) != AccessLevel.Public) {
-                  enclType.displayError("Type with @MainSettings must be public");
-               }
-               enclType = enclType.getEnclosingType();
-            }
-            if (ModelUtil.getAccessLevel(this, false) != AccessLevel.Public)
-               displayError("Method with @MainSettings must be public");
+            // Note: used to also check that the class is public but turns out that's not required - just for the method to be public
+            if (!ModelUtil.hasModifier(this, "public"))
+               displayError("Method with @MainSettings must be public for: ");
          }
       }
    }
