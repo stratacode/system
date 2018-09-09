@@ -107,8 +107,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private Element[] invisTags = null;
 
-   // Applies to the client only - server content is not rendered on the client.  Diffs from the exec flags in that if you use exec="client" the code is not compiled into the client version at all.  When the client version
-   // is used to generate a server-side html file, that's awkward cause you can't for example render the script tags and things that should only go on the server.
+   // This property is set for the client version of the tag objects on tags whose content is defined on the server, not dynamically by running the Javascript code on the client.
+   // This property is not the same as setting exec="server" which indicates that the tag object itself should not be included in the client version at all.
+   // It makes sense to set serverContent=true when you want that content to be included in the static HTML file for the client-only version.
+   // For example, you'd set serverContent on tags which generate the script tags to include javascript.
    public boolean serverContent = false;
 
    public boolean needsRefresh = false;
@@ -259,8 +261,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if ((flags & ExecServer) == 0 || (flags & ExecClient) == 0)
          return true;
       Element enclTag = getEnclosingTag();
-      // Not checking serverContent on the tag itself because we do create that tag on client and server.  The child
-      // tags for that tag though are not created and so should not be using symmetrics ids.
+      // Not checking serverContent on the tag itself because we do create the tag with this attribute set on both the client and server.  The child
+      // tags for that tag though are not created and so should not be using symmetric ids.
       if (enclTag != null && (enclTag.isClientServerSpecific() || enclTag.getBooleanAttribute("serverContent")))
          return true;
       return false;
@@ -295,8 +297,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
    */
 
-   // These ids shoud be consistent for a given page.  Since we traverse the object graphs in the same order on client and server hopefully they will be :)
-   // Share the idSpaces map with the root tag.
+   // These ids should be consistent for a given page because we traverse the object graph in the same order on client/server.
+   // It uses the idSpaces map stored on the root tag.
    public String allocUniqueId(String name, boolean clientServerSpecific) {
       String suffix = clientServerSpecific ? "_s" : null;
       if (suffix != null)
@@ -2570,8 +2572,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                             attExpr = StringLiteral.create(getAltId());
                          SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                          args.add(attExpr);
+                         // Don't add 'true' here - the id has been assigned and so style sheets may depend upon it.
+                         // I think the need for the "_s" suffix is just for when we use the tag name because the order in which ids are assigned must match between client/server
+                         /*
                          if (getNeedsClientServerSpecificId())
                             args.add(BooleanLiteral.create(true));
+                         */
                          attExpr = IdentifierExpression.createMethodCall(args, "allocUniqueId");
                       }
                       else
