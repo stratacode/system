@@ -22,6 +22,10 @@ public class ZipSrcEntry extends SrcEntry {
       this.zipFileName = zipFileName;
    }
 
+   public boolean canRead() {
+      return new File(zipFileName).canRead();
+   }
+
    public long getLastModified() {
       return new File(zipFileName).lastModified();
    }
