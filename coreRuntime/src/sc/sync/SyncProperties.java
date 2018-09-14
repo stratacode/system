@@ -23,7 +23,11 @@ public class SyncProperties {
    /** True if this an instance of this object is allowed to be created from the client */
    public boolean allowCreate = true;
 
-   // The default value for initDefault for those cases where you do not call addSyncInst explicitly
+   /**
+    * The default value for initDefault for those cases where you do not call addSyncInst explicitly.  See @Sync(initDefault)
+    * for details, but basically whether or not the remote side needs to be initialized with default values when the instance is
+    * created.  Sometimes, the code for the remote side already has default values and so only needs to be sent changes.
+    */
    public boolean initDefault = true;
 
    // Set this to true if the object's values are constant - i.e. don't need listeners

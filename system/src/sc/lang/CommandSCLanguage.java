@@ -26,6 +26,8 @@ import java.util.HashMap;
  *    startModifyDeclaration for inner type
  *    memberDefinition - i.e. anything appropriate for the current type, property assignment, field or method definition
  *    expression
+ *
+ * TODO: rename this to SCRLanguage?
  */
 public class CommandSCLanguage extends SCLanguage {
    public final static String SCR_SUFFIX = "scr";

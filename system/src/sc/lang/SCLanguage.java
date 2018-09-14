@@ -141,10 +141,12 @@ public class SCLanguage extends JavaLanguage {
    OrderedChoice reqClassBodyDeclaration = (OrderedChoice) classBodyDeclarations.clone();
    Sequence optOpenBraceEOL = (Sequence) openBraceEOL.clone();
    {
+      reqClassBodyDeclaration.removeParselet(incompleteStatement);
       reqPackageDeclaration.optional = false;
       reqImport.repeat = false;
       reqImport.optional = false;
-      reqClassBodyDeclaration.setName(reqClassBodyDeclaration.getName().replace("<classBodyDeclarations>", "<reqClassBodyDeclaration>"));
+      reqClassBodyDeclaration.setName("<reqClassBodyDeclarations>([],[],,[],[],[])");
+      //reqClassBodyDeclaration.setName(reqClassBodyDeclaration.getName().replace("<classBodyDeclarations>", "<reqClassBodyDeclaration>"));
       reqClassBodyDeclaration.repeat = false;
       reqClassBodyDeclaration.skipOnErrorParselet = null;
       reqClassBodyDeclaration.optional = false;
