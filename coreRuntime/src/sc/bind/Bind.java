@@ -49,7 +49,7 @@ public class Bind {
    */
 
    /** These are option flags you can combine in the flags argument to various calls to create bindings.  Settable via @Bindable using code-generation */
-   public static int INACTIVE = 1, TRACE = 2, VERBOSE = 4, QUEUED = 8, IMMEDIATE = 16, CROSS_SCOPE = 32, DO_LATER = 64, HISTORY = 128, ORIGIN= 256;
+   public static int INACTIVE = 1, TRACE = 2, VERBOSE = 4, QUEUED = 8, IMMEDIATE = 16, CROSS_SCOPE = 32, DO_LATER = 64, HISTORY = 128, ORIGIN = 256;
 
    static class BindingListenerEntry {
       int numProps = 0;
@@ -60,7 +60,13 @@ public class Bind {
       }
    }
 
+   /**
+    * For objects which do not implement IBindingContainer, stores the list of bindings set on that instance for each property in a list.  This includes forward, bi-directional,
+    * and reverse bindings.   We do not order the list, so in order to see which property a given binding is set on, you look at the DestinationListener's destination property.
+    */
    public final static Map<Object,List<DestinationListener>> bindingContainerRegistry = PTypeUtil.getWeakIdentityHashMap();
+
+   /** Stores a linked list of binding listeners for a given object.  The BindingListenerEntry has the array of listeners which is indexed by the property position */
    public final static Map<Object,BindingListenerEntry> bindingListenerRegistry = PTypeUtil.getWeakIdentityHashMap();
 
    public static boolean trace = false;
@@ -1194,6 +1200,40 @@ public class Bind {
          }
       }
       return toRet;
+   }
+
+   public static boolean hasBindingListeners(Object obj, String prop) {
+      return hasBindingListeners(obj, TypeUtil.getObjectPropertyMapping(obj, prop));
+   }
+
+   /**
+    * Returns true for an object and property where there is one or more bindings that listen for changes on that property.
+    * If prop is null, we return true if there are listeners for the default value event listener.
+    * For static properties, obj should be a class or TypeDeclaration.
+    */
+   public static boolean hasBindingListeners(Object obj, IBeanMapper prop) {
+      BindingListener[] listeners = getBindingListeners(obj);
+      if (listeners == null)
+         return false;
+
+      int propPos = prop == null ? 0 : DynUtil.isSType(obj) ? prop.getStaticPropertyPosition() : prop.getPropertyPosition(obj);
+      if (propPos == -1 || propPos > listeners.length)
+         return false;
+
+      return listeners[propPos] != null;
+
+   }
+
+   /**
+    * First call getBindingListeners with the same object provided here.  Then call this method with the returned list to retrieve the listener linked list
+    * for the given property, or null if there are no binding listeners for this property on this object.
+    */
+   public static BindingListener getPropListeners(Object obj, BindingListener[] listeners, IBeanMapper prop) {
+      int propPos = prop == null ? 0 : DynUtil.isSType(obj) ? prop.getStaticPropertyPosition() : prop.getPropertyPosition(obj);
+      if (propPos == -1 || propPos > listeners.length)
+         return null;
+
+      return listeners[propPos];
    }
 
    public static DestinationListener[] getBindings(Object dstObj) {

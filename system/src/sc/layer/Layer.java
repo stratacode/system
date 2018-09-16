@@ -4728,6 +4728,23 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return null;
    }
 
+   public SrcEntry getSubLayerFileFromRelName(String relName, boolean byPosition) {
+      SrcEntry res;
+      List<Layer> layersList = getLayersList();
+      if (layerPosition < layersList.size()) {
+         // Pick any layer after this one in the stack - used for testScripts etc. which need to be merged based on the layers stack, not the baseLayers so a mixin layer can be inserted
+         for (int i = layerPosition + 1; i < layersList.size(); i++) {
+            Layer subLayer = layersList.get(i);
+            res = subLayer.getLayerFileFromRelName(relName, false, true);
+            if (res != null) {
+               if (byPosition || subLayer.extendsLayer(this))
+                  return res;
+            }
+         }
+      }
+      return null;
+   }
+
    public boolean checkRemovedDirectory(String dirPath) {
       File layerDir = new File(layerPathName);
       // The layer itself was removed so let's start there :)

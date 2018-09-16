@@ -187,4 +187,8 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
    public String toGenerateString() {
       return value;
    }
+
+   public boolean isIncompleteStatement() {
+      return false;
+   }
 }

@@ -9,8 +9,12 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Use this annotation to mark an annotation that uses a differerent retention policy than Java.  For example, if
- * you want to not include the annotation in Javascript but you do in Java you can se this annotation to RetentionPolicy.SOURCE */
+/**
+ * For Javascript handling of annotations where JS uses a different retention policy than Java.  For example, if
+ * you want to exclude the annotation from the JS runtime (the generated JS code) set this to RetentionPolicy source.
+ * It's a bit confusing because for Java this means keep the annotation in the java source - i.e. don't compile it into the class files.
+ * The Source policy here for Javascript means leave it in the Java source.
+ */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.ANNOTATION_TYPE)
 public @interface JSRetention {
