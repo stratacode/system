@@ -3525,7 +3525,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ((BodyTypeDeclaration) extType).initDynSyncInst(inst);
       }
       if (getSyncProperties() != null) {
-         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName());
+         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null);
       }
    }
 
@@ -7044,7 +7044,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          int len = argValues.length;
          if (getEnclosingInstType() != null && len >= 1)
             plainArgValues = Arrays.asList(argValues).subList(1, len).toArray();
-         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), plainArgValues);
+         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null, plainArgValues);
       }
    }
 
