@@ -31,7 +31,7 @@ public class InstanceWrapper implements IObjectId {
    }
    */
 
-   // WARNING: if you change the parameters here, also update them in the addSyncInst call.
+   // WARNING: if you change the parameters here, also update the last three args for the addSyncInst call made here.
    // This class is also (mostly) copied in js/layer/lang/InstanceWrapper.scj so changes made here
    // usually are also made there.
    public InstanceWrapper(EditorContext ctx, Object inst, String typeName) {
@@ -39,7 +39,7 @@ public class InstanceWrapper implements IObjectId {
       this.ctx = ctx;
       this.typeName = typeName;
       // Because this class is not compiled with SC, we need to include this call by hand
-      SyncManager.addSyncInst(this, true, true, null, ctx, inst, typeName);
+      SyncManager.addSyncInst(this, true, true, null, null, ctx, inst, typeName);
    }
 
    public Object getInstance() {

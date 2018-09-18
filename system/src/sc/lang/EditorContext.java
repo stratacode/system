@@ -1624,7 +1624,7 @@ public class EditorContext extends ClientEditorContext {
       SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
       SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
-      SyncManager.addSyncInst(this, true, true, null);
+      SyncManager.addSyncInst(this, true, true, null, null);
 
       SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
    }

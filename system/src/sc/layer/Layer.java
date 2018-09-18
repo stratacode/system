@@ -4004,7 +4004,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void initSync() {
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncInst(this, true, true, null);
+      SyncManager.addSyncInst(this, true, true, null, null);
    }
 
    public String toDetailString() {

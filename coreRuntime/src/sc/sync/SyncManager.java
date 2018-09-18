@@ -1110,11 +1110,11 @@ public class SyncManager {
       /**
        * This is a lower-level method to add a new sync inst with the most flexibility.  Since it's defined on ScopeContext, it's called after you have selected the scope to manage
        * the lifecycle of this instance.
-       * If depChanges is not null, any changes recorded to initialize this instance are put into the changes list.  Otherwise, they are recorded at the end of the SyncLayer
+       * If depChanges is not null, any dependent changes required to initialize this instance are put into the provided depChanges list.  If depChanges is null, dependent changes are added to the end of the current SyncLayer of changes.
        * If initInst is false, we'll register the instance but won't initialize it with the sync system yet.
        * If onDemand is false, the instance is added explicitly to all sync contexts - they will be pushed to listeners on the scope involved
-       * If queueNewObj is true, a 'new' or create object is added with this change.  Otherwise, it's assumed the remote client will already have created the object, or a new obj has already been queued
-       * for this instance (or will be later).
+       * If queueNewObj is true, a 'new' or create object is added to the SyncLayer to create this instance on the remote side.
+       * Otherwise, it's assumed the remote client will already have created the object, or a new obj has already been queued for this instance (or will be later).
        * Note that it's possible the parent context has already registered this instance due to a super-type call to addSyncInst (when queuing is disabled).
        * We'll add the instance to this sync context, then unless it's on-demand, we initialize it in all child-contexts so they sync it as well.
        */
@@ -2463,7 +2463,7 @@ public class SyncManager {
 
       // Process the original addSyncInst calls now in order
       for (AddSyncInfo asi:queue) {
-         addSyncInst(asi.inst, asi.onDemand, asi.initDefault, asi.scopeName, asi.args);
+         addSyncInst(asi.inst, asi.onDemand, asi.initDefault, asi.scopeName, asi.props, asi.args);
       }
       return true;
    }
@@ -2474,12 +2474,14 @@ public class SyncManager {
       boolean initDefault;
       String scopeName;
       Object[] args;
+      SyncProperties props;
 
-      AddSyncInfo(Object i, boolean od, boolean initDef, String scopeName, Object[] args) {
+      AddSyncInfo(Object i, boolean od, boolean initDef, String scopeName, SyncProperties props, Object[] args) {
          this.inst = i;
          this.onDemand = od;
          this.initDefault = initDef;
          this.scopeName = scopeName;
+         this.props = props;
          this.args = args;
       }
    }
@@ -2491,22 +2493,25 @@ public class SyncManager {
     * This method is used often in code-generation or you can
     * call it to manually implement synchronization without code-generation.
     * <p>
-    * If a scopeName is not supplied, we look for the scopeName annotation
+    * If a scopeName is supplied as null, we look for the scopeName annotation
     * on the instance or any outer objects to find the scope where this object should be registered.
     * <p>
     * If onDemand is true, this object is not immediately serialized to the other side - instead it's only serialized
     * the first time it is fetched or referenced by another object which is serialized.
     * <p>
+    * If props is null, the SyncProperties registered using addSyncType for this instances type are used to determine which properties are synchronized
+    * along with any property specific options.
+    * <p>
     * Any constructor args needed to rebuild the instance should be provided here and those objects must also
-    * be manageable by the sync system (e.g. primitives or that have called addSyncType).
+    * be manageable by the sync system (e.g. primitives or that have a SyncProperties registered via addSyncType).
     */
-   public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, String scopeName, Object ...args) {
+   public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, String scopeName, SyncProperties props, Object ...args) {
       // TODO: should we use a linked-map for the sync so we can replace a previous entry for the same instance.
       // If a base class is synchronized on a different scope than the sub-class and a sync queue is enabled, this prevents
       // us from temporarily initializing the instance in the wrong scope which is not a safe thing to do
       LinkedHashSet<AddSyncInfo> syncQueue = (LinkedHashSet<AddSyncInfo>) PTypeUtil.getThreadLocal("syncAddQueue");
       if (syncQueue != null) {
-         syncQueue.add(new AddSyncInfo(inst, onDemand, initDefault, scopeName, args));
+         syncQueue.add(new AddSyncInfo(inst, onDemand, initDefault, scopeName, props, args));
          return;
       }
 
@@ -2515,16 +2520,16 @@ public class SyncManager {
       if (scopeName == null)
          scopeName = DynUtil.getScopeName(inst);
       ScopeDefinition def = getScopeDefinitionByName(scopeName);
-      addSyncInst(inst, onDemand, initDefault, def.scopeId, args);
+      addSyncInstInternal(inst, onDemand, initDefault, def.scopeId, null, args);
    }
 
-   public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, int scopeId, Object...args) {
+   private static void addSyncInstInternal(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties props, Object...args) {
       Object type = DynUtil.getType(inst);
 
       boolean found = false;
 
       for (SyncManager syncMgr:syncManagers) {
-         SyncProperties syncProps = syncMgr.getSyncProperties(type);
+         SyncProperties syncProps = props != null ? props : syncMgr.getSyncProperties(type);
          if (syncProps != null) {
             syncMgr.addSyncInst(inst, onDemand, initDefault, scopeId, syncProps, args);
             found = true;
