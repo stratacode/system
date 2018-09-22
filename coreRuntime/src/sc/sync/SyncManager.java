@@ -53,6 +53,7 @@ public class SyncManager {
    // A SyncManager manages all traffic going out of a given channel type, i.e. per SyncDestination instance.
    private static Map<String,SyncManager> syncManagersByDest = new HashMap<String,SyncManager>();
    private static List<SyncManager> syncManagers = new ArrayList<SyncManager>();
+   private static Map<Object, SyncProperties> globalSyncTypes = new IdentityHashMap<Object, SyncProperties>();
 
    private static HashMap<Object, Class> syncHandlerRegistry = new HashMap<Object, Class>();
 
@@ -2225,8 +2226,10 @@ public class SyncManager {
       if (syncDest.name == null)
          throw new IllegalArgumentException("Must set the name property on the SyncDestination class: " + syncDest);
       syncDest.initSyncManager();
-      syncManagersByDest.put(syncDest.name, syncDest.syncManager);
-      syncManagers.add(syncDest.syncManager);
+      SyncManager mgr = syncDest.syncManager;
+      syncManagersByDest.put(syncDest.name, mgr);
+      syncManagers.add(mgr);
+      mgr.syncTypes.putAll(globalSyncTypes);
    }
 
    public static SyncManager getSyncManager(String destName) {
@@ -2316,6 +2319,8 @@ public class SyncManager {
          for (SyncManager mgr:syncManagers) {
             old = mgr.syncTypes.put(type, props);
          }
+         // Keep track of all global sync types added in case the SyncManager has not yet been created
+         globalSyncTypes.put(type, props);
       }
       else {
          SyncManager syncMgr = getSyncManager(props.destName);

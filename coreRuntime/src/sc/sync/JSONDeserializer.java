@@ -233,6 +233,7 @@ public class JSONDeserializer {
                         objType = DynUtil.getSType(curObj);
                         if (!mgr.isSynced(objType, nextNameStr)) {
                            System.err.println("Not allowed to set unsynchronized property from json: " + DynUtil.getTypeName(objType, true) + "." + nextNameStr);
+                           boolean isSynced = !mgr.isSynced(objType, nextNameStr);
                            skipSet = true;
                         }
                      }
