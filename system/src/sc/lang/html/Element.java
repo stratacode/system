@@ -4213,12 +4213,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (tagId == null)
             System.err.println("*** null id for server tag");
          if (serverTag != null) {
-            if (serverTags == null)
-               serverTags = new LinkedHashMap<String,ServerTag>();
-
             // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
-            if (serverTag.eventSource)
+            if (serverTag.eventSource) {
+               if (serverTags == null)
+                  serverTags = new LinkedHashMap<String,ServerTag>();
+
                serverTags.put(tagId, serverTag);
+            }
 
             if (scopeDef != null) {
                ScopeContext scopeCtx = scopeDef.getScopeContext(true);
