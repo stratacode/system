@@ -9,12 +9,15 @@ import sc.obj.Sync;
 import sc.obj.SyncMode;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 
 /**
- * We are setting the dependentTypes here because we always have an HtmlPage loaded in each client.  We might need it on other types as well cause it's
- * only processed on the first 'extends' class from Java source we are processing.
+ * We are setting the dependentTypes here to ensure these classes are compiled into the JS runtime when HtmlPage is used.
+ * We always have an HtmlPage loaded in each client so this just a convenient place to put this dependency.
+ * Currently we always include this class in each page but might need to add this dependency elsewhere if it gets skipped for
+ * a JS runtime that uses some of these classes.
  */
-@sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentTypes="sc.obj.IChildInit")
+@sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentTypes="sc.obj.IChildInit,sc.js.ServerTagManager")
 /** Used as the tag class for the html tag it is the top level tag in the page. */
 // TODO: on the client, this uses the js_Page_c constructor which we can't easily replicate in Java.  But maybe it should extend Page
 // and have it just set tagName to 'html'?

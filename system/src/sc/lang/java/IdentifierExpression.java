@@ -43,7 +43,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    // One identifier type in each slot of the idTypes array.  This corresponds to one element in the "a.b" expression
    public enum IdentifierType {
-      BoundName,        // Used in interprete mode - referencedObject is "the" value to return
+      BoundName,        // Used in the dynamic runtime - referencedObject is "the" value to return
       PackageName,      // This identifier is a component in a package name.  Preceded either BoundType or BoundObjectName
       BoundTypeName,    // This slot refers to an actual type - referencedObject is either a type declaration or class.
       BoundObjectName,  // This slot refers to an "object" definition.  Otherwise similar to the above.

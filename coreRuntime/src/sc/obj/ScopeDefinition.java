@@ -28,7 +28,7 @@ public abstract class ScopeDefinition {
    public boolean eventListenerCtx = false;
 
    /**
-    * Must set this to true for scopes that clients will use to send/receive events (e.g. window for the server and global for the client0.
+    * Must set this to true for scopes that clients will use to send/receive events (e.g. window for the server and global for the client).
     * It's false for the intermediate 'store-only' contexts
      */
    public boolean supportsChangeEvents = false;

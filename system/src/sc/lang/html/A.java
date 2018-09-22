@@ -6,6 +6,10 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.type.IBeanMapper;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 /** The tag base class for the anchor tag.
  *
@@ -14,6 +18,10 @@ import sc.bind.Bindable;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class A extends HTMLElement {
    public final static sc.type.IBeanMapper _clickCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.A.class, "clickCount");
+   private final static TreeMap<String,IBeanMapper> aServerTagProps = new TreeMap<String,IBeanMapper>();
+   static {
+      aServerTagProps.put("clickCount", _clickCountProp);
+   }
 
    public A() {
       super();
@@ -33,5 +41,9 @@ public class A extends HTMLElement {
    @Bindable(manual=true) public void setClickCount(int _clickCount) {
       clickCount = _clickCount;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _clickCountProp, _clickCount);
+   }
+
+   public Map<String,IBeanMapper> getCustomServerTagProps() {
+      return aServerTagProps;
    }
 }

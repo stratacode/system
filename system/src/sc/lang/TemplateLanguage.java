@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * The template language companion to SCLanguage.  It is implemented as an extension to StrataCode but with
  * a different starting point.  Like other template languages, you start out in "text mode", then break into Java
- * with the START_CODE_DELIMINTER.  Unlike other template languages, you can break out back out again into text
+ * with the START_CODE_DELIMITER.  Unlike other template languages, you can break out back out again into text
  * anyplace Java expects statements or expressions (or class body declarations though that's more of an edge case).
  *
  * Lots of advantages for doing it this way, instead of the more traditional "mixing languages" approach.  The syntax

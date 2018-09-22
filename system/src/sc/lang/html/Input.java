@@ -6,6 +6,10 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.type.IBeanMapper;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Input extends HTMLElement {
@@ -13,7 +17,15 @@ public class Input extends HTMLElement {
    private final static sc.type.IBeanMapper _disabledProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "disabled");
    private final static sc.type.IBeanMapper _valueProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "value");
    public final static sc.type.IBeanMapper _changeEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "changeEvent");
-   public static sc.type.IBeanMapper _clickCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "clickCount");
+   public final static sc.type.IBeanMapper _clickCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Input.class, "clickCount");
+
+   private final static TreeMap<String,IBeanMapper> inputServerTagProps = new TreeMap<String,IBeanMapper>();
+   static {
+      inputServerTagProps.put("checked", _checkedProp);
+      inputServerTagProps.put("value", _valueProp);
+      inputServerTagProps.put("changeEvent", _changeEventProp);
+      inputServerTagProps.put("clickCount", _clickCountProp);
+   }
 
    public Input() {
       super();
@@ -69,5 +81,13 @@ public class Input extends HTMLElement {
    @Bindable(manual=true) public void setClickCount(int _clickCount) {
       clickCount = _clickCount;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _clickCountProp, _clickCount);
+   }
+
+   public Map<String,IBeanMapper> getCustomServerTagProps() {
+      return inputServerTagProps;
+   }
+
+   public boolean isEventSource() {
+      return true;
    }
 }

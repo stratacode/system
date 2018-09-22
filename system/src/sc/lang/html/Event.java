@@ -11,7 +11,7 @@ public class Event {
    public Element currentTarget;
    public Element currentTag;
    public Element target;
-   public long timeStamp;
+   public double timeStamp;
 
    // TODO: these are stubs for the client right now since there's no real event delivery on the server
    public void preventDefault() {

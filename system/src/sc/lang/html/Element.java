@@ -6,8 +6,11 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.bind.BindingListener;
+import sc.bind.IListener;
 import sc.dyn.DynUtil;
 import sc.dyn.IObjChildren;
+import sc.js.ServerTag;
 import sc.js.URLPath;
 import sc.lang.*;
 import sc.lang.java.*;
@@ -18,15 +21,15 @@ import sc.lang.sc.ScopeModifier;
 import sc.lang.template.*;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
-import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
 import sc.obj.*;
 import sc.parser.*;
 import sc.obj.IChildInit;
 import sc.sync.SyncManager;
+import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
+import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
-import sc.type.RTypeUtil;
 import sc.util.FileUtil;
 import sc.util.IdentityHashSet;
 import sc.util.StringUtil;
@@ -56,6 +59,7 @@ import java.util.*;
 @ResultSuffix("html")
 public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
    public static boolean trace = false, verbose = false;
+   private final static sc.type.IBeanMapper _innerHTMLProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "innerHTML");
 
    /** When a tag is invisible, instead of rendering the tag, we render the 'alt' child if there is one */
    private final static String ALT_ID = "alt";
@@ -86,10 +90,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private transient Object extendsTypeDecl;
 
    /**
-    * Tags are rendered in two different phases - the start tag, which includes the attributes and the body.
+    * Tags are rendered in two different phases - 1) the start tag, which includes the attributes and 2) the body.
     * These flags indicate if the current rendered version is known to be stale for each of these two phases
     */
    public transient boolean startTagValid = false, bodyValid = false;
+
+   /**
+    * Like bodyValid but applies only to changes made to the static text chunks.  When a child tag's bodyTxt changes,
+    * we set both this and bodyValid = false.  For the parent nodes, we only make bodyValid = false.  This way, we can
+    * walk down the tree to find any child nodes which have actually changed.
+    */
+   public transient boolean bodyTxtValid = false;
 
    private transient boolean needsSuper = false;
    private transient boolean needsBody = true;
@@ -112,6 +123,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // It makes sense to set serverContent=true when you want that content to be included in the static HTML file for the client-only version.
    // For example, you'd set serverContent on tags which generate the script tags to include javascript.
    public boolean serverContent = false;
+
+   /** Set to true in the runtime version of the tag object for tags which are to be run on the server only */
+   public boolean serverTag = false;
 
    public boolean needsRefresh = false;
 
@@ -360,6 +374,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return execFlags;
    }
 
+   /** Returns the derived execFlags for this tag - i.e. the value of the exec=".." attribute or the inherited value if it's not set, defaulting to "ExecAll" */
    public int getComputedExecFlags() {
       if (execFlags == 0) {
          execFlags = getDefinedExecFlags();
@@ -440,6 +455,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
       int genFlags = template.getGenerateExecFlags();
       return (genFlags & getComputedExecFlags()) == 0;
+   }
+
+   /** A server tag is one which is rendered on the server only */
+   private boolean isServerTag() {
+      Template template = getEnclosingTemplate();
+      if (template == null)
+         return false;
+
+      int execFlags = getComputedExecFlags();
+      if ((execFlags & ExecServer) != 0 && (execFlags & ExecClient) == 0)
+         return true;
+      return false;
    }
 
    public boolean execOmitObject() {
@@ -1415,7 +1442,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    void invalidateParent() {
       Element element = getEnclosingTag();
       if (element != null)
-         element.invalidateBody();
+         element.childInvalidated();
    }
 
    public void invalidateStartTag() {
@@ -1427,9 +1454,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public void invalidateBody() {
       if (bodyValid) {
-         bodyValid = false;
+         markBodyValid(false);
          invalidateParent();
       }
+   }
+
+   public void childInvalidated() {
+      if (bodyValid) {
+         bodyValid = false; // Our body is no longer valid because it includes the child whose body changed.
+         invalidateParent();
+      }
+   }
+
+   public void findChangedTags() {
+      if (bodyValid)
+         return;
+
    }
 
    public Element getDerivedElement() {
@@ -2499,7 +2539,16 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       initAttrExprs();
 
       if (remoteContent) {
-         idIx = addSetServerContent(tagType, idIx);
+         idIx = addSetServerAtt(tagType, idIx, "serverContent");
+      }
+      serverTag = isServerTag();
+      if (serverTag) {
+         Element parentTag = getEnclosingTag();
+         // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
+         // switching back to a client tag from within a server tag, but not sure that use case makes sense anyway.  We could add 'clientTag'
+         // to switch it back in that case rather than having to set this on every inner tag object.
+         if (parentTag == null || !parentTag.serverTag)
+            idIx = addSetServerAtt(tagType, idIx, "serverTag");
       }
 
       List<Object> implTypes = getTagImplementsTypes();
@@ -2702,11 +2751,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                // Use of addBefore or addAfter with append mode?  Not sure this makes sense... maybe an error?
                if (uniqueChildren == children || bodyMerge == MergeMode.Merge) {
                   // Do not do the super if there are any addBefore or addAfter's in our children's list
+                  IdentifierExpression superExpr;
                   if (needsSuper) {
-                     IdentifierExpression texpr = IdentifierExpression.createMethodCall(outArgs, "super.outputBody");
-                     texpr.fromStatement = this;
-                     outputBodyMethod.addStatement(texpr);
+                     superExpr = IdentifierExpression.createMethodCall(outArgs, "super.outputBody");
                   }
+                  // If we are not calling the super, we still need to set bodyValid = true.  Doing this as a method so it's a hook point tag objects can extend
+                  else {
+                     SemanticNodeList<Expression> validArgs = new SemanticNodeList<Expression>();
+                     validArgs.add(BooleanLiteral.create(true));
+                     superExpr = IdentifierExpression.createMethodCall(validArgs, "markBodyValid");
+                  }
+                  superExpr.fromStatement = this;
+                  outputBodyMethod.addStatement(superExpr);
                }
                else
                   displayWarning("Use of addBefore/addAfter with bodyMerge='append' - not appending to eliminate duplicate content");
@@ -2856,11 +2912,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return 0;
    }
 
-   private int addSetServerContent(BodyTypeDeclaration type, int idx) {
+   private int addSetServerAtt(BodyTypeDeclaration type, int idx, String propName) {
       BodyTypeDeclaration parentType = type.getEnclosingType();
       if (parentType != null) {
          //PropertyAssignment pa = PropertyAssignment.create("parentNode", IdentifierExpression.create(parentType.typeName, "this"), "=");
-         PropertyAssignment pa = PropertyAssignment.create("serverContent", BooleanLiteral.create(true), "=");
+         PropertyAssignment pa = PropertyAssignment.create(propName, BooleanLiteral.create(true), "=");
          addTagTypeBodyStatement(type, pa);
          return type.body.size();
       }
@@ -2938,7 +2994,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addMatchingNamesFromSet(attList, prefix, candidates);
       addMatchingNamesFromSet(behaviorAttributes, prefix, candidates);
       addMatchingNamesFromSet(notInheritedAttributes, prefix, candidates);
-      addMatchingNamesFromSet(domAttributes, prefix, candidates);
+      addMatchingNamesFromSet(HTMLElement.domAttributes.keySet(), prefix, candidates);
    }
 
    private static void addMatchingNamesFromSet(Set<String> attributes, String prefix, Set<String> candidates) {
@@ -2946,20 +3002,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (prefix == null || att.startsWith(prefix))
             candidates.add(att);
       }
-   }
-
-   static HashSet<String> domAttributes = new HashSet<String>();
-   {
-      domAttributes.add("clickEvent");
-      domAttributes.add("dblClickEvent");
-      domAttributes.add("mouseDownEvent");
-      domAttributes.add("mouseOutEvent");
-      domAttributes.add("mouseUpEvent");
-      domAttributes.add("keyDownEvent");
-      domAttributes.add("keyPressEvent");
-      domAttributes.add("keyUpEvent");
-      domAttributes.add("focusEvent");
-      domAttributes.add("blurEvent");
    }
 
    static HashSet<String> notInheritedAttributes = new HashSet<String>();
@@ -3377,13 +3419,33 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void outputBody(StringBuilder sb) {
-      bodyValid = true;
+      markBodyValid(true);
+   }
+
+   public void markBodyValid(boolean val) {
+      bodyValid = val;
+      bodyTxtValid = val;
    }
 
    public void outputEndTag(StringBuilder sb) {
       sb.append("</");
       sb.append(lowerTagName());
       sb.append(">");
+   }
+
+   /**
+    * Returns the current body contents by regenerating it - so the Element api mirrors the DOM api and for synchronization.
+    * This is read-only by default on the server but used for serverTags to transfer a change of body to the client.
+    */
+   public String getInnerHTML() {
+      StringBuilder out = new StringBuilder();
+      outputBody(out);
+      return out.toString();
+   }
+
+   public void setInnerHTML(String htmlTxt) {
+      // TODO: do we need this?  It's used now for transporting the HTML generated on the server to the client
+      throw new UnsupportedOperationException();
    }
 
    public void setTextContent(String tc) {
@@ -3861,9 +3923,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Bind.sendChangedEvent(this, "style");
    }
 
-   public void registerServerPage() {
-   }
-
    // No need to transform the element and it's children since it did it's work in convertToObject.
    public boolean transform(ILanguageModel.RuntimeType rt) {
       return true;
@@ -3934,6 +3993,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
 
+   // TODO: make escAtt and escBody static?
    public String escAtt(CharSequence in) {
       if (in == null)
          return null;
@@ -4088,5 +4148,149 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // Not copying tagObject here - it needs to be cloned at the root and then tagObjects assigned as a second pass
       //}
       return res;
+   }
+
+   public boolean isEventSource() {
+      return false;
+   }
+
+   public ServerTag serverTagInfo = null;
+
+   public ServerTag getServerTagInfo() {
+      if (serverTagInfo != null)
+         return serverTagInfo;
+
+      BindingListener[] listeners = Bind.getBindingListeners(this);
+      ServerTag stag = null;
+      String id = getId();
+      if (id != null) {
+         stag = new ServerTag();
+         stag.id = id;
+         stag.eventSource = isEventSource();
+      }
+      if (listeners != null) {
+         stag = addServerTagProps(listeners, stag, HTMLElement.domAttributes);
+         // TODO: Do we need to add these to indicate the need for immediate versus non-immediate?
+         //stag = addServerTagProps(listeners, stag, getCustomServerTagProps());
+
+      }
+      if (stag != null) {
+         serverTagInfo = stag;
+      }
+
+      return stag;
+   }
+
+   private ServerTag addServerTagProps(BindingListener[] listeners, ServerTag stag, Map<String,IBeanMapper> propsMap) {
+      if (propsMap == null)
+         return stag;
+      for (Map.Entry<String,IBeanMapper> domProp:propsMap.entrySet()) {
+         BindingListener listener = Bind.getPropListeners(this, listeners, domProp.getValue());
+         if (listener != null) {
+            if (stag == null) {
+               stag = new ServerTag();
+               stag.id = getId();
+            }
+            if (stag.props == null)
+               stag.props = new ArrayList<Object>();
+            //stp.immediate = true;
+            // TODO also add SyncPropOption here if we want to control immediate or other flags we add to how
+            // to synchronize these properties from client to server?
+            stag.props.add(domProp.getKey());
+         }
+      }
+      return stag;
+   }
+
+   public Map<String,IBeanMapper> getCustomServerTagProps() {
+      return null;
+   }
+
+   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag) {
+      if (defaultServerTag || serverTag) {
+         ServerTag serverTag = getServerTagInfo();
+         String tagId = getId();
+         if (tagId == null)
+            System.err.println("*** null id for server tag");
+         if (serverTag != null) {
+            if (serverTags == null)
+               serverTags = new LinkedHashMap<String,ServerTag>();
+
+            // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
+            if (serverTag.eventSource)
+               serverTags.put(tagId, serverTag);
+
+            if (scopeDef != null) {
+               ScopeContext scopeCtx = scopeDef.getScopeContext(true);
+               if (scopeCtx != null) {
+                  Object oldValue = scopeCtx.getValue(tagId);
+                  if (oldValue != null) {
+                     if (oldValue != this) {
+                        System.err.println("*** Conflicting value for tag id: " + tagId + " in scope: " + scopeDef.name);
+                     }
+                  }
+                  else {
+                     scopeCtx.setValue(tagId, this);
+                     // Register this with the sync system so we can apply changes made on the client and detect changes
+                     // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
+                     // and those should be unique cause they are already a global name space used by this page.
+                     // TODO: if we have name conflicts, we could pass the DOM element id in the ServerTagInfo as well as the object name
+                     SyncManager.registerSyncInst(this, tagId, scopeDef.scopeId, true);
+                  }
+               }
+            }
+         }
+         defaultServerTag = true;
+      }
+      Object[] children = getObjChildren(false);
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Element) {
+               serverTags = ((Element) child).addServerTags(scopeDef, serverTags, defaultServerTag);
+            }
+         }
+      }
+      return serverTags;
+   }
+
+
+   /**
+    * Called on the client only.  It will create or update a tag object based on the DOM element id.   When a ServerTag is provided, it provides additional info on what
+    * the server needs the client to do, in order to synchronize properties of the server tag object.  For example, it includes properties with bindings on the server
+    * the client knows which DOM events to listen to, in order to send the appropriate changes to the server.
+    */
+   public static Element updateServerTag(Element tagObj, String id, ServerTag stag, boolean addSync) {
+      System.err.println("*** updateServerTag called on server - it is a client-only method used to create, update and get the server's subscription for a specific DOM tag");
+      return null;
+   }
+
+   public void fireChangedTagEvents() {
+      if (!bodyTxtValid) // Here we'll just fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
+         Bind.sendEvent(IListener.VALUE_CHANGED, this, _innerHTMLProp);
+
+      if (bodyValid)
+         return;
+
+      Object[] children = getObjChildren(false);
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Element) {
+               ((Element) child).fireChangedTagEvents();
+            }
+         }
+      }
+   }
+
+   /** Can be called at startup for any components that will use synchronization with tag objects */
+   public static void initSync() {
+      // By default, we'll synchronize any body content this tag has in a read-only way.  When it changes, there's a change event for innerHTML
+      // and getInnerHTML() generates the new contents.  We send over specific DOM attributes as well for each type but maybe for server tags we
+      // synchronize attribute value changes by sending over the parent tag's body instead of trying to patch in a specific attribute change?
+      SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[] {"type", "timeStamp", "currentTag"}, 0));
+      SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{"innerHTML", "style", "class"}, 0));
+      SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
+      SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
+      SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));
+      SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));
    }
 }

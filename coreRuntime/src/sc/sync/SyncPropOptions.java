@@ -9,10 +9,15 @@ import sc.obj.SyncMode;
 
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
 @Sync(syncMode=SyncMode.Disabled)
+/**
+ * Use an instance of this class in the list of properties for your SyncProperties instance to control specified behavior for
+ * a given property.  Add one or more flags to override the default SyncOptions specified in SyncProperties.
+ */
 public class SyncPropOptions {
-   // Synchronization this property when the object or class is intialized.  The default is to assume that sync properties
-   // are initialized 'in sync' to avoid this initial sync.
+   /** Send the initial property value to the remote side during the initial sync.  If SYNC_INIT is not set, the remote side is
+    assumed to start out synchronized - i.e. the class has compiled in the same default for this property. */
    public final static int SYNC_INIT = 1;
+   /** Do not send the value of this property until it's value is requested by the remote side. */
    public final static int SYNC_ON_DEMAND = 2;
    public final static int SYNC_SERVER = 4; // For on-demand properties, is this class the client or the server?
    public final static int SYNC_CLIENT = 8; // For on-demand properties, is this class the client or the server?

@@ -6,11 +6,20 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.type.IBeanMapper;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Option<T> extends HTMLElement {
    public final static sc.type.IBeanMapper _selectedProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Option.class, "selected");
    public final static sc.type.IBeanMapper _optionDataProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Option.class, "optionData");
+   private final static TreeMap<String,IBeanMapper> optionServerTagProps = new TreeMap<String,IBeanMapper>();
+   static {
+      optionServerTagProps.put("selected", _selectedProp);
+      optionServerTagProps.put("optionData", _optionDataProp);
+   }
    {
       tagName = "option";
    }
@@ -43,4 +52,11 @@ public class Option<T> extends HTMLElement {
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _optionDataProp, values);
    }
 
+   public Map<String,IBeanMapper> getCustomServerTagProps() {
+      return optionServerTagProps;
+   }
+
+   public boolean isEventSource() {
+      return true;
+   }
 }

@@ -6,11 +6,21 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.type.IBeanMapper;
+
+import java.util.Map;
+import java.util.TreeMap;
 
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Form extends HTMLElement {
    public final static sc.type.IBeanMapper _submitEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitEvent");
    private final static sc.type.IBeanMapper _submitCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitCount");
+   private final static TreeMap<String,IBeanMapper> formServerTagProps = new TreeMap<String,IBeanMapper>();
+   static {
+      formServerTagProps.put("submitEvent", _submitEventProp);
+      formServerTagProps.put("submitCount", _submitCountProp);
+   }
+
    {
       tagName = "form";
    }
@@ -44,5 +54,13 @@ public class Form extends HTMLElement {
    /** Implemented on the client to simulate form submit */
    @sc.obj.Exec(clientOnly=true)
    public void submit() {
+   }
+
+   public Map<String,IBeanMapper> getCustomServerTagProps() {
+      return formServerTagProps;
+   }
+
+   public boolean isEventSource() {
+      return true;
    }
 }

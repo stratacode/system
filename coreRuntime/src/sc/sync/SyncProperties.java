@@ -40,6 +40,8 @@ public class SyncProperties {
 
    IntCoalescedHashMap propIndex;
 
+   Object[] allProps;
+
    public SyncProperties(String destName, String syncGroup, Object[] props, int flags) {
       this(destName, syncGroup, props, null, flags);
    }
@@ -48,6 +50,11 @@ public class SyncProperties {
       this(destName, syncGroup, props, chainedType, flags, -1);
    }
 
+   /**
+    * Creates a SyncProperties object to define how to synchronize a specific type or instance.  After you create one of these
+    * you pass it to either addSyncType - when all instances are synchronized using the same properties/settings or addSyncInst - when
+    * an individual instance is not synchronized like others with the same type.
+    */
    public SyncProperties(String destName, String syncGroup, Object[] props, Object chainedType, int flags, int scopeId) {
       this.destName = destName;
       this.syncGroup = syncGroup;
@@ -56,10 +63,13 @@ public class SyncProperties {
       // TODO: this assumes the sync type, the base type has already run.  Since we are doing this as part of the
       // static initialization of our class, doesn't that mean the static init of the base class has already been done?
       chainedProps = chainedType == null ? null : SyncManager.getSyncProperties(chainedType, destName);
-      propIndex = new IntCoalescedHashMap(getNumProperties());
+      propIndex = new IntCoalescedHashMap(classProps == null ? 0 : classProps.length + (chainedProps == null ? 0 : chainedProps.getNumProperties()));
       constant = (flags & SyncOptions.SYNC_CONSTANT) != 0;
       initDefault = (flags & SyncOptions.SYNC_INIT_DEFAULT) != 0;
+      ArrayList<Object> newProps = null;
       if (props != null) {
+         if (chainedProps != null)
+            propIndex.putAll(chainedProps.propIndex);
          for (Object prop:props) {
             int options;
             String propName;
@@ -75,13 +85,27 @@ public class SyncProperties {
                options = 0;
                propName = (String) prop;
             }
-            propIndex.put(propName, options);
+            if (propIndex.put(propName, options) == -1 && chainedProps != null) {
+               // when we are combining two property lists, keep track of only the new ones so the order of properties
+               // in the list remains consistent just like we do elsewhere
+               if (newProps == null)
+                  newProps = new ArrayList<Object>(props.length);
+               newProps.add(propName);
+            }
          }
-         if (chainedProps != null)
-            propIndex.putAll(chainedProps.propIndex);
       }
       else if (chainedProps != null)
          propIndex = chainedProps.propIndex;
+
+      if (chainedProps != null) {
+         ArrayList<Object> allPropsList = new ArrayList<Object>(propIndex.size);
+         allPropsList.addAll(Arrays.asList(chainedProps.getSyncProperties()));
+         if (newProps != null)
+            allPropsList.addAll(newProps);
+         allProps = allPropsList.toArray(new Object[allPropsList.size()]);
+      }
+      else
+         allProps = classProps;
    }
 
    public boolean isSynced(String prop) {
@@ -93,11 +117,13 @@ public class SyncProperties {
    }
 
    public int getNumProperties() {
-      return (classProps == null ? 0 : classProps.length) + (chainedProps == null ? 0 : chainedProps.getNumProperties());
+      if (allProps == null)
+         return 0;
+      return allProps.length;
    }
 
    public Object[] getSyncProperties() {
-      return classProps;
+      return allProps;
    }
 
    public String getSyncGroup() {
@@ -137,5 +163,8 @@ public class SyncProperties {
       if (myProps == null)
          return;
       classProps = myProps.toArray(new Object[classProps.length]);
+      if (chainedProps != null) // TODO: this is used when building the SyncProperties at compile time which right now does not use chainedProps so we should be ok
+         System.err.println("*** Not merging in chainedProperties!");
+      allProps = classProps;
    }
 }

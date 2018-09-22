@@ -6,6 +6,7 @@ package sc.sync;
 
 import sc.bind.*;
 import sc.dyn.DynUtil;
+import sc.dyn.INameContext;
 import sc.dyn.RemoteResult;
 import sc.obj.*;
 import sc.type.CTypeUtil;
@@ -54,6 +55,8 @@ public class SyncManager {
    private static List<SyncManager> syncManagers = new ArrayList<SyncManager>();
 
    private static HashMap<Object, Class> syncHandlerRegistry = new HashMap<Object, Class>();
+
+   private static List<INameContext> frameworkNameContexts = null;
 
    /** Traces synchronization layers between client and server for understanding and debugging client/server issues */
    public static boolean trace = false;
@@ -417,6 +420,11 @@ public class SyncManager {
          }
       }
 
+      private boolean isFixedObject(Object refVal) {
+         InstInfo ii = getInstInfo(refVal);
+         return (ii != null && ii.fixedObject);
+      }
+
       public void addChangedValue(List<SyncLayer.SyncChange> depChanges, Object obj, String propName, Object val, String syncGroup, SyncLayer syncLayer) {
          SyncLayer changedLayer = syncLayer == null ? getChangedSyncLayer(syncGroup) : syncLayer;
          if (verboseValues || (verbose && !needsSync)) {
@@ -440,7 +448,7 @@ public class SyncManager {
                      Class valClass = val.getClass();
                      // TODO: we could find a faster way to do this logic, or switch it and only look for references which are being added to the stream since it's only 'forward references' we are trying to avoid here.
                      // we also could just support deserializing forward references
-                     if (PTypeUtil.isStringOrChar(valClass) || PTypeUtil.isPrimitive(valClass) || PTypeUtil.isANumber(valClass) || valClass == Boolean.class || valClass == Boolean.TYPE || DynUtil.isEnumConstant(val))
+                     if (PTypeUtil.isStringOrChar(valClass) || PTypeUtil.isPrimitive(valClass) || PTypeUtil.isANumber(valClass) || valClass == Boolean.class || valClass == Boolean.TYPE || DynUtil.isEnumConstant(val) || isFixedObject(val))
                         safeDepChange = true;
                   }
                }
@@ -2133,6 +2141,15 @@ public class SyncManager {
             */
             return inst;
          }
+         // Check framework specific name spaces - e.g. we want to lazily create tag objects from the server nodes created in the DOM space
+         if (frameworkNameContexts != null) {
+            for (INameContext resolver:frameworkNameContexts) {
+               inst = resolver.resolveName(name, create, true);
+               if (inst != null)
+                  return inst;
+            }
+            return null;
+         }
          return null;
       }
 
@@ -2241,6 +2258,16 @@ public class SyncManager {
 
    public static SyncProperties getSyncProperties(Object type, String destName) {
       SyncManager syncMgr = getSyncManager(destName);
+      if (syncMgr == null) {
+         if (destName == null) {
+            for (SyncManager mgr:syncManagers) {
+               SyncProperties sp = mgr.getSyncProperties(type);
+               if (sp != null && sp.destName == null)
+                  return sp;
+            }
+         }
+         throw new IllegalArgumentException("No sync properties registered for destination: " + destName + " for type: " + DynUtil.getTypeName(type, false));
+      }
       return syncMgr.getSyncProperties(type);
    }
 
@@ -2520,7 +2547,7 @@ public class SyncManager {
       if (scopeName == null)
          scopeName = DynUtil.getScopeName(inst);
       ScopeDefinition def = getScopeDefinitionByName(scopeName);
-      addSyncInstInternal(inst, onDemand, initDefault, def.scopeId, null, args);
+      addSyncInstInternal(inst, onDemand, initDefault, def.scopeId, props, args);
    }
 
    private static void addSyncInstInternal(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties props, Object...args) {
@@ -2531,7 +2558,7 @@ public class SyncManager {
       for (SyncManager syncMgr:syncManagers) {
          SyncProperties syncProps = props != null ? props : syncMgr.getSyncProperties(type);
          if (syncProps != null) {
-            syncMgr.addSyncInst(inst, onDemand, initDefault, scopeId, syncProps, args);
+            syncMgr.addSyncInstCtx(inst, onDemand, initDefault, scopeId, syncProps, args);
             found = true;
          }
       }
@@ -2592,6 +2619,8 @@ public class SyncManager {
          return null;
       }
       ScopeContext scopeCtx = scopeDef.getScopeContext(create);
+      if (scopeCtx == null)
+         return null;
       return getSyncContextFromScopeContext(scopeCtx, create);
    }
 
@@ -2630,7 +2659,7 @@ public class SyncManager {
 
    public final static String SC_SYNC_CONTEXT_SCOPE_KEY = "sc.SyncContext";
 
-   private void addSyncInst(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties syncProps, Object...args) {
+   private void addSyncInstCtx(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties syncProps, Object...args) {
       SyncContext ctx;
 
       ctx = getSyncContext(scopeId, true);
@@ -3159,22 +3188,23 @@ public class SyncManager {
    public static Object getSyncInst(String name) {
       SyncContext defaultCtx = getDefaultSyncContext();
       Object obj = defaultCtx.getObjectByName(name, true);
-      if (obj == null)
-         obj = DynUtil.resolveName(name, true, true);
       return obj;
    }
 
    /** Used from JS generated code */
    public static Object resolveSyncInst(String name) {
       Object obj = getSyncInst(name);
-      if (obj == null)
-         System.err.println("*** Unable to resolve syncInst: " + name);
+      if (obj == null) {
+         obj = DynUtil.resolveName(name, true, true);
+         if (obj == null)
+            System.err.println("*** Unable to resolve syncInst: " + name);
+      }
       return obj;
    }
 
    /** Used from JS generated code */
    public static Object resolveOrCreateSyncInst(String name, Object type, String sig, Object...args) {
-      Object inst = getSyncInst(name);
+      Object inst = resolveSyncInst(name);
       if (inst != null)
          return inst;
       inst = DynUtil.createInstance(type, sig, args);
@@ -3186,6 +3216,16 @@ public class SyncManager {
       if (!SyncHandler.class.isAssignableFrom(handlerClass))
          throw new IllegalArgumentException("Must provide a class which extends SyncHandler and has a constructor matching: (Object inst, SyncContext ctx)");
       syncHandlerRegistry.put(typeObj, handlerClass);
+   }
+
+   /**
+    * A hook point for frameworks to add their own name resolver for looking up sync objects.  For example, the JS runtime registers a resolver
+    * so the server can map directly to DOM elements in the browser namespace.
+    */
+   public static void addFrameworkNameContext(INameContext nameResolver) {
+      if (frameworkNameContexts == null)
+         frameworkNameContexts = new ArrayList<INameContext>();
+      frameworkNameContexts.add(nameResolver);
    }
 
    public static ScopeDefinition getScopeDefinitionByName(String scopeName) {

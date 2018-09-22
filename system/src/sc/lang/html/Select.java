@@ -6,13 +6,21 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.type.IBeanMapper;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+
 
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Select<RE> extends HTMLElement<RE> {
    private final static sc.type.IBeanMapper _selectedValueProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedValue");
    private final static sc.type.IBeanMapper _selectedIndexProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedIndex");
+   private final static TreeMap<String,IBeanMapper> selectServerTagProps = new TreeMap<String,IBeanMapper>();
+   static {
+      selectServerTagProps.put("selectedIndex", _selectedIndexProp);
+   }
    {
       tagName = "select";
    }
@@ -108,4 +116,11 @@ public class Select<RE> extends HTMLElement<RE> {
       outputEndTag(sb);
    }
 
+   public Map<String,IBeanMapper> getCustomServerTagProps() {
+      return selectServerTagProps;
+   }
+
+   public boolean isEventSource() {
+      return true;
+   }
 }

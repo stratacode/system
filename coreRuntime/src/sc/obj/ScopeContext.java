@@ -47,6 +47,8 @@ public abstract class ScopeContext {
 
    private boolean refreshPending = false;
 
+   private boolean destroyed = false;
+
    // Used for synchronizing the set/get of eventListener
    public final Object eventListenerLock = new Object();
 
@@ -57,6 +59,10 @@ public abstract class ScopeContext {
    public IScopeEventListener eventListener = null;
 
    public void scopeDestroyed() {
+      if (destroyed) {
+         return;
+      }
+      destroyed = true;
       if (destroyListener != null)
          destroyListener.scopeDestroyed(this);
       if (parentContexts != null) {
@@ -68,8 +74,11 @@ public abstract class ScopeContext {
       if (childContexts != null && childContexts.size() > 0) {
          ArrayList<ScopeContext> childrenToRemove = new ArrayList<ScopeContext>(childContexts);
          childContexts = null;
-         for (ScopeContext child:childrenToRemove)
+         // NOTE: because the child removes itself from the parent we end up double-destroying here but the 'destroyed' flag in the ScopeContext
+         // keeps us from doing the work twice.
+         for (ScopeContext child:childrenToRemove) {
             child.scopeDestroyed();
+         }
       }
    }
 
@@ -96,6 +105,10 @@ public abstract class ScopeContext {
 
    /** Should be called to initialize the parent/child scopeContexts */
    public void init() {
+      if (destroyed) {
+         System.err.println("*** Reinitializing destroyed scope context");
+         destroyed = false;
+      }
       ScopeDefinition def = getScopeDefinition();
       if (def != null) {
          List<ScopeDefinition> parScopeDefs = def.getParentScopes();

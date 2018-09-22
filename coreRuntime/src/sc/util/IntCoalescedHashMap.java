@@ -20,6 +20,7 @@ import java.io.Serializable;
 public class IntCoalescedHashMap implements Cloneable, Serializable {
    Object [] keyTable;
    int [] valueTable;
+   public int size;
 
    public IntCoalescedHashMap(int size) {
       if (size == 0)
@@ -69,30 +70,26 @@ public class IntCoalescedHashMap implements Cloneable, Serializable {
       int len = keyTable.length;
       int h = Math.abs(key.hashCode()) % len;
 
-      if (keyTable[h] == null)
-      {
+      if (keyTable[h] == null) {
          keyTable[h] = key;
          valueTable[h] = value;
+         size++;
          return -1;
       }
-      else if (keyTable[h].equals(key))
-      {
+      else if (keyTable[h].equals(key)) {
          int oldVal = valueTable[h];
          valueTable[h] = value;
          return oldVal;
       }
-      else
-      {
-         for (int i = 0; i < len; i++)
-         {
-            if (keyTable[i] == null)
-            {
+      else {
+         for (int i = 0; i < len; i++) {
+            if (keyTable[i] == null) {
                keyTable[i] = key;
                valueTable[i] = value;
+               size++;
                return -1;
             }
-            else if (keyTable[i].equals(key))
-            {
+            else if (keyTable[i].equals(key)) {
                int oldVal = valueTable[i];
                valueTable[i] = value;
                return oldVal;
@@ -118,8 +115,7 @@ public class IntCoalescedHashMap implements Cloneable, Serializable {
       init(newLen);
 
       // Re-add all of the items to the new table.
-      for (int i = 0; i < oldLen; i++)
-      {
+      for (int i = 0; i < oldLen; i++) {
          if (oldKeyTable[i] != null)
             put(oldKeyTable[i], oldValueTable[i]);
       }

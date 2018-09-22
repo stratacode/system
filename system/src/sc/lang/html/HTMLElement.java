@@ -11,6 +11,7 @@ import sc.obj.SyncMode;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 
+import java.util.HashMap;
 import java.util.HashSet;
 
 /** The base class for all HTML elements.
@@ -46,6 +47,21 @@ public class HTMLElement<E> extends Element<E> {
    public final static sc.type.IBeanMapper _keyUpEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "keyUpEvent");
    public final static sc.type.IBeanMapper _focusEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "focusEvent");
    public final static sc.type.IBeanMapper _blurEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "blurEvent");
+
+   static HashMap<String,IBeanMapper> domAttributes = new HashMap<String,IBeanMapper>();
+   {
+      domAttributes.put("clickEvent", HTMLElement._clickEventProp);
+      domAttributes.put("dblClickEvent", HTMLElement._dblClickEventProp);
+      domAttributes.put("mouseDownEvent", HTMLElement._mouseDownEventProp);
+      domAttributes.put("mouseOutEvent", HTMLElement._mouseOutEventProp);
+      domAttributes.put("mouseUpEvent", HTMLElement._mouseUpEventProp);
+      domAttributes.put("keyDownEvent", HTMLElement._keyDownEventProp);
+      domAttributes.put("keyPressEvent", HTMLElement._keyPressEventProp);
+      domAttributes.put("keyUpEvent", HTMLElement._keyUpEventProp);
+      domAttributes.put("focusEvent", HTMLElement._focusEventProp);
+      domAttributes.put("blurEvent", HTMLElement._blurEventProp);
+   }
+
 
    public HTMLElement() {
    }

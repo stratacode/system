@@ -9648,6 +9648,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Object parseSrcBuffer(SrcEntry srcEnt, boolean enablePartialValues, String buffer, boolean dummy) {
       long modTimeStart = srcEnt.getLastModified();
       IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
+      if (processor == null && srcEnt.layer != null && !srcEnt.layer.isStarted()) {
+         // For the sctjs extension, we need to start the layer before the processor is registered
+         srcEnt.layer.ensureStarted(false);
+         processor = getFileProcessorForSrcEnt(srcEnt, null, false);
+      }
       if (processor instanceof Language) {
          Language lang = (Language) processor;
          Object result = lang.parseString(srcEnt.absFileName, buffer, enablePartialValues);
