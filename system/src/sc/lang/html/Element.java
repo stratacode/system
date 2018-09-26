@@ -58,7 +58,9 @@ import java.util.*;
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
 @ResultSuffix("html")
 public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
+   // Set to true for trace and/or verbose messages - great for debugging problems with schtml
    public static boolean trace = false, verbose = false;
+   private final static sc.type.IBeanMapper _startTagTxtProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "startTagTxt");
    private final static sc.type.IBeanMapper _innerHTMLProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "innerHTML");
 
    /** When a tag is invisible, instead of rendering the tag, we render the 'alt' child if there is one */
@@ -2709,6 +2711,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             // TODO: make these parameters configurable - e.g. request and response?  Or just as a RequestContext method we can customize for different frameworks
             outputStartMethod.setProperty("parameters", template.getDefaultOutputParameters());
             outputStartMethod.initBody();
+            SemanticNodeList<Expression> trueArgs = new SemanticNodeList<Expression>(1);
+            trueArgs.add(BooleanLiteral.create(true));
+            outputStartMethod.addBodyStatementAt(0, IdentifierExpression.createMethodCall(trueArgs, "markStartTagValid"));
             outputStartMethod.fromStatement = this;
             String preTagStr;
             if (preTagContent == null) {
@@ -3325,6 +3330,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       if (anyChanges)
          repeatTagsChanged();
+
+      markBodyValid(true);
    }
 
    // These methods are implemented for JS where they update the DOM.
@@ -3427,6 +3434,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       bodyTxtValid = val;
    }
 
+   public void markStartTagValid(boolean val) {
+      startTagValid = val;
+   }
+
    public void outputEndTag(StringBuilder sb) {
       sb.append("</");
       sb.append(lowerTagName());
@@ -3447,6 +3458,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // TODO: do we need this?  It's used now for transporting the HTML generated on the server to the client
       throw new UnsupportedOperationException();
    }
+
+   /** Returns the current contents of the startTagTxt, composed of the tag name and attributes - e.g. <input id="foo"> */
+   public String getStartTagTxt() {
+      StringBuilder out = new StringBuilder();
+      outputStartTag(out);
+      return out.toString();
+   }
+
+   public void setStartTagTxt(String newStartTxt) {
+      // TODO: like setInnerHTML - do we need this on the server?
+      throw new UnsupportedOperationException();
+   }
+
 
    public void setTextContent(String tc) {
       if (tc == null)
@@ -3700,9 +3724,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (tagObject != null)
             return tagObject.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
 
+         Object repeatMember = findMember("repeatVar", mtype, fromChild, refType, ctx, skipIfaces);
+         if (repeatMember != null) {
+            Object repeatElemType = getRepeatElementType();
+            FieldDefinition repeatVarField = FieldDefinition.create(getLayeredSystem(), repeatElemType, repeatVar);
+            repeatVarField.parentNode = this;
+            ParseUtil.initAndStartComponent(repeatVarField);
+            return repeatVarField.variableDefinitions.get(0);
+         }
          // Unless we can implement the "RE" (repeat element type-parameter) scheme this won't preserve the type.  It's only for the non-tag object case though
          // so not sure it's important.   Maybe we could just create a ParamTypedMember here and return that if so?
-         return findMember("repeatVar", mtype, fromChild, refType, ctx, skipIfaces);
+         return repeatMember;
       }
 
       Object o = definesMember(name, mtype, refType, ctx, skipIfaces, false);
@@ -4208,38 +4240,43 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag) {
       if (defaultServerTag || serverTag) {
-         ServerTag serverTag = getServerTagInfo();
+
          String tagId = getId();
-         if (tagId == null)
-            System.err.println("*** null id for server tag");
-         if (serverTag != null) {
-            // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
-            if (serverTag.eventSource) {
-               if (serverTags == null)
-                  serverTags = new LinkedHashMap<String,ServerTag>();
+         if (tagId != null) {
+            ServerTag serverTag = getServerTagInfo();
+            if (serverTag != null) {
+               // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
+               if (serverTag.eventSource) {
+                  if (serverTags == null)
+                     serverTags = new LinkedHashMap<String,ServerTag>();
 
-               serverTags.put(tagId, serverTag);
-            }
+                  serverTags.put(tagId, serverTag);
+               }
 
-            if (scopeDef != null) {
-               ScopeContext scopeCtx = scopeDef.getScopeContext(true);
-               if (scopeCtx != null) {
-                  Object oldValue = scopeCtx.getValue(tagId);
-                  if (oldValue != null) {
-                     if (oldValue != this) {
-                        System.err.println("*** Conflicting value for tag id: " + tagId + " in scope: " + scopeDef.name);
+               if (scopeDef != null) {
+                  ScopeContext scopeCtx = scopeDef.getScopeContext(true);
+                  if (scopeCtx != null) {
+                     Object oldValue = scopeCtx.getValue(tagId);
+                     if (oldValue != null) {
+                        if (oldValue != this) {
+                           System.err.println("*** Conflicting value for tag id: " + tagId + " in scope: " + scopeDef.name);
+                        }
                      }
-                  }
-                  else {
-                     scopeCtx.setValue(tagId, this);
-                     // Register this with the sync system so we can apply changes made on the client and detect changes
-                     // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
-                     // and those should be unique cause they are already a global name space used by this page.
-                     // TODO: if we have name conflicts, we could pass the DOM element id in the ServerTagInfo as well as the object name
-                     SyncManager.registerSyncInst(this, tagId, scopeDef.scopeId, true);
+                     else {
+                        scopeCtx.setValue(tagId, this);
+                        // Register this with the sync system so we can apply changes made on the client and detect changes
+                        // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
+                        // and those should be unique cause they are already a global name space used by this page.
+                        // TODO: if we have name conflicts, we could pass the DOM element id in the ServerTagInfo as well as the object name
+                        SyncManager.registerSyncInst(this, tagId, scopeDef.scopeId, true);
+                     }
                   }
                }
             }
+         }
+         else {
+            if (!(this instanceof IRepeatWrapper))
+               System.out.println("*** null id for repeat tag");
          }
          defaultServerTag = true;
       }
@@ -4266,7 +4303,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void fireChangedTagEvents() {
-      if (!bodyTxtValid) // Here we'll just fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
+      if (!startTagValid) // some attribute or other contents of the start tag for this tag object changed - so fire this change event.  The value is retrieved with getStartTagTxt()
+         Bind.sendEvent(IListener.VALUE_CHANGED, this, _startTagTxtProp);
+      if (!bodyTxtValid) // Some part of our body txt has changed so fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
          Bind.sendEvent(IListener.VALUE_CHANGED, this, _innerHTMLProp);
 
       if (bodyValid)
@@ -4284,11 +4323,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    /** Can be called at startup for any components that will use synchronization with tag objects */
    public static void initSync() {
-      // By default, we'll synchronize any body content this tag has in a read-only way.  When it changes, there's a change event for innerHTML
-      // and getInnerHTML() generates the new contents.  We send over specific DOM attributes as well for each type but maybe for server tags we
-      // synchronize attribute value changes by sending over the parent tag's body instead of trying to patch in a specific attribute change?
       SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[] {"type", "timeStamp", "currentTag"}, 0));
-      SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{"innerHTML", "style", "class"}, 0));
+      // By default, we'll synchronize any body content this tag has in a read-only way.  When it changes, there's a change event for innerHTML
+      // and getInnerHTML() generates the new contents.  Same idea with startTagTxt for attribute changes.
+      // Specific DOM type subclasses (e.g. input) have custom attributes that are sync'd for server tags we
+      SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{"startTagTxt", "innerHTML", "style", "class"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));

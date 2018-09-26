@@ -89,7 +89,7 @@ public class SyncLayer {
 
    private static class SyncPropChange extends SyncChange {
       String prop;
-      Object val;;
+      Object val;
 
       SyncPropChange(Object obj, String p, Object val, boolean remote) {
          super(obj);
