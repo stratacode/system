@@ -436,8 +436,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return fromJSLib.hashCode() + 3 * toJSLib.hashCode();
       }
 
+      public String getDetail() {
+         return " (" + (fromType != null ? ModelUtil.getTypeName(fromType) : "") + " " + relation + " " + (toType == null ? "" : ModelUtil.getTypeName(toType)) + ")";
+      }
+
       public String toString() {
-         return "\n   " + fromJSLib + " -> " + toJSLib + " (" + (fromType != null ? ModelUtil.getTypeName(fromType) : "") + " " + relation + " " + (toType == null ? "" : ModelUtil.getTypeName(toType)) + ")";
+         return "\n   " + fromJSLib + " -> " + toJSLib + getDetail();
       }
    }
 
@@ -921,7 +925,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
     * This walks through the dependency graph and adds all of the libraries to the list.  This is done during "start" because
     * we expose this list to templates which need to have it set before the "transform" phase.
     */
-   void addTypeLibsToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, BodyTypeDeclaration parentType, String relation) {
+   void addTypeLibsToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Object parentType, String relation) {
       type = (BodyTypeDeclaration) resolveBaseType(type);
 
       JavaModel javaModel = type.getJavaModel();
@@ -990,13 +994,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          // Unless this is a final type, it could be modified layer on, without us restarting the parent types.  We
          // record these dependencies to be sure they get updated later on.
-         if (!type.isFinalLayerType() && parentType != null) {
+         if (!type.isFinalLayerType() && parentType instanceof BodyTypeDeclaration) {
             ArrayList<BodyTypeDeclaration> prevDeps = jti.prevDepTypes;
             if (prevDeps == null) {
                prevDeps = new ArrayList<BodyTypeDeclaration>();
                jti.prevDepTypes = prevDeps;
             }
-            prevDeps.add(parentType);
+            prevDeps.add((BodyTypeDeclaration) parentType);
          }
 
          typesInFile.put(jsEnt, Boolean.FALSE);
@@ -1224,11 +1228,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          ParseUtil.initComponent(depTD);
          ParseUtil.startComponent(depTD);
 
-         // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
          if (type instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration typeTD = (BodyTypeDeclaration) type;
+            // If depTD extends type, do not add it here.  Instead, we need to add type before depTD in this case
             if (!typeTD.isAssignableFrom(depTD, false) && !ModelUtil.isOuterType(typeTD.getEnclosingType(), depTD))
                addTypeLibsToFile(depTD, typesInFile, typeLibFile, typeTD, "uses");
+         }
+         // TODO: this is the same as the if statement
+         else {
+            if (!ModelUtil.isAssignableFrom(type, depTD, false, null, depTD.getLayeredSystem()) && !ModelUtil.isOuterType(ModelUtil.getEnclosingType(type), depTD))
+               addTypeLibsToFile(depTD, typesInFile, typeLibFile, type, "uses");
          }
       }
    }
@@ -2339,7 +2348,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             String nextFile = jsBuildInfo.jsFiles.get(df);
             if (hasDependency(thisFile, nextFile)) {
                if (hasDependency(nextFile, thisFile)) {
-                  System.err.println("*** Warning conflicting dependency between javascript libraries: " + thisFile + " and: " + nextFile + " with dependencies: " + jsBuildInfo.typeDeps);
+                  System.err.println("*** Warning cyclic dependency between javascript libraries - may cause startup errors between: " + thisFile + " and: " + nextFile + " with details: " + getDepsDetails(thisFile, nextFile, jsBuildInfo.typeDeps));
                   break;
                }
                else {
@@ -2365,6 +2374,75 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       // This is a placeholder we need to store dependencies to the default file.  Once we've sorted them, we can remove this one.
       jsBuildInfo.jsFiles.remove(defaultLib);
+   }
+
+   private String getDepsDetails(String thisFile, String nextFile, HashSet<JSFileDep> typeDeps) {
+      StringBuilder thisFromDeps = new StringBuilder();
+      StringBuilder thisToDeps = new StringBuilder();
+      StringBuilder nextFromDeps = new StringBuilder();
+      StringBuilder nextToDeps = new StringBuilder();
+      boolean directFrom = false, directTo = false;
+      String directDetailFrom = null, directDetailTo = null;
+      for (JSFileDep fd:typeDeps) {
+         if (fd.fromJSLib.equals(thisFile) && fd.toJSLib.equals(nextFile)) {
+            directFrom = true;
+            if (directDetailFrom == null)
+               directDetailFrom = fd.getDetail();
+         }
+         if (fd.toJSLib.equals(thisFile) && fd.fromJSLib.equals(nextFile)) {
+            directTo = true;
+            if (directDetailTo == null)
+               directDetailTo = fd.getDetail();
+         }
+         if (fd.fromJSLib.equals(thisFile)) {
+            if (thisToDeps.length() > 0)
+               thisToDeps.append(", ");
+            thisToDeps.append(fd.toJSLib);
+         }
+         if (fd.toJSLib.equals(thisFile)) {
+            if (thisFromDeps.length() > 0)
+               thisFromDeps.append(", ");
+            thisFromDeps.append(fd.fromJSLib);
+         }
+         if (fd.fromJSLib.equals(nextFile)) {
+            if (nextToDeps.length() > 0)
+               nextToDeps.append(", ");
+            nextToDeps.append(fd.toJSLib);
+         }
+         if (fd.toJSLib.equals(nextFile)) {
+            if (nextFromDeps.length() > 0)
+               nextFromDeps.append(", ");
+            nextFromDeps.append(fd.fromJSLib);
+         }
+      }
+      StringBuilder res = new StringBuilder();
+      res.append("\n   --- ");
+      res.append(thisFile);
+      if (directFrom)
+         res.append(" uses " + nextFile + (directDetailFrom == null ? "" : directDetailFrom));
+      else if (!directTo) {
+         res.append(" depends on ");
+         res.append(thisToDeps);
+      }
+      if (directTo)
+         res.append(" that it's also used by" + (directDetailTo == null ? "" : directDetailTo));
+      else if (!directFrom) {
+         res.append(" is used by ");
+         res.append(thisFromDeps);
+      }
+      if (!directTo && !directFrom) {
+         res.append("\n   --- ");
+         res.append(nextFile);
+         res.append(" depends on ");
+         res.append(nextToDeps);
+         res.append(" is used by ");
+         res.append(nextFromDeps);
+      }
+      if (getLayeredSystem().options.sysDetails) {
+         res.append(" all dependencies: " + typeDeps);
+      }
+      // TODO: we could add 1st, 2nd level dependency checks here to find the chain that is causing it
+      return res.toString();
    }
 
    String getJSFilesRange(int from, int to) {

@@ -506,7 +506,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          return ((IDynObject) inst).invoke(methodName, paramSig, args);
       else {
          Method meth = RTypeUtil.getMethodFromTypeSignature(inst.getClass(), methodName, paramSig);
-         return TypeUtil.invokeMethod(inst, meth, args);
+         return PTypeUtil.invokeMethod(inst, meth, args);
       }
    }
 

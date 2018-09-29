@@ -1468,12 +1468,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   public void findChangedTags() {
-      if (bodyValid)
-         return;
-
-   }
-
    public Element getDerivedElement() {
       if (modifyType != null && modifyType instanceof TypeDeclaration) {
          TypeDeclaration modifyTD = (TypeDeclaration) modifyType;

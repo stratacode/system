@@ -9,7 +9,7 @@ import java.util.ArrayList;
  * page a given tag lives.  This is more flexible than just using the tag object hierarchy because it can include
  * nodes dynamically generated in code, as long as we know the parent tag element and start the tag.
  */
-@JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
+@JSSettings(jsModuleFile="js/schtml.js", prefixAlias="sc_")
 public class ServerTag {
 
    /** The value of the id attribute for the tag */

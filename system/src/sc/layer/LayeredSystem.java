@@ -4465,7 +4465,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (options.info)
                System.out.println("Running compiled main for class: " + runClass + "(" + StringUtil.arrayToString(args) + ")");
             runClassStarted = true;
-            TypeUtil.invokeMethod(null, meth, args);
+            PTypeUtil.invokeMethod(null, meth, args);
          }
       }
       return null;
@@ -4507,7 +4507,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (options.info)
                System.out.println("Running compiled main stopMethod for class: " + runClass + "." + stopMethod + "()");
             runClassStarted = true;
-            TypeUtil.invokeMethod(null, meth, args);
+            PTypeUtil.invokeMethod(null, meth, args);
          }
       }
       return null;

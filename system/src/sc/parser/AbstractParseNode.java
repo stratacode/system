@@ -10,10 +10,12 @@ import java.util.List;
 
 public abstract class AbstractParseNode implements IParseNode, Cloneable {
    int startIndex = -1;
-   /** Set during the reparse process as a node is moved from the old to the new tree.  TODO: we could eliminate this perhaps by copying the parse-node tree? */
+   /** Set during the reparse process as a node is moved from the old to the new tree.  TODO: performance - there are a lot of parse-nodes.  we could eliminate this perhaps by copying the parse-node tree or different classes used for when we need it */
    int newStartIndex = -1;
    /** Set to true for any parse-nodes which are generated as part of an error state */
-   boolean errorNode = false;
+   boolean errorNode = false; // TODO: performance use a bit in 'startIndex' or use a 'long' to store parselet-id (15), startIndex (32), newStartIndexOffset(15), errorNode(1), and generated(1) flag in ParentParseNode using bitfields
+   // Before apn: (java 16) + 4 + 4 + 4  +ppn: 8 + 8 + 8 + 4 = 52  +pn: 8 + 8 + 8 = 48 = 100
+   // after  apn: (16) + 8 ppn: 8 + 8 = 40  pn: 8 + 8 = 40  = 80
 
    public void setParselet(Parselet p) {}
 

@@ -231,7 +231,7 @@ public class DynUtil {
          return ((IMethodMapper) method).invoke(obj, paramValues);
       }
       else
-        return TypeUtil.invokeMethod(obj, method, paramValues);
+        return PTypeUtil.invokeMethod(obj, method, paramValues);
    }
 
    // TODO: Should this api itself be pluggable so we can use other RPC frameworks with data binding?  Or perhaps just make the sync framework itself pluggable for other RPC frameworks?

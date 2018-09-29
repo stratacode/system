@@ -2755,7 +2755,7 @@ public class ModelUtil {
          if (annotation instanceof IAnnotation)
             val = ((IAnnotation) annotation).getAnnotationValue(s);
          else if (annotation instanceof java.lang.annotation.Annotation)
-            val = TypeUtil.invokeMethod(annotation, RTypeUtil.getMethod(annotation.getClass(), s), (Object[]) null);
+            val = PTypeUtil.invokeMethod(annotation, RTypeUtil.getMethod(annotation.getClass(), s), (Object[]) null);
          else
             throw new UnsupportedOperationException();
          if (val != null)
@@ -2768,7 +2768,7 @@ public class ModelUtil {
       if (annotation instanceof IAnnotation)
          return ((IAnnotation) annotation).getAnnotationValue(s);
       else if (annotation instanceof java.lang.annotation.Annotation)
-         return TypeUtil.invokeMethod(annotation, RTypeUtil.getMethod(annotation.getClass(), s), (Object[])null);
+         return PTypeUtil.invokeMethod(annotation, RTypeUtil.getMethod(annotation.getClass(), s), (Object[])null);
       throw new UnsupportedOperationException();
    }
 
@@ -3679,7 +3679,7 @@ public class ModelUtil {
                continue;
             AnnotationValue av = new AnnotationValue();
             av.identifier = name;
-            av.elementValue = TypeUtil.invokeMethod(lannot, annotValues[i], (Object[])null);
+            av.elementValue = PTypeUtil.invokeMethod(lannot, annotValues[i], (Object[])null);
             values.add(av);
          }
          return values;
@@ -3695,10 +3695,10 @@ public class ModelUtil {
          Class cl = lannot.getClass();
          Method[] annotValues = cl.getMethods();
          if (annotValues.length != 1) {
-            return TypeUtil.invokeMethod(lannot, TypeUtil.resolveMethod(cl, "value", null), (Object[])null);
+            return PTypeUtil.invokeMethod(lannot, TypeUtil.resolveMethod(cl, "value", null), (Object[])null);
          }
 
-         return TypeUtil.invokeMethod(lannot, annotValues[0], (Object[])null);
+         return PTypeUtil.invokeMethod(lannot, annotValues[0], (Object[])null);
       }
    }
 
@@ -3821,7 +3821,7 @@ public class ModelUtil {
    public static Object callMethod(Object thisObj, Object method, Object...argValues) {
       if (method instanceof Method) {
          Method jMethod = (Method) method;
-         return TypeUtil.invokeMethod(thisObj, jMethod, argValues);
+         return PTypeUtil.invokeMethod(thisObj, jMethod, argValues);
       }
       else if (method instanceof AbstractMethodDefinition) {
          return ((AbstractMethodDefinition) method).callVirtual(thisObj, argValues);
@@ -3854,7 +3854,7 @@ public class ModelUtil {
       // Compiled
       if (method instanceof Method) {
          Method jMethod = (Method) method;
-         return TypeUtil.invokeMethod(thisObject, jMethod, argValues);
+         return PTypeUtil.invokeMethod(thisObject, jMethod, argValues);
       }
       // Interpreted
       else if (method instanceof AbstractMethodDefinition) {
@@ -3925,7 +3925,7 @@ public class ModelUtil {
          if (repeatArgs && argValues.length > 0) {
             argValues = convertArgsForRepeating(jMethod, pmeth, arguments, argValues);
          }
-         return TypeUtil.invokeMethod(thisObject, jMethod, argValues);
+         return PTypeUtil.invokeMethod(thisObject, jMethod, argValues);
       }
       // Interpreted
       else if (method instanceof AbstractMethodDefinition) {
@@ -8649,11 +8649,11 @@ public class ModelUtil {
       return false;
    }
 
-   public static boolean isOuterType(TypeDeclaration enclosingType, Object currentType) {
+   public static boolean isOuterType(Object enclosingType, Object currentType) {
       while (enclosingType != null) {
          if (ModelUtil.sameTypes(enclosingType, currentType))
             return true;
-         enclosingType = enclosingType.getEnclosingType();
+         enclosingType = ModelUtil.getEnclosingType(enclosingType);
       }
       return false;
    }

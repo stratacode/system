@@ -997,7 +997,7 @@ public class PTypeUtil {
    public static Object getValueFromAnnotation(Object annotation, String annotValue) {
       if (annotation instanceof Annotation) {
          Method method = RTypeUtil.getMethod(annotation.getClass(), annotValue);
-         return TypeUtil.invokeMethod(annotation, method, (Object[]) null);
+         return PTypeUtil.invokeMethod(annotation, method, (Object[]) null);
       }
       else
          throw new IllegalArgumentException("Invalid arg to getValueFromAnnotation");

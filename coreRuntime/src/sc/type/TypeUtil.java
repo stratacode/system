@@ -317,10 +317,6 @@ public class TypeUtil  {
          return PTypeUtil.getProperty(parent, mapping);
    }
 
-   public static Object invokeMethod(Object thisObject, Object method, Object... argValues) {
-      return PTypeUtil.invokeMethod(thisObject, method, argValues);
-   }
-
    public static IBeanMapper resolveObjectPropertyMapping(Object dstObj, String dstPropName) {
       IBeanMapper map;
       if (!(dstObj instanceof Class)) {

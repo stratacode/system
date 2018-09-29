@@ -1048,7 +1048,7 @@ public class RTypeUtil {
    }
 
    public static Object getAnnotationValue(java.lang.annotation.Annotation annotation, String annotName) {
-      return TypeUtil.invokeMethod(annotation, getMethod(annotation.getClass(), annotName), (Object[])null);
+      return PTypeUtil.invokeMethod(annotation, getMethod(annotation.getClass(), annotName), (Object[])null);
    }
 
    public static Class findCommonSuperClass(Class c1, Class c2) {
