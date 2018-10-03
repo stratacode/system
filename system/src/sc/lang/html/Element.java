@@ -4446,6 +4446,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void fireChangedTagEvents(boolean parentBodyChanged) {
+      // TODO: this syncMode stuff here was a previous attempt to fix the bug for nested tag content.  The problem was that
+      // when we validate the parent we would update the cached state of the children so there was no way to detect the child change
+      // events.  Move that logic to the 'outputTag' method where we see a change in the text.
       SyncManager.SyncState oldSyncState = null;
       boolean setSyncModeToPrev = false;
       if (!startTagValid) // some attribute or other contents of the start tag for this tag object changed - so fire this change event.  The value is retrieved with getStartTagTxt()
