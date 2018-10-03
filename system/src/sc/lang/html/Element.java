@@ -3429,10 +3429,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       DynUtil.execLaterJobs();
 
       Object repeatVal = getCurrentRepeatVal();
+      boolean isRepeatTag = repeatVal != null || this instanceof IRepeatWrapper;
+
       boolean cacheEnabled = isCacheEnabled();
       if (!cacheEnabled) {
          // Just re-render all tags all of the time when cache is not enabled
-         if (repeatVal != null) {
+         if (isRepeatTag) {
             outputRepeatBody(repeatVal, sb);
          }
          else {
@@ -3442,7 +3444,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
       else {
-         if (repeatVal != null) {
+         if (isRepeatTag) {
             if (serverTag)
                outputRepeatTagMarker(sb);
             if (!bodyValid) {
@@ -3505,6 +3507,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private void callOutputStartTag(StringBuilder sb) {
+      if (this instanceof IRepeatWrapper)
+         return; // No start tag for repeat wrapper
       if (dynObj == null)
          outputStartTag(sb);
       else
@@ -3519,6 +3523,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private void callOutputEndTag(StringBuilder sb) {
+      if (this instanceof IRepeatWrapper)
+         return;
       if (dynObj == null)
          outputEndTag(sb);
       else
