@@ -67,15 +67,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private final static String ALT_ID = "alt";
    private final static Element[] EMPTY_ELEMENT_ARRAY = new Element[]{};
 
+   // These are the properties of the Element which are populated from the HTMLLanguage - i.e. the 'non-transient' properties
    public String tagName;
    public SemanticNodeList<Attr> attributeList;
    public SemanticNodeList<Object> children;
-   public transient SemanticNodeList<Object> hiddenChildren;
-   public transient SemanticNodeList<Attr> inheritedAttributes;
   // Set to true from the parser if this tag has a close symbol in the open tag
    public Boolean selfClose;
    // Should always match tagName via toLowerCase.  TODO: For the grammar, we should only need to store a boolean as to whether there's a close tag or not.  But we also need a read-only "closeTagName" property for generation and not sure how to specify that.  I suppose using different rules for generation than for parsing?
    public String closeTagName;
+
+   public transient SemanticNodeList<Object> hiddenChildren;
+   public transient SemanticNodeList<Attr> inheritedAttributes;
 
    private transient String id;
 
@@ -96,6 +98,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * These flags indicate if the current rendered version is known to be stale for each of these two phases
     */
    public transient boolean startTagValid = false, bodyValid = false;
+   public transient String startTagCache, bodyCache;
+
+   public transient CacheMode cache;
 
    /**
     * Like bodyValid but applies only to changes made to the static text chunks.  When a child tag's bodyTxt changes,
@@ -112,26 +117,29 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private transient Object defaultExtendsType = null;
 
    /** When processing a template once we hit a parent node whose type is not available in this mode, we insert a dummy node and only process static portsion of the template until some tag sets exec="process" to turn back on processing */
-   public boolean staticContentOnly = false;
+   public transient boolean staticContentOnly = false;
 
-   private Object repeat;
+   private transient Object repeat;
 
-   private boolean visible = true;
+   /** When we have a repeat value, this listener */
+   private transient RepeatListener repeatListener = null;
 
-   private Element[] invisTags = null;
+   private transient boolean visible = true;
+
+   private transient Element[] invisTags = null;
 
    // This property is set for the client version of the tag objects on tags whose content is defined on the server, not dynamically by running the Javascript code on the client.
    // This property is not the same as setting exec="server" which indicates that the tag object itself should not be included in the client version at all.
    // It makes sense to set serverContent=true when you want that content to be included in the static HTML file for the client-only version.
    // For example, you'd set serverContent on tags which generate the script tags to include javascript.
-   public boolean serverContent = false;
+   public transient boolean serverContent = false;
 
    /** Set to true in the runtime version of the tag object for tags which are to be run on the server only */
-   public boolean serverTag = false;
+   public transient boolean serverTag = false;
 
-   public boolean needsRefresh = false;
+   public transient boolean needsRefresh = false;
 
-   private String cachedObjectName = null;
+   private transient String cachedObjectName = null;
 
    public final static boolean nestedTagsInStatements = false;
 
@@ -160,6 +168,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     */
     public void setRepeat(Object rv) {
       repeat = rv;
+      if (rv != null) {
+         if (repeatListener == null) {
+            repeatListener = new RepeatListener(this);
+            // TODO: need to use VALUE_CHANGED rather than just INVALIDATED because we do not propagate the 'invalidate' event across bindings otherwise.  I'm not sure this is right!  An example is when we try to add a 'todo' to the TodoList sample with the repeat := todos binding.
+            Bind.addListener(this, "repeat", repeatListener, IListener.VALUE_CHANGED);
+         }
+      }
       Bind.sendChangedEvent(this, "repeat");
    }
 
@@ -498,7 +513,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (templLayer != null && templLayer.annotationLayer)
          return false;
 
-      boolean needsObject = getElementId() != null || getAttribute("extends") != null || getAttribute("tagMerge") != null || getDynamicAttribute() != null || isRepeatElement();
+      boolean needsObject = getElementId() != null || getAttribute("extends") != null || getAttribute("tagMerge") != null || getDynamicAttribute() != null || isRepeatElement() || getAttribute("cache") != null;
 
       // When not part of a top-level tag, we currently can't define the object structure.  We'll have to treat this case as elements having no state - just do normal string processing on the templates and print an error
       // if any features are used that are not compatible with that behavior.  To support normal tag objects here, we could use inner types which are created, output and then destroyed
@@ -848,7 +863,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             ParseUtil.initComponent(templ);
          }
          // Eliminate redundant setId calls in the generated code.  Look for the first tag in our hierarchy which specified the id
-         // If it matches, return it.  This is particular important now because unique elements like head, body need to have a fixed id so if you
+         // If it matches, return it.  This is particularly important now because unique elements like head, body need to have a fixed id so if you
          // allocate two of them with the same tag name, you end up with the wrong id.
          if (cur != null && cur.specifiedId) {
             elemId = cur.tagObject.typeName;
@@ -2057,8 +2072,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return null;
    }
 
-   public boolean getNoCache() {
-      return getBooleanAttribute("noCache");
+   public boolean getStateless() {
+      return getBooleanAttribute("stateless");
    }
 
    public void _updateInst() {
@@ -2543,8 +2558,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
          // switching back to a client tag from within a server tag, but not sure that use case makes sense anyway.  We could add 'clientTag'
          // to switch it back in that case rather than having to set this on every inner tag object.
-         if (parentTag == null || !parentTag.serverTag)
-            idIx = addSetServerAtt(tagType, idIx, "serverTag");
+         if (parentTag == null || !parentTag.serverTag) {
+            idIx = addSetServerAtt(repeatWrapper != null ? repeatWrapper : tagType, idIx, "serverTag");
+         }
       }
 
       List<Object> implTypes = getTagImplementsTypes();
@@ -2578,6 +2594,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // Needs to be after the setParent call.
          addTagTypeBodyStatement(tagType, PropertyAssignment.create("id", IdentifierExpression.createMethodCall(args, "allocUniqueId"), "="));
          specifiedId = true;
+      }
+      if (repeatWrapper != null) {
+         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+         args.add(StringLiteral.create(repeatWrapper.typeName));
+         if (getNeedsClientServerSpecificId())
+            args.add(BooleanLiteral.create(true));
+         // Needs to be after the setParent call.
+         addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("id", IdentifierExpression.createMethodCall(args, "allocUniqueId"), "="));
       }
       if (tagName != null) {
          // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
@@ -2649,6 +2673,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                       }
                       else
                          tagType.addBodyStatementIndent(pa);
+
+                      // The serverTag property needs to be set on both the repeat inner tag class and the wrapper
+                      if (repeatWrapper != null && att.name.equals("serverTag")) {
+                         PropertyAssignment npa = pa.deepCopy(ISemanticNode.CopyParseNode, null);
+                         npa.fromAttribute = att;
+                         repeatWrapper.addBodyStatementIndent(npa);
+                      }
+
                       // If we're tracking changes for the page content
                       if (template.statefulPage && !isReadOnlyAttribute(att.name) && isHtmlAttribute(att.name) && !hasInvalidateBinding(att.name) && !isRefreshAttribute(att.name)) {
                          IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidateStartTag");
@@ -3026,7 +3058,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("addBefore");
       behaviorAttributes.add("addAfter");
       behaviorAttributes.add("orderValue");
-      behaviorAttributes.add("noCache");
+      behaviorAttributes.add("stateless");
+      behaviorAttributes.add("cache");
       behaviorAttributes.add("scope");
       behaviorAttributes.add("needsRefresh");
       behaviorAttributes.add(ALT_ID);
@@ -3177,7 +3210,27 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    /** A hook for tag objects to override to be notified when the repeat tags have has been updated */
-   public void repeatTagsChanged() {
+   public void repeatTagsChanged() {}
+
+   /** Returns true if any values have been removed, added or replaced in the repeat property for this tag.  */
+   public boolean anyChangedRepeatTags() {
+      Object repeatVal = getCurrentRepeatVal();
+      int repeatValSz = repeatVal == null ? 0 : DynUtil.getArrayLength(repeatVal);
+      int repeatTagsSz = repeatTags == null ? 0 : repeatTags.size();
+
+      if (repeatValSz != repeatTagsSz)
+         return true;
+
+      for (int i = 0; i < repeatValSz; i++) {
+         Object newElem = DynUtil.getArrayElement(repeatVal, i);
+         Element oldTag = repeatTags.get(i);
+         Object oldElem = oldTag.repeatVar;
+         // Note: not checking the equals method here.  We really only care if there were new repeatVal elements added or
+         // removed because those are the situations where we need to refresh the repeatTags list.
+         if (newElem != oldElem)
+            return true;
+      }
+      return false;
    }
 
    public void syncRepeatTags(Object repeatVal) {
@@ -3223,10 +3276,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      System.out.println("*** Internal error in sync repeat tags!");
                   Element oldElem = tags.get(i);
                   Object oldArrayVal = oldElem.repeatVar;
-                  // The guy in this spot is not our guy.
+                  // The arrayVal in this spot is not the arrayVal for the current tag.
                   if (oldArrayVal != arrayVal && (oldArrayVal == null || !oldArrayVal.equals(arrayVal))) {
                      anyChanges = true;
-                     // The current guy is new to the list
+                     // The current array val is new to the list
                      if (curIx == -1) {
                         // Either replace or insert a row
                         int curNewIx = repeatElementIndexOf(repeatVal, i, oldArrayVal);
@@ -3375,36 +3428,101 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // Even events which fired during the tag initialization or since we last were rendered must be flushed so our content is accurate.
       DynUtil.execLaterJobs();
 
-      if (dynObj == null) {
-         if (repeat != null || this instanceof IRepeatWrapper) {
-            syncRepeatTags(repeat);
-            if (repeatTags != null) {
-               for (int i = 0; i < repeatTags.size(); i++) {
-                  repeatTags.get(i).outputTag(sb);
-               }
-            }
+      Object repeatVal = getCurrentRepeatVal();
+      boolean cacheEnabled = isCacheEnabled();
+      if (!cacheEnabled) {
+         // Just re-render all tags all of the time when cache is not enabled
+         if (repeatVal != null) {
+            outputRepeatBody(repeatVal, sb);
          }
          else {
-            outputStartTag(sb);
-            outputBody(sb);
-            outputEndTag(sb);
-         }
-      } else {
-         Object repeatVal = dynObj.getPropertyFromWrapper(this, "repeat");
-         if (repeatVal != null || ModelUtil.isAssignableFrom(IRepeatWrapper.class, dynObj.getDynType())) {
-            syncRepeatTags(repeatVal);
-            if (repeatTags != null) {
-               for (int i = 0; i < repeatTags.size(); i++) {
-                  repeatTags.get(i).outputTag(sb);
-               }
-            }
-         }
-         else {
-            dynObj.invokeFromWrapper(this, "outputStartTag", "Ljava/lang/StringBuilder;", sb);
-            dynObj.invokeFromWrapper(this, "outputBody", "Ljava/lang/StringBuilder;", sb);
-            dynObj.invokeFromWrapper(this, "outputEndTag", "Ljava/lang/StringBuilder;", sb);
+            callOutputStartTag(sb);
+            callOutputBody(sb);
+            callOutputEndTag(sb);
          }
       }
+      else {
+         if (repeatVal != null) {
+            if (serverTag)
+               outputRepeatTagMarker(sb);
+            if (!bodyValid) {
+               StringBuilder bodySB = new StringBuilder();
+               outputRepeatBody(repeatVal, bodySB);
+               bodyCache = bodySB.toString();
+            }
+            if (bodyCache != null)
+               sb.append(bodyCache);
+         }
+         else {
+            if (!startTagValid) {
+               StringBuilder newSB = new StringBuilder();
+               callOutputStartTag(newSB);
+               String newStartTagCache = newSB.toString();
+
+               // We're rendering the parent again.  If our startTagTxt has changed we need to record the change at this level so we can later
+               // update just this property if it changes on its own.
+               if (serverTag && !StringUtil.equalStrings(startTagCache, newStartTagCache))
+                  SyncManager.updateRemoteValue(this, "startTagTxt", newStartTagCache);
+
+               startTagCache = newStartTagCache;
+            }
+            if (startTagCache != null)
+               sb.append(startTagCache);
+            if (!bodyValid) {
+               StringBuilder bodySB = new StringBuilder();
+               callOutputBody(bodySB);
+               String newBody = bodySB.toString();
+               if (serverTag && !StringUtil.equalStrings(bodyCache, newBody))
+                  SyncManager.updateRemoteValue(this, "innerHTML", newBody);
+               bodyCache = newBody;
+            }
+            if (bodyCache != null)
+               sb.append(bodyCache);
+            callOutputEndTag(sb);
+         }
+      }
+   }
+
+   private void outputRepeatTagMarker(StringBuilder sb) {
+      sb.append("<span id=\'" + getId() + "' style='display:none'></span>"); // Warning - span tag cannot be 'self-closed' - TODO: is there a better tag to use here?  Meta is only supposed to be in the head section.
+   }
+
+   private void outputRepeatBody(Object repeatVal, StringBuilder sb) {
+      syncRepeatTags(repeatVal);
+      for (int i = 0; i < repeatTags.size(); i++) {
+         repeatTags.get(i).outputTag(sb);
+      }
+   }
+
+   private Object getCurrentRepeatVal() {
+      if (dynObj == null) {
+         return this instanceof IRepeatWrapper ? repeat : null;
+      }
+      else {
+         return ModelUtil.isAssignableFrom(IRepeatWrapper.class, dynObj.getDynType()) ?
+                                              dynObj.getPropertyFromWrapper(this, "repeat") : null;
+      }
+   }
+
+   private void callOutputStartTag(StringBuilder sb) {
+      if (dynObj == null)
+         outputStartTag(sb);
+      else
+         dynObj.invokeFromWrapper(this, "outputStartTag", "Ljava/lang/StringBuilder;", sb);
+   }
+
+   private void callOutputBody(StringBuilder sb) {
+      if (dynObj == null)
+         outputBody(sb);
+      else
+         dynObj.invokeFromWrapper(this, "outputBody", "Ljava/lang/StringBuilder;", sb);
+   }
+
+   private void callOutputEndTag(StringBuilder sb) {
+      if (dynObj == null)
+         outputEndTag(sb);
+      else
+         dynObj.invokeFromWrapper(this, "outputEndTag", "Ljava/lang/StringBuilder;", sb);
    }
 
    public void outputStartTag(StringBuilder sb) {
@@ -3443,28 +3561,50 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * This is read-only by default on the server but used for serverTags to transfer a change of body to the client.
     */
    public String getInnerHTML() {
-      StringBuilder out = new StringBuilder();
-      outputBody(out);
-      return out.toString();
+      Object repeatVal = getCurrentRepeatVal();
+      boolean cacheEnabled = isCacheEnabled();
+      if (cacheEnabled) {
+         if (bodyValid) {
+            return bodyCache == null ? "" : bodyCache;
+         }
+      }
+      StringBuilder sb = new StringBuilder();
+      if (repeatVal == null) {
+         outputBody(sb);
+      }
+      else {
+         outputRepeatBody(repeatVal,  sb);
+      }
+      String newInnerHTML = sb.toString();
+      if (cacheEnabled)
+         bodyCache = newInnerHTML;
+      return newInnerHTML;
    }
 
    public void setInnerHTML(String htmlTxt) {
-      // TODO: do we need this?  It's used now for transporting the HTML generated on the server to the client
-      throw new UnsupportedOperationException();
+      bodyCache = htmlTxt;
    }
 
    /** Returns the current contents of the startTagTxt, composed of the tag name and attributes - e.g. <input id="foo"> */
    public String getStartTagTxt() {
-      StringBuilder out = new StringBuilder();
-      outputStartTag(out);
-      return out.toString();
+      if (this instanceof IRepeatWrapper)
+         return "";
+      boolean cacheEnabled = isCacheEnabled();
+      if (cacheEnabled) {
+         if (startTagValid)
+            return startTagCache == null ? "" : startTagCache;
+      }
+      StringBuilder sb = new StringBuilder();
+      outputStartTag(sb);
+      String newStartTagTxt = sb.toString();
+      if (cacheEnabled)
+         startTagCache = newStartTagTxt;
+      return newStartTagTxt;
    }
 
    public void setStartTagTxt(String newStartTxt) {
-      // TODO: like setInnerHTML - do we need this on the server?
-      throw new UnsupportedOperationException();
+      startTagCache = newStartTxt;
    }
-
 
    public void setTextContent(String tc) {
       if (tc == null)
@@ -4219,7 +4359,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
             if (stag.props == null)
                stag.props = new ArrayList<Object>();
-            //stp.immediate = true;
+            // Since we have a listener for one of the DOM events - e.g. clickEvent, we need to send the registration over to the client
+            // so it knows to sync with that change.
+            stag.eventSource = true;
+            //stag.immediate = true;
             // TODO also add SyncPropOption here if we want to control immediate or other flags we add to how
             // to synchronize these properties from client to server?
             stag.props.add(domProp.getKey());
@@ -4257,6 +4400,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         }
                      }
                      else {
+                        // This starts out only being set on the parent from the code-generation perspective but we need it set on
+                        // every synchronized object.
+                        this.serverTag = true;
+
                         scopeCtx.setValue(tagId, this);
                         // Register this with the sync system so we can apply changes made on the client and detect changes
                         // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
@@ -4269,8 +4416,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
          }
          else {
+            // No id is normal for the 'repeat wrapper' class
             if (!(this instanceof IRepeatWrapper))
                System.out.println("*** null id for repeat tag");
+            // else - TODO: is this a case we want to handle?
          }
          defaultServerTag = true;
       }
@@ -4296,35 +4445,73 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return null;
    }
 
-   public void fireChangedTagEvents() {
+   public void fireChangedTagEvents(boolean parentBodyChanged) {
+      SyncManager.SyncState oldSyncState = null;
+      boolean setSyncModeToPrev = false;
       if (!startTagValid) // some attribute or other contents of the start tag for this tag object changed - so fire this change event.  The value is retrieved with getStartTagTxt()
          Bind.sendEvent(IListener.VALUE_CHANGED, this, _startTagTxtProp);
-      if (!bodyTxtValid) // Some part of our body txt has changed so fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
+      if (!bodyTxtValid) { // Some part of our body txt has changed so fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
          Bind.sendEvent(IListener.VALUE_CHANGED, this, _innerHTMLProp);
+         if (!parentBodyChanged) {
+            setSyncModeToPrev = true;
+            parentBodyChanged = true;
+         }
+      }
 
+      // formerly: bodyValid && !parentBodyChanged
       if (bodyValid)
          return;
 
-      Object[] children = getObjChildren(false);
-      if (children != null) {
-         for (Object child:children) {
-            if (child instanceof Element) {
-               ((Element) child).fireChangedTagEvents();
+      //if (setSyncModeToPrev)
+      //   oldSyncState = SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
+
+      try {
+         Object[] children = getObjChildren(false);
+         if (children != null) {
+            for (Object child:children) {
+               if (child instanceof Element) {
+                  ((Element) child).fireChangedTagEvents(parentBodyChanged);
+               }
             }
          }
       }
+      finally {
+         //if (setSyncModeToPrev)
+         //   SyncManager.setSyncState(oldSyncState);
+      }
    }
 
-   /** Can be called at startup for any components that will use synchronization with tag objects */
+   /**
+    * Can be called at startup by frameworks to allow synchronization of tag objects.  This is helpful for 'serverTags' which
+    * are always rendered on the server, but the important properties can be synchronized to the client and parsed and managed with
+    * a smaller code footprint, or to mix and match Javascript client tag objects with html server-side rendered objects in a single page.
+    */
    public static void initSync() {
-      SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[] {"type", "timeStamp", "currentTag"}, 0));
+      SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[]{"type", "timeStamp", "currentTag"}, 0));
       // By default, we'll synchronize any body content this tag has in a read-only way.  When it changes, there's a change event for innerHTML
       // and getInnerHTML() generates the new contents.  Same idea with startTagTxt for attribute changes.
       // Specific DOM type subclasses (e.g. input) have custom attributes that are sync'd for server tags we
-      SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{"startTagTxt", "innerHTML", "style", "class"}, 0));
+      SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{
+            "startTagTxt", "innerHTML", "style", "class", "clickEvent", "dblClickEvent", "mouseDownEvent", "mouseOutEvent",
+            "mouseUpEvent", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));
       SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));
+   }
+
+   public boolean isCacheEnabled() {
+      if (cache == null || cache == CacheMode.Unset) {
+         Element enclTag = getEnclosingTag();
+         if (enclTag != null)
+            return enclTag.isCacheEnabled();
+         /*
+         Template enclTemplate = getEnclosingTemplate();
+         if (enclTemplate != null)
+            return enclTemplate.isCacheEnabled();
+         */
+         return false;
+      }
+      return cache == CacheMode.Enabled;
    }
 }

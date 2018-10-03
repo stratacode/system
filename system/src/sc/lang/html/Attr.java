@@ -7,6 +7,7 @@ package sc.lang.html;
 import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.template.Template;
+import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
 import sc.util.FileUtil;
@@ -106,6 +107,7 @@ public class Attr extends Node implements ISrcStatement {
       boolean htmlAttribute = tag.isHtmlAttribute(name);
       boolean behaviorAttribute = tag.isBehaviorAttribute(name);
       link = tag.isLinkAttribute(name);
+      LayeredSystem sys = getLayeredSystem();
       Object prop = tag.definesMember(propName, MemberType.PropertySetSet, tag.tagObject, null, false, false);
       valueProp = prop;
       if (prop == null && !behaviorAttribute && !htmlAttribute) {
@@ -178,6 +180,14 @@ public class Attr extends Node implements ISrcStatement {
                catch (NumberFormatException exc) {
                   displayError("Property: " + name + " expects a floating point value not: " + attValue);
                   init = null;
+               }
+            }
+            else if (ModelUtil.sameTypes(propType, CacheMode.class)) {
+               CacheMode cm = CacheMode.fromString(attStr);
+               if (cm == null)
+                  displayError("Cache attribute must be one of: " + CacheMode.values() + " for: ");
+               else if (sys.runtimeProcessor == null || sys.runtimeProcessor.supportsTagCaching()) {
+                  init = IdentifierExpression.create("sc.lang.html.CacheMode." + cm.toString());
                }
             }
             else if (htmlAttribute) {

@@ -3412,4 +3412,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public boolean supportsSyncRemoteCalls() {
       return true;
    }
+
+   public boolean supportsTagCaching() {
+      return false;
+   }
 }

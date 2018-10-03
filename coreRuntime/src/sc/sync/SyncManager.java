@@ -334,6 +334,8 @@ public class SyncManager {
          //return val;
       }
 
+      /** See addPreviousBelow - the inherited flag here determines if we look in parent contexts and register this object
+       * in this context or only look in the current  */
       public void addPreviousValue(Object obj, String propName, Object val, boolean inherited) {
          InstInfo ii = inherited ? getInheritedInstInfo(obj) : getInstInfo(obj);
          if (ii != null && ii.syncContext != this)
@@ -341,6 +343,16 @@ public class SyncManager {
          addPreviousValue(obj, ii, propName, val);
       }
 
+      /**
+       * Records the value that represents the last synchronized state from the remote process.  When you start a new
+       * operation, the previous value also stores the unchanged value or original. Normally the previous value is maintained
+       * automatically.   It's a cache of the old version basically and updated when a property change event is received.
+       * It knows the context - are we apply changes from the server or recording new changes and updates the previous value accordingly.
+       * There are some situations when you might update the previous value directly.  For example, you generate the
+       * body of a parent tag which includes the child tag's startTagTxt and InnerHTML properties.  Once the parent's body
+       * is received on the remote side, the children's values will updated implicitly.  We need to update the previous
+       * value so we know when to send over changes.
+       */
       public void addPreviousValue(Object obj, InstInfo ii, String propName, Object val) {
          if (ii == null) {
             System.err.println("*** No sync inst registered for: " + DynUtil.getInstanceName(obj));
@@ -2748,8 +2760,12 @@ public class SyncManager {
    }
 
    public static SyncContext getSyncContextForInst(Object inst) {
+      // The scopes from global -> request
       ArrayList<ScopeDefinition> scopes = ScopeDefinition.scopes;
-      for (ScopeDefinition scopeDef:scopes) {
+
+      // process them in the reverse direction so we get the 'most specific' SyncContext
+      for (int i = scopes.size() - 1; i >= 0; i--) {
+         ScopeDefinition scopeDef = scopes.get(i);
          if (scopeDef != null) {
             ScopeContext scopeCtx = scopeDef.getScopeContext(false);
             if (scopeCtx != null) {
@@ -2806,6 +2822,7 @@ public class SyncManager {
       }
    }
 
+   /** Starts synchronization for an on-demand property - see SyncContext.startSync for details */
    public void startSync(Object inst, int scopeId, String prop) {
       SyncContext ctx = getSyncContext(scopeId, false);
       if (ctx != null)
@@ -2856,6 +2873,21 @@ public class SyncManager {
       }
       else
          syncCtx.initProperty(inst, prop);
+   }
+
+   /**
+    * If this object has already been synchronized, update the remote side's representation of the value of this property - i.e.
+    * record the value supplied as the 'previous value' managed by the sync system.
+    * Use this to tell the sync system that a property has been updated implicitly on the client side - not using the sync
+    * system.
+    */
+   public static void updateRemoteValue(Object inst, String prop, Object value) {
+      SyncContext syncCtx = getSyncContextForInst(inst);
+      if (syncCtx == null) { // This instance is just not synchronized yet so nothing to update.
+         return;
+      }
+      else
+         syncCtx.addPreviousValue(inst, prop, value, false);
    }
 
    private void removeSyncInst(Object inst, int scopeId, SyncProperties syncProps) {

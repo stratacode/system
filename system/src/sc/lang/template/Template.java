@@ -1013,7 +1013,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
             /** statefulContext=false when we are inside of a template statement - i.e. inside of normal code in a method */
             /** TODO: should we use "isdeclaredConstant" to avoid starting the expression here?  It seems like we need to start it eventually anyway so that won't help. */
-            if (statefulPage && expr.canMakeBindable() && !expr.isConstant() && statefulContext && (parentElement == null || !parentElement.getNoCache())) {
+            if (statefulPage && expr.canMakeBindable() && !expr.isConstant() && statefulContext && (parentElement == null || !parentElement.getStateless())) {
                Expression resultExpr = (Expression) ParseUtil.nodeToSemanticValue(parseResult);
                Element enclTag;
                // The enclosing tag might be nested inside of a non-object.  In that case, just skip the non-object.

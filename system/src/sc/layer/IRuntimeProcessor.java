@@ -100,4 +100,10 @@ public interface IRuntimeProcessor {
 
    /** For JS or other async environments, return false - this means, remote method calls not in data binding statements generate errors at compile time */
    public boolean supportsSyncRemoteCalls();
+
+   /**
+    * For server environment, we build the caching into the generated Tag object classes but on the client,
+    * the cache is the DOM itself so no need to set the cache property in the generated tag object
+    */
+   public boolean supportsTagCaching();
 }
