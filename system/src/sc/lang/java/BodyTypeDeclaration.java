@@ -4101,7 +4101,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                PropertyAssignment pa = (PropertyAssignment) st;
                if (pa.initializer != null) {
                   Object initVal = pa.initializer.eval(null, eCtx);
-                  syncCtx.addPreviousValue(inst, pa.propertyName, initVal);
+                  syncCtx.addPreviousValue(inst, pa.propertyName, initVal, true);
                }
             }
          }

@@ -178,6 +178,9 @@ public class Options {
    @Constant public String layerPath = null;
    @Constant public boolean needsClassLoaderReset;
 
+   /** For schtml pages, should they use caching by default for runtimes that support it? */
+   @Constant public boolean defaultPageCache = true;
+
    boolean restartArg = false;
    boolean headlessSet = false;
    List<String> includeFiles = null;  // List of files to process
@@ -245,6 +248,7 @@ public class Options {
                          "   [ -nd ]: Disable the liveDynamicTypes option - so that you cannot modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
                          "   [ -ee ]: Edit the editor itself - when including the program editor, do not exclude it's source from editing.\n" +
                          "   [ -cd <ApplicationTypeName>]: Start the command-interpreter in the context of the given ApplicationTypeName.\n" +
+                         "   [ -npc ]: Turn off page caching by default for schtml in runtimes that support this option (e.g. java but not js where caching is built-in)\n" +
                          "   [ -version, -h or -help - print version/usage info.\n\n" +
                          StringUtil.insertLinebreaks(AbstractInterpreter.USAGE, 80));
       System.exit(-1);
@@ -401,6 +405,10 @@ public class Options {
                      startInterpreter = false;
                   else if (opt.equals("ndbg")) {
                      debug = false;
+                     break;
+                  }
+                  else if (opt.equals("npc")) {
+                     defaultPageCache = false;
                      break;
                   }
                   else

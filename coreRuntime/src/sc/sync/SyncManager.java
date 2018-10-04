@@ -336,11 +336,11 @@ public class SyncManager {
 
       /** See addPreviousBelow - the inherited flag here determines if we look in parent contexts and register this object
        * in this context or only look in the current  */
-      public void addPreviousValue(Object obj, String propName, Object val, boolean inherited) {
+      public void addPreviousValue(Object obj, String propName, Object val, boolean inherited, boolean addToInitialLayer) {
          InstInfo ii = inherited ? getInheritedInstInfo(obj) : getInstInfo(obj);
          if (ii != null && ii.syncContext != this)
             System.out.println("*** Using inherited context for previous value: " + ii.syncContext + " for " + this);
-         addPreviousValue(obj, ii, propName, val);
+         addPreviousValue(obj, ii, propName, val, addToInitialLayer);
       }
 
       /**
@@ -353,7 +353,7 @@ public class SyncManager {
        * is received on the remote side, the children's values will updated implicitly.  We need to update the previous
        * value so we know when to send over changes.
        */
-      public void addPreviousValue(Object obj, InstInfo ii, String propName, Object val) {
+      public void addPreviousValue(Object obj, InstInfo ii, String propName, Object val, boolean addToInitialLayer) {
          if (ii == null) {
             System.err.println("*** No sync inst registered for: " + DynUtil.getInstanceName(obj));
             return;
@@ -389,7 +389,7 @@ public class SyncManager {
          // Needs to be added as a change to the initialSyncLayer.  For the server (recordInitial=true), this records all changes so we can do an accurate "refresh" using the initial layer.  For the client (recordInitial = false), this only
          // includes the changes made while recording changes.  These are the changes made locally on the client, the only ones we need to resync back to the server when the session is lost.
          // If ii.inherited is true, we've been propagated this event from a parent context.  Do not record it in the initial layer in this case since the initial layer is already inherited.
-         if (state != SyncState.Disabled && syncProps != null && syncProps.isSynced(propName) && ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges)) && !ii.inherited)
+         if (addToInitialLayer && state != SyncState.Disabled && syncProps != null && syncProps.isSynced(propName) && ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges)) && !ii.inherited)
             initialSyncLayer.addChangedValue(obj, propName, val, recordInitial && state == SyncState.ApplyingChanges);
          //else if (trace) {
          //   System.out.println("Not sync'ing back change to: " + propName + " that is sync'd us");
@@ -471,7 +471,7 @@ public class SyncManager {
                   changedLayer.addChangedValue(obj, propName, val);
             }
             else {
-               addPreviousValue(obj, propName, val, false); // If this scope does not support change events, we just apply the previous value now, so we'll continue to propagate any subsequent changes to children
+               addPreviousValue(obj, propName, val, false, true); // If this scope does not support change events, we just apply the previous value now, so we'll continue to propagate any subsequent changes to children
             }
          }
 
@@ -1531,7 +1531,7 @@ public class SyncManager {
          SyncAction action = getSyncAction(syncProp);
          switch (action) {
             case Previous:
-               addPreviousValue(syncObj, syncProp, value, true);
+               addPreviousValue(syncObj, syncProp, value, true, true);
                break;
             case Value:
                addChangedValue(null, syncObj, syncProp, value, syncGroup, null);
@@ -1997,7 +1997,7 @@ public class SyncManager {
          // Any changes triggered when we are processing a sync just update the previous value - they do not trigger a change, unless there are pending bindingings.  That means we are setting a drived value.
          SyncAction action = getSyncAction(propName);
          if (action == SyncAction.Previous) {
-            addPreviousValue(obj, propName, curValue, true);
+            addPreviousValue(obj, propName, curValue, true, true);
          }
          else if (action == SyncAction.Value) {
             if (refreshProperty(obj, propName, curValue, syncGroup, "Property change")) {
@@ -2886,8 +2886,10 @@ public class SyncManager {
       if (syncCtx == null) { // This instance is just not synchronized yet so nothing to update.
          return;
       }
-      else
-         syncCtx.addPreviousValue(inst, prop, value, false);
+      else {
+         // Not adding this to the initial layer because it will be included
+         syncCtx.addPreviousValue(inst, prop, value, false, false);
+      }
    }
 
    private void removeSyncInst(Object inst, int scopeId, SyncProperties syncProps) {

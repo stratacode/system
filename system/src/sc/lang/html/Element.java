@@ -474,8 +474,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return (genFlags & getComputedExecFlags()) == 0;
    }
 
-   /** A server tag is one which is rendered on the server only */
+   /** At runtime, we are a server tag if we are explicitly marked, or our parent tag is marked.  Eventually serverTag
+    * gets set on all server tags to avoid the walk up the tree. */
    private boolean isServerTag() {
+      if (serverTag)
+         return true;
+      Element enclTag = getEnclosingTag();
+      if (enclTag != null)
+         return enclTag.isServerTag();
+      return false;
+   }
+
+   /** For compile time - use this to determine if the schtml file marks this as a server tag based on the tree */
+   private boolean isMarkedAsServerTag() {
       Template template = getEnclosingTemplate();
       if (template == null)
          return false;
@@ -2155,13 +2166,25 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                if (childElem.isRepeatElement()) {
                   String repeatName = childElem.getRepeatObjectName();
                   TypeDeclaration childRepeatType = (TypeDeclaration) parentType.getInnerType(repeatName, null);
-                  childElem.repeatWrapper = childRepeatType;
-                  childRepeatType.element = childElem;
-                  parentType = childRepeatType;
+                  if (childRepeatType == null) {
+                     System.out.println("*** Skipping assignChildTagObjects for: " + parentType + " and: " + repeatName);
+                     continue;
+                  }
+                  else {
+                     childElem.repeatWrapper = childRepeatType;
+                     childRepeatType.element = childElem;
+                  }
                }
-               TypeDeclaration childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null);
+               TypeDeclaration childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null, false, false, false);
                if (childType != null)
                   childElem.assignChildTagObjects(childType, oldChildElem);
+               else {
+                  // TODO: remove this debug code
+                  childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null, true, false, false);
+                  if (childType != null)
+                     System.out.println("***");
+
+               }
             }
          }
       }
@@ -2552,7 +2575,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (remoteContent) {
          idIx = addSetServerAtt(tagType, idIx, "serverContent");
       }
-      serverTag = isServerTag();
+      serverTag = isMarkedAsServerTag();
       if (serverTag) {
          Element parentTag = getEnclosingTag();
          // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
@@ -3445,7 +3468,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       else {
          if (isRepeatTag) {
-            if (serverTag)
+            if (isServerTag())
                outputRepeatTagMarker(sb);
             if (!bodyValid) {
                StringBuilder bodySB = new StringBuilder();
@@ -3463,7 +3486,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
                // We're rendering the parent again.  If our startTagTxt has changed we need to record the change at this level so we can later
                // update just this property if it changes on its own.
-               if (serverTag && !StringUtil.equalStrings(startTagCache, newStartTagCache))
+               if (isServerTag() && !StringUtil.equalStrings(startTagCache, newStartTagCache))
                   SyncManager.updateRemoteValue(this, "startTagTxt", newStartTagCache);
 
                startTagCache = newStartTagCache;
@@ -3474,7 +3497,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                StringBuilder bodySB = new StringBuilder();
                callOutputBody(bodySB);
                String newBody = bodySB.toString();
-               if (serverTag && !StringUtil.equalStrings(bodyCache, newBody))
+               if (isServerTag() && !StringUtil.equalStrings(bodyCache, newBody))
                   SyncManager.updateRemoteValue(this, "innerHTML", newBody);
                bodyCache = newBody;
             }
@@ -3579,6 +3602,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          outputBody(sb);
       }
       else {
+         if (isServerTag())
+            outputRepeatTagMarker(sb);
          outputRepeatBody(repeatVal,  sb);
       }
       String newInnerHTML = sb.toString();
@@ -4510,15 +4535,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public boolean isCacheEnabled() {
+      if (serverTag) // server tags need the cache to be enable
+         return true;
       if (cache == null || cache == CacheMode.Unset) {
          Element enclTag = getEnclosingTag();
          if (enclTag != null)
             return enclTag.isCacheEnabled();
-         /*
-         Template enclTemplate = getEnclosingTemplate();
-         if (enclTemplate != null)
-            return enclTemplate.isCacheEnabled();
-         */
          return false;
       }
       return cache == CacheMode.Enabled;
