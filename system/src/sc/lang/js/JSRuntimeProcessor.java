@@ -2626,6 +2626,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    /** Adds the type to the jsFileBody for the lib file registered for this type (or the default lib file)  */
    void addTypeToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile, List<BodyTypeDeclaration> addLaterTypes) {
+
       BodyTypeDeclaration origType = type;
       ModelUtil.ensureStarted(type, true); // Coming from dependent types, we may not be started.
       boolean transformed;
@@ -2804,6 +2805,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      }
                      else {
                         BodyTypeDeclaration depTD = (BodyTypeDeclaration) depType;
+                        if (depTD.excluded) {
+                           if (depTD.excludedStub != null)
+                              continue;
+                           else
+                              System.err.println("*** excluding type which has a dependency in the JS runtime");
+                        }
                         ModelUtil.ensureStarted(depType, true);
                         depTD = depTD.resolve(true);
 

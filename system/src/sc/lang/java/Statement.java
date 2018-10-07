@@ -254,7 +254,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public String getNodeErrorText() {
-      if (errorArgs != null) {
+      // Note: in Template when dealing with a 'serverContent' section use [0] length array here as a marker or to clear old errors.   Ignore those false errors here
+      if (errorArgs != null && errorArgs.length > 0) {
          StringBuilder sb = new StringBuilder();
          for (Object arg:errorArgs) {
             // This is added on so we know which component of an identifier expression should display the error.  Don't display the toString of it to the user.

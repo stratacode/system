@@ -292,7 +292,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
       boolean any = false;
 
       if (excluded)
-         return transformExcluded();
+         return transformExcluded(runtime);
 
       // Before we transform the fields, we first make a copy of the entire field into the hidden body.  When we are transforming
       // the classes, we'll need to get at the complete field definition for copying it into them.

@@ -357,7 +357,7 @@ public class ClassDeclaration extends TypeDeclaration {
       // If our parent type was excluded, we should not be here.  So this must be the case where we are an inner type
       // that's excluded from it's outer type in this runtime - just remove this code from the parent.
       if (excluded) {
-         return transformExcluded();
+         return transformExcluded(runtime);
       }
 
       if (!processed)

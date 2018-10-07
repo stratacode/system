@@ -41,6 +41,8 @@ public class Options {
    /** Diagnose issues finding classes (e.g. to trace adding entries to the package index) */
    @Constant public boolean verboseClasses = false;
    @Constant public boolean verboseLocks = false;
+   /** Turns on debug messages specific to the @Exec annotation - see which types are excluded from a given runtime */
+   @Constant public boolean verboseExec = false;
    /** Set to true when collecting the logs as a 'verification file' - a signal to not output dates, or other info that will vary from run to run */
    @Constant public boolean testVerifyMode = false;
    /** Set to true when debugging the program - used to disable timeouts  */
@@ -227,6 +229,7 @@ public class Options {
                          "   [ -v* ]: Enable verbose flags to debug features\n" +
                          "       [ -v ]: verbose info of main system events.  [-vb ] [-vba] Trace data binding (or trace all) [-vs] [-vsa] [-vsv] [-vsp] Trace options for the sync system: trace, traceAll, verbose-inst, verbose-inst+props \n" +
                          "       [ -vh ]: verbose html [ -vha ]: trace html [ -vl ]: display initial layers [ -vp ] turn on performance monitoring [ -vc ]: info on loading of class files\n" +
+                         "       [ -vlck ]: verbose lock [ -ve ]: verbose exec to see 'excluded classes'\n" +
                          "   [ -f <file-list>]: Process/compile only these files\n" +
                          "   [ -cp <classPath>]: Use this classpath for resolving compiled references.\n" +
                          "   [ -lp <layerPath>]: Set of directories to search in order for layer directories.\n" +
@@ -654,6 +657,8 @@ public class Options {
                      testVerifyMode = true;
                      testMode = true;
                   }
+                  else if (opt.equals("ve"))
+                     verboseExec = true;
                   else if (opt.equals("v"))
                      LayeredSystem.traceNeedsGenerate = verbose = true;
                   else if (opt.equals("version")) {

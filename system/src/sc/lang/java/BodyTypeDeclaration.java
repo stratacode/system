@@ -63,7 +63,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient boolean removed = false;  // Set to true when the source for this type has been removed from the system.
 
    /** Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime */
-   transient protected boolean excluded = false;
+   transient public boolean excluded = false;
+   /**
+    * For an excluded type, a framework can designate a 'stub type' to replace an excluded type for a given runtime.
+    * In that case, this stores the excludedStub type.  It's included in the list of children and generated according to the
+    * needs of the framework.  For SCHTML, we generate a node with the parentNode and id properties set by which is marked
+    * as serverContent with no children so we stitch in the server content with the client content.
+    */
+   transient public TypeDeclaration excludedStub = null;
 
    /** Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer */
    public transient boolean dynamicType = false;
@@ -1166,8 +1173,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void addModifier(Object modifier) {
       super.addModifier(modifier);
 
-      // This annotation won't affect the scopes and is added during the transform process so don't bother clearning
-      // the scopee interfaces.
+      // This annotation won't affect the scopes and is added during the transform process so don't bother clearing the scope interfaces.
       if (modifier instanceof Annotation && ((Annotation) modifier).typeName.equals("sc.obj.TypeSettings"))
          return;
 
@@ -1638,7 +1644,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (useTypeName == null)
             return null;
          // TODO: is this right?
-         res = CTypeUtil.prefixPath(getJavaModel().getPackagePrefix(), ((Element) pnode).getFullTypeName());
+         res = ((Element) pnode).getFullTypeName();
          res = res + innerTypeSep + useTypeName;
       }
       else {
@@ -7085,6 +7091,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                   useChildNames = childNames;
                   if (innerTypeDecl != null) {
+                     if (innerTypeDecl.excluded && innerTypeDecl.excludedStub == null) // This inner type is not included in this runtime so don't add it to the child list
+                        continue;
                      typeScope = innerTypeDecl.getScopeProcessor();
                      String groupName;
                      if (typeScope != null && !componentsOnly && (groupName = typeScope.getChildGroupName()) != null) {
@@ -7833,7 +7841,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = getLayeredSystem();
 
       if (isLayerType && layer != null && layer.excluded) {
-         excluded = true;
+         markExcluded();
       }
 
       if (!excluded)
@@ -7843,7 +7851,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (!isLayerType && !isLayerComponent() && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
          if (sys.options.verbose)
             sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
-         excluded = true;
+         markExcluded();
       }
 
       if (!excluded) {
@@ -7942,6 +7950,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (membersByName == null) {
          initMembersByName();
       }
+   }
+
+   public void markExcluded() {
+      excluded = true;
    }
 
    public TypeIndexEntry createTypeIndex() {
@@ -9202,6 +9214,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.needsDynDefaultConstructor = needsDynDefaultConstructor;
          res.extendsInvalid= extendsInvalid;
          res.extendsOverridden= extendsOverridden;
+
+         res.excluded = excluded;
+         res.excludedStub = excludedStub;
 
          res.innerObjs = innerObjs;
 

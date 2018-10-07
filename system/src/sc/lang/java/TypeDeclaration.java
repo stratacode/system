@@ -1496,6 +1496,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       boolean any = false;
 
+      // Any special init-time code that the tag type needs to add.  This could be done with a mixin but we already have the element dependency
+      if (element != null)
+         element.addMixinProperties(this);
+
       /* Any properties not declared as fields on this type but which have bindability injected as a wrapper. */
       if (propertiesToMakeBindable != null) {
          // For interfaces, we should have inherited the 'bindable' flag in the implementing classes, or logged an error - nothing to do here
@@ -1871,11 +1875,41 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return null;
    }
 
-   protected boolean transformExcluded() {
+   protected boolean transformExcluded(ILanguageModel.RuntimeType runtime) {
       LayeredSystem sys = getLayeredSystem();
-      if (sys.options.verbose)
-        sys.verbose("Excluded type: " + typeName);
-      parentNode.removeChild(this);
+      if (excludedStub != null) {
+         if (sys.options.verbose || sys.options.verboseExec)
+            sys.verbose("Excluded type: " + typeName + " replaced with stub for: " + getLayeredSystem().getProcessIdent());
+
+         parentNode.replaceChild(this, excludedStub);
+
+         excludedStub.transform(runtime);
+      }
+      else {
+         if (sys.options.verbose || sys.options.verboseExec)
+           sys.verbose("Excluded type: " + typeName + " for: " + getLayeredSystem().getProcessIdent());
+         int myIx = -1;
+         List parentList = null;
+         if (parentNode instanceof List) {
+            parentList = (List) parentNode;
+            myIx = parentList.indexOf(this);
+         }
+         parentNode.removeChild(this);
+         // By removing this type, our parent list will skip the next object so transforming that here
+         if (myIx != -1 && myIx < parentList.size()) {
+            Object newNode = parentList.get(myIx);
+            if (newNode instanceof SemanticNode)
+               ((SemanticNode) newNode).transform(runtime);
+         }
+      }
       return true;
+   }
+
+   public void markExcluded() {
+      super.markExcluded();
+      if (element != null) {
+         excludedStub = element.getExcludedStub();
+         ParseUtil.initAndStartComponent(excludedStub);
+      }
    }
 }

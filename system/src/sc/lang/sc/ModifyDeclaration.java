@@ -349,6 +349,12 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
    }
 
+   public void markExcluded() {
+      super.markExcluded();
+      if (modifyTypeDecl != null)
+         modifyTypeDecl.markExcluded();
+   }
+
    public void stop() {
       super.stop();
       modifyTypeDecl = null;
@@ -1329,7 +1335,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       // If our parent type was excluded, we should not be here.  So this must be the case where we are an inner type
       // that's excluded from it's outer type in this runtime - just remove this code from the parent.
       if (excluded) {
-         return transformExcluded();
+         return transformExcluded(runtime);
       }
 
       if (!processed)

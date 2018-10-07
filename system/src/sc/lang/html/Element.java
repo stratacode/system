@@ -142,6 +142,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private transient String cachedObjectName = null;
 
    public final static boolean nestedTagsInStatements = false;
+   private static final boolean oldExecTag = false;
 
    public Element() {
    }
@@ -370,12 +371,26 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
+   private static int parseExecFlags(String execStr) {
+      String[] execVals = execStr.toLowerCase().split(",");
+      int flags = 0;
+      for (String execVal:execVals) {
+         if (execVal.equals("client"))
+            flags |= ExecClient;
+         else if (execVal.equals("server"))
+            flags |= ExecServer;
+         // TODO: remove this one?
+         else if (execVal.equals("process"))
+            flags |= ExecProcess;
+      }
+      return flags;
+   }
+
    public int getDefinedExecFlags() {
       String execStr = getFixedAttribute("exec");
       int execFlags = 0;
       if (execStr != null) {
-         execStr = execStr.toLowerCase();
-         execFlags = (execStr.indexOf("server") != -1 ? ExecServer : 0) | (execStr.indexOf("client") != -1 ? ExecClient : 0) | (execStr.indexOf("process") != -1 ? ExecProcess : 0);
+         execFlags = parseExecFlags(execStr);
       }
       else {
          Element elem = getDerivedElement();
@@ -1304,6 +1319,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Object tagType = getExtendsTypeDeclaration();
       if (tagType == null)
          return null;
+      return convertExtendsTypeToJavaType(tagType);
+   }
+
+   public JavaType convertExtendsTypeToJavaType(Object tagType) {
       List<?> tps = ModelUtil.getTypeParameters(tagType);
 
       ClassType ct = (ClassType) ClassType.create(ModelUtil.getTypeName(tagType));
@@ -2178,6 +2197,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                TypeDeclaration childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null, false, false, false);
                if (childType != null)
                   childElem.assignChildTagObjects(childType, oldChildElem);
+               /*
                else {
                   // TODO: remove this debug code
                   childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null, true, false, false);
@@ -2185,7 +2205,63 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      System.out.println("***");
 
                }
+               */
             }
+         }
+      }
+   }
+
+   /** Adds the id=.. assignment for a stub - the type inserted into the client tag class to represent the server tag object for exec="server"
+    * Because the stub type only inherits from the base tag-type, it always needs to set the id property. */
+   private void addStubIdAssignment(BodyTypeDeclaration type) {
+      String idInitStr = getElementId();
+      boolean idSpecified = idInitStr != null;
+      if (!idSpecified)
+         idInitStr = type.typeName;
+      addSetIdAssignment(type, idInitStr, idSpecified);
+   }
+
+   private void addSetIdAssignment(BodyTypeDeclaration type, String idInitStr, boolean idSpecified) {
+      if (!idSpecified)
+         idInitStr = type.typeName;
+      Expression idInitExpr = createIdInitExpr(null, idInitStr, idSpecified);
+      addTagTypeBodyStatement(type, PropertyAssignment.create("id", idInitExpr, "="));
+   }
+
+   public TypeDeclaration getExcludedStub() {
+      if (tagObject == null)
+         return null;
+      int myExecFlags = getDefinedExecFlags();
+      Element parentTag = getEnclosingTag();
+      int parentExecFlags = parentTag == null ? 0 : parentTag.getComputedExecFlags();
+      if (myExecFlags != parentExecFlags && isRemoteContent() && !isAbstract()) {
+         Object extType = getDefaultExtendsTypeDeclaration(false);
+         ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType));
+         decl.addModifier("public");
+         decl.parentNode = parentNode;
+         addSetServerAtt(decl, 0, "serverContent");
+         addSetServerAtt(decl, 0, "serverTag");
+         addParentNodeAssignment(decl);
+         addStubIdAssignment(decl);
+         return decl;
+      }
+      return null;
+   }
+
+   /** Called during transform to set properties specific to the java version of the StrataCode.
+    * Used to modify the generated Java based on the merged version of the type, not know in convertToObject.  Specifically because the
+    * exec attribute can affect the tag properties, but is not know until transform type because we create the tagObject during init.
+    * TODO: could be implemented as a mixinTemplate but since we have the element in the tagObject this is easier
+    */
+   public void addMixinProperties(BodyTypeDeclaration tagType) {
+      boolean serverTag = isMarkedAsServerTag();
+      if (serverTag) {
+         Element parentTag = getEnclosingTag();
+         // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
+         // switching back to a client tag from within a server tag, but not sure that use case makes sense anyway.  We could add 'clientTag'
+         // to switch it back in that case rather than having to set this on every inner tag object.
+         if (parentTag == null || !parentTag.isMarkedAsServerTag()) {
+            addSetServerAtt(tagType, 0, "serverTag");
          }
       }
    }
@@ -2341,7 +2417,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
 
-      boolean remoteContent = isRemoteContent();
+      // We used to exclude the generation of child tag objects and modified how the parent was generated based
+      // on the exec.  Now, we are going to add the @Exec annotation for the exec attribute and let StrataCode
+      // do the processing to remove the tag objects using that annotation.  That's because we might be modified
+      // by a new layer which resets our 'exec' attribute.  To support that, we cannot be doing this processing
+      // during the 'init' phase - we need to do it after start.  The @Exec will be applied during start as
+      // setting properties (setting excluded and not starting children) and transform - removing the node
+      // from the transformed layer.
+      boolean remoteContent = oldExecTag ? isRemoteContent() : false;
 
       boolean isRepeatElement = isRepeatElement();
       Object repeatWrapperType = null;
@@ -2528,6 +2611,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
 
       processScope(tagType, scopeName);
+      processExecAttr(tagType);
 
       // Leave a trail for finding where this statement was generated from for debugging purposes
       tagType.fromStatement = this;
@@ -2575,7 +2659,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (remoteContent) {
          idIx = addSetServerAtt(tagType, idIx, "serverContent");
       }
-      serverTag = isMarkedAsServerTag();
+      serverTag = oldExecTag ? isMarkedAsServerTag() : false;
       if (serverTag) {
          Element parentTag = getEnclosingTag();
          // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
@@ -2610,21 +2694,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          fixedIdAtt = CTypeUtil.escapeIdentifierString(fixedIdAtt);
       }
       if (needsAutoId(fixedIdAtt)) {
-         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
-         args.add(StringLiteral.create(tagType.typeName));
-         if (getNeedsClientServerSpecificId())
-            args.add(BooleanLiteral.create(true));
          // Needs to be after the setParent call.
-         addTagTypeBodyStatement(tagType, PropertyAssignment.create("id", IdentifierExpression.createMethodCall(args, "allocUniqueId"), "="));
+         addSetIdAssignment(tagType, tagType.typeName, false);
          specifiedId = true;
       }
       if (repeatWrapper != null) {
-         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
-         args.add(StringLiteral.create(repeatWrapper.typeName));
-         if (getNeedsClientServerSpecificId())
-            args.add(BooleanLiteral.create(true));
          // Needs to be after the setParent call.
-         addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("id", IdentifierExpression.createMethodCall(args, "allocUniqueId"), "="));
+         addSetIdAssignment(repeatWrapper, repeatWrapper.typeName, false);
       }
       if (tagName != null) {
          // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
@@ -2656,23 +2732,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                    }
 
                    if (isIdProperty) {
-                      // We might be inheriting this same id in which case do not set it - otherwise, we get duplicates of the same unique id.
-                      // But if we are extending a tag with a different id, we do need to set it even if we are inheriting it.
-                      if (!PString.isString(att.value) || !inheritsId(att.value.toString())) {
-                         String attStr = att.value.toString();
-                         if (attStr.equals(ALT_ID))
-                            attExpr = StringLiteral.create(getAltId());
-                         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
-                         args.add(attExpr);
-                         // Don't add 'true' here - the id has been assigned and so style sheets may depend upon it.
-                         // I think the need for the "_s" suffix is just for when we use the tag name because the order in which ids are assigned must match between client/server
-                         /*
-                         if (getNeedsClientServerSpecificId())
-                            args.add(BooleanLiteral.create(true));
-                         */
-                         attExpr = IdentifierExpression.createMethodCall(args, "allocUniqueId");
-                      }
-                      else
+                      attExpr = getIdInitExpr(attExpr, att.value); // Converts the provided id attribute value to an expression for initializing this tag or returns null if we can inherit it
+                      if (attExpr == null)
                          continue;
                    }
                    // For remote content, only look at the id attribute
@@ -2861,6 +2922,36 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return tagType;
    }
 
+
+   private Expression createIdInitExpr(Expression attExpr, String attStr, boolean idSpecified) {
+      if (idSpecified && attStr.equals(ALT_ID))
+         attExpr = StringLiteral.create(getAltId());
+      SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+      if (attExpr == null)
+         attExpr = StringLiteral.create(attStr);
+      args.add(attExpr);
+      // Don't add 'true' here if the id has been assigned explicitly as an attribute
+      if (!idSpecified && getNeedsClientServerSpecificId()) {
+         args.add(BooleanLiteral.create(true));
+      }
+      // I think the need for the "_s" suffix is just for when we use the tag name because the order in which ids are assigned must match between client/server
+                         /*
+                         if (getNeedsClientServerSpecificId())
+                            args.add(BooleanLiteral.create(true));
+                         */
+      return IdentifierExpression.createMethodCall(args, "allocUniqueId");
+   }
+
+   private Expression getIdInitExpr(Expression defaultAttExpr, Object attVal) {
+      // We might be inheriting this same id in which case do not set it - otherwise, we get duplicates of the same unique id.
+      // But if we are extending a tag with a different id, we do need to set it even if we are inheriting it.
+      if (!PString.isString(attVal) || !inheritsId(attVal.toString())) {
+         return createIdInitExpr(defaultAttExpr, attVal.toString(), true);
+      }
+      // else - no need to initialize the id property - it's inherited
+      return null;
+   }
+
    private String getTagNameForExplicitType(Object type) {
       if (ModelUtil.hasTypeParameters(type))
          type = ModelUtil.getParamTypeBaseType(type);
@@ -2938,6 +3029,23 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    }
 
+   private void processExecAttr(TypeDeclaration tagType) {
+      if (oldExecTag)
+         return;
+      String execStr = getFixedAttribute("exec");
+      if (execStr != null) {
+         Annotation annot = Annotation.create("sc.obj.Exec");
+         annot.addAnnotationValues(AnnotationValue.create("runtimes", execStr));
+         int flags = parseExecFlags(execStr);
+         if ((flags & ExecServer) != 0)
+            annot.addAnnotationValues(AnnotationValue.create("serverOnly", true));
+         if ((flags & ExecClient) != 0)
+            annot.addAnnotationValues(AnnotationValue.create("clientOnly", true));
+
+         tagType.addModifier(annot);
+      }
+   }
+
    private boolean tagTypeNeedsAbstract() {
       if (children != null) {
          for (Object child:children) {
@@ -2967,14 +3075,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private int addSetServerAtt(BodyTypeDeclaration type, int idx, String propName) {
-      BodyTypeDeclaration parentType = type.getEnclosingType();
-      if (parentType != null) {
-         //PropertyAssignment pa = PropertyAssignment.create("parentNode", IdentifierExpression.create(parentType.typeName, "this"), "=");
-         PropertyAssignment pa = PropertyAssignment.create(propName, BooleanLiteral.create(true), "=");
-         addTagTypeBodyStatement(type, pa);
-         return type.body.size();
-      }
-      return idx;
+      PropertyAssignment pa = PropertyAssignment.create(propName, BooleanLiteral.create(true), "=");
+      addTagTypeBodyStatement(type, pa);
+      return type.body.size();
    }
 
    static HashMap<String, Set<String>> htmlAttributeMap = new HashMap<String, Set<String>>();
@@ -4545,4 +4648,5 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       return cache == CacheMode.Enabled;
    }
+
 }
