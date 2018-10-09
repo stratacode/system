@@ -83,6 +83,9 @@ public interface IRuntimeProcessor {
    /** Some runtimes, like Javascript, are not active in Java so suppress loading classes there */
    boolean getLoadClassesInRuntime();
 
+   /** Should this runtime use the Thread.currentThread().setContextClassLoader() mechanism (as used by java servlets and components) */
+   boolean getUseContextClassLoader();
+
    /** The list of process names this runtime should sync against. */
    public List<String> getSyncProcessNames();
 

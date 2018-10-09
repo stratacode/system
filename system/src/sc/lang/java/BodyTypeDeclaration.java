@@ -3889,7 +3889,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if ((ctxLoader = Thread.currentThread().getContextClassLoader()) != sysLoader) {
          // In this case, the system loader has been updated so update the thread's class loader.
          if (ctxLoader instanceof TrackingClassLoader) {
-            Thread.currentThread().setContextClassLoader(sysLoader);
+            if (sys.getUseContextClassLoader())
+               Thread.currentThread().setContextClassLoader(sysLoader);
          }
          else {
             sys.setAutoSystemClassLoader(ctxLoader);

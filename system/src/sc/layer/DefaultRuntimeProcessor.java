@@ -25,10 +25,15 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
 
    boolean loadClassesInRuntime = true;
 
+   boolean useContextClassLoader = true;
+
    ArrayList<String> syncProcessNames;
 
    public DefaultRuntimeProcessor(String rtName) {
       runtimeName = rtName;
+      // TODO: do we need a better way to define this?
+      if (rtName != null && (rtName.equals("android") || rtName.equals("gwt")))
+         useContextClassLoader = false;
    }
 
    public String getDestinationName() {
@@ -129,6 +134,13 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    }
    public boolean getLoadClassesInRuntime() {
       return loadClassesInRuntime;
+   }
+
+   public void setUseContextClassLoader(boolean val) {
+      useContextClassLoader = val;
+   }
+   public boolean getUseContextClassLoader() {
+      return useContextClassLoader;
    }
 
    public List<String> getSyncProcessNames() {

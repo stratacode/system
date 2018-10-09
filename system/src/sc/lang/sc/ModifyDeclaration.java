@@ -521,7 +521,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyType == null) {
             String fullTypeName = getFullTypeName();
 
-            modifyClass = thisModel.getClass(fullTypeName, false, layer, isLayerType, false, isLayerType);
+            modifyClass = isLayerType ? null : thisModel.getClass(fullTypeName, false, layer, isLayerType, false, isLayerType);
 
             // For the layer object, it is registered as a global object.  Look it up with resolveName and just assign
             // the class to avoid the error.

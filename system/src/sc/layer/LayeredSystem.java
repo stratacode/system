@@ -2652,7 +2652,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void updateBuildClassLoader(ClassLoader loader) {
       buildClassLoader = loader;
-      Thread.currentThread().setContextClassLoader(buildClassLoader);
+      if (getUseContextClassLoader())
+         Thread.currentThread().setContextClassLoader(buildClassLoader);
       // We have just extended the class path and so need to flush out any null sentinels we may have cached for
       // these newly loaded classes.
       RTypeUtil.flushLoadedClasses();
@@ -2729,7 +2730,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          else {
             buildClassLoader = getClass().getClassLoader();
-            Thread.currentThread().setContextClassLoader(buildClassLoader);
+            if (getUseContextClassLoader())
+               Thread.currentThread().setContextClassLoader(buildClassLoader);
          }
       }
    }
@@ -3606,7 +3608,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // TODO should we have some way for layers to turn this on or off?  Most SC frameworks do not do this injected class
          // dependency thing and work fine without the rest.  It means we have to reload all classes.
          sys.resetClassLoader();
-         Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
+         if (sys.getUseContextClassLoader())
+            Thread.currentThread().setContextClassLoader(sys.getSysClassLoader());
       }
 
       // This will do any post-build processing such as generating static HTML files.  Only do it for the main runtime... otherwise, we'll do the .html files twice.
@@ -3689,7 +3692,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                System.setProperty("user.dir", runFromDir);
             }
 
-            if (commandThread != null)
+            if (sys.getRuntimeName() != null && sys.getRuntimeName().equals("android"))
+               System.out.println("***");
+
+            if (commandThread != null && sys.getUseContextClassLoader())
                commandThread.setContextClassLoader(sys.getSysClassLoader());
 
             // first initialize and start all initOnStartup and createOnStartup objects
@@ -4304,7 +4310,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Models such as schtml templates need to run after the entire system has compiled - the postBuild phase. */
    private void initPostBuildModels() {
-      Thread.currentThread().setContextClassLoader(getSysClassLoader());
+      if (getUseContextClassLoader())
+         Thread.currentThread().setContextClassLoader(getSysClassLoader());
 
       // Turn off sync for the page objects when they are being rendered statically - just removes some errors because we may create synchronized instances here
       SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.Disabled);
@@ -5276,6 +5283,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (String layerName:layerNames) {
          Layer l = initLayer(layerName, relDir, relPath, markDynamic, lpi);
          layers.add(l);
+         if (l.layeredSystem != this)
+            System.out.println("*** initLayer returned mismatching runtime");
          if (specified && !specifiedLayers.contains(l) && l != null)
             specifiedLayers.add(l);
          lpi.createdLayers.add(l);
@@ -9162,7 +9171,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       resetModelCaches();
       initSysClassLoader(buildLayer, ClassLoaderMode.ALL);
 
-      Thread.currentThread().setContextClassLoader(getSysClassLoader());
+      if (getUseContextClassLoader())
+         Thread.currentThread().setContextClassLoader(getSysClassLoader());
       refreshBoundTypes(ModelUtil.REFRESH_CLASSES, true);
 
       // Test processors and other instances need to be refreshed with the new class loader
@@ -10166,7 +10176,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          cleanTypeCache();
 
       // Clear out any compiled classes which might have changed as a result of being compiled elsewhere - this currently does not support java.lang.Class since that requires messing with class loaders and instances.  It only works with CFClass's.
-      refreshClassCache();
+      refreshClassCache(); // TODO: don't think this works
 
       // We may start some new models here so reset this flag
       allTypesProcessed = false;
@@ -11559,8 +11569,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (srcFile == null)
+      if (srcFile == null) {
          srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer, layerResolve);
+         if (srcFile != null && srcFile.layer != null && srcFile.layer.layeredSystem != this) {
+            System.err.println("*** SrcFile returned from wrong layeredSystem!");
+            srcFile = getSrcFileFromTypeName(typeName, true, fromLayer, prependPackage, null, refLayer, layerResolve);
+         }
+      }
 
       if (srcFile == null && layerResolve) {
          Layer layer;
@@ -12979,7 +12994,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model != null)
             return model.layer;
          // If this layer has already been disabled return the disabled layer
-         Layer disabledLayer = lookupDisabledLayer(expectedName);
+         /* This causes us to get the wrong layered system for a styled file in the compile doc - and was being called even when we had created an android layered system */
+         Layer disabledLayer = null; // lookupDisabledLayer(expectedName);
          if (disabledLayer != null)
             return disabledLayer;
       }
@@ -13206,8 +13222,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (int li = 0; li < baseLayerNames.size(); li++) {
          String baseLayerName = baseLayerNames.get(li);
          Layer bl = activated ? findLayerByName(relPath, baseLayerName) : findInactiveLayerByName(relPath, baseLayerName.replace('/', '.'), openLayers);
-         if (bl != null)
+         if (bl != null) {
             baseLayers.add(bl);
+            if (bl.layeredSystem != this)
+               System.out.println("*** find layer returned mismatching runtime");
+         }
          else {
             if (options.sysDetails)
                System.out.println("No base layer: " + baseLayerName + " for: " + relPath + " in: " + getProcessIdent());
@@ -14552,6 +14571,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Avoid loading classes or initing dynamic types for the JS runtime because it's not really active */
    public boolean getLoadClassesInRuntime() {
       return runtimeProcessor == null || runtimeProcessor.getLoadClassesInRuntime();
+   }
+
+   public boolean getUseContextClassLoader() {
+      if (layers.size() == 0)
+         return false; // This is an inactive layered system - no need to set the context class loader.  This avoids setting this to java_Desktop for the documentation where we want it always to be java_Server
+      return runtimeProcessor == null || runtimeProcessor.getUseContextClassLoader();
    }
 
    public void registerDefaultAnnotationProcessor(String annotationTypeName, IAnnotationProcessor processor) {

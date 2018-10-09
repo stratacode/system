@@ -3385,6 +3385,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
+   public boolean getUseContextClassLoader() {
+      return false;
+   }
+
    public String transformStatement(BodyTypeDeclaration currentType, Object instance, Statement st) {
       JSTypeParameters exprParams = new JSTypeParameters(currentType);
 
@@ -3430,4 +3434,5 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public boolean supportsTagCaching() {
       return false;
    }
+
 }

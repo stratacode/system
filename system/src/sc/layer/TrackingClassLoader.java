@@ -38,6 +38,8 @@ public class TrackingClassLoader extends URLClassLoader {
          // Also when we start a new stack of layers that are not related to the previous ones, we do not disable the old one.
          // TODO: Essentially we want this last test to  disable the previous loader if we included the URLs from the previous one in this one.  Maybe we should just change it to work by comparing the URLs or breaking out the logic in which we decide if we should include the URLs?
          Layer parentLayer = parentTrackingLoader.layer;
+         if (parentLayer != null && layer != null && parentLayer.layeredSystem != layer.layeredSystem)
+            System.out.println("*** Mismatching runtimes in class loaders");
          if (layer != null && !layer.tempLayer && !layer.buildSeparate && parentLayer != null && (layer.isBuildLayer() || layer.extendsLayer(parentLayer)))
             parentTrackingLoader.disableBuildLoaders(this);
       }
@@ -80,7 +82,7 @@ public class TrackingClassLoader extends URLClassLoader {
 
    protected Class loadClass (String name, boolean resolve) throws ClassNotFoundException {
       activeCount++;
-      Class c = null;
+      Class c;
       try {
          if (disabled) {
             Class sc = findLoadedClass(name);
