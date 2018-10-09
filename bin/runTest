@@ -50,6 +50,11 @@ else
    done
 fi
 
+if [ "$SHOW_WINDOW" = "1" ] ; then
+  echo "Environment: SHOW_WINDOW set to 1"
+  ARGS+=" -sw"
+fi
+
 if [ "${#ARGS[@]}" == "0" ] ; then
    echo "No arguments supplied to runTest: $TEST_NAME"
    exit -1
@@ -87,6 +92,7 @@ echo "--- Running test $TEST_NAME: ${CMD}${INPUT_FILE_REDIR} > $OUTP_FILE"
 echo "$TEST_NAME" >> "${RUN_DIR}/testsRun"
 touch "${RUN_DIR}/passed"
 if [ "$ECHO_OUTPUT" = "1" ] ; then
+   echo "Environment: ECHO_OUTPUT set to 1"
    if [ ! -z "$INPUT_FILE" ] ; then
       $CMD 2>&1 < "$INPUT_FILE" | tee "$OUTP_FILE" 
    else
