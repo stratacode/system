@@ -126,6 +126,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
                // This matches the rules for a file name with intelliJ's virtual file system so we don't have to convert it to hand it off (and it seems like as good as any)
                file.zipFileName = zipFile.getName();
                file.classFileName = "jar://" + file.zipFileName + "!/" + classPathName;
+               file.lastModifiedTime = new File(file.zipFileName).lastModified();
                return file.getCFClass();
             }
          }

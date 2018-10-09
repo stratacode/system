@@ -926,6 +926,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
     * we expose this list to templates which need to have it set before the "transform" phase.
     */
    void addTypeLibsToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Object parentType, String relation) {
+      if (type.excludedStub != null)
+         type = type.excludedStub;
+
       type = (BodyTypeDeclaration) resolveBaseType(type);
 
       JavaModel javaModel = type.getJavaModel();
@@ -1029,7 +1032,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
             Set<Object> depTypes = type.getDependentTypes();
             for (Object depType:depTypes) {
-               addDependentType(type, depType, typeLibFile, typesInFile);
+               if (!ModelUtil.isOuterType(type, depType)) // If we are in the midst of starting an outer type, and we end up finding that outer type is a dependency of some inner type - don't go and add that dependency as it causes us to restart the outer type
+                  addDependentType(type, depType, typeLibFile, typesInFile);
             }
             addFrameworkDependencies(type, typeLibFile, typesInFile);
          }
@@ -2626,6 +2630,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    /** Adds the type to the jsFileBody for the lib file registered for this type (or the default lib file)  */
    void addTypeToFile(BodyTypeDeclaration type, Map<JSFileEntry,Boolean> typesInFile, String rootLibFile, Layer genLayer, Set<String> typesInSameFile, List<BodyTypeDeclaration> addLaterTypes) {
+      if (type.excludedStub != null)
+         type = type.excludedStub;
 
       BodyTypeDeclaration origType = type;
       ModelUtil.ensureStarted(type, true); // Coming from dependent types, we may not be started.
@@ -2805,14 +2811,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      }
                      else {
                         BodyTypeDeclaration depTD = (BodyTypeDeclaration) depType;
-                        if (depTD.excluded) {
-                           if (depTD.excludedStub != null)
-                              continue;
-                           else
-                              System.err.println("*** excluding type which has a dependency in the JS runtime");
-                        }
                         ModelUtil.ensureStarted(depType, true);
                         depTD = depTD.resolve(true);
+                        if (depTD.excluded) {
+                           if (depTD.excludedStub == null)
+                              System.err.println("*** excluding type which has a dependency in the JS runtime");
+                           else {
+                              depTD = depTD.excludedStub;
+                           }
+                        }
 
                         if (!ModelUtil.sameTypes(depTD, type)) {
                            if (!type.isAssignableFrom(depTD, false))

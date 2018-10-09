@@ -71,6 +71,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * as serverContent with no children so we stitch in the server content with the client content.
     */
    transient public TypeDeclaration excludedStub = null;
+   transient public boolean isExcludedStub = false; // Set to true for the excludedStub type itself
 
    /** Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer */
    public transient boolean dynamicType = false;
@@ -7848,8 +7849,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          super.start();
 
       // Need to do this after we start the @Exec annotation
-      if (!isLayerType && !isLayerComponent() && layer != null && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
-         if (sys.options.verbose)
+      if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
+         if (sys.options.verbose || sys.options.verboseExec)
             sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
          markExcluded();
       }
@@ -9216,7 +9217,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.extendsOverridden= extendsOverridden;
 
          res.excluded = excluded;
-         res.excludedStub = excludedStub;
+         res.excludedStub = excludedStub == null ? null : excludedStub.deepCopy(options, oldNewMap);
+         res.isExcludedStub = isExcludedStub;
 
          res.innerObjs = innerObjs;
 

@@ -12,7 +12,6 @@ import sc.dyn.DynRemoteMethod;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.html.Attr;
-import sc.lang.html.Body;
 import sc.lang.html.Element;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.ModifyDeclaration;
@@ -8872,6 +8871,11 @@ public class ModelUtil {
    }
 
    public static boolean execForRuntime(LayeredSystem refSys, Layer refLayer, Object refTypeOrMember, LayeredSystem runtimeSys) {
+      if (refTypeOrMember instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration td = (BodyTypeDeclaration) refTypeOrMember;
+         if (td.isExcludedStub) // The stub is included even though it's underlying type has been excluded
+            return true;
+      }
       Object execAnnot = ModelUtil.getInheritedAnnotation(refSys, refTypeOrMember, "sc.obj.Exec", false, refLayer, false);
       if (execAnnot != null) {
          String execRuntimes = (String) ModelUtil.getAnnotationValue(execAnnot, "runtimes");
@@ -8881,6 +8885,10 @@ public class ModelUtil {
                if (rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
                   return true;
                if (rtName.equals("default") && runtimeSys.isDefaultSystem())
+                  return true;
+               if (rtName.equals("server") && runtimeSys.serverEnabled)
+                  return true;
+               if (rtName.equals("client") && !runtimeSys.serverEnabled)
                   return true;
             }
             return false;

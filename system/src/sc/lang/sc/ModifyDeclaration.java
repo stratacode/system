@@ -351,7 +351,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    public void markExcluded() {
       super.markExcluded();
-      if (modifyTypeDecl != null)
+      if (modifyTypeDecl != null && !modifyInherited)
          modifyTypeDecl.markExcluded();
    }
 

@@ -1909,7 +1909,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       super.markExcluded();
       if (element != null) {
          excludedStub = element.getExcludedStub();
-         ParseUtil.initAndStartComponent(excludedStub);
+         if (excludedStub != null) {
+            excludedStub.isExcludedStub = true;
+            ParseUtil.initAndStartComponent(excludedStub);
+         }
       }
    }
 }

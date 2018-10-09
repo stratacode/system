@@ -619,7 +619,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          Object result = parselet.generate(newGenerateContext(parselet), this);
          if (result instanceof ParseError) {
             System.err.println("*** Error generating ad-hoc model: " + this);
-            return "Error translating";
+            return "Error generating text from parselet: " + parselet;
          }
          return result.toString();
       }

@@ -440,7 +440,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          Object result = parselet.generate(parselet.getLanguage().newGenerateContext(parselet, this), this);
          if (result instanceof ParseError || result instanceof GenerateError) {
             System.err.println("*** Error generating code for parselet: " + parselet + " language: " + parselet.getLanguage() + " and model: " + this);
-            return "Error translating";
+            return "Error generating list from parselet: " + parselet;
          }
          else if (result instanceof IParseNode)
             return ((IParseNode) result).formatString(null, null, -1, true).toString();

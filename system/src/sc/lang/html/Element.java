@@ -2218,7 +2218,16 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       boolean idSpecified = idInitStr != null;
       if (!idSpecified)
          idInitStr = type.typeName;
-      addSetIdAssignment(type, idInitStr, idSpecified);
+      String fixedIdAtt = getFixedAttribute("id");
+      if (fixedIdAtt != null) {
+         if (fixedIdAtt.equals(ALT_ID)) {
+            fixedIdAtt = getAltId();
+         }
+         fixedIdAtt = CTypeUtil.escapeIdentifierString(fixedIdAtt);
+      }
+      if (!inheritsId(fixedIdAtt)) {
+         addSetIdAssignment(type, idInitStr, idSpecified);
+      }
    }
 
    private void addSetIdAssignment(BodyTypeDeclaration type, String idInitStr, boolean idSpecified) {
@@ -2232,10 +2241,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (tagObject == null)
          return null;
       int myExecFlags = getDefinedExecFlags();
+
       Element parentTag = getEnclosingTag();
-      int parentExecFlags = parentTag == null ? 0 : parentTag.getComputedExecFlags();
-      if (myExecFlags != parentExecFlags && isRemoteContent() && !isAbstract()) {
-         Object extType = getDefaultExtendsTypeDeclaration(false);
+      int parentExecFlags = parentTag == null ? -1 : parentTag.getComputedExecFlags();
+      if (myExecFlags != parentExecFlags) {
+         Object extType = getTagObjectExtends();
          ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType));
          decl.addModifier("public");
          decl.parentNode = parentNode;
@@ -2243,9 +2253,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          addSetServerAtt(decl, 0, "serverTag");
          addParentNodeAssignment(decl);
          addStubIdAssignment(decl);
+
+         // TODO: currently if you exclude something with exec="server" nested children can't turn it back to exec="client" but we could potentially support that
+         // by finding all child tags that become visible with exec="client" and adding them here.
+
          return decl;
       }
       return null;
+   }
+
+   private Object getTagObjectExtends() {
+      if (tagObject instanceof ModifyDeclaration) {
+         ModifyDeclaration modTagObj = (ModifyDeclaration) tagObject;
+         if (modTagObj.modifyInherited)
+            return modTagObj.getModifiedType();
+      }
+      return getExtendsTypeDeclaration();
    }
 
    /** Called during transform to set properties specific to the java version of the StrataCode.
@@ -3026,7 +3049,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                attr.displayTypeError("No scope " + scopeName + " for tag: ");
          }
       }
-
    }
 
    private void processExecAttr(TypeDeclaration tagType) {
@@ -3037,9 +3059,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          Annotation annot = Annotation.create("sc.obj.Exec");
          annot.addAnnotationValues(AnnotationValue.create("runtimes", execStr));
          int flags = parseExecFlags(execStr);
-         if ((flags & ExecServer) != 0)
+         if ((flags & ExecServer) != 0 && ((flags & ExecClient) == 0))
             annot.addAnnotationValues(AnnotationValue.create("serverOnly", true));
-         if ((flags & ExecClient) != 0)
+         if ((flags & ExecClient) != 0 && ((flags & ExecServer) == 0))
             annot.addAnnotationValues(AnnotationValue.create("clientOnly", true));
 
          tagType.addModifier(annot);
