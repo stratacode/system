@@ -1905,9 +1905,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return true;
    }
 
-   public void markExcluded() {
-      super.markExcluded();
-      if (element != null) {
+   public void markExcluded(boolean topLevel) {
+      super.markExcluded(topLevel);
+
+      // The first element which is excluded in a parent/child chain needs a stub from the element to stitch in the static content from the children rendered on the server
+      if (element != null && topLevel) {
          excludedStub = element.getExcludedStub();
          if (excludedStub != null) {
             excludedStub.isExcludedStub = true;

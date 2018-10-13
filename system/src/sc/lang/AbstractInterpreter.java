@@ -744,6 +744,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             if (!assign.hasErrors() && performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, assign)) {
                performedOnce = true;
+
+               if (system.options.verboseExec)
+                  system.info("Exec: " + assign + " on system: " + system.getProcessIdent());
+
                if (edit) {
                   // synchronization done inside updateProperty - we grab the lock to update the model but release it to update the property in case that triggers events back into the system
                   JavaSemanticNode newDefinition = current.updateProperty(assign, execContext, !skipEval, null);
@@ -771,6 +775,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         peerAssign.parentNode = peerType;
 
                         if (!ignoreRemoteStatement(peerSys, peerAssign)) {
+                           if (system.options.verboseExec)
+                              system.info("Exec: " + peerAssign + " on system: " + peerSys.getProcessIdent());
+
                            if (edit) {
                               UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
                               // TODO: is it right to pass execContext here and to updateInstances - isn't the currentObj stacks are not for the peer runtime
@@ -881,6 +888,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                if (!skipEval) {
                   boolean evalPerformed = false;
                   if (performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, expr)) {
+                     if (system.options.verboseExec)
+                        system.info("Exec local expr: " + expr + " on: " + system.getProcessIdent());
+
                      Object exprResult = expr.eval(null, execContext);
                      evalPerformed = true;
                      if (exprResult == null) {
@@ -900,6 +910,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                               Expression peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
                               if (!ignoreRemoteStatement(peerSys, peerExpr)) {
+                                 if (system.options.verboseExec)
+                                    system.info("Exec remote expr: " + expr + " on: " + peerSys.getProcessIdent());
                                  Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
                                  System.out.println(remoteRes);
                               }
@@ -1007,6 +1019,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                if (!skipEval) {
                   boolean evalPerformed = false;
                   if (performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, expr)) {
+                     if (system.options.verboseExec)
+                        system.info("Exec local statement: " + expr + " on: " + system.getProcessIdent());
                      ExecResult execResult = expr.exec(execContext);
                      if (execResult != ExecResult.Next)
                         System.err.println("*** Statement flow control at top-level not supported: " + expr);
@@ -1023,6 +1037,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                               peerExpr.parentNode = peerType;
 
                               if (!ignoreRemoteStatement(peerSys, peerExpr)) {
+                                 if (system.options.verboseExec)
+                                    system.info("Exec remote statement: " + peerExpr + " on: " + peerSys.getProcessIdent());
                                  Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
                                  System.out.println(remoteRes);
                               }

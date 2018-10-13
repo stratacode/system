@@ -2271,13 +2271,25 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return getExtendsTypeDeclaration();
    }
 
+   public boolean isServerTagType(BodyTypeDeclaration tagType) {
+      Object execAnnot = ModelUtil.getInheritedAnnotation(getLayeredSystem(), tagType, "sc.obj.Exec", false, tagType.getLayer(), false);
+      if (execAnnot != null) {
+         Boolean serverOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "serverOnly");
+         return serverOnly != null && serverOnly;
+      }
+      return false;
+   }
+
    /** Called during transform to set properties specific to the java version of the StrataCode.
     * Used to modify the generated Java based on the merged version of the type, not know in convertToObject.  Specifically because the
     * exec attribute can affect the tag properties, but is not know until transform type because we create the tagObject during init.
     * TODO: could be implemented as a mixinTemplate but since we have the element in the tagObject this is easier
     */
    public void addMixinProperties(BodyTypeDeclaration tagType) {
-      boolean serverTag = isMarkedAsServerTag();
+      // NOTE: using this method, not isMarkedServerTag which only looks at this element.  Instead, we need to look at the merged-version of the final tag
+      // type after the annotations have been merged to determine if it's a server tag in this instance.  Otherwise, we can't modify the exec attribute in
+      // another layer.
+      boolean serverTag = isServerTagType(tagType);
       if (serverTag) {
          Element parentTag = getEnclosingTag();
          // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for

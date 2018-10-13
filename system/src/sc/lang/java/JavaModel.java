@@ -3145,6 +3145,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 
+   public boolean getDisableTypeErrors() {
+      if (disableTypeErrors)
+         return true;
+      if (nonTransformedModel != null)
+         return nonTransformedModel.getDisableTypeErrors();
+      return false;
+   }
+
    public void updateTypeName(String oldTypeName, String newTypeName, boolean renameFile) {
       TypeDeclaration oldType = definedTypesByName.remove(oldTypeName);
       if (oldType != null)

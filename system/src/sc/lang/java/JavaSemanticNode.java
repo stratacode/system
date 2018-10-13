@@ -374,7 +374,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
    /** Used for errors involving type resolution.  These errors can be disabled during certain operations like transform */
    public boolean displayTypeError(String...args) {
       JavaModel model = getJavaModel();
-      if (model != null && !model.disableTypeErrors) {
+      if (model != null && !model.getDisableTypeErrors()) {
          model.reportError(getMessageString(args), this);
          return true;
       }

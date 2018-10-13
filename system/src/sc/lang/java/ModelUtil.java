@@ -4945,7 +4945,7 @@ public class ModelUtil {
             next = null;
             Object[] ifaces = ModelUtil.getImplementsTypeDeclarations(resultType);
             Object[] ifaceJavaTypes = ModelUtil.getImplementsJavaTypes(resultType);
-            if (ifaces != null) {
+            if (ifaces != null && ifaceJavaTypes != null) {
                for (int i = 0; i < ifaces.length; i++) {
                   Object ifaceType = ifaces[i];
                   Object ifaceJavaType = ifaceJavaTypes[i];
@@ -8916,7 +8916,6 @@ public class ModelUtil {
       }
       else
          return true;
-
    }
 
    public static Object getPropertyTypeFromType(Object type, String propName) {

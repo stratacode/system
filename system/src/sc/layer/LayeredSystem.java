@@ -147,6 +147,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    static LayeredSystem defaultLayeredSystem;
 
+   /** The LayeredSystem which is currently associated with the thread's ContextClassLoader. */
+   static LayeredSystem contextLoaderSystem;
+
    {
       setCurrent(this);
    }
@@ -3692,9 +3695,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                System.setProperty("user.dir", runFromDir);
             }
 
-            if (sys.getRuntimeName() != null && sys.getRuntimeName().equals("android"))
-               System.out.println("***");
-
             if (commandThread != null && sys.getUseContextClassLoader())
                commandThread.setContextClassLoader(sys.getSysClassLoader());
 
@@ -4959,7 +4959,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // If any of the existing layers used this build layer need to reset them.
          for (int i = 0; i < layers.size(); i++) {
             Layer toCheck = layers.get(i);
-            if (toCheck.origBuildLayer.removed) {
+            if (toCheck.origBuildLayer != null && toCheck.origBuildLayer.removed) {
                toCheck.origBuildLayer = buildLayer;
                toCheck.buildClassesDir = buildClassesDir;
                toCheck.sysBuildSrcDir = buildSrcDir;
@@ -5283,7 +5283,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (String layerName:layerNames) {
          Layer l = initLayer(layerName, relDir, relPath, markDynamic, lpi);
          layers.add(l);
-         if (l.layeredSystem != this)
+         if (l != null && l.layeredSystem != this)
             System.out.println("*** initLayer returned mismatching runtime");
          if (specified && !specifiedLayers.contains(l) && l != null)
             specifiedLayers.add(l);
@@ -6846,10 +6846,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   try {
                      acquireDynLock(false);
                      if (options.verbose) {
-                        if (curTypeIndexEntry == null)
-                           verbose("Refreshing type index: no type index entry for: " + path);
-                        else
-                           verbose("Refreshing type index: file has changed " + path);
+                        verbose("Refreshing type index for layer: " + layerName + " in: " + getProcessIdent() +
+                                (curTypeIndexEntry == null ? ": no type index entry for: " : " file changed: ") + path);
                      }
                      Layer newLayer = getActiveOrInactiveLayerByPath(layerName, null, false, true, true);
                      if (newLayer == null) {
@@ -14574,9 +14572,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public boolean getUseContextClassLoader() {
-      if (layers.size() == 0)
-         return false; // This is an inactive layered system - no need to set the context class loader.  This avoids setting this to java_Desktop for the documentation where we want it always to be java_Server
-      return runtimeProcessor == null || runtimeProcessor.getUseContextClassLoader();
+      if (layers.size() == 0) {
+         if (contextLoaderSystem == null) {
+            contextLoaderSystem = this;
+            return true;
+         }
+         return contextLoaderSystem == this; // This is an inactive layered system - no need to set the context class loader unless we're the default one.  This avoids setting this to java_Desktop for the documentation where we want it always to be java_Server
+      }
+      boolean res = runtimeProcessor == null || runtimeProcessor.getUseContextClassLoader();
+      if (res) {
+         if (contextLoaderSystem != null) {
+            if (contextLoaderSystem.layers.size() == 0)
+               contextLoaderSystem = this;
+            else if (contextLoaderSystem != this)
+               System.err.println("*** Warning: multiple runtimes trying to set context classLoader");
+         }
+         else
+            contextLoaderSystem = this;
+      }
+      return res;
    }
 
    public void registerDefaultAnnotationProcessor(String annotationTypeName, IAnnotationProcessor processor) {

@@ -349,10 +349,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
    }
 
-   public void markExcluded() {
-      super.markExcluded();
+   public void markExcluded(boolean topLevel) {
+      super.markExcluded(topLevel);
       if (modifyTypeDecl != null && !modifyInherited)
-         modifyTypeDecl.markExcluded();
+         modifyTypeDecl.markExcluded(topLevel);
    }
 
    public void stop() {

@@ -1425,6 +1425,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    }
 
    public boolean needsCompile() {
+      if (!super.needsCompile())
+         return false;
       // The default action here is to compile this file as .java file source unless the processor for the template says otherwise.
       // Normally templates that are not processed are compiled, unless they are runtime templates like the sctd files.
       if (templateProcessor == null || (!templateProcessor.isRuntimeTemplate()) && !templateProcessor.needsProcessing())

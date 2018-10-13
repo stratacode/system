@@ -790,6 +790,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
       if (td.typeName != null && td.typeName.equals("BuildInfo") && td.getDerivedTypeDeclaration() == BuildInfo.class)
          return true;
+
+      // Not part of this runtime - controlled by @sc.obj.Exec
+      if (td.excluded)
+         return true;
+
       return false;
    }
 
@@ -1475,9 +1480,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public void process(BodyTypeDeclaration td) {
-      if (skipTypeInJS(td))
-         return;
-
+      //if (skipTypeInJS(td))
+      //   return;
    }
 
    public void stop(BodyTypeDeclaration td) {
@@ -2989,6 +2993,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return false;
       }
       if (!processedTypes.contains(td.getFullTypeName()) && !hasJSLibFiles(td)) {
+         if (td.getJavaModel() == null) {
+            System.err.println("*** Error null java model for JS type");
+            return false;
+         }
          td.getJavaModel().disableTypeErrors = true;
          appendJSTypeTemplate(td, result, lineIndex);
          //appendInnerJSTypes(td, result);

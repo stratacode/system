@@ -7843,7 +7843,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = getLayeredSystem();
 
       if (isLayerType && layer != null && layer.excluded) {
-         markExcluded();
+         markExcluded(true);
       }
 
       if (!excluded)
@@ -7852,8 +7852,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Need to do this after we start the @Exec annotation
       if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
          if (sys.options.verbose || sys.options.verboseExec)
-            sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
-         markExcluded();
+            sys.info("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
+
+         TypeDeclaration enclType = getEnclosingType();
+
+         markExcluded(enclType == null || !enclType.excluded);
       }
 
       if (!excluded) {
@@ -7884,7 +7887,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (isLayerType && layer != null && layer.excluded)
          return;
 
-      super.validate();
+      //super.validate();
 
       if (needsDynamicStubForExtends()) {
          if (!dynamicNew) {
@@ -7922,6 +7925,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       initSyncProperties();
 
+      // Doing this after initSyncProperties so we process the 'validate' operation on the parent before the children.  For example initSyncProperties
+      // is best run top-down so we pick up all parent modify types to figure out which types are excluded before we do the 'automatic' sync mode.
+      super.validate();
+
       // If we are a dynamic type, we need to add any definition processor code that needs to be run for this type.  This may work in "start" if we need it earlier but replacedByType is not consistntly set by then.
       JavaModel model = getJavaModel();
       if (isDynamicType() && replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
@@ -7954,8 +7961,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public void markExcluded() {
+   public void markExcluded(boolean topLevel) {
       excluded = true;
+      List<Object> innerTypes = getAllInnerTypes(null, true);
+      if (innerTypes != null) {
+         for (Object innerType:innerTypes) {
+            if (innerType instanceof BodyTypeDeclaration) {
+               ((BodyTypeDeclaration) innerType).markExcluded(false);
+            }
+         }
+      }
    }
 
    public TypeIndexEntry createTypeIndex() {
@@ -8652,12 +8667,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       // Don't do sync for the layer types, annotation layer types or interfaces or deactivated layers
-      if (isLayerType || isLayerComponent() || layer.annotationLayer || getDeclarationType() == DeclarationType.INTERFACE || !layer.activated)
+      if (isLayerType || isLayerComponent() || layer.annotationLayer || getDeclarationType() == DeclarationType.INTERFACE || !layer.activated || excluded)
          return;
 
       // Or temporary types like documentation
       JavaModel model = getJavaModel();
       if (model.temporary)
+         return;
+
+      if (isExcludedStub)
          return;
 
       Object syncAnnot = getInheritedAnnotation("sc.obj.Sync");
@@ -8837,6 +8855,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                      ModelUtil.ensureStarted(syncType, false);
 
+                     if (syncType.excluded) {
+                        continue;
+                     }
                      // See if the other type defines the property - if so, we're in default mode so we sync on it.
                      // TODO: check the Sync annotation on the remote side?  Or maybe that annotation should only
                      // control how it syncs against us, not the other way around.
@@ -9218,7 +9239,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.extendsOverridden= extendsOverridden;
 
          res.excluded = excluded;
-         res.excludedStub = excludedStub == null ? null : excludedStub.deepCopy(options, oldNewMap);
+         if (excludedStub != null) {
+            // NOTE: the parentNode for the excludedStub gets set later - when the type is added to it's parent list in setParentNode
+            res.excludedStub = excludedStub.deepCopy(options, oldNewMap);
+         }
          res.isExcludedStub = isExcludedStub;
 
          res.innerObjs = innerObjs;
@@ -9708,5 +9732,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (ext != null)
          templatePathName = FileUtil.addExtension(templatePathName, ext);
       return templatePathName;
+   }
+
+   public void setParentNode(ISemanticNode parentNode) {
+      super.setParentNode(parentNode);
+      if (excludedStub != null)
+         excludedStub.parentNode = parentNode;
    }
 }

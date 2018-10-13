@@ -805,6 +805,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
          if (typeIndexRestored) {
             if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry)) {
+               if (layeredSystem.options.verbose && !typeIndexNeedsSave) {
+                  verbose("Type index for layer: " + layerDirName + " needs save - first changed type: " + typeName);
+               }
                typeIndexNeedsSave = true;
             }
             else if (lastModified > typeIndexFileLastModified)
@@ -2418,6 +2421,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             os.writeObject(layerTypeIndex);
             typeIndexNeedsSave = false;
             typeIndexFileLastModified = System.currentTimeMillis();
+
+            if (layeredSystem.options.verbose)
+               verbose("Saved type index for layer: " + layerDirName + " in runtime: " + layeredSystem.getProcessIdent() + " saved with: " + layerTypeIndex.layerTypeIndex.size() + " entries");
          }
          catch (IOException exc) {
             System.err.println("*** Unable to write typeIndexFile: " + exc);
@@ -2509,11 +2515,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public void saveDynTypeIndex() {
       File dynTypeFile = new File(buildSrcDir, layeredSystem.getDynTypeIndexFile());
       File buildSrcDirFile = new File(buildSrcDir);
+      /* Some old debug code... not sure why this was here
       if (buildSrcDir.contains("clientServer") && layeredSystem.getRuntimeName().contains("java")) {
          if (dynTypeIndex != null && !dynTypeIndex.contains("sc.html.index") && dynamic) {
             System.err.println("*** Error - saving clientServer index without a dynamic sc.html.index page!");
          }
       }
+      */
       if (!buildSrcDirFile.isDirectory()) {
          if (!buildSrcDirFile.mkdirs()) {
             System.err.println("*** Can't make buildSrcDir: " + buildSrcDir);

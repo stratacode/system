@@ -236,13 +236,13 @@ public class Options {
                          "   [ -db,-ds,-d <buildOrSrcDir> ]: override the buildDir, buildSrcDir, or both of the buildLayer's buildDir and buildSrcDir properties \n" +
                          "   [ -r/-rs <main-class-pattern> ...all remaining args...]: After compilation, run all main classes matching the java regex with the rest of the arguments.  -r: run in the same process.  -rs: exec the generated script in a separate process.\n" +
                          "   [ -ra ... remaining args passed to main methods... ]: Run all main methods\n" +
-                         "   [ -tv ]: Enable 'test verify' mode.  Run all tests, or those specified with -t, -ts, -ti or -ta.  Omit timestamps or other info in log files that changes from run to run for easier comparison\n" +
+                         "   [ -tv ]: Enable 'test verify' mode.  Run all tests, or those specified with -t, -ts, -ti or -ta.  Don't show windows for frameworks that support headless operation. Omit timestamps or other info in log files that changes from run to run for easier comparison\n" +
+                         "   [ -tw ]: Enable 'test with window' mode.  Like -tv but shows the window.\n" +
                          "   [ -t <test-class-pattern>]: Run only the matching tests.\n" +
                          "   [ -ts/-ti <scriptName.scr>]: After compilation, run (-ts) or include (-ti) the specified test-script.  Use -ts to exit when the script is done.  -ti to enter the interpreter when the test is completed\n" +
                          "   [ -o <pattern> ]: Sets the openPattern, used by frameworks to choose which page to open after startup.\n" +
                          "   [ -ta ]: Like -tv but runs all tests without 'test verify mode'.\n" +
                          "   [ -nw ]: For web frameworks, do not open the default browser window.\n" +
-                         "   [ -sw ]: Show window, even when running in testMode which otherwise defaults to headless operation\n" +
                          "   [ -P<propFileName.propName=value> ]: Override layer property, bound at top-level of layer directory in propFileName with propName=value\n" +
                          "   [ -n ]: Start 'create layer' wizard on startup.\n" +
                          "   [ -ni ]: Disable command interpreter\n" +
