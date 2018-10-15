@@ -1033,7 +1033,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          str = addExtraAttributes(str, strExprs);
 
          if (!inactive) {
-            if (needsId()) {
+            if (needsId() && !isSingletonTag()) {
                str.append(" id='");
                strExprs.add(StringLiteral.create(str.toString()));
                strExprs.add(IdentifierExpression.createMethodCall(new SemanticNodeList(), "getId"));
@@ -1226,7 +1226,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
             if (!inactive) {
                Expression texpr;
-               if (needsId()) {
+               if (needsId() && !isSingletonTag()) {
                   str.append(" id='");
                   texpr = StringLiteral.create(str.toString());
                   texpr.fromStatement = this;
@@ -2225,7 +2225,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
          fixedIdAtt = CTypeUtil.escapeIdentifierString(fixedIdAtt);
       }
-      if (!inheritsId(fixedIdAtt)) {
+      if (!inheritsId(fixedIdAtt) && !isSingletonTag()) {
          addSetIdAssignment(type, idInitStr, idSpecified);
       }
    }
@@ -2233,6 +2233,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private void addSetIdAssignment(BodyTypeDeclaration type, String idInitStr, boolean idSpecified) {
       if (!idSpecified)
          idInitStr = type.typeName;
+      if (idInitStr != null && tagName != null && idInitStr.equals(tagName) && isSingletonTag())
+         return;
       Expression idInitExpr = createIdInitExpr(null, idInitStr, idSpecified);
       addTagTypeBodyStatement(type, PropertyAssignment.create("id", idInitExpr, "="));
    }

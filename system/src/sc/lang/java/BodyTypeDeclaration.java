@@ -7093,7 +7093,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                   useChildNames = childNames;
                   if (innerTypeDecl != null) {
-                     if (innerTypeDecl.excluded && innerTypeDecl.excludedStub == null) // This inner type is not included in this runtime so don't add it to the child list
+                     if (!innerTypeDecl.needsCompile()) // This inner type is not included in this runtime so don't add it to the child list
                         continue;
                      typeScope = innerTypeDecl.getScopeProcessor();
                      String groupName;
@@ -9738,5 +9738,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       super.setParentNode(parentNode);
       if (excludedStub != null)
          excludedStub.parentNode = parentNode;
+   }
+
+   /** An excluded type can have an excludedStub that's inserted in it's place */
+   public boolean needsCompile() {
+      return !excluded || excludedStub != null;
    }
 }

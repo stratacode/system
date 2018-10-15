@@ -792,7 +792,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
 
       // Not part of this runtime - controlled by @sc.obj.Exec
-      if (td.excluded)
+      if (!td.needsCompile())
          return true;
 
       return false;
@@ -2607,7 +2607,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          extType = resolveBaseType(extType);
          if (extType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration extTD = (BodyTypeDeclaration) extType;
-            addTypeToFile(extTD, typesInFile, rootLibFile, genLayer, null, addLaterTypes);
+            if (extTD.needsCompile()) // Skip 'excluded' types (unless there's a stub which replaces the type).  For excluded/non-stub classes we don't generate a Java class for these so don't try to generate a JS one either
+               addTypeToFile(extTD, typesInFile, rootLibFile, genLayer, null, addLaterTypes);
          }
          else if (!hasJSLibFiles(extType) && !hasJSCompiled(extType))
             System.err.println("*** Can't convert compiled type: " + ModelUtil.getTypeName(extType) + " to JS");

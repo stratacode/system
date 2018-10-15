@@ -1572,8 +1572,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       if (modelType != null && modelType.excluded) {
          LayeredSystem sys = getLayeredSystem();
-         if (sys.options.verbose)
-            sys.verbose("Excluded: " + modelType.typeName + " from: " + sys.getProcessIdent());
+         if (sys.options.verbose) {
+            if (modelType.excludedStub == null)
+               sys.verbose("Excluded: " + modelType.typeName + " in: " + sys.getProcessIdent());
+            else
+               sys.verbose("Excluded: " + modelType.typeName + " replaced by stub in: " + sys.getProcessIdent());
+         }
          return Collections.emptyList();
       }
 
@@ -2309,7 +2313,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public boolean needsCompile() {
       TypeDeclaration modelType = getModelTypeDeclaration();
-      return modelType != null && !modelType.excluded;
+      return modelType != null && modelType.needsCompile();
    }
 
    public boolean needsPostBuild() {
