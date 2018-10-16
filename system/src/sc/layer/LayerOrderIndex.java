@@ -53,9 +53,6 @@ public class LayerOrderIndex implements Serializable {
       }
       int lastPos = -1;
       int numInactiveLayers = sys.inactiveLayers.size();
-      int numInOrderList = inactiveLayerNames.size();
-      if (numInactiveLayers != numInOrderList && numInOrderList > 0 && numInactiveLayers > 0)
-         System.out.println("*** Refreshing order index for: " + sys.getProcessIdent() + " with: " + sys.inactiveLayers.size() + " inactive and " + inactiveLayerNames.size() + " in the order index");
       for (int i = 0; i < numInactiveLayers; i++) {
          String layerName = sys.inactiveLayers.get(i).getLayerName();
          int nextPos = inactiveLayerNames.indexOf(layerName);
