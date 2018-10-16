@@ -17,14 +17,17 @@ import java.util.List;
  */
 public class ProcessDefinition implements IProcessDefinition, Serializable {
    String processName;
+   boolean useContextClassLoader;
+
    public ProcessDefinition() {
    }
    public ProcessDefinition(String procName) {
       processName = procName;
    }
-   public ProcessDefinition(String procName, IRuntimeProcessor proc) {
+   public ProcessDefinition(String procName, IRuntimeProcessor proc, boolean useContextClassLoader) {
       this(procName);
       runtimeProcessor = proc;
+      this.useContextClassLoader = useContextClassLoader;
    }
    public String getProcessName() {
       return processName;
@@ -53,6 +56,7 @@ public class ProcessDefinition implements IProcessDefinition, Serializable {
          return runtimeProcessor.getSyncProcessNames();
       return syncProcessNames;
    }
+
    public void setSyncProcessNames(List<String> syncProcessNames) {
       this.syncProcessNames = syncProcessNames;
    }
@@ -65,12 +69,12 @@ public class ProcessDefinition implements IProcessDefinition, Serializable {
       return runtimeProcessor == null ? IRuntimeProcessor.DEFAULT_RUNTIME_NAME : runtimeProcessor.getRuntimeName();
    }
 
-   public static ProcessDefinition create(String procName) {
-      return new ProcessDefinition(procName);
+   public boolean getUseContextClassLoader() {
+      return useContextClassLoader;
    }
 
-   public static ProcessDefinition create(String procName, IRuntimeProcessor proc) {
-      return new ProcessDefinition(procName, proc);
+   public static ProcessDefinition create(String procName, String runtimeName, boolean useContextClassLoader) {
+      return new ProcessDefinition(procName, LayeredSystem.getRuntime(runtimeName), useContextClassLoader);
    }
 
    public String toString() {
@@ -153,6 +157,5 @@ public class ProcessDefinition implements IProcessDefinition, Serializable {
       finally {
          FileUtil.safeClose(os);
       }
-
    }
 }

@@ -8,7 +8,6 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
-import sc.lang.html.Element;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.SCModel;
@@ -149,6 +148,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** The LayeredSystem which is currently associated with the thread's ContextClassLoader. */
    static LayeredSystem contextLoaderSystem;
+
+   /** If there's a specific layered system which should set the context class loader, set this property to it's process identity (see getProcessIdent()) */
+   public static String contextLoaderSystemName = null;
 
    {
       setCurrent(this);
@@ -566,7 +568,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       removeAllActivePackageIndexEntries();
 
-      if (!peerMode && !options.disableGC)
+      if (!peerMode && !options.disableAutoGC)
          System.gc();
 
    }
@@ -1826,7 +1828,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (!options.disableGC)
+      if (!options.disableAutoGC)
          System.gc();
    }
 
@@ -1967,7 +1969,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          addRuntime(fromLayer, rtProc);
    }
 
-   public static boolean createDefaultRuntime(Layer fromLayer, String name) {
+   public static boolean createDefaultRuntime(Layer fromLayer, String name, boolean needsContextClassLoader) {
       if (runtimes != null) {
          for (IRuntimeProcessor proc:runtimes) {
             if (proc != null) {
@@ -1977,7 +1979,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
       }
-      addRuntime(fromLayer, new DefaultRuntimeProcessor(name));
+      addRuntime(fromLayer, new DefaultRuntimeProcessor(name, needsContextClassLoader));
       return true;
    }
 
@@ -14572,6 +14574,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public boolean getUseContextClassLoader() {
+      if (options.disableContextClassLoader)
+         return false;
+      if (processDefinition != null && !processDefinition.getUseContextClassLoader())
+         return false;
       if (layers.size() == 0) {
          if (contextLoaderSystem == null) {
             contextLoaderSystem = this;

@@ -22,4 +22,7 @@ public interface IProcessDefinition {
    boolean getPerProcessSync();
 
    public List<String> getSyncProcessNames();
+
+   /** Should this process use the Thread.currentThread().setContextClassLoader() mechanism (as used by java servlets and components) */
+   boolean getUseContextClassLoader();
 }

@@ -483,8 +483,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /** Creates a new java runtime which is incompatible with the standard Java runtime */
-   public void createDefaultRuntime(String runtimeName) {
-      LayeredSystem.createDefaultRuntime(this, runtimeName);
+   public void createDefaultRuntime(String runtimeName, boolean useContextClassLoader) {
+      LayeredSystem.createDefaultRuntime(this, runtimeName, useContextClassLoader);
       setLayerRuntime(LayeredSystem.getRuntime(runtimeName));
    }
 

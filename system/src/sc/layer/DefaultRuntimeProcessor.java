@@ -29,11 +29,11 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
 
    ArrayList<String> syncProcessNames;
 
-   public DefaultRuntimeProcessor(String rtName) {
+   public DefaultRuntimeProcessor(String rtName, boolean useContextClassLoader) {
       runtimeName = rtName;
       // TODO: do we need a better way to define this?
       if (rtName != null && (rtName.equals("android") || rtName.equals("gwt")))
-         useContextClassLoader = false;
+         this.useContextClassLoader = useContextClassLoader;
    }
 
    public String getDestinationName() {

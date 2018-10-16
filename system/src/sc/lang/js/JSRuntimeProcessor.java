@@ -157,7 +157,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
 
    public JSRuntimeProcessor() {
-      super("js");
+      super("js", false);
    }
 
    class SystemUpdate {
@@ -3391,10 +3391,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    */
 
    public boolean getLoadClassesInRuntime() {
-      return false;
-   }
-
-   public boolean getUseContextClassLoader() {
       return false;
    }
 

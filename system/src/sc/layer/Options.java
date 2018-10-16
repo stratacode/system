@@ -153,7 +153,11 @@ public class Options {
    /** After the first successful build, should we continue to use buildAllFiles or set it to false. */
    @Constant public boolean rebuildAllFiles = false;
 
-   @Constant public boolean disableGC = false;
+   /** By default StrataCode will use System.gc() at intervals it thinks are great times to clean up unless this option is disabled */
+   @Constant public boolean disableAutoGC = false;
+
+   /** By default StrataCode sets the Thread's contextClassLoader automatically unless this option is set to true. */
+   @Constant public boolean disableContextClassLoader = false;
 
    /** Should we generate the debugging line number mappings for generated source */
    @Constant public boolean genDebugInfo = true;
