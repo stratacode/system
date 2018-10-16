@@ -4549,6 +4549,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (defaultServerTag || serverTag) {
 
          String tagId = getId();
+         if (tagId == null && isSingletonTag() && tagName != null) {
+            tagId = tagName;
+         }
          if (tagId != null) {
             ServerTag serverTag = getServerTagInfo();
             if (serverTag != null) {
