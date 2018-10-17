@@ -167,7 +167,7 @@ public abstract class ScopeContext {
       Map<String,Object> valueMap = getValues();
       Object firstInst = null;
       if (valueMap != null) {
-         for (Object inst:valueMap.entrySet()) {
+         for (Object inst:valueMap.values()) {
             if (DynUtil.isAssignableFrom(typeObj, DynUtil.getType(inst))) {
                if (firstInst == null)
                   firstInst = inst;
@@ -176,7 +176,7 @@ public abstract class ScopeContext {
             }
          }
       }
-      return null;
+      return firstInst;
    }
 
 }

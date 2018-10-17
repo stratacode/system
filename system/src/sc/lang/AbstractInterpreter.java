@@ -770,7 +770,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   if (performUpdatesToSystem(peerSys, performedOnce)) {
                      Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                      BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(current.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
-                     if (peerType != null) {
+                     if (peerType != null && !peerType.excluded) {
                         PropertyAssignment peerAssign = assign.deepCopy(ISemanticNode.CopyAll, null);
                         peerAssign.parentNode = peerType;
 
@@ -906,7 +906,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         if (performUpdatesToSystem(peerSys, evalPerformed)) {
                            Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                            BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
-                           if (peerType != null) {
+                           if (peerType != null && !peerType.excluded) {
                               Expression peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
                               if (!ignoreRemoteStatement(peerSys, peerExpr)) {
@@ -963,7 +963,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   if (performUpdatesToSystem(system, updatedAlready)) {
                      Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                      BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
-                     if (peerType != null) {
+                     if (peerType != null && !peerType.excluded) {
                         BlockStatement peerBlock = block.deepCopy(ISemanticNode.CopyNormal, null);
                         if (edit) {
                            UpdateInstanceInfo peerUpdateInfo = peerSys.newUpdateInstanceInfo();
@@ -1032,7 +1032,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         if (performUpdatesToSystem(peerSys, evalPerformed)) {
                            Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                            BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
-                           if (peerType != null) {
+                           if (peerType != null && !peerType.excluded) {
                               Statement peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
 

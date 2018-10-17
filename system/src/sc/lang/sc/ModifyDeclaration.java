@@ -1097,6 +1097,12 @@ public class ModifyDeclaration extends TypeDeclaration {
    public boolean mergeDefinitionsInto(BodyTypeDeclaration baseType, boolean inTransformed) {
       boolean any = false;
 
+      // We want to find the element on the transformed model so it can use addMixinProperties
+      if (element != null && baseType instanceof TypeDeclaration) {
+         TypeDeclaration baseTD = (TypeDeclaration) baseType;
+         baseTD.element = element;
+      }
+
       if (baseType.dependentTypes != null) {
          if (dependentTypes != null) // We'll likely need this later so merge the tables if possible
             baseType.dependentTypes.addAll(dependentTypes);
