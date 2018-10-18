@@ -12501,7 +12501,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getExtendsType(Object type) {
-      return ModelUtil.getSuperclass(type);
+      Object superType = ModelUtil.getSuperclass(type);
+      // Unwrapping this here because SyncManager uses this to map the real .class or type declaration into a list of sync properties
+      // If we return ParamTypeDeclaration, it has no api to unwrap it right now that also works in the browser.  Since getSuperclass
+      // returns the Class.getSuperclass not getGenericSuperclass, it seems like maybe getSuperclass should do this unwrapping itself?
+      if (ModelUtil.hasTypeParameters(superType))
+         return ModelUtil.getParamTypeBaseType(superType);
+      return superType;
    }
 
    private ZipFile getCachedZipFile(String pathName) {
