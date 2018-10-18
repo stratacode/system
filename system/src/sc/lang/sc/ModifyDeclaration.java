@@ -1745,7 +1745,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             Object implType = extendsBoundTypes[i];
             if (implType instanceof ITypeDeclaration && ((ITypeDeclaration) implType).isAssignableTo(other))
                return true;
-            else if (ModelUtil.isAssignableFrom(other, implType))
+            else if (implType != null && ModelUtil.isAssignableFrom(other, implType))
                return true;
          }
       }

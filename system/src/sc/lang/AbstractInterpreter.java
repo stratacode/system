@@ -1869,7 +1869,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    abstract void popCurrentInput();
 
-   public void loadScript(String baseDirName, String pathName) {
+   public void loadScript(String baseDirName, String pathName, Layer includeLayer) {
       if (!pathName.startsWith(".") && !FileUtil.isAbsolutePath(pathName)) {
          this.inputRelName = pathName;
          pathName = FileUtil.concat(baseDirName, pathName);
@@ -1877,6 +1877,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       else
          this.inputRelName = null;
       this.inputFileName = pathName;
+      this.includeLayer = includeLayer;
       resetInput();
    }
 
@@ -1893,7 +1894,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    /** Pushes an include script onto the top of the stack of files to be processed and returns immediately - before the script has run. */
-   public void pushIncludeScript(String baseDirName, String includeName) {
+   public void pushIncludeScript(String baseDirName, String includeName, Layer includeLayer) {
       String relName = null;
       if (!FileUtil.isAbsolutePath(includeName)) {
          relName = includeName;
@@ -1908,7 +1909,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       try {
          this.inputFileName = includeName;
          this.inputRelName = relName;
-         this.includeLayer = null; // The normal include chooses the most specific version of the file (at least when a relative name is used
+         this.includeLayer = includeLayer; // Specifies the source layer where the test script came from (or null if we should use the buildLayer)
          resetInput();
       }
       catch (RuntimeException exc) {
@@ -1920,7 +1921,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** Includes the script and waits for the script to complete.  Use this from a script to synchronously include another */
    public void include(String includeName) {
       try {
-         pushIncludeScript(system.buildDir, includeName);
+         pushIncludeScript(system.buildDir, includeName, null);
          this.returnOnInputChange = true;
          if (!readParseLoop())
             pendingInput = new StringBuilder();

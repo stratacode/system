@@ -52,7 +52,7 @@ fi
 
 if [ "$SHOW_WINDOW" = "1" ] ; then
   echo "Environment: SHOW_WINDOW set to 1"
-  ARGS+=" -sw"
+  ARGS+=" -tw"
 fi
 
 if [ "${#ARGS[@]}" == "0" ] ; then

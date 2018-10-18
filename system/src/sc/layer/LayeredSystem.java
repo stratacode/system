@@ -3632,10 +3632,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (options.testScriptName != null && options.testMode && !sys.peerMode) {
                String pathName = options.testScriptName;
                System.out.println("Running test script: " + pathName + " from: " + sys.buildDir);
+               SrcEntry layerFile = sys.buildLayer.getLayerFileFromRelName(pathName, true, true);
+               Layer includeLayer = layerFile == null ? null : layerFile.layer;
                if (options.includeTestScript)
-                  sys.cmd.pushIncludeScript(sys.buildDir, pathName);
+                  sys.cmd.pushIncludeScript(sys.buildDir, pathName, includeLayer);
                else
-                  sys.cmd.loadScript(sys.buildDir, pathName);
+                  sys.cmd.loadScript(sys.buildDir, pathName, includeLayer);
 
                // We need to add the temp layer so the testScriptName is not evaluated in a compiled layer - it has to be dynamic
                options.editLayer = false;
