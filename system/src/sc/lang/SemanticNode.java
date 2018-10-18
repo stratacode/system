@@ -39,7 +39,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    transient public ISemanticNode parentNode;
 
-   // TODO performance: turn these into bitfields
+   // TODO performance: turn these into bitfields - need to add a set method and change code that uses the protected fields
    transient protected boolean initialized;
    transient protected boolean started;
    transient protected boolean validated;

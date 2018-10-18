@@ -3631,8 +3631,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             if (options.testScriptName != null && options.testMode && !sys.peerMode) {
                String pathName = options.testScriptName;
-               System.out.println("Running test script: " + pathName + " from: " + sys.buildDir);
                SrcEntry layerFile = sys.buildLayer.getLayerFileFromRelName(pathName, true, true);
+               System.out.println("Running test script: " + pathName + " from: " + sys.buildDir + " script layer: " + layerFile == null ? "null" : layerFile.layer);
                Layer includeLayer = layerFile == null ? null : layerFile.layer;
                if (options.includeTestScript)
                   sys.cmd.pushIncludeScript(sys.buildDir, pathName, includeLayer);

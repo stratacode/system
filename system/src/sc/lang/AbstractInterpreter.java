@@ -1921,10 +1921,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** Includes the script and waits for the script to complete.  Use this from a script to synchronously include another */
    public void include(String includeName) {
       try {
-         pushIncludeScript(system.buildDir, includeName, null);
+         SrcEntry includeSrcEnt = system.buildLayer.getLayerFileFromRelName(includeName, true, true);
+         if (system.options.verbose) {
+            system.verbose("Script include: " + includeName + " from layer: " + (includeSrcEnt == null ? "null" : includeSrcEnt.layer));
+         }
+         pushIncludeScript(system.buildDir, includeName, includeSrcEnt == null ? null : includeSrcEnt.layer);
          this.returnOnInputChange = true;
          if (!readParseLoop())
             pendingInput = new StringBuilder();
+
+         if (system.options.verbose) {
+            system.verbose("Script end: " + includeName + " from layer: " + (includeSrcEnt == null ? "null" : includeSrcEnt.layer));
+         }
       }
       finally {
          popCurrentInput();
