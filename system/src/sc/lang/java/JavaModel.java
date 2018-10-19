@@ -20,12 +20,25 @@ import sc.parser.*;
 import java.io.*;
 import java.util.*;
 
+/**
+ * The semantic node corresponding to a Java file.  Look for "JavaModel" in the sc.lang.JavaLanguage grammar to find how this is created from code.
+ * It's semantic properties (those set by the parser) are packageDef, imports, and types.
+ * It's extended by other languages that can convert to Java (e.g. SCModel, JSModel, Template).
+ * This class does a lot.  It manages it's dependencies on other files for faster incremental builds.  It can update a type index for IDEs to bootstrap type system
+ * searches.  It supports a basic transformation capability to pre-process the Java code into a different format.  It can refresh itself from the file system -
+ * updating any changes using the dynamic runtime.
+ */
 public class JavaModel extends JavaSemanticNode implements ILanguageModel, INameContext, IChangeable, IUserDataNode {
-   static private final String[] SYSTEM_PACKAGE_PREFIX = {"java.", "javax."};
+   static private final String[] SYSTEM_PACKAGE_PREFIX = {"java.", "javax."}; // Don't maintain dependencies on these system packages since those are not likely to change and require an incremental compile
 
+   // Semantic properties - populated from the grammar:
+
+   /** The package of the Java model if any */
    public Package packageDef;
+   /** The list of imports */
    public SemanticNodeList<ImportDeclaration> imports;
-   public SemanticNodeList<TypeDeclaration> types;  // populated from grammar
+   /** The set of types defined in this file.  Normally there's just one but Java does let you specify multiple types per file at the top-level. */
+   public SemanticNodeList<TypeDeclaration> types;
 
    @Constant
    transient public LayeredSystem layeredSystem;
@@ -1401,8 +1414,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    /** Returns the transformed model for this model. */
    public JavaModel getTransformedModel() {
-      // We are the transformed model...
-      if (nonTransformedModel != null || getTransformed())
+      if (nonTransformedModel != null || getTransformed()) // If we asking for the transformed model from the transformed model - just return this
          return this;
       if (transformedModel != null)
          return transformedModel;
@@ -3372,8 +3384,4 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 }
-
-
-
-
 
