@@ -3524,16 +3524,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return children;
    }
 
-   public void initDynSyncInst(Object inst) {
-      Object extType = getDerivedTypeDeclaration();
-      // For compiled types, we compile in the addSyncInst call so it happens for each type.  Apparently we rely on this
-      // happening for cases where the sub-class disables sync mode but it was on for the base class.
-      if (extType instanceof BodyTypeDeclaration) {
-         ((BodyTypeDeclaration) extType).initDynSyncInst(inst);
-      }
-      if (getSyncProperties() != null) {
-         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null);
-      }
+   private void initServerTag(Object inst) {
+      // This is for the dynamic type equivalent of the addMixinProperties which are now done during the transform phase.
+      // TODO: this is like the mixinTemplate functionality
+      if (inst instanceof Element && isServerTagType())
+         ((Element) inst).serverTag = true;
    }
 
    public void initDynComponent(Object inst, ExecutionContext ctx, boolean doInit, Object outerObj, boolean initSyncInst) {
@@ -4277,7 +4272,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       String base = encl.isLayerType ? LayerConstants.LAYER_COMPONENT_TYPE_NAME : enclEncl == null ? encl.typeName : encl.getInnerStubTypeNameInternal();
       // This component of the pathname needs to have the normal part of the type name because it extends a compiled
       // inner type.
-      if (needsDynInnerStub)
+      if (getNeedsDynInnerStub())
          return base + "." + typeName;
       else
          return base.replace(".", INNER_STUB_SEPARATOR) + INNER_STUB_SEPARATOR + typeName;
@@ -4513,7 +4508,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    String getSrcIndexName() {
       String stubBaseName;
-      if (needsDynInnerStub)
+      if (getNeedsDynInnerStub())
          stubBaseName = getTypeName() + ".java";
       else
          stubBaseName = getEnclosingType() != null ? getInnerStubFileName() : (getTypeName() + ".java");
@@ -4540,7 +4535,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (ModelUtil.isDynamicType(innerType)) {
                buildLayer.markDynamicType(td.getFullTypeName());
 
-               if (td.isDynamicStub(false) && !td.needsDynInnerStub) {
+               if (td.isDynamicStub(false) && !td.getNeedsDynInnerStub()) {
                   if (resEnt == null)
                      resEnt = new ArrayList<SrcEntry>();
 
@@ -7046,6 +7041,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return inst;
    }
 
+   // See also initDynSyncInst below which is similar but for DynObjects
    private void initNewSyncInst(Object[] argValues, Object inst) {
       if (getSyncProperties() != null) {
          Object[] plainArgValues = argValues;
@@ -7054,7 +7050,22 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             plainArgValues = Arrays.asList(argValues).subList(1, len).toArray();
          SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null, plainArgValues);
       }
+      initServerTag(inst);
    }
+
+   public void initDynSyncInst(Object inst) {
+      Object extType = getDerivedTypeDeclaration();
+      // For compiled types, we compile in the addSyncInst call so it happens for each type.  Apparently we rely on this
+      // happening for cases where the sub-class disables sync mode but it was on for the base class.
+      if (extType instanceof BodyTypeDeclaration) {
+         ((BodyTypeDeclaration) extType).initDynSyncInst(inst);
+      }
+      if (getSyncProperties() != null) {
+         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null);
+      }
+      initServerTag(inst);
+   }
+
 
    public int getMemberCount() {
       return body == null ? 0 : body.size();
@@ -8104,7 +8115,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return;
          }
          needsDynamicStub = true;
-         if (needsDynInnerStub) {
+         if (getNeedsDynInnerStub()) {
             BodyTypeDeclaration enclType = getEnclosingType();
             if (enclType != null)
                enclType.setNeedsDynamicStub(val);
@@ -9743,5 +9754,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /** An excluded type can have an excludedStub that's inserted in it's place */
    public boolean needsCompile() {
       return !excluded || excludedStub != null;
+   }
+
+   public boolean isServerTagType() {
+      Object execAnnot = ModelUtil.getInheritedAnnotation(getLayeredSystem(), this, "sc.obj.Exec", false, this.getLayer(), false);
+      if (execAnnot != null) {
+         Boolean serverOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "serverOnly");
+         return serverOnly != null && serverOnly;
+      }
+      return false;
+   }
+
+   public boolean getNeedsDynInnerStub() {
+      return needsDynInnerStub;
    }
 }

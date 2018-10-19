@@ -315,7 +315,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                if (outerObj != null) {
                   // Make sure the runtime class is itself an inner class before we make the enclosing type be the access class.  We may not have
                   // needed to generate a class for the inner type
-                  if ((accessClass != null) && dynType.needsDynInnerStub) {
+                  if ((accessClass != null) && dynType.getNeedsDynInnerStub()) {
                      String name = dynType.typeName;
                      Object curType = dynType;
                      while (curType != null && !ModelUtil.sameTypes(ModelUtil.getEnclosingType(curType), accessType)) {
@@ -407,6 +407,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          if (constr instanceof ConstructorDefinition) {
             ModelUtil.invokeMethod(null, constr, args, ctx);
          }
+
          dynType.initDynComponent(dynObj, ctx, doInit, outerObj, true);
       }
       finally {

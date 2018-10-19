@@ -104,18 +104,19 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
          ParseUtil.initAndStartComponent(objTypeDecl);
 
+         boolean needsDynInnerStub = objTypeDecl.getNeedsDynInnerStub();
          // INNER STUB
-         typeName = objTypeDecl.isDynInnerStub() && !objTypeDecl.needsDynInnerStub ? objTypeDecl.getInnerStubTypeName() : objTypeDecl.getTypeName();
+         typeName = objTypeDecl.isDynInnerStub() && !needsDynInnerStub ? objTypeDecl.getInnerStubTypeName() : objTypeDecl.getTypeName();
          //typeName = objTypeDecl.getTypeName();
 
-         packageName = getInnerType() && objTypeDecl.needsDynInnerStub ? "" : objTypeDecl.getPackageName();
+         packageName = getInnerType() && needsDynInnerStub ? "" : objTypeDecl.getPackageName();
 
          scopeInterfaces = objTypeDecl.scopeInterfaces;
       }
       else {
          typeName = ModelUtil.getClassName(objType);
          // INNER STUB packageName = TypeUtil.getPackageName(getFullTypeName());
-         packageName = getInnerType() && objTypeDecl.needsDynInnerStub ? "" : CTypeUtil.getPackageName(getFullTypeName());
+         packageName = getInnerType() ? "" : CTypeUtil.getPackageName(getFullTypeName());
 
          scopeInterfaces = null;
       }
@@ -123,11 +124,11 @@ public class DynStubParameters extends AbstractTemplateParameters {
       Object extType;
       ModifyDeclaration modDecl;
       // This is the innerType extends ParentBaseType.innerType case.  Since we did not transform the modify inherited into this case,
-      // we need to do it here.
-      // TODO: do we need to look for modify types up the chain which are modify inherited?
-      if (objType instanceof ModifyDeclaration && (modDecl = (ModifyDeclaration) objType).modifyInherited) {
-         extType = modDecl.getModifiedType();
-         baseClassName = extType == null ? null : ModelUtil.getCompiledTypeName(extType);
+      // we need to do it here.  There can be more than one level of indirection so using getModifyInheritedType (e.g. example.unitConverter.jsuis)
+      Object modInheritType = objType instanceof ModifyDeclaration ? ((ModifyDeclaration) objType).getModifyInheritedType() : null;
+      if (modInheritType != null) {
+         extType = modInheritType;
+         baseClassName = ModelUtil.getCompiledTypeName(extType);
       }
       else {
          extType = ModelUtil.getExtendsClass(objType);
@@ -135,7 +136,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       // Only strip off static if thi sis a top-level inner stub
-      if (objTypeDecl != null && !objTypeDecl.needsDynInnerStub)
+      if (objTypeDecl != null && !objTypeDecl.getNeedsDynInnerStub())
          typeModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(objType, false, true, false, false, true, null), TransformUtil.nonStubTypeModifiers);
       else
          typeModifiers = ModelUtil.modifiersToString(objType, false, true, false, false, true, null);
@@ -210,7 +211,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
    /** Returns true if the dynamic stub needs to be an inner type for this type */
    public boolean getDynInnerInstType() {
-      return ModelUtil.getEnclosingInstType(objType) != null && objTypeDecl.needsDynInnerStub;
+      return ModelUtil.getEnclosingInstType(objType) != null && objTypeDecl.getNeedsDynInnerStub();
    }
 
    public String getUpperClassName() {
@@ -272,7 +273,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       // When generating newX methods, if this is an inner class type, we already put the newX method in the enclosing
       // type.  Regular constructors still go in the inner class (componentDef = false).   Objects also need the newX
       // so that we can construct them at runtime when the getX method is not generated.
-      if (componentDef && ModelUtil.getEnclosingType(objType) != null && objTypeDecl.isComponentType() && objTypeDecl.needsDynInnerStub)
+      if (componentDef && ModelUtil.getEnclosingType(objType) != null && objTypeDecl.isComponentType() && objTypeDecl.getNeedsDynInnerStub())
          return new DynConstructor[0];
 
      // Before we were always getting the constructors on the base type.  Why?  Maybe Java SHOULD work that way but it doesn't... we need the constructors on this type
@@ -311,7 +312,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
          for (Object t:innerTypes) {
             if (t instanceof BodyTypeDeclaration) {
                BodyTypeDeclaration bt = (BodyTypeDeclaration) t;
-               if (bt.isComponentType() && bt.needsDynInnerStub) {
+               if (bt.isComponentType() && bt.getNeedsDynInnerStub()) {
                   Object[] constrs = bt.getConstructors(objType);
                   DynInnerConstructor dc;
                   if (constrs == null) {
@@ -467,7 +468,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
                BodyTypeDeclaration td = (BodyTypeDeclaration) innerType;
                // Only include the types which need the compiled inner type.  The other types will use the traditional
                // method of generating the inner stub as a separate class
-               if (td.isDynamicStub(false) && td.needsDynInnerStub) {
+               if (td.isDynamicStub(false) && td.getNeedsDynInnerStub()) {
                   defs.add(td);
                }
             }

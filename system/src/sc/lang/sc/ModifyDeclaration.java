@@ -2897,4 +2897,22 @@ public class ModifyDeclaration extends TypeDeclaration {
          return modifyTypeDecl.getTemplatePathName();
       return null;
    }
+
+   public boolean getNeedsDynInnerStub() {
+      if (super.getNeedsDynInnerStub())
+         return true;
+      if (modifyTypeDecl != null && !modifyInherited)
+         return modifyTypeDecl.getNeedsDynInnerStub();
+      return false;
+   }
+
+   /** Returns the 'modify inherited type' in the chain of modifications.  If there isn't one, null is returned */
+   public BodyTypeDeclaration getModifyInheritedType() {
+      if (modifyInherited)
+         return getModifiedType();
+      if (modifyTypeDecl instanceof ModifyDeclaration) {
+         return ((ModifyDeclaration) modifyTypeDecl).getModifyInheritedType();
+      }
+      return null;
+   }
 }
