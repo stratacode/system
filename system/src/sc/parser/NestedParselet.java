@@ -2731,9 +2731,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          oldTagMode = ctx.tagMode;
          ctx.tagMode = enableTagMode;
       }
-      boolean isGenNode = false;
+      boolean isGenNode = node.isGeneratedTree();
       if (pushIndent) {
-         isGenNode = node.isGeneratedTree();
          if (!isGenNode)
             ctx.pushIndent();
       }
