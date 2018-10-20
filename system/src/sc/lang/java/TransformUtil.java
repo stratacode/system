@@ -427,7 +427,7 @@ public class TransformUtil {
 
    public static void addObjectDefinition(TypeDeclaration accessClass, TypeDeclaration objType, ObjectDefinitionParameters parameters,
                                           SemanticNodeList<Statement> assignments, Template customTemplate,
-                                          boolean isObject, boolean isComponent, boolean applyToHiddenBody) {
+                                          boolean isObject, boolean isComponent, boolean applyToHiddenBody, boolean mainDef) {
       PerfMon.start("addObjectDefinition");
       Template template = customTemplate;
       String templateFromStr = null;
@@ -517,7 +517,8 @@ public class TransformUtil {
             }
          }
 
-         if (parameters.getLiveDynamicTypes()) {
+         // If this is the first constructor only, we may need to add the addDynInnerObject or addDynInnerInstance call.
+         if (mainDef && parameters.getLiveDynamicTypes()) {
             if (initString == null)
                initString = new StringBuilder();
             initString.append(parameters.getDynamicTypeDefinition("this", 2));
@@ -1301,7 +1302,7 @@ public class TransformUtil {
       boolean isObject = td.getDeclarationType() == DeclarationType.OBJECT;
       Template template = td.findTemplatePath(templatePath, templateTypeName, ObjectDefinitionParameters.class);
       ObjectDefinitionParameters params = TransformUtil.createObjectDefinitionParameters(td);
-      TransformUtil.addObjectDefinition(td, td, params, null, template, isObject && !useNewTemplate, params.typeIsComponent, true);
+      TransformUtil.addObjectDefinition(td, td, params, null, template, isObject && !useNewTemplate, params.typeIsComponent, true, false);
    }
 
    public static ObjectDefinitionParameters createObjectDefinitionParameters(TypeDeclaration td) {
