@@ -13401,6 +13401,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void addDynInnerInstance(String typeName, Object inst, Object outer) {
+      if (inst == outer) {
+         System.out.println("*** addDynInnerInstance called with outer = inner!");
+         return;
+      }
       if (getLiveDynamicTypes(typeName)) {
          addDynInstance(typeName, inst);
          innerToOuterIndex.put(inst, outer);
