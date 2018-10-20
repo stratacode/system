@@ -760,7 +760,7 @@ public class ClassDeclaration extends TypeDeclaration {
                                              isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName,
                                              null, "", "", this, useAltComponent, customResolver, customSetter, needsField, preAssignments, postAssignments);
                TransformUtil.addObjectDefinition(this, this, params,
-                       assignments, scopeTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody);
+                       assignments, scopeTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, false);
             }
          }
 
@@ -780,13 +780,13 @@ public class ClassDeclaration extends TypeDeclaration {
 
             if (mixinTemplates != null) {
                for (Template mixinTemplate:mixinTemplates) {
-                  TransformUtil.addObjectDefinition(this, this, params, assignments, mixinTemplate, false, isComponent, inHiddenBody);
+                  TransformUtil.addObjectDefinition(this, this, params, assignments, mixinTemplate, false, isComponent, inHiddenBody, false);
                }
             }
             if (staticMixinTemplates != null) {
                for (Template staticMixinTemplate:staticMixinTemplates) {
                   // Make sure to put the static mix template code into the root type of the type hierarchy since Java does not like static code in inner classes.
-                  TransformUtil.addObjectDefinition(this.getEnclosingType() == null ? this : this.getRootType(), this, params, assignments, staticMixinTemplate, false, isComponent, inHiddenBody);
+                  TransformUtil.addObjectDefinition(this.getEnclosingType() == null ? this : this.getRootType(), this, params, assignments, staticMixinTemplate, false, isComponent, inHiddenBody, false);
                }
             }
          }
@@ -826,7 +826,7 @@ public class ClassDeclaration extends TypeDeclaration {
                     constDecls, constParams, accessClass, useAltComponent, customResolver, customSetter, needsField, preAssignments, postAssignments);
 
             TransformUtil.addObjectDefinition(accessClass, this, params,
-                                              assignments, customTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody);
+                                              assignments, customTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, i == 0);
                                               
             i++;
          } while (constructors != null && i < constructors.length);
