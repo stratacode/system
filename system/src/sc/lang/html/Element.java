@@ -4703,6 +4703,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (bodyValid)
          return;
 
+      if (!visible)
+         return;
+
       //if (setSyncModeToPrev)
       //   oldSyncState = SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
 
