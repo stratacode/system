@@ -99,6 +99,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     */
    public transient boolean startTagValid = false, bodyValid = false;
    public transient String startTagCache, bodyCache;
+   /** A separate flag to handle the state where we know repeat has changed but don't know if the bodyTxt of the list has changed or just an element */
+   public transient boolean repeatTagsValid = true;
 
    public transient CacheMode cache;
 
@@ -1513,6 +1515,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
+   public void invalidateRepeatTags() {
+      if (repeatTagsValid) {
+         repeatTagsValid = false;
+         invalidateParent();
+      }
+   }
+
    public Element getDerivedElement() {
       if (modifyType != null && modifyType instanceof TypeDeclaration) {
          TypeDeclaration modifyTD = (TypeDeclaration) modifyType;
@@ -2248,7 +2257,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       int myExecFlags = getDefinedExecFlags();
 
       Element parentTag = getEnclosingTag();
-      int parentExecFlags = parentTag == null ? -1 : parentTag.getComputedExecFlags();
+      if (parentTag == null) // We only need the excluded stub for inner types
+         return null;
+      int parentExecFlags = parentTag.getComputedExecFlags();
       if (myExecFlags != parentExecFlags) {
          Object extType = getTagObjectExtends();
          ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType));
@@ -3389,9 +3400,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return false;
    }
 
-   public void syncRepeatTags(Object repeatVal) {
+   public boolean syncRepeatTags(Object repeatVal) {
       int sz = repeatVal == null ? 0 : DynUtil.getArrayLength(repeatVal);
       boolean anyChanges = false;
+      boolean childChanges = false;
+
+      repeatTagsValid = true;
 
       // TODO: remove this?  We can't disable sync entirely.  We need to turn it on before we call "output" since there can be side-effect changes
       // in there which need to be synchronized.  Now that we do not sync the page objects, this should not be needed anyway.
@@ -3411,7 +3425,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                }
                Element arrayElem = createRepeatElement(arrayVal, i, null);
                tags.add(arrayElem);
-               anyChanges = true;
+               childChanges = anyChanges = true;
             }
          }
          else {
@@ -3454,6 +3468,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                               removeElement(oldElem, i);
                               tags.add(i, newElem);
                               insertElement(newElem, i);
+                              childChanges = true;
                            }
                         }
                         else {
@@ -3461,6 +3476,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            Element newElem = createRepeatElement(arrayVal, i, null);
                            tags.add(i, newElem);
                            insertElement(newElem, i);
+                           childChanges = true;
                         }
                      }
                      // The current guy is in the list but later on
@@ -3489,11 +3505,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            tags.add(i, elemToMove);
                            moveElement(elemToMove, curIx, i);
                         }
+                        childChanges = true;
                      }
                   }
                }
                else {
-                  anyChanges = true;
+                  childChanges = anyChanges = true;
                   if (curIx == -1) {
                      Element arrayElem = createRepeatElement(arrayVal, i, null);
                      tags.add(arrayElem);
@@ -3513,7 +3530,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                int ix = tags.size() - 1;
                Element toRem = tags.remove(ix);
                removeElement(toRem, ix);
-               anyChanges = true;
+               childChanges = anyChanges = true;
             }
             // We removed one or more elements so make sure the repeatIndex is correct now
             if (renumberIx != -1) {
@@ -3535,6 +3552,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          repeatTagsChanged();
 
       markBodyValid(true);
+      return childChanges;
    }
 
    // These methods are implemented for JS where they update the DOM.
@@ -3706,6 +3724,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void markBodyValid(boolean val) {
       bodyValid = val;
       bodyTxtValid = val;
+      repeatTagsValid = val;
    }
 
    public void markStartTagValid(boolean val) {
@@ -3735,8 +3754,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          outputBody(sb);
       }
       else {
-         if (isServerTag())
-            outputRepeatTagMarker(sb);
+         // Do not include the repeatTagMarker in the innerHTML.  We will have rendered it already with the initial page and currently we just replace all of the
+         // elements after it so if we send it again, we'd just have to remove it from the DOM.
+         //if (isServerTag())
+         //   outputRepeatTagMarker(sb);
          outputRepeatBody(repeatVal,  sb);
       }
       String newInnerHTML = sb.toString();
@@ -4610,6 +4631,30 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public static Element updateServerTag(Element tagObj, String id, ServerTag stag, boolean addSync) {
       System.err.println("*** updateServerTag called on server - it is a client-only method used to create, update and get the server's subscription for a specific DOM tag");
       return null;
+   }
+
+   /**
+    * This is a step we do after refreshing all of the bindings before rendering to improve incremental refresh efficiency.
+    * If any 'repeat' properties have changed, we'll now go through and
+    * determine if the repeat tag's body has changed or perhaps we can handle any repeat tag changes incrementally through the children.  This should be called
+    * before fireChangedTagEvents which triggers the innerHTML property changes for incremental refresh.
+    * This is a simple approach for now until we handle selective update of the elements of the list.  Right now if the class or structure of a child
+    * has changed,
+    */
+   public void validateTags() {
+      if (repeat != null || this instanceof IRepeatWrapper) {
+         if (!repeatTagsValid && syncRepeatTags(repeat))
+            invalidateBody();
+      }
+
+      Object[] children = getObjChildren(false);
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Element) {
+               ((Element) child).validateTags();
+            }
+         }
+      }
    }
 
    public void fireChangedTagEvents(boolean parentBodyChanged) {

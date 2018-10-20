@@ -12,7 +12,11 @@ public class RepeatListener extends AbstractListener {
    // We react by marking the owning property as changed.  So if you are listening to the property value, you'll see a change.
    public boolean valueInvalidated(Object obj, Object prop, Object eventDetail, boolean apply) {
       if (tag.anyChangedRepeatTags()) {
-         tag.invalidateBody();
+         tag.invalidateRepeatTags();
+         // Rather than invalidating the body immediately, wait until we call syncRepeatTags to see if
+         // we can do an incremental update.  In Element.validateTag() we'll invalidate the body if
+         // it needs to do a complete refresh.
+         //tag.invalidateBody();
       }
       return true;
    }

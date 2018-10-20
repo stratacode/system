@@ -31,7 +31,10 @@ import java.lang.reflect.TypeVariable;
 import java.util.*;
 
 /**
- * This class implements the Java to Javascript conversion process.  It defines a StrataCode runtime environment.
+ * This class implements the Java to Javascript conversion process.  It defines a StrataCode runtime processor, which is attached to it's
+ * own LayeredSystem instance (i.e. layeredSystem.runtimeProcessor).  The JS runtime has it's own complete set of layers, types, etc
+ * All types in the JS runtime are initialized, started, validated, processed, then transformed.  The JSRuntimeProcessor hooks into these
+ * basic steps.
  *
  * The generation works in the following stages:
  *    - the start method is called for each type.  It computes the list of jsFiles - the javascript files we are either generating (jsGenFiles) or js library files (jsLibFiles).
@@ -2157,6 +2160,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             for (EntryPoint e:jsBuildInfo.entryPoints.values()) {
                e.initLayer(sys);
                if (e.layer != null && !genLayer.buildsLayer(e.layer))
+                  continue;
+
+               // Because a type can be started when it's not excluded, and then later excluded so it ends up in this list
+               if (e.type != null && !e.type.needsCompile())
                   continue;
 
                if (e.jsFile.equals(jsFile)) {
