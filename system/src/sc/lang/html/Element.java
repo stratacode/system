@@ -98,11 +98,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * These flags indicate if the current rendered version is known to be stale for each of these two phases
     */
    public transient boolean startTagValid = false, bodyValid = false;
-   public transient String startTagCache, bodyCache;
-   /** A separate flag to handle the state where we know repeat has changed but don't know if the bodyTxt of the list has changed or just an element */
-   public transient boolean repeatTagsValid = true;
-
-   public transient CacheMode cache;
 
    /**
     * Like bodyValid but applies only to changes made to the static text chunks.  When a child tag's bodyTxt changes,
@@ -110,6 +105,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * walk down the tree to find any child nodes which have actually changed.
     */
    public transient boolean bodyTxtValid = false;
+
+   /** A separate flag to handle the state where we know repeat has changed but don't know if the bodyTxt of the list has changed or just an element */
+   public transient boolean repeatTagsValid = true;
+
+   public transient String startTagCache, bodyCache;
+   public transient CacheMode cache;
 
    private transient boolean needsSuper = false;
    private transient boolean needsBody = true;
@@ -3551,7 +3552,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (anyChanges)
          repeatTagsChanged();
 
-      markBodyValid(true);
       return childChanges;
    }
 
@@ -3587,6 +3587,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          syncRepeatTags(repeat);
    }
 
+   public boolean isRepeatTag() {
+      Object repeatVal = getCurrentRepeatVal();
+      return repeatVal != null || this instanceof IRepeatWrapper;
+   }
+
    public void outputTag(StringBuilder sb) {
       if (!visible) {
          if (invisTags == null) {
@@ -3603,7 +3608,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       DynUtil.execLaterJobs();
 
       Object repeatVal = getCurrentRepeatVal();
-      boolean isRepeatTag = repeatVal != null || this instanceof IRepeatWrapper;
+      boolean isRepeatTag = isRepeatTag();
 
       boolean cacheEnabled = isCacheEnabled();
       if (!cacheEnabled) {
@@ -3619,6 +3624,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       else {
          if (isRepeatTag) {
+            if (!repeatTagsValid && syncRepeatTags(repeatVal)) {
+               bodyTxtValid = false;
+               invalidateBody();
+            }
             if (isServerTag())
                outputRepeatTagMarker(sb);
             if (!bodyValid) {
@@ -3665,6 +3674,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private void outputRepeatBody(Object repeatVal, StringBuilder sb) {
       syncRepeatTags(repeatVal);
+      markBodyValid(true);
       for (int i = 0; i < repeatTags.size(); i++) {
          repeatTags.get(i).outputTag(sb);
       }
@@ -3745,6 +3755,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Object repeatVal = getCurrentRepeatVal();
       boolean cacheEnabled = isCacheEnabled();
       if (cacheEnabled) {
+         if (isRepeatTag() && !repeatTagsValid && syncRepeatTags(repeat)) {
+            bodyTxtValid = false;
+            invalidateBody();
+         }
          if (bodyValid) {
             return bodyCache == null ? "" : bodyCache;
          }
@@ -4641,10 +4655,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * This is a simple approach for now until we handle selective update of the elements of the list.  Right now if the class or structure of a child
     * has changed,
     */
+   /*
    public void validateTags() {
-      if (repeat != null || this instanceof IRepeatWrapper) {
-         if (!repeatTagsValid && syncRepeatTags(repeat))
+      if (isRepeatTag()) {
+         if (!repeatTagsValid && syncRepeatTags(getCurrentRepeatVal())) {
+            bodyTxtValid = false;
             invalidateBody();
+         }
       }
 
       Object[] children = getObjChildren(false);
@@ -4656,8 +4673,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
    }
+   */
 
    public void fireChangedTagEvents(boolean parentBodyChanged) {
+      if (isRepeatTag()) {
+         if (!repeatTagsValid) {
+            if (syncRepeatTags(getCurrentRepeatVal())) {
+               bodyTxtValid = false;
+               bodyValid = false;
+            }
+         }
+      }
       // TODO: this syncMode stuff here was a previous attempt to fix the bug for nested tag content.  The problem was that
       // when we validate the parent we would update the cached state of the children so there was no way to detect the child change
       // events.  Move that logic to the 'outputTag' method where we see a change in the text.
