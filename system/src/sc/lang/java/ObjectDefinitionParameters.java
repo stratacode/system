@@ -43,8 +43,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public boolean typeIsCompiledComponent = false; // True if the type we is a component class and not a dynamic one
    public boolean isAbstract = false;    // True if the class being generated is abstract
    public String childTypeName;          // If known, specifies the type name of the objects in the childrenNames list
-   public String rootName;               // Type name of the root object in the class hierarchy
-   public String parentName;             // Type name of the enclosing type's class
+   public String rootName;               // Variable name that refers to the root object in the type tree
+   public String parentName;             // Variable name that refers to the enclosing type's instance
    public Object currentConstructor;     // When we are processing a constructor, refers to the constructor we are processing.
    public String constructorDecls;       // Specifies variable declarations (e.g. "int foo, float bar") for each constructor parameter
    public String constructorParams;      // Specifies constructor method call parameters (e.g. "foo, bar")

@@ -640,7 +640,7 @@ public class ClassDeclaration extends TypeDeclaration {
             newModifiers = modifiersToString(false, true, false, false, false, null);
 
             if (!hasModifier("static")) {
-               parentName = "this";
+               parentName = outer.getCompiledClassName() + ".this";
                ClassDeclaration rootType = (ClassDeclaration) outer.getRootType();
                if (rootType == null)
                   rootName = parentName;
