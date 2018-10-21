@@ -2750,7 +2750,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public static void setCurrent(LayeredSystem sys) {
-      defaultLayeredSystem = sys;
+      //defaultLayeredSystem = sys;  Not going to set this here - we want the defaultLayeredSystem to be the main one by default, not the last one created
       DynUtil.dynamicSystem = sys;
       RDynUtil.dynamicSystem = sys;
       if (sys == null)
@@ -13146,6 +13146,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       List<Layer> baseLayers = null;
       boolean initFailed = false;
+      List<Layer> allBaseLayers;
       // This comes from the extends operation
       if (baseLayerNames != null) {
          // This is the "stub" layer used to load the real layer. Need some place to hold these so we can display
@@ -13161,6 +13162,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // When we are processing only the explicit layers do not recursively init the layers.  Just init the layers specified.
             baseLayers = mapLayerNamesToLayers(relPath, baseLayerNames, lpi.activate, false);
          }
+
+         // If some of the base layers were excluded, we'll compute a separate base layers list to compute the package prefix which includes all of them.
+         // Otherwise, the package prefix will not match in the two systems which is just unhelpful.
+         if (baseLayers != null && baseLayerNames.size() > baseLayers.size() && peerMode) {
+            allBaseLayers = mapLayerNamesToAnySystemLayers(relPath, baseLayerNames);
+         }
+         else
+            allBaseLayers = baseLayers;
          /*
          if (baseLayers != null) {
             int li = 0;
@@ -13177,10 +13186,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          initFailed = cleanupLayers(baseLayers) || initFailed;
       }
+      else
+         allBaseLayers = null;
 
       /* Now that we have defined the base layers, we'll inherit the package prefix and dynamic state */
       boolean baseIsDynamic = Layer.getBaseIsDynamic(baseLayers);
-      boolean inheritedPrefix = Layer.getInheritedPrefix(baseLayers, prefix, model);
+      boolean inheritedPrefix = Layer.getInheritedPrefix(allBaseLayers, prefix, model);
 
       prefix = model.getPackagePrefix();
       //if (!lpi.activate)
@@ -13240,6 +13251,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                System.out.println("No base layer: " + baseLayerName + " for: " + relPath + " in: " + getProcessIdent());
             // For this case we may be in the JS runtime and this layer is server specific...
             //baseLayers.add(null);
+         }
+      }
+      return baseLayers;
+   }
+
+   List<Layer> mapLayerNamesToAnySystemLayers(String relPath, List<String> baseLayerNames) {
+      List<Layer> baseLayers = new ArrayList<Layer>();
+      if (baseLayerNames == null)
+         return null;
+      for (int li = 0; li < baseLayerNames.size(); li++) {
+         String baseLayerName = baseLayerNames.get(li);
+         Layer bl = findLayerByName(relPath, baseLayerName);
+         if (bl == null) {
+            // Go to the main system where we will have this excluded layer
+            bl = mainSystem.findLayerByName(relPath, baseLayerName);
+         }
+         if (bl != null) {
+            baseLayers.add(bl);
          }
       }
       return baseLayers;

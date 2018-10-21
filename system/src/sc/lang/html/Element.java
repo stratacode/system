@@ -1415,6 +1415,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             continue;
 
          // Only match against tag packages which we directly extend
+         // TODO: for activated layers, should we inherit any tag package?  It can be confusing when you see html.schtml in the stack below you, and the layer
+         // is really extended by through an excluded layer.   Maybe we should take the 'allBaseLayers' and use that in the layer so that we pick up even excluded
+         // dependencies here?
          if (tagPackageLayer == null || modelLayer == null || modelLayer.extendsLayer(tagPackageLayer) || modelLayer == tagPackageLayer) {
             String tagName = lowerTagName();
             String origTagName = tagName;

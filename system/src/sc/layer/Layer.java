@@ -1403,10 +1403,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public static boolean getInheritedPrefix(List<Layer> baseLayers, String prefix, JavaModel model) {
+      if (prefix != null) {
+         return false;
+      }
       boolean inheritedPrefix = false;
       if (baseLayers != null) {
          for (Layer baseLayer:baseLayers) {
-            if (prefix == null && baseLayer.packagePrefix != null && baseLayer.exportPackage) {
+            if (baseLayer.packagePrefix != null && baseLayer.exportPackage) {
                prefix = baseLayer.packagePrefix;
                model.setComputedPackagePrefix(prefix);
                inheritedPrefix = true;
