@@ -2750,7 +2750,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public static void setCurrent(LayeredSystem sys) {
-      //defaultLayeredSystem = sys;  Not going to set this here - we want the defaultLayeredSystem to be the main one by default, not the last one created
+      if (defaultLayeredSystem == null) // Pick the initial main layered system here by default
+         defaultLayeredSystem = sys;
       DynUtil.dynamicSystem = sys;
       RDynUtil.dynamicSystem = sys;
       if (sys == null)

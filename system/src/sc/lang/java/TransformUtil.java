@@ -152,7 +152,7 @@ public class TransformUtil {
    static Template getObjectDefinitionTemplate() {
       if (objectDefinitionTemplate != null)
          return objectDefinitionTemplate;
-      return objectDefinitionTemplate = parseTemplate(OBJECT_DEFINITION, ObjectDefinitionParameters.class, false);
+      return objectDefinitionTemplate = parseTemplate(OBJECT_DEFINITION, ObjectDefinitionParameters.class, false, null);
    }
 
    // TODO: move this into LayeredSystem so we don't rely on static things that could theoretically change between layered systems
@@ -175,7 +175,7 @@ public class TransformUtil {
       bindableDefinitions = null;
    }
 
-   public static Template parseTemplate(String templateCode, Class defaultExtendsType, boolean cache) {
+   public static Template parseTemplate(String templateCode, Class defaultExtendsType, boolean cache, LayeredSystem sys) {
       if (cache) {
          Template t = templateCache.get(templateCode);
          if (t != null)
@@ -186,7 +186,7 @@ public class TransformUtil {
          throw new IllegalArgumentException(((ParseError) res).errorStringWithLineNumbers(templateCode));
       Template template = (Template) ParseUtil.nodeToSemanticValue(res);
       template.defaultExtendsType = defaultExtendsType;
-      template.setLayeredSystem(LayeredSystem.getCurrent());
+      template.setLayeredSystem(sys == null ? LayeredSystem.getCurrent() : sys);
       ParseUtil.initAndStartComponent(template);
       if (cache) {
          templateCache.put(templateCode, template);
@@ -227,7 +227,7 @@ public class TransformUtil {
    static Template getComplexObjectDefinitionTemplate() {
       if (complexObjectDefinitionTemplate != null)
          return complexObjectDefinitionTemplate;
-      return complexObjectDefinitionTemplate = parseTemplate(COMPLEX_OBJECT_DEFINITION, ObjectDefinitionParameters.class, false);
+      return complexObjectDefinitionTemplate = parseTemplate(COMPLEX_OBJECT_DEFINITION, ObjectDefinitionParameters.class, false, null);
    }
 
    private final static String COMPONENT_OBJECT_DEFINITION =
@@ -260,7 +260,7 @@ public class TransformUtil {
    static Template getComponentObjectDefinitionTemplate() {
       if (componentObjectDefinitionTemplate != null)
          return componentObjectDefinitionTemplate;
-      return componentObjectDefinitionTemplate = parseTemplate(COMPONENT_OBJECT_DEFINITION, ObjectDefinitionParameters.class, false);
+      return componentObjectDefinitionTemplate = parseTemplate(COMPONENT_OBJECT_DEFINITION, ObjectDefinitionParameters.class, false, null);
    }
 
    private final static String OBJ_CHILDREN_DEFINITION =
@@ -280,7 +280,7 @@ public class TransformUtil {
    static Template getObjChildrenDefinitionTemplate() {
       if (objChildrenDefinitionTemplate != null)
          return objChildrenDefinitionTemplate;
-      return objChildrenDefinitionTemplate = parseTemplate(OBJ_CHILDREN_DEFINITION, ObjectDefinitionParameters.class, false);
+      return objChildrenDefinitionTemplate = parseTemplate(OBJ_CHILDREN_DEFINITION, ObjectDefinitionParameters.class, false, null);
    }
 
    private final static String COMPONENT_CLASS_DEFINITION =
@@ -311,7 +311,7 @@ public class TransformUtil {
    static Template getComponentClassDefinitionTemplate() {
       if (componentClassDefinitionTemplate != null)
          return componentClassDefinitionTemplate;
-      return componentClassDefinitionTemplate = parseTemplate(COMPONENT_CLASS_DEFINITION, ObjectDefinitionParameters.class, false);
+      return componentClassDefinitionTemplate = parseTemplate(COMPONENT_CLASS_DEFINITION, ObjectDefinitionParameters.class, false, null);
    }
 
    // Code snippet for injecting bindability into a class
@@ -687,7 +687,7 @@ public class TransformUtil {
          return null;
       }
 
-      Template res = TransformUtil.parseTemplate(templateBuf.toString(), params, false);
+      Template res = TransformUtil.parseTemplate(templateBuf.toString(), params, false, null);
       res.setSrcFile(new SrcEntry(null, resourcePath, resourcePath, resourcePath));
       templateResourceCache.put(templateResourceTypeName, res);
       return res;
@@ -770,7 +770,7 @@ public class TransformUtil {
       if (propertyDefinitionTemplate != null)
          return propertyDefinitionTemplate;
 
-      return propertyDefinitionTemplate = parseTemplate(PROPERTY_DEFINITION,  PropertyDefinitionParameters.class, false);
+      return propertyDefinitionTemplate = parseTemplate(PROPERTY_DEFINITION,  PropertyDefinitionParameters.class, false, null);
    }
 
    private static Template interfaceGetSetTemplate;
@@ -780,13 +780,13 @@ public class TransformUtil {
    static Template getDynTypePropDefStaticTemplate() {
       if (dynTypePropDefStaticTemplate != null)
          return dynTypePropDefStaticTemplate;
-      return dynTypePropDefStaticTemplate = parseTemplate(DYN_TYPE_PROP_DEF_STATIC_TEMPLATE, PropertyDefinitionParameters.class, false);
+      return dynTypePropDefStaticTemplate = parseTemplate(DYN_TYPE_PROP_DEF_STATIC_TEMPLATE, PropertyDefinitionParameters.class, false, null);
    }
 
    static Template getInterfaceGetSetTemplate() {
       if (interfaceGetSetTemplate != null)
          return interfaceGetSetTemplate;
-      return interfaceGetSetTemplate = parseTemplate(INTERFACE_GETSET, PropertyDefinitionParameters.class, false);
+      return interfaceGetSetTemplate = parseTemplate(INTERFACE_GETSET, PropertyDefinitionParameters.class, false, null);
    }
 
    static Template getPropertyDefinitionStaticTemplate(TypeDeclaration fieldType) {
@@ -794,7 +794,7 @@ public class TransformUtil {
          return getDynTypePropDefStaticTemplate();
       if (propertyDefinitionStaticTemplate != null)
          return propertyDefinitionStaticTemplate;
-      return propertyDefinitionStaticTemplate = parseTemplate(PROPERTY_DEFINITION_STATIC, PropertyDefinitionParameters.class, false);
+      return propertyDefinitionStaticTemplate = parseTemplate(PROPERTY_DEFINITION_STATIC, PropertyDefinitionParameters.class, false, null);
    }
 
    private static void setPropertyMappingName(PropertyDefinitionParameters params, TypeDeclaration fieldType) {
@@ -1249,7 +1249,7 @@ public class TransformUtil {
 
    public static String evalTemplate(Object params, String templateStr, boolean cache) {
       PerfMon.start("evalTemplate");
-      Template template = parseTemplate(templateStr, params.getClass(), cache);
+      Template template = parseTemplate(templateStr, params.getClass(), cache, null);
       String res = evalTemplate(params, template);
       PerfMon.end("evalTemplate");
       return res;
@@ -1275,7 +1275,7 @@ public class TransformUtil {
 
 
    public static Object parseCodeTemplate(Object params, String templateStr, Parselet parselet, boolean cache) {
-      Template template = parseTemplate(templateStr, params.getClass(), cache);
+      Template template = parseTemplate(templateStr, params.getClass(), cache, null);
       return parseCodeTemplate(params, template, parselet);
    }
 

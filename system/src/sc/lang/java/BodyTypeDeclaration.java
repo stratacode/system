@@ -4930,7 +4930,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    String generateDynamicStub(boolean batchCompile) {
       // TODO: could make this configurable via compiler settings
       if (dynStubTemplate == null)
-         dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr,  DynStubParameters.class, false);
+         dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr,  DynStubParameters.class, false, getLayeredSystem());
       return TransformUtil.evalTemplate(new DynStubParameters(getLayeredSystem(), getLayer(), this, batchCompile), dynStubTemplate);
    }
 
