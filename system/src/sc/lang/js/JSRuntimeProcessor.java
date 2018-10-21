@@ -2826,8 +2826,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         ModelUtil.ensureStarted(depType, true);
                         depTD = depTD.resolve(true);
                         if (depTD.excluded) {
-                           if (depTD.excludedStub == null)
-                              System.err.println("*** excluding type which has a dependency in the JS runtime");
+                           if (depTD.excludedStub == null) {
+                              System.err.println("*** Excluded type: " + depTD + " is a dependency from JS runtime type: " + type);
+                              continue;
+                           }
                            else {
                               depTD = depTD.excludedStub;
                            }

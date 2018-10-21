@@ -1322,17 +1322,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Object tagType = getExtendsTypeDeclaration();
       if (tagType == null)
          return null;
-      return convertExtendsTypeToJavaType(tagType);
+      return convertExtendsTypeToJavaType(tagType, true);
    }
 
-   public JavaType convertExtendsTypeToJavaType(Object tagType) {
+   public JavaType convertExtendsTypeToJavaType(Object tagType, boolean addTypeVar) {
       List<?> tps = ModelUtil.getTypeParameters(tagType);
 
       ClassType ct = (ClassType) ClassType.create(ModelUtil.getTypeName(tagType));
 
       // We will optionally supply a parameter type to the extends type we create.  Only if the
       // base class has one.
-      if (tps != null && tps.size() == 1 && ModelUtil.isTypeVariable(tps.get(0))) {
+      if (addTypeVar && tps != null && tps.size() == 1 && ModelUtil.isTypeVariable(tps.get(0))) {
          Object repeatElemType = getRepeatElementType();
          if (repeatElemType != null && repeatElemType != Object.class) {
             SemanticNodeList typeArgs = new SemanticNodeList(1);
@@ -1382,6 +1382,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private static HashMap<String,String> classNameToTagNameIndex = new HashMap<String,String>();
 
+   public static Class getSystemTagClassForTagName(String tagName) {
+       Class res = systemTagClassMap.get(tagName);
+       if (res == null)
+          res = HTMLElement.class;
+       return res;
+   }
+
    public Object getDefaultExtendsTypeDeclaration(boolean processable) {
       if (defaultExtendsType != null)
          return defaultExtendsType;
@@ -1427,7 +1434,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             // No longer capitalizing.  Object names should be lower case
             String typeName = CTypeUtil.prefixPath(tagPackage.name, CTypeUtil.capitalizePropertyName(tagName));
             Template templ = getEnclosingTemplate();
-            // There's the odd case where the template itself is defining the default for this tag.  Obviously don't use the default in that case.
+            // There's the odd case where the template itself is defining the default for this tag.  Skipping this match because it does not make sense.
             if (templ != null && typeName.equals(templ.getModelTypeName()))
                continue;
             // When we are compiling, need to pick up the src type declaration here so that we can get at the corresponding element to inherit tags.
@@ -2266,7 +2273,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       int parentExecFlags = parentTag.getComputedExecFlags();
       if (myExecFlags != parentExecFlags) {
          Object extType = getTagObjectExtends();
-         ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType));
+         // TODO: the addTypeVar param here might not be necessary... I think we add it typically for all classes in case they eventually are used as
+         // a base class for a repeat tag which uses it for the element type.  Saw an error where the type param could not be resolved: RE_typeName so I
+         // think maybe when the ClassType tries to resolve itself, it is not looking at the stub?
+         ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType, false));
          decl.addModifier("public");
          decl.parentNode = parentNode;
          addSetServerAtt(decl, 0, "serverContent");
@@ -2283,12 +2293,20 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private Object getTagObjectExtends() {
+      Object extRes = null;
       if (tagObject instanceof ModifyDeclaration) {
          ModifyDeclaration modTagObj = (ModifyDeclaration) tagObject;
          if (modTagObj.modifyInherited)
-            return modTagObj.getModifiedType();
+            extRes = modTagObj.getModifiedType();
       }
-      return getExtendsTypeDeclaration();
+      if (extRes == null)
+         extRes = getExtendsTypeDeclaration();
+      // Don't return the extends type of an excluded type since we only create excludedStubs for inner classes we might be extending an excluded class.
+      // In that case, pick the default extends class for this tag type
+      if (extRes instanceof BodyTypeDeclaration && !((BodyTypeDeclaration) extRes).needsCompile()) {
+         extRes = getSystemTagClassForTagName(lowerTagName());
+      }
+      return extRes;
    }
 
    /** Called during transform to set properties specific to the java version of the StrataCode.
@@ -3129,6 +3147,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    static HashMap<String, Set<String>> linkAttributeMap = new HashMap<String, Set<String>>();
    static HashMap<String, String> tagExtendsMap = new HashMap<String, String>();
 
+   static HashMap<String, Class> systemTagClassMap = new HashMap<String, Class>();
+
    private static HashSet<String> singletonTagNames = new HashSet<String>();
 
    static void addTagAttributes(String tagName, String extName, String[] htmlAttributes, String[] linkAttributes) {
@@ -3136,8 +3156,24 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (linkAttributes != null)
          linkAttributeMap.put(tagName, new TreeSet(Arrays.asList(linkAttributes)));
       tagExtendsMap.put(tagName, extName);
+      if (systemTagClassMap.get(tagName) == null)
+         systemTagClassMap.put(tagName, HTMLElement.class);
    }
    static {
+      systemTagClassMap.put("head", Head.class);
+      systemTagClassMap.put("body", Body.class);
+      systemTagClassMap.put("input", Input.class);
+      systemTagClassMap.put("option", Option.class);
+      systemTagClassMap.put("select", Select.class);
+      systemTagClassMap.put("form", Form.class);
+      systemTagClassMap.put("a", A.class);
+      systemTagClassMap.put("html", HtmlPage.class);
+      systemTagClassMap.put("div", Div.class);
+      systemTagClassMap.put("span", Span.class);
+      systemTagClassMap.put("img", Img.class);
+      systemTagClassMap.put("button", Button.class);
+      systemTagClassMap.put("style", Style.class);
+
       String[] emptyArgs = {};
       addTagAttributes("element", null, new String[] {"id", "style", "class"}, null);
       addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
