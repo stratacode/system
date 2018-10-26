@@ -1408,8 +1408,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       String typeName = ModelUtil.getTypeName(type);
       for (LayeredSystem syncSys:syncSystems) {
-         if (!syncSys.enableRemoteMethods)
-            continue;
          Layer syncRefLayer = syncSys.getPeerLayerFromRemote(typeModel.getLayer());
          SrcEntry peerSrcEnt = syncSys.getSrcFileFromTypeName(typeName, true, null, true, null, syncRefLayer, false);
          if (peerSrcEnt != null)

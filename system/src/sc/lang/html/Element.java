@@ -2332,8 +2332,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          LayeredSystem sys = getLayeredSystem();
          // If we're on the server system and there's no client type for this page, we'll mark it to run using serverTags
          if (sys.serverEnabled && tagType.getEnclosingType() == null) {
-            if (!sys.hasSyncPeerTypeDeclaration(tagType))
+            if (!sys.hasSyncPeerTypeDeclaration(tagType)) {
                addSetServerAtt(tagType, 0, "serverTag");
+            }
          }
       }
    }
