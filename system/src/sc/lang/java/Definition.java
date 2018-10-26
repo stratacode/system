@@ -518,7 +518,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
          if (modifier instanceof Annotation) {
             Annotation annotation = (Annotation) modifier;
             String ftn;
-            if (annotation.typeName.equals(annotationName) || (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
+            if (annotation.typeName != null && annotation.typeName.equals(annotationName) || (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
                return annotation;
          }
       }

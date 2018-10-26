@@ -24,4 +24,28 @@ public class ServerTag {
    public String toString() {
       return "id=" + id + "(" + props + ")";
    }
+
+   public int hashCode() {
+      return id.hashCode();
+   }
+
+   public boolean equals(Object other) {
+      if (other instanceof ServerTag) {
+         ServerTag ot = (ServerTag) other;
+         if (!id.equals(ot.id))
+            return false;
+
+         if (this == ot)
+            return true;
+
+         if (props != ot.props && (props == null || ot.props == null))
+            return false;
+
+         if (eventSource != ot.eventSource)
+            return false;
+
+         return true;
+      }
+      return false;
+   }
 }

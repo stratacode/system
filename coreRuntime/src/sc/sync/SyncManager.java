@@ -2933,7 +2933,7 @@ public class SyncManager {
    }
 
    /** Used from the generated code for the browser to apply a sync layer to the default destination */
-   public static void applySyncLayer(String language, String data) {
+   public static void applySyncLayer(String language, String data, String detail) {
       for (SyncManager syncManager:syncManagers) {
          // TODO: compare language and syncDestination.receiveLanguage?
          syncManager.syncDestination.applySyncLayer(data, language, false);
@@ -3014,7 +3014,7 @@ public class SyncManager {
          StringBuilder jsRes = new StringBuilder();
          jsRes.append("sc_SyncManager_c.applySyncLayer(\"" + syncDestination.getOutputLanguage() + "\", \"");
          jsRes.append(CTypeUtil.escapeJavaString(res.toString(), false));
-         jsRes.append("\");\n");
+         jsRes.append("\", \"init\");\n");
          return jsRes;
       }
       return res;

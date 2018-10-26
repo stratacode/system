@@ -1396,6 +1396,28 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ss != null && ss.size() > 0;
    }
 
+   public boolean hasSyncPeerTypeDeclaration(BodyTypeDeclaration type) {
+      JavaModel typeModel = type.getJavaModel();
+
+      if (typeModel == null || typeModel.isLayerModel)
+         return false;
+
+      List<LayeredSystem> syncSystems = getSyncSystems();
+      if (syncSystems == null)
+         return false;
+
+      String typeName = ModelUtil.getTypeName(type);
+      for (LayeredSystem syncSys:syncSystems) {
+         if (!syncSys.enableRemoteMethods)
+            continue;
+         Layer syncRefLayer = syncSys.getPeerLayerFromRemote(typeModel.getLayer());
+         SrcEntry peerSrcEnt = syncSys.getSrcFileFromTypeName(typeName, true, null, true, null, syncRefLayer, false);
+         if (peerSrcEnt != null)
+            return true;
+      }
+      return false;
+   }
+
    private void initBuildSystem(boolean initPeers, boolean fromScratch) {
       initBuildDir();
       initTypeIndexDir();

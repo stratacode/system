@@ -987,4 +987,8 @@ public class BinaryExpression extends Expression {
          return true;
       return false;
    }
+
+   public boolean isIncompleteStatement() {
+      return false;
+   }
 }

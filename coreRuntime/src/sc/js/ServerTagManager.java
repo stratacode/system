@@ -21,4 +21,13 @@ public class ServerTagManager implements IObjectId {
    public String getObjectId() {
       return "sc.js.PageServerTagManager";
    }
+
+   public void updateServerTags(Map<String,ServerTag> newSts) {
+      if (newSts == serverTags)
+         return;
+      if (newSts == null)
+         return;
+      if (serverTags == null || !newSts.equals(serverTags))
+         setServerTags(newSts); // TODO - once we add incremental map updates for the sync system, plug that in here
+   }
 }

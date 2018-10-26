@@ -92,7 +92,7 @@ public abstract class SyncDestination {
    /**
     * Applies the changes received from the sync layers received from the remote definition.  When we receive JS, we'll just eval the returned Javascript.
     * When receiving stratacode or json, we'll parse the layer definition and apply it as a set of changes to the instances.
-    * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and pull the receive language out of the text
+    * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and get the receive language out of the text
     */
    public void applySyncLayer(String input, String receiveLanguage, boolean resetSync) {
       SyncManager.SyncState oldSyncState = SyncManager.getSyncState();
@@ -115,7 +115,7 @@ public abstract class SyncDestination {
          boolean success = false;
          // When no receiveLanguage is known at this time, we must parse it from the header in the value itself
          if (receiveLanguage == null) {
-            // Otherwise, it's a string in the form sync:language:len:data:sync:language:len:data
+            // Otherwise, it's a string of the form sync:language:len:data:sync:language:len:data
             // Supporting more than one format - e.g. json and js when there are code updates to be applied
             if (layerDef.startsWith(SYNC_LAYER_START)) {
                int endLangIx = layerDef.indexOf(':', SYNC_LAYER_START_LEN);
@@ -184,7 +184,8 @@ public abstract class SyncDestination {
       return getSendLanguage().equals("stratacode") ? "js" : getSendLanguage();
    }
 
-   /** True if this destination is a sending a current sync now (i.e. the client) or receiving one (i.e. the server) */
+   // TODO: rename this to isClient()
+   /** True if this destination is a a client sending a sync - returns false for the server */
    public abstract boolean isSendingSync();
 
    /** Allows this class to be override in subclasses */
@@ -201,7 +202,7 @@ public abstract class SyncDestination {
    public class SyncListener implements IResponseListener {
       ArrayList<SyncLayer> syncLayers;
       SyncManager.SyncContext clientContext;
-      boolean anyChanges;
+      boolean anyChanges; // Did the sync request contain any changes
       public SyncListener(ArrayList<SyncLayer> sls, boolean anyChanges) {
          syncLayers = sls;
          clientContext = sls.get(0).syncContext;

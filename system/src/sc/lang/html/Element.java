@@ -2328,6 +2328,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             addSetServerAtt(tagType, 0, "serverTag");
          }
       }
+      else {
+         LayeredSystem sys = getLayeredSystem();
+         // If we're on the server system and there's no client type for this page, we'll mark it to run using serverTags
+         if (sys.serverEnabled && tagType.getEnclosingType() == null) {
+            if (!sys.hasSyncPeerTypeDeclaration(tagType))
+               addSetServerAtt(tagType, 0, "serverTag");
+         }
+      }
    }
 
    static class AddChildResult {
@@ -4177,25 +4185,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public List<String> getJSFiles() {
       LayeredSystem sys = getLayeredSystem();
       if (sys == null) {
-         System.out.println("*** No jsFiles - no layered system!");
+         System.out.println("*** No Element.JSFiles - no layered system!");
          return null;
       }
+      // First see if we are contained in an enclosing tag and just defer the source of js files to the parent tag.
+      Element parent = getEnclosingTag();
+      if (parent != null)
+         return parent.getJSFiles();
+
       JSRuntimeProcessor jsRT = (JSRuntimeProcessor) sys.getRuntime("js");
       if (jsRT != null) {
-         // First see if we are contained in an enclosing tag and just defer the source of js files to the parent tag.
-         Element parent = getEnclosingTag();
-         if (parent != null)
-            return parent.getJSFiles();
-
          // Then find the type associated with this tag, look up the JS files associated with the root type of that type.
-         Object decl = tagObject;
-         if (decl == null) {
-            if (dynObj != null)
-               decl = dynObj.getDynType();
-            else {
-               decl = sys.getRuntimeTypeDeclaration(DynUtil.getTypeName(DynUtil.getType(this), false));
-            }
-         }
+         Object decl = getTagType();
          if (decl != null) {
             Object declRoot = DynUtil.getRootType(decl);
             if (declRoot == null)
@@ -4223,7 +4224,46 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
 
       }
+      else {
+         if (serverTag) {
+            Object type = getTagType();
+            if (type != null) {
+               String jsFiles = (String) DynUtil.getInheritedAnnotationValue(type, "sc.obj.ServerTagSettings", "jsFiles");
+               if (jsFiles == null)
+                  return null;
+               String[] jsFilesArr = jsFiles.split(",");
+               ArrayList<String> res = new ArrayList<String>(jsFilesArr.length);
+               for (int i = 0; i < jsFilesArr.length; i++) {
+                  String jsFilePath = jsFilesArr[i];
+                  // TODO: code copied from above - move to a separate method
+                  if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
+                     if (!sys.postBuildProcessing)
+                        jsFilePath = "/" + jsFilePath;
+                     else {
+                        jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
+                     }
+                  }
+                  res.add(jsFilePath);
+               }
+               return res;
+            }
+         }
+      }
       return null;
+   }
+
+   private Object getTagType() {
+      LayeredSystem sys = getLayeredSystem();
+      // Then find the type associated with this tag, look up the JS files associated with the root type of that type.
+      Object decl = tagObject;
+      if (decl == null) {
+         if (dynObj != null)
+            decl = dynObj.getDynType();
+         else {
+            decl = sys.getRuntimeTypeDeclaration(DynUtil.getTypeName(DynUtil.getType(this), false));
+         }
+      }
+      return decl;
    }
 
    /** For now, this just handles converting relative URL paths so a path relative to a template in one directory can be
