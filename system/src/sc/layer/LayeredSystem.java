@@ -376,6 +376,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** When restoring serialized layered components, we need to lookup a thread-local layered system and be able to know we are doing layerResolves - to swap the name space to that of the layer. */
    public boolean layerResolveContext = false;
 
+   /** Stores up layers that we've found in checkRemovedDirectory that need to be removed (for the IDE to manage a two step process of identifying layers to remove) */
+   private List<Layer> layersToRemove;
+
    public void buildReverseTypeIndex(boolean clear) {
       try {
          acquireDynLock(false);
@@ -10824,10 +10827,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             toRemove.add(layer);
       }
       if (toRemove.size() > 0) {
-         removeLayers(toRemove, null);
+         // This gets called from the fileDeleted event in IntelliJs VirtualFileListener.  It's not the right time to make changes or even to load the psi.
+         // We'll let the caller know some layers have been removed and it can then layer call doRemoveLayers().
+         if (layersToRemove == null)
+            layersToRemove = new ArrayList<Layer>();
+         layersToRemove.addAll(toRemove);
          return true;
       }
       return false;
+   }
+
+   public void doRemoveLayers() {
+      if (layersToRemove != null) {
+         removeLayers(layersToRemove, null);
+         layersToRemove = null;
+      }
    }
 
    public void notifyModelListeners(JavaModel model) {
