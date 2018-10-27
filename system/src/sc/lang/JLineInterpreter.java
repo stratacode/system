@@ -63,6 +63,14 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       system.acquireDynLock(false);
       system.releaseDynLock(false);
 
+      // If this is a nested include or something, and we are already in the midst of processing a statement higher up,
+      // we want to release the locks here and then reacquire them afterwards.
+      boolean needsPushCtx = false;
+      if (currentScopeCtx != null) {
+         needsPushCtx = true;
+         popCurrentScopeContext();
+      }
+
       initReadThread();
       do {
          try {
@@ -161,6 +169,10 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   system.verbose("Exception in terminal reset: " + termExc);
                }
             }
+         }
+         finally {
+            if (needsPushCtx)
+               pushCurrentScopeContext();
          }
       } while (true);
    }
