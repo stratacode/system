@@ -1246,6 +1246,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public String scopeStateName = "defaultCmdContext";
 
+   protected CurrentScopeContext currentScopeCtx = null;
    /**
     * Before we run any object resolveName methods or expressions from the command, we may need to select a CurrentScopeContext that's
     * been registered by the framework, to select the specific context these commands operate in.  For example, when the command
@@ -1254,16 +1255,22 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
     * logical state based on the developer's current context (e.g. the last web-page loaded).
     */
    public boolean pushCurrentScopeContext() {
+      if (currentScopeCtx != null)
+         System.err.println("*** Nested pushCurrentScopeContext calls in interpreter!");
       CurrentScopeContext ctx = CurrentScopeContext.get(scopeStateName);
       if (ctx != null && ctx != CurrentScopeContext.getEnvScopeContextState()) {
          CurrentScopeContext.pushCurrentScopeContext(ctx, true);
+         currentScopeCtx = ctx;
          return true;
       }
       return false;
    }
 
    public void popCurrentScopeContext() {
+      if (currentScopeCtx == null)
+         System.err.println("*** Popping current scope context when it has not been pushed!");
       CurrentScopeContext.popCurrentScopeContext(true);
+      currentScopeCtx = null;
    }
 
    /**
