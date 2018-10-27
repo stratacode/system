@@ -1503,6 +1503,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Element element = getEnclosingTag();
       if (element != null)
          element.childInvalidated();
+      if (serverTag) {
+         DynUtil.invokeLater(new Runnable() {
+            public void run() {
+               Element.this.fireChangedTagEvents(false);
+            }
+         }, 5);
+
+      }
    }
 
    public void invalidateStartTag() {
