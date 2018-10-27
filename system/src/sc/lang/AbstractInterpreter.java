@@ -1070,6 +1070,21 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          sleep(pauseTime);
    }
 
+   /**
+    * Is synchronization enabled for the current type, or if no current type do we have any synchronization going on.  Useful in test scripts so we can tell
+    * whether there is a separate client version of an object or not
+    */
+   public boolean getSyncEnabled() {
+      if (currentTypes.size() == 0) {
+         List<LayeredSystem> syncSystems = system.getSyncSystems();
+         return syncSystems != null && syncSystems.size() > 0;
+      }
+      else {
+         BodyTypeDeclaration type = currentTypes.get(currentTypes.size()-1);
+         return system.hasSyncPeerTypeDeclaration(type);
+      }
+   }
+
    SrcEntry findModelSrcFileForLayer(BodyTypeDeclaration type, String filePrefix, Layer layer) {
       String baseFileName = type.typeName;
       int ix;
