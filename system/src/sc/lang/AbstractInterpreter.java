@@ -991,7 +991,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
       else if (statement instanceof Statement) {
          boolean pushed = false;
-         boolean pushedCtx = false;
+         boolean pushedCtx = pushCurrentScopeContext();
          Object curObj = null;
 
          Statement expr = (Statement) statement;
@@ -1009,7 +1009,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                CurrentObjectResult cor = selectCurrentObject(expr, currentType, false, true, true);
                if (cor.wizardStarted)
                   return;
-               pushedCtx = cor.pushedCtx;
+               pushedCtx = pushedCtx || cor.pushedCtx;
                skipEval = cor.skipEval;
                pushed = cor.pushedObj;
                curObj = cor.curObj;

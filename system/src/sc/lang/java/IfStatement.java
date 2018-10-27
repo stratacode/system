@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
+import sc.layer.LayeredSystem;
 import sc.parser.GenFileLineIndex;
 import sc.parser.IParseNode;
 import sc.parser.ParseUtil;
@@ -204,6 +205,14 @@ public class IfStatement extends NonIndentedStatement {
 
    public boolean isIncompleteStatement() {
       return false;
+   }
+
+   /**
+    * For IfStatement, only run it in a runtime if we can do the whole thing remotely.  Otherwise, the main runtime will need to split it up
+    * and send out individual remote requests for the expression and statement
+    */
+   public boolean execForRuntime(LayeredSystem sys) {
+      return expression.execForRuntime(sys) && trueStatement.execForRuntime(sys) && (falseStatement == null || falseStatement.execForRuntime(sys));
    }
 
 }
