@@ -158,6 +158,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
            "   sc_SyncManager_c.endSync();\n   if (sc_refresh !== undefined) sc_refresh();\n" +
            "}";
 
+   public final static String NoSyncCode =  "   if (sc_refresh !== undefined) sc_refresh();\n";
+
 
    public JSRuntimeProcessor() {
       super("js", false);
