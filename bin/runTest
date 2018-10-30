@@ -7,7 +7,7 @@ if [ "${TEST_NAME}" == "" ] ; then
 fi
 shift
 
-if [ -z "$RESULTS_DIR" ] ; then
+if [ -z "$SC_RESULTS_DIR" ] ; then
    # Being run directly from command line
    if [ -z "TEST_HOME" ] ; then
       if [ -z "$BASH_SOURCE" ] ; then 
