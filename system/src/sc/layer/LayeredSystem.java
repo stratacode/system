@@ -293,6 +293,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public long sysStartTime = -1;
    long buildStartTime = -1;
 
+   /** Set to true for cases where we create a runtime purely for representing inactive types - e.g. the documentation.  In that case, no active layers are populated */
+   public boolean inactiveRuntime = false;
+
    /** A global setting turned on when in the IDE.  If true the original runtime is always 'java' - the default.  In the normal build env, if there's only one runtime, we never create the default runtime. */
    public static boolean javaIsAlwaysDefaultRuntime = false;
 
@@ -1500,7 +1503,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (processPeer != null) {
                   String runtimeName = processPeer.getRuntimeName();
                   String processIdent = processPeer.getProcessName();
-                  if (!isRuntimeDisabled(runtimeName) && (!active || isRuntimeActivated(runtimeName) || isProcessActivated(processIdent)))
+                  if (active && !isRuntimeDisabled(runtimeName) && (isRuntimeActivated(runtimeName) || isProcessActivated(processIdent)))
                      updateSystemLayers(processPeer, specifiedOnly);
                   continue;
                }
@@ -1528,7 +1531,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
 
-            LayeredSystem peerSys = createPeerSystem(proc, procLayerNames, explicitDynLayers);
+            LayeredSystem peerSys = createPeerSystem(proc, procLayerNames, explicitDynLayers); if (!active) peerSys.inactiveRuntime = true;
 
             for (int i = 0; i < inactiveLayers.size(); i++) {
                Layer inactiveLayer = inactiveLayers.get(i);
@@ -1558,7 +1561,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else { // If there's only one runtime, we'll use this layered system for it.
          processDefinition = processes != null && processes.size() > 0 ? processes.get(0) : null;
          runtimeProcessor = processDefinition == null ? null : processDefinition.getRuntimeProcessor();
-         if (peerSystems != null) {
+         if (peerSystems != null && active) {  // This only initializes active layers so don't do it if we are not activating a layer - otherwise for doc we'll end up activating JS layers even if the JS runtime is not active
             for (LayeredSystem peerSys: peerSystems) {
                updateSystemLayers(peerSys, specifiedOnly);
             }
@@ -2034,6 +2037,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       return null;
+   }
+
+   public boolean hasActiveRuntime(String name) {
+      String rtName = getRuntimeName();
+      if (rtName != null && rtName.equals(name))
+         return true;
+      if (peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            rtName = peerSys.getRuntimeName();
+            if (rtName != null && rtName.equals(name) && peerSys.layers.size() > 0)
+               return true;
+         }
+      }
+      return false;
    }
 
    public static IProcessDefinition getProcessDefinition(String procName, String runtimeName) {
@@ -4025,6 +4042,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean skipBuild = separateLayersOnly && !layer.buildSeparate;
       if (options.info) {
          String runtimeName = getProcessIdent();
+         if (!peerMode && peerSystems != null)
+            runtimeName = runtimeName + "(main)";
+
          if (!skipBuild && !systemCompiled) {
             if (!layer.buildSeparate) {
                if (!layer.compiled) {
@@ -5856,7 +5876,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String layerFileName = FileUtil.concat(origLayerPathName, layerBaseName);
          File layerPathFile = new File(layerFileName);
          if (lpi.activate)
-            System.err.println("No layer definition file: " + layerPathFile.getPath() + (layerPathFile.isAbsolute() ? "" : " (at full path " + layerPathFile.getAbsolutePath() + ")"));
+            System.err.println("No layer definition file: " + layerPathFile.getPath() + (layerPathFile.isAbsolute() ? "" : " (at full path " + layerPathFile.getAbsolutePath() + ")") + " in layer path: " + layerPath);
       }
       else if (layer.initFailed && lpi.activate) {
          System.err.println("Layer: " + layer.getLayerName() + " failed to start");
@@ -6109,6 +6129,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (initStrataCodeDir(parentName))
                            return;
 
+                        /* We used to use .stratacode for storing layerPath in a layers or bundle but now we use it for the home directory - storing
+                          build src, indexes etc.   Turns out these two uses conflict because we find the home directory .stratacode thinking it's a layer bundle
+                           and initialize in the wrong location.  need to remove this one
                         File layerPathFile = new File(FileUtil.concat(parentName, LayerConstants.SC_DIR));
                         // There's a .stratacode here - it's a layer bundle - either layers or inside of bundles?
                         if (layerPathFile.isDirectory()) {
@@ -6135,6 +6158,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            }
                         }
                         else
+                        */
                            currentFile = new File(parentName);
                      }
                   } while (parentName != null);
