@@ -1559,8 +1559,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // We've added some layers to the this layered system through activate.  Now we need to go through the
       // other systems and include the layers in them if they are needed.
       else { // If there's only one runtime, we'll use this layered system for it.
-         processDefinition = processes != null && processes.size() > 0 ? processes.get(0) : null;
-         runtimeProcessor = processDefinition == null ? null : processDefinition.getRuntimeProcessor();
+         if (active && runtimeProcessor == null && processDefinition == null) {
+            processDefinition = processes != null && processes.size() > 0 ? processes.get(0) : null;
+            runtimeProcessor = processDefinition == null ? null : processDefinition.getRuntimeProcessor();
+         }
          if (peerSystems != null && active) {  // This only initializes active layers so don't do it if we are not activating a layer - otherwise for doc we'll end up activating JS layers even if the JS runtime is not active
             for (LayeredSystem peerSys: peerSystems) {
                updateSystemLayers(peerSys, specifiedOnly);
