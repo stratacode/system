@@ -1379,6 +1379,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public String getCachedJSModuleFile(String typeName) {
+      if (jsBuildInfo == null || jsBuildInfo.jsModuleNames == null) {
+         System.out.println("*** JS runtime inactive - no JS files available for type: " + typeName);
+         return null;
+      }
       String res = jsBuildInfo.jsModuleNames.get(typeName);
       if (res != null && res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
          res = null;
