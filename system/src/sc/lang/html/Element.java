@@ -107,7 +107,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public transient boolean bodyTxtValid = false;
 
    /** A separate flag to handle the state where we know repeat has changed but don't know if the bodyTxt of the list has changed or just an element */
-   public transient boolean repeatTagsValid = true;
+   public transient boolean repeatTagsValid = false;
+
+   // Have we scheduled a 'refreshTags' call yet for this element.  We'll set properties, and invalidate DOM elements, then run a refreshTags to
+   // walk down the tree and fire changed events to notify listeners of what needs to be sync'd to the remote client
+   public transient boolean refreshTagsScheduled = false;
 
    public transient String startTagCache, bodyCache;
    public transient CacheMode cache;
@@ -119,7 +123,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Object defaultExtendsType = null;
 
-   /** When processing a template once we hit a parent node whose type is not available in this mode, we insert a dummy node and only process static portsion of the template until some tag sets exec="process" to turn back on processing */
+   /** When processing a template once we hit a parent node whose type is not available in this mode, we insert a dummy node and only process static portion of the template until some tag sets exec="process" to turn back on processing */
    public transient boolean staticContentOnly = false;
 
    private transient Object repeat;
@@ -155,8 +159,24 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    @Bindable(manual=true)
    public void setVisible(boolean vis) {
+      if (vis == visible)
+         return;
       visible = vis;
-      invalidateStartTag();
+      // Only want to send the invalidate if we start out valid.  Otherwise, we might be in the midst of being rendered -
+      // our parent will have marked itself as valid which can trigger an invalidation at this point.
+      if (startTagValid) {
+         invalidateStartTag();
+         Element enclTag = getEnclosingTag();
+         if (enclTag != null)
+            enclTag.invalidateBody();
+      }
+      // When we become visible, even if we are not valid, it's possible our parent's body is valid.  Need to invalidate the parent's body
+      // so it re-renders the new list of children.
+      else if (vis) {
+         Element enclTag = getEnclosingTag();
+         if (enclTag != null)
+            enclTag.invalidateBody();
+      }
       Bind.sendChangedEvent(this, "visible");
    }
 
@@ -1501,15 +1521,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    void invalidateParent() {
       Element element = getEnclosingTag();
+      boolean isValid = bodyValid;
       if (element != null)
          element.childInvalidated();
       if (serverTag) {
-         DynUtil.invokeLater(new Runnable() {
-            public void run() {
-               Element.this.fireChangedTagEvents(false);
-            }
-         }, 5);
-
+         Element rootTag = getRootTag();
+         if (rootTag != null) {
+            rootTag.scheduleRefreshTags();
+         }
       }
    }
 
@@ -1521,7 +1540,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void invalidateBody() {
-      if (bodyValid) {
+      if (bodyValid || bodyTxtValid) {
          markBodyValid(false);
          invalidateParent();
       }
@@ -4202,7 +4221,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (parent != null)
          return parent.getJSFiles();
 
-      JSRuntimeProcessor jsRT = (JSRuntimeProcessor) sys.getRuntime("js");
+      // Make sure there's a js runtime that has active layers in it.
+      JSRuntimeProcessor jsRT = sys.hasActiveRuntime("js") ? (JSRuntimeProcessor) sys.getRuntime("js") : null;
       if (jsRT != null) {
          // Then find the type associated with this tag, look up the JS files associated with the root type of that type.
          Object decl = getTagType();
@@ -4292,8 +4312,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          return srcRelPath;
       String curRelPath = window.location.pathname;
       if (curRelPath != null) {
-         if (curRelPath.endsWith("/") && curRelPath.length() > 1)
-            curRelPath = curRelPath.substring(0, curRelPath.length() - 1);
+         // TODO: remove this bogus code - if we have /articles/ the relPath should be /articles
+         //if (curRelPath.endsWith("/") && curRelPath.length() > 1)
+         //   curRelPath = curRelPath.substring(0, curRelPath.length() - 1);
+         if (curRelPath.length() > 1 && curRelPath.startsWith("/")) // Remove /foo prefix so we just have "foo" as the dir to avoid counting one too many
+            curRelPath = curRelPath.substring(1);
          curRelPath = URLUtil.getParentPath(curRelPath);
       }
       if (curRelPath == null || curRelPath.equals(srcRelPath))
@@ -4739,7 +4762,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * This is a step we do after refreshing all of the bindings before rendering to improve incremental refresh efficiency.
     * If any 'repeat' properties have changed, we'll now go through and
     * determine if the repeat tag's body has changed or perhaps we can handle any repeat tag changes incrementally through the children.  This should be called
-    * before fireChangedTagEvents which triggers the innerHTML property changes for incremental refresh.
+    * before refreshTags which triggers the innerHTML property changes for incremental refresh.
     * This is a simple approach for now until we handle selective update of the elements of the list.  Right now if the class or structure of a child
     * has changed,
     */
@@ -4763,7 +4786,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
    */
 
-   public void fireChangedTagEvents(boolean parentBodyChanged) {
+   public void scheduleRefreshTags() {
+      if (refreshTagsScheduled)
+         return;
+      refreshTagsScheduled = true;
+      DynUtil.invokeLater(new Runnable() {
+         public void run() {
+            refreshTagsScheduled = false;
+            refreshTags(false);
+         }
+      }, 5);
+   }
+
+   public void refreshTags(boolean parentBodyChanged) {
       if (isRepeatTag()) {
          if (!repeatTagsValid) {
             if (syncRepeatTags(getCurrentRepeatVal())) {
@@ -4802,7 +4837,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (children != null) {
             for (Object child:children) {
                if (child instanceof Element) {
-                  ((Element) child).fireChangedTagEvents(parentBodyChanged);
+                  ((Element) child).refreshTags(parentBodyChanged);
                }
             }
          }
