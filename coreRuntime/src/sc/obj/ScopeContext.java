@@ -131,6 +131,9 @@ public abstract class ScopeContext {
             public void run() {
                notifyListeners();
             }
+            public String toString() {
+               return "scope changed listener for: " + ScopeContext.this.toString();
+            }
          }, 0);
       }
       // when the session changes, potentially all of the windows will change

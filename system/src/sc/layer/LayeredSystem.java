@@ -14933,7 +14933,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       StringBuilder sb = new StringBuilder();
       sb.append("LayeredSystem: ");
       sb.append(getProcessIdent());
-      sb.append("  activeLayers: ");
+      sb.append("\n   activeLayers: ");
       sb.append(layers.size());
       sb.append(" inactiveLayers: ");
       sb.append(inactiveLayers.size());
@@ -14950,7 +14950,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (Layer l:inactiveLayers) {
          totalLayerModels += l.layerModels.size();
       }
-      sb.append("  layerModels: " + totalLayerModels);
+      sb.append("\n   layerModels: " + totalLayerModels);
       sb.append(" viewErrors: " + viewedErrors.size());
       sb.append(" globalObjects: " + globalObjects.size());
       sb.append(" pendingActiveLayers: " + pendingActiveLayers.size());
@@ -14972,10 +14972,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (HashMap<String,PackageEntry> pkgMap:packageIndex.values()) {
          pkgIndexSize += pkgMap.size();
       }
-      sb.append("  packageIndexSize: " + pkgIndexSize + "\n\n");
+      sb.append(" packageIndexSize: " + pkgIndexSize + "\n\n");
+      sb.append(" inactiveModels:");
+      int ct = 0;
+      for (Map.Entry<String,ILanguageModel> ent: inactiveModelIndex.entrySet()) {
+         if ((ct % 10) == 0)
+            sb.append("\n   ");
+         else
+            sb.append(", ");
+         ILanguageModel m = ent.getValue();
+         TypeDeclaration mtype = m.getModelTypeDeclaration();
+         if (mtype == null)
+            sb.append("no model");
+         else
+            sb.append(mtype.getTypeName());
+         ct++;
+      }
 
       if (!peerMode && typeIndexProcessMap != null) {
-         sb.append("Peers type indexes:\n");
+         sb.append("System type indexes:\n");
          for (Map.Entry<String,SysTypeIndex> ent:typeIndexProcessMap.entrySet()) {
             sb.append("  index for: " + ent.getKey());
             sb.append(": ");
@@ -14984,7 +14999,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (!peerMode && peerSystems != null) {
-         sb.append("Peers: \n");
+         sb.append("Peer systems --------- \n");
          for (LayeredSystem peerSys:peerSystems)
             sb.append(peerSys.dumpCacheStats());
       }

@@ -125,8 +125,10 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   nextPrompt = "";
                }
                else {
-                  if (toRunLater.size() > 0)
-                     System.err.println("*** run later jobs missed during invoke of command");
+                  // Note: any doLater jobs that we encounter here will not be synchronized with the command that's been run.  They can get here because
+                  // pushCurrentScopeContext returns false - i.e. there's no defined scopeContextName like when we start running commands like TestPageLoader.loadAllPages().
+                  // It can invalidate scope contexts - for global scope for example which add invokeLater calls that won't then get flushed out in popCurrentScopeCtx.
+                  execLaterJobs();
 
                   nextPrompt = inputBytesAvailable() ? "" : prompt();
                }

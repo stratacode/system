@@ -93,6 +93,10 @@ public class CommandInterpreter extends AbstractInterpreter {
                      nextPrompt = "Incomplete statement: ";
                }
                else {
+                  // Run here just in case there's no currentScopeContext - ideally we clear these out before releasing the locks so we do command and doLater jobs
+                  // atomically but because we may not have a current scope context at the start of the test script.
+                  execLaterJobs();
+
                   nextPrompt = inputBytesAvailable() ? "" : prompt();
                }
                if (!noPrompt)
