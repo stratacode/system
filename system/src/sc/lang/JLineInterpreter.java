@@ -125,7 +125,8 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   nextPrompt = "";
                }
                else {
-                  execLaterJobs();
+                  if (toRunLater.size() > 0)
+                     System.err.println("*** run later jobs missed during invoke of command");
 
                   nextPrompt = inputBytesAvailable() ? "" : prompt();
                }

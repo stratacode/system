@@ -1284,6 +1284,12 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public void popCurrentScopeContext() {
       if (currentScopeCtx == null)
          System.err.println("*** Popping current scope context when it has not been pushed!");
+
+      // We need to exec any jobs that were invoked with this current scope context before we release the locks.
+      // this helps us flush out all data binding events before any waiting sync's are woken up.  Otherwise, they may get
+      // only part of the change.
+      execLaterJobs();
+
       CurrentScopeContext.popCurrentScopeContext(true);
       currentScopeCtx = null;
    }
@@ -1848,7 +1854,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       DynUtil.setThreadScheduler(this);
    }
 
-   private ArrayList<ScheduledJob> toRunLater = new ArrayList<ScheduledJob>();
+   protected ArrayList<ScheduledJob> toRunLater = new ArrayList<ScheduledJob>();
 
    public void invokeLater(Runnable r, int priority) {
       ScheduledJob job = new ScheduledJob();
@@ -1864,12 +1870,21 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       if (CurrentScopeContext.getEnvScopeContextState() == null)
          pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
       try {
-         ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
-         toRunLater.clear();
-         for (int i = 0; i < toRunNow.size(); i++) {
-            ScheduledJob toRun = toRunNow.get(i);
-            toRun.run();
+         int runCt = 0;
+         do {
+            runCt++;
+            ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
+            toRunLater.clear();
+            for (int i = 0; i < toRunNow.size(); i++) {
+               ScheduledJob toRun = toRunNow.get(i);
+               toRun.run();
+            }
+            if (runCt > 16) {
+               System.err.println("*** execLaterJobs - exceeded indirection count!");
+               return;
+            }
          }
+         while (toRunLater.size() > 0); // Make sure we run any jobs found when running these jobs
       }
       finally {
          if (pushed)

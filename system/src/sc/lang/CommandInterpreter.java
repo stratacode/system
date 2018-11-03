@@ -93,8 +93,6 @@ public class CommandInterpreter extends AbstractInterpreter {
                      nextPrompt = "Incomplete statement: ";
                }
                else {
-                  execLaterJobs();
-
                   nextPrompt = inputBytesAvailable() ? "" : prompt();
                }
                if (!noPrompt)
