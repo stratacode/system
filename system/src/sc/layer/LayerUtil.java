@@ -8,6 +8,7 @@ import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.java.Expression;
 import sc.lang.java.ModelUtil;
+import sc.lang.java.TypeDeclaration;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.SCModel;
@@ -988,4 +989,24 @@ public class LayerUtil implements LayerConstants {
       }
    }
 
+   public static StringBuilder dumpModelIndexStats(Map<String,ILanguageModel> modelIndex) {
+      StringBuilder sb = new StringBuilder();
+
+      int ct = 0;
+      for (Map.Entry<String,ILanguageModel> ent: modelIndex.entrySet()) {
+         if ((ct % 10) == 0)
+            sb.append("\n   ");
+         else
+            sb.append(", ");
+         ILanguageModel m = ent.getValue();
+         TypeDeclaration mtype = m.getModelTypeDeclaration();
+         if (mtype == null)
+            sb.append("no model");
+         else
+            sb.append(mtype.getTypeName());
+         ct++;
+      }
+      sb.append("\n\n");
+      return sb;
+   }
 }

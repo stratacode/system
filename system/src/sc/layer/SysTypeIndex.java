@@ -233,12 +233,12 @@ public class SysTypeIndex {
    public StringBuilder dumpCacheStats() {
       StringBuilder sb = new StringBuilder();
       if (activeTypeIndex != null) {
-         sb.append("  activeTypeIndex: ");
+         sb.append("   activeTypeIndex: ");
          sb.append(activeTypeIndex.dumpCacheStats());
          sb.append("\n");
       }
       if (inactiveTypeIndex != null) {
-         sb.append("  inActiveTypeIndex: ");
+         sb.append("   inactiveTypeIndex: ");
          sb.append(inactiveTypeIndex.dumpCacheStats());
          sb.append("\n");
       }

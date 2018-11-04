@@ -346,7 +346,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
             if (ModelUtil.sameTypes(ModelUtil.getTypeParameterDeclaration(res), this))
                return getTypeDeclarationForParam(ModelUtil.getTypeParameterName(res), res, resolve);
          }
-         return ModelUtil.getTypeDeclFromType(this, res, false, getLayeredSystem(), resolve, definedInType);
+         return ModelUtil.getTypeDeclFromType(this, res, false, getLayeredSystem(), resolve, definedInType, null, -1);
          // TODO: do we need to resolve any type parameters here before returning?
          //return res;
       }

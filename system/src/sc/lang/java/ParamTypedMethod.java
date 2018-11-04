@@ -171,7 +171,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
    }
 
    private ParamTypeDeclaration createParamTypeFromNative(Object parameterizedType) {
-      List<?> typeParams = ModelUtil.getTypeParameters(ModelUtil.getTypeDeclFromType(this, parameterizedType, true, getLayeredSystem(), true, definedInType));
+      List<?> typeParams = ModelUtil.getTypeParameters(ModelUtil.getTypeDeclFromType(this, parameterizedType, true, getLayeredSystem(), true, definedInType, null, -1));
       int numParams = ModelUtil.getNumTypeParameters(parameterizedType);
       Object baseType = ModelUtil.getParamTypeBaseType(parameterizedType);
       ArrayList<Object> typeDefs = new ArrayList<Object>(numParams);
@@ -467,7 +467,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       //int boundParams = sameParamTypes ? ModelUtil.getNumTypeParameters(boundType) : -1;
       for (int i = 0; i < numParams; i++) {
          Object typeParamArg = ModelUtil.getTypeArgument(paramJavaType, i);
-         Object typeParam = ModelUtil.getTypeDeclFromType(null, typeParamArg, false, getLayeredSystem(), false, getDefinedInType());
+         Object typeParam = ModelUtil.getTypeDeclFromType(null, typeParamArg, false, getLayeredSystem(), false, getDefinedInType(), paramType, i);
          Object typeParamType = ModelUtil.getTypeParameter(paramType, i);
          // Unresolved type
          if (typeParam == null)
@@ -595,7 +595,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       Object[] res = oldRes == null ? new Object[len] : oldRes;
       for (int i = startIx; i < len; i++) {
          JavaType paramJavaType = javaTypes[i];
-         res[i] = paramJavaType.getTypeDeclaration(bound ? this : null, definedInType, false, refreshParams, bindUnbound);
+         res[i] = paramJavaType.getTypeDeclaration(bound ? this : null, definedInType, false, refreshParams, bindUnbound, null, -1);
          if (res[i] instanceof ClassType) {
             Object newRes = javaTypes[i].getTypeDeclaration();
             if (newRes != null)

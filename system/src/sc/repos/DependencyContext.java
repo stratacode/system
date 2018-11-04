@@ -38,6 +38,12 @@ public class DependencyContext implements Serializable {
    public DependencyContext child(RepositoryPackage fromPkg) {
       if (children == null)
          children = new ArrayList<DependencyContext>();
+      else {
+         for (DependencyContext child:children) {
+            if (child.fromPkg == fromPkg)
+               return child;
+         }
+      }
       DependencyContext child = new DependencyContext(depth + 1, fromPkg, this);
       children.add(child);
       return child;

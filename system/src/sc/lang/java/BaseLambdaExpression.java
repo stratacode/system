@@ -535,7 +535,7 @@ public abstract class BaseLambdaExpression extends Expression {
       else {
          // Convert between the ParameterizedType and ParamTypeDeclaration
          if (parentType instanceof ParameterizedType)
-            parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType());
+            parentType = ModelUtil.getTypeDeclFromType(parentType, parentType, false, getLayeredSystem(), false, getEnclosingType(), null, -1);
 
          if (inferredType != null) {
             if (ModelUtil.isAssignableFrom(parentType, inferredType)) {

@@ -193,11 +193,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Stores the latest representation of each model from the absolute file name.  When the externalModelIndex is set, this index shadows the external index, i.e. storing the last result we retreive from that index. */
    private Map<String,ILanguageModel> modelIndex = new HashMap<String,ILanguageModel>();
 
-   /** During a refresh, keep track of the types which have been stopped so we can update instances based on these types when they are restarted (or remove them if they are not) */
-   private LinkedHashMap<String,TypeDeclaration> stoppedTypes = null;
-
    /** Stores the inactive model types, separate from the active ones.  Here the layer stack is lazily formed and contains files we are not compiling... just loading for tooling purposes like the IDE or the doc styling */
    private HashMap<String,ILanguageModel> inactiveModelIndex = new HashMap<String,ILanguageModel>();
+
+   /** During a refresh, keep track of the types which have been stopped so we can update instances based on these types when they are restarted (or remove them if they are not) */
+   private LinkedHashMap<String,TypeDeclaration> stoppedTypes = null;
 
    /** As we are editing, we are only updating the model in one runtime.  Instead, we accumulate the set of models which are stale in the peer runtimes and flush them out periodically. */
    private Map<String,ILanguageModel> peerModelsToUpdate = new HashMap<String,ILanguageModel>();
@@ -14956,14 +14956,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       sb.append(" pendingActiveLayers: " + pendingActiveLayers.size());
       sb.append(" pendingInActiveLayers: " + pendingInactiveLayers.size());
       sb.append(" inactiveLayerIndex: " + inactiveLayerIndex.size() + "\n");
-      sb.append("  typesByName: " + typesByName.size());
+      sb.append("   typesByName: " + typesByName.size());
       sb.append(" innerTypeCache: " + innerTypeCache.size());
       sb.append(" beingLoaded: " + beingLoaded.size());
       sb.append(" typesByRootName: " + typesByRootName.size());
       sb.append(" templateCache: " + templateCache.size());
       sb.append(" zipFileCache: " + zipFileCache.size() + "\n");
 
-      sb.append("  instancesByTypes: " + instancesByType.size());
+      sb.append("   instancesByTypes: " + instancesByType.size());
       sb.append(" innerToOuterIndex: " + innerToOuterIndex.size());
       sb.append(" objectNameIndex: " + objectNameIndex.size());
       sb.append(" subTypesByType: " + subTypesByType.size());
@@ -14973,21 +14973,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          pkgIndexSize += pkgMap.size();
       }
       sb.append(" packageIndexSize: " + pkgIndexSize + "\n\n");
-      sb.append(" inactiveModels:");
-      int ct = 0;
-      for (Map.Entry<String,ILanguageModel> ent: inactiveModelIndex.entrySet()) {
-         if ((ct % 10) == 0)
-            sb.append("\n   ");
-         else
-            sb.append(", ");
-         ILanguageModel m = ent.getValue();
-         TypeDeclaration mtype = m.getModelTypeDeclaration();
-         if (mtype == null)
-            sb.append("no model");
-         else
-            sb.append(mtype.getTypeName());
-         ct++;
-      }
+      sb.append("   active models:");
+      sb.append(LayerUtil.dumpModelIndexStats(modelIndex));
+
+      sb.append("   inactiveModels:");
+      sb.append(LayerUtil.dumpModelIndexStats(inactiveModelIndex));
 
       if (!peerMode && typeIndexProcessMap != null) {
          sb.append("System type indexes:\n");

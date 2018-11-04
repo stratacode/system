@@ -254,9 +254,10 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
                      // methods in this list.  As long as we ignore those other methods, we get by ok.
                      if (j < methodList.length && superMethodList[j] == methodList[j]) {
                         // Used to use "pickMoreSpecificMethod" here but the isAssignableTo led to a recursive 'start' call which found an uninitialized method cache
-                        // It looks like we really only need to choose between abstract/interface methods and real ones - since the default is that the sub-class overrides
-                        // the base class for any implementation method.
-                        Object implMethod = ModelUtil.chooseImplMethod(superMethodList[j], method);
+                        // It looks like we really only need to choose between interface methods and real ones - since the default is that the sub-class overrides
+                        // the base class for any implementation method.  That's true for 'abstract' methods as well here - e.g. an abstract class that overrides
+                        // the Object.clone method and refines the type to
+                        Object implMethod = ModelUtil.chooseImplMethod(superMethodList[j], method, false);
                         if (implMethod != null) {
                            method = implMethod;
                         }

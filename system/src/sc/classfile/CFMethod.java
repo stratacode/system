@@ -74,8 +74,8 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
          boundParameterTypes = new Object[parameterJavaTypes.length];
          unboundParameterTypes = new Object[parameterJavaTypes.length];
          for (int i = 0; i < parameterJavaTypes.length; i++) {
-            boundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, null, true, false, true);
-            unboundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, null, false, false, true);
+            boundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, null, true, false, true, null, -1);
+            unboundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, null, false, false, true, null, -1);
          }
       }
 
@@ -107,7 +107,7 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
          start();
       if (returnType == null)
          return null;
-      return returnType.getTypeDeclaration(null, null, boundParams, false, true);
+      return returnType.getTypeDeclaration(null, null, boundParams, false, true, null, -1);
    }
 
    public Object getReturnJavaType() {

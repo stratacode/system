@@ -254,7 +254,7 @@ public class ClassType extends JavaType {
       return false;
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, Object itd, boolean resolve, boolean refreshParams, boolean bindUnbound) {
+   public Object getTypeDeclaration(ITypeParamContext ctx, Object itd, boolean resolve, boolean refreshParams, boolean bindUnbound, Object baseType, int paramIx) {
       // We should only be accessing the top level ClassType's type declaration
       // since the chained types are just part of this definition.
       assert !chained;
@@ -311,7 +311,7 @@ public class ClassType extends JavaType {
             for (int i = 0; i < typeArgs.size(); i++) {
                JavaType typeArg = typeArgs.get(i);
                if (typeArg != null) {
-                  Object ptdt = typeArg.getTypeDeclaration(ctx, itd, false, true, true);
+                  Object ptdt = typeArg.getTypeDeclaration(ctx, itd, false, true, true, ptd, i);
                   ptd.writable = true;
                   ptd.setTypeParamIndex(i, ptdt);
                }
@@ -351,26 +351,22 @@ public class ClassType extends JavaType {
       
    }
 
-   public List<Object> getTypeArgumentDeclarations() {
-      return getTypeArgumentDeclarations(null, null, null, null, null);
-   }
-
-   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, Object it, JavaSemanticNode node, ITypeParamContext ctx, List<Object> typeParamTypes) {
+   public List<Object> getTypeArgumentDeclarations(LayeredSystem sys, Object it, JavaSemanticNode node, ITypeParamContext ctx, List<Object> typeParamTypes, Object baseType) {
       List<JavaType> typeArgs = getResolvedTypeArguments();
       if (typeArgs == null)
          return null;
       List<Object> typeDefs = new ArrayList<Object>(typeArgs.size());
       for (int i = 0; i < typeArgs.size(); i++) {
          JavaType typeArg = typeArgs.get(i);
-         Object argType = typeArg.getTypeDeclaration(ctx, it, false, false, false);
+         Object argType = typeArg.getTypeDeclaration(ctx, it, false, false, false, baseType, i);
          Object typeParamType = typeParamTypes == null ? null : typeParamTypes.get(i);
          if (argType == null) {
             typeArg.initType(sys, it, node, ctx, true, false, typeParamType);
-            argType = typeArg.getTypeDeclaration(ctx, it, false, false, true);
+            argType = typeArg.getTypeDeclaration(ctx, it, false, false, true, baseType, i);
          }
          if (argType == null) {
             typeDefs.add(null); // An unresolved type?  Do not put ClassTypes here but are there any cases we need a TypeVariable?
-            argType = typeArg.getTypeDeclaration(ctx, it, false, false, true); // TODO: DEBUG - remove me
+            argType = typeArg.getTypeDeclaration(ctx, it, false, false, true, baseType, i); // TODO: DEBUG - remove me
          }
          else
             typeDefs.add(argType);
@@ -549,7 +545,7 @@ public class ClassType extends JavaType {
       // Before we return the type, check and see if this definition adds any bound type parameters -
       // i.e. concrete types instead of parameter names.  If so, we need to wrap the returned type with
       // an object which knows how to resolve type parameters to do the proper type matching when generics are used.
-      List<Object> typeDefs = getTypeArgumentDeclarations(sys, it, node, ctx, typeParamTypes);
+      List<Object> typeDefs = getTypeArgumentDeclarations(sys, it, node, ctx, typeParamTypes, type);
       if (typeDefs != null && type != FAILED_TO_INIT_SENTINEL && anyBoundParameters(typeDefs)) {
          List<?> typeParams = ModelUtil.getTypeParameters(type);
          if (typeParams == null || typeParams.size() != typeDefs.size())

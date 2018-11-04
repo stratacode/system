@@ -45,17 +45,17 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    // Returns the TypeDeclaration or Class for this type
    public Object getTypeDeclaration() {
-      return getTypeDeclaration(null, null, false, false, true);
+      return getTypeDeclaration(null, null, false, false, true, null, -1);
    }
 
-   public abstract Object getTypeDeclaration(ITypeParamContext ctx, Object definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound);
+   public abstract Object getTypeDeclaration(ITypeParamContext ctx, Object definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound, Object baseType, int paramIx);
 
    public int getNdims() {
       return arrayDimensions == null || arrayDimensions.length() == 0 ? -1 : arrayDimensions.length() >> 1;
    }
 
    public String getAbsoluteBaseTypeName() {
-      Object type = getTypeDeclaration(null, null, true, false, true);
+      Object type = getTypeDeclaration(null, null, true, false, true, null, -1);
       if (type != null)
          return ModelUtil.getTypeName(type, false);
       else
@@ -63,7 +63,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    }
 
    public String getJavaFullTypeName() {
-      Object type = getTypeDeclaration(null, null, true, false, true);
+      Object type = getTypeDeclaration(null, null, true, false, true, null, -1);
       if (type != null)
          return ModelUtil.getJavaFullTypeName(type);
       else
@@ -350,7 +350,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       String dimsStr = getSignatureDims();
       String baseSig = getBaseSignature();
       if (baseSig.startsWith("T") && expandTypeParams) {
-         Object type = getTypeDeclaration(null, null, true, false, true);
+         Object type = getTypeDeclaration(null, null, true, false, true, null, -1);
          if (ModelUtil.isArray(type))
             type = ModelUtil.getArrayComponentType(type);
          if (ModelUtil.isTypeVariable(type))

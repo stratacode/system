@@ -79,18 +79,26 @@ public class ExtendsType extends JavaType {
       return sb.toString();
    }
 
-   public Object getTypeDeclaration(ITypeParamContext ctx, Object definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound) {
-      if (typeArgument == null)
+   public Object getTypeDeclaration(ITypeParamContext ctx, Object definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound, Object baseType, int paramIx) {
+      if (typeArgument == null) {
+         if (baseType != null && paramIx != -1) {
+            Object classTypeParam = ModelUtil.getTypeParameter(baseType, paramIx);
+            if (ModelUtil.isTypeVariable(classTypeParam))
+               classTypeParam = ModelUtil.getTypeParameterDefault(classTypeParam);
+            if (classTypeParam != null && classTypeParam != Object.class)
+               return classTypeParam;
+         }
          return resolve ? Object.class : new WildcardTypeDeclaration(getLayeredSystem());
+      }
       if (operator != null && operator.equals("super")) {
-         Object typeDecl = typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound);
+         Object typeDecl = typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound, null, -1);
          if (typeDecl == null)
             return bindUnbound ? Object.class : null;
          if (typeDecl instanceof LowerBoundsTypeDeclaration)
             return typeDecl;
          return new LowerBoundsTypeDeclaration(getLayeredSystem(), typeDecl);
       }
-      return typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound);
+      return typeArgument.getTypeDeclaration(ctx, definedInType, resolve, refreshParams, bindUnbound, null, -1);
    }
 
    /** Represents a ? super X type */

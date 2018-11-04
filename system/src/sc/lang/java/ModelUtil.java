@@ -378,7 +378,7 @@ public class ModelUtil {
                               System.out.println("*** Warning - unhandled case getting method type");
                         }
 
-                        Object argMappedType = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType);
+                        Object argMappedType = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType, null, -1);
                         if (paramMappedType == null) {
                            if (argMappedType != null) {
                               paramMappedType = argMappedType;
@@ -395,11 +395,11 @@ public class ModelUtil {
                         if (typeParam instanceof ParamTypeDeclaration && paramMap.size() > 0) {
                            typeParam = ((ParamTypeDeclaration) typeParam).mapTypeParameters(paramMap);
                         }
-                        Object res = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType);
+                        Object res = getTypeDeclFromType(typeContext, typeParam, false, sys, false, definedInType, null, -1);
                         typeDefs.add(res);
                      }
                   }
-                  List<?> typeParams = getTypeParameters(getTypeDeclFromType(typeContext, retType, true, sys, false, definedInType));
+                  List<?> typeParams = getTypeParameters(getTypeDeclFromType(typeContext, retType, true, sys, false, definedInType, null, -1));
                   Object baseParamType = ModelUtil.getParamTypeBaseType(retType);
                   ParamTypeDeclaration resType;
                   if (definedInType != null)
@@ -425,36 +425,36 @@ public class ModelUtil {
             }
          }
          if (varObj instanceof Method) {
-            return getTypeDeclFromType(typeContext, genRetType, false, model == null ? null : model.getLayeredSystem(), false, definedInType);
+            return getTypeDeclFromType(typeContext, genRetType, false, model == null ? null : model.getLayeredSystem(), false, definedInType, null, -1);
          }
          // Note: we are passing the arguments in here but I think they are only used for the case handled above.  There's code to handle type parameters
          // in there, but not parameters defined at the method level.
          else {
-            return getTypeDeclFromType(typeContext, ((IMethodDefinition) varObj).getTypeDeclaration(arguments, false), false, model == null ? null : model.getLayeredSystem(), false, definedInType);
+            return getTypeDeclFromType(typeContext, ((IMethodDefinition) varObj).getTypeDeclaration(arguments, false), false, model == null ? null : model.getLayeredSystem(), false, definedInType, null, -1);
          }
       }
       // MethodDefinition implements ITypedObject - don't reorder
       else  if (varObj instanceof ITypedObject)
          return ((ITypedObject) varObj).getTypeDeclaration();
       else if (varObj instanceof IBeanMapper)
-         return getTypeDeclFromType(typeContext, ((IBeanMapper) varObj).getGenericType(), false, model.getLayeredSystem(), false, definedInType);
+         return getTypeDeclFromType(typeContext, ((IBeanMapper) varObj).getGenericType(), false, model.getLayeredSystem(), false, definedInType, null, -1);
       // Weird case - when you have a newX method which resolves against an untransformed reference - i.e. X has no newX method, it resolves to X.
       else if (varObj instanceof ITypeDeclaration)
          return varObj;
       throw new UnsupportedOperationException();
    }
 
-   public static Object getTypeDeclFromType(Object typeContext, Object type, boolean classOnly, LayeredSystem sys, boolean bindUnboundParams, Object definedInType) {
+   public static Object getTypeDeclFromType(Object typeContext, Object type, boolean classOnly, LayeredSystem sys, boolean bindUnboundParams, Object definedInType, Object parentType, int parentParamIx) {
       if (type instanceof Class)
          return type;
       else if (ModelUtil.hasTypeParameters(type)) {
          if (classOnly)
-            return getTypeDeclFromType(typeContext, ModelUtil.getParamTypeBaseType(type), true, sys, bindUnboundParams, definedInType);
+            return getTypeDeclFromType(typeContext, ModelUtil.getParamTypeBaseType(type), true, sys, bindUnboundParams, definedInType, parentType, parentParamIx);
          else {
             int numTypeParameters = ModelUtil.getNumTypeParameters(type);
             Object[] types = new Object[numTypeParameters];
             for (int i = 0; i < numTypeParameters; i++) {
-               types[i] = getTypeDeclFromType(typeContext, ModelUtil.getTypeParameter(type, i), classOnly, sys, bindUnboundParams, definedInType);
+               types[i] = getTypeDeclFromType(typeContext, ModelUtil.getTypeParameter(type, i), classOnly, sys, bindUnboundParams, definedInType, type, i);
                if (ModelUtil.hasTypeVariables(types[i]) && bindUnboundParams) {
                   // If we do this in a simple method declaration, we lose the type parameter - later in some cases we need that type parameter
                   // to bind it to the type context for the method invocation.
@@ -462,7 +462,7 @@ public class ModelUtil {
                   //types[i] = getTypeDeclFromType(typeContext, ModelUtil.getTypeParameter(type, i), classOnly, sys);
                }
             }
-            List<?> typeParams = getTypeParameters(getTypeDeclFromType(typeContext, type, true, sys, bindUnboundParams, definedInType));
+            List<?> typeParams = getTypeParameters(getTypeDeclFromType(typeContext, type, true, sys, bindUnboundParams, definedInType, parentType, parentParamIx));
             Object baseType = ModelUtil.getParamTypeBaseType(type);
             ParamTypeDeclaration res;
             if (definedInType != null) {
@@ -484,7 +484,7 @@ public class ModelUtil {
             gat = (GenericArrayType) gat.getGenericComponentType();
          }
          int[] dims = new int[ndim];
-         Object compTypeDecl = getTypeDeclFromType(typeContext, compType, true, sys, bindUnboundParams, definedInType);
+         Object compTypeDecl = getTypeDeclFromType(typeContext, compType, true, sys, bindUnboundParams, definedInType, null, -1);
          // Do not get the default here - need to signal that this is unbound
          if (bindUnboundParams && ModelUtil.hasTypeVariables(compTypeDecl))
             compTypeDecl = ModelUtil.getTypeParameterDefault(compTypeDecl);
@@ -549,14 +549,22 @@ public class ModelUtil {
          // The super case does not act like a regular type.
          if (ModelUtil.isSuperWildcard(type)) {
             Object lowerBounds = getWildcardLowerBounds(type);
-            type = getTypeDeclFromType(typeContext, lowerBounds, classOnly, sys, bindUnboundParams, definedInType);
+            type = getTypeDeclFromType(typeContext, lowerBounds, classOnly, sys, bindUnboundParams, definedInType, parentType, parentParamIx);
             if (type instanceof ExtendsType.LowerBoundsTypeDeclaration)
                return type;
             // Need to resolve the type parameters here and return a LowerBoundTD that points to the resolved type paraemters
             return new ExtendsType.LowerBoundsTypeDeclaration(sys, type);
          }
-         else
-            return getTypeDeclFromType(typeContext, getWildcardUpperBounds(type), classOnly, sys, bindUnboundParams, definedInType);
+         else {
+            Object upperBounds = getWildcardUpperBounds(type);
+            if ((upperBounds == null || upperBounds == Object.class) && parentType != null && parentParamIx != -1) {
+               Object parentBaseType = ModelUtil.getParamTypeBaseType(parentType);
+               Object classTypeParam = ModelUtil.getTypeParameter(parentBaseType, parentParamIx);
+               if (ModelUtil.isTypeVariable(classTypeParam))
+                  upperBounds = ModelUtil.getTypeParameterDefault(classTypeParam);
+            }
+            return getTypeDeclFromType(typeContext, upperBounds, classOnly, sys, bindUnboundParams, definedInType, parentType, parentParamIx);
+         }
       }
       else if (type instanceof ExtendsType.LowerBoundsTypeDeclaration) {
          return type;
@@ -1154,7 +1162,7 @@ public class ModelUtil {
       return true;
    }
 
-   public static Object chooseImplMethod(Object c1, Object c2) {
+   public static Object chooseImplMethod(Object c1, Object c2, boolean includeAbstract) {
       // Preference to methods in the type rather than in the interface
       boolean c1iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c1));
       boolean c2iface = ModelUtil.isInterface(ModelUtil.getEnclosingType(c2));
@@ -1163,13 +1171,15 @@ public class ModelUtil {
       if (c2iface && !c1iface)
          return c1;
 
-      // Most likely only one method in this list is abstract but just to be paranoid, we check both flags
-      boolean c1abs = ModelUtil.hasModifier(c1, "abstract");
-      boolean c2abs = ModelUtil.hasModifier(c2, "abstract");
-      if (c1abs && !c2abs)
-         return c2;
-      if (c2abs && !c1abs)
-         return c1;
+      if (includeAbstract) {
+         // Most likely only one method in this list is abstract but just to be paranoid, we check both flags
+         boolean c1abs = ModelUtil.hasModifier(c1, "abstract");
+         boolean c2abs = ModelUtil.hasModifier(c2, "abstract");
+         if (c1abs && !c2abs)
+            return c2;
+         if (c2abs && !c1abs)
+            return c1;
+      }
       return null;
    }
 
@@ -1359,7 +1369,9 @@ public class ModelUtil {
          }
       }
 
-      Object implMethod = ModelUtil.chooseImplMethod(c1, c2);
+      // TODO: should we be using 'abstract' methods here?    An example - an abstract clone() method can refine the return type
+      // so if we return Object.clone, we return the wrong type.  That's why we added includeAbstract=false in initMethodAndFieldIndex
+      Object implMethod = ModelUtil.chooseImplMethod(c1, c2, true);
       if (implMethod != null)
          return implMethod;
 
@@ -5144,6 +5156,16 @@ public class ModelUtil {
       }
       if (curParamIx == -1) {
          return null;
+      }
+
+      List<?> lastExtTypeArgs = ModelUtil.getTypeArguments(lastExtType);
+      if (lastExtTypeArgs == null)
+         return null;
+      Object lastExtTypeArg = lastExtTypeArgs.get(curParamIx);
+      if (lastExtTypeArg instanceof JavaType)
+         lastExtTypeArg = ((JavaType) lastExtTypeArg).getTypeDeclaration();
+      if (!ModelUtil.isTypeVariable(lastExtTypeArg)) {
+         return lastExtTypeArg;
       }
 
       Object nextType;
