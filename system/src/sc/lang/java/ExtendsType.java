@@ -81,7 +81,7 @@ public class ExtendsType extends JavaType {
 
    public Object getTypeDeclaration(ITypeParamContext ctx, Object definedInType, boolean resolve, boolean refreshParams, boolean bindUnbound, Object baseType, int paramIx) {
       if (typeArgument == null) {
-         if (baseType != null && paramIx != -1) {
+         if (baseType != null && paramIx != -1 && !(baseType instanceof LowerBoundsTypeDeclaration)) {
             Object classTypeParam = ModelUtil.getTypeParameter(baseType, paramIx);
             if (ModelUtil.isTypeVariable(classTypeParam))
                classTypeParam = ModelUtil.getTypeParameterDefault(classTypeParam);

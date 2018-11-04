@@ -2219,6 +2219,8 @@ public class ModelUtil {
       }
       else if (paramType instanceof ITypeDeclaration) {
          List typeParams = ((ITypeDeclaration) paramType).getClassTypeParameters();
+         if (typeParams == null)
+            return null;
          return typeParams.get(ix);
       }
       else throw new UnsupportedOperationException();
