@@ -30,10 +30,16 @@ public class MvnRepositoryPackage extends RepositoryPackage {
    public boolean includeOptional = false;
    /** Should we include dependencies marked as "provided" scope in maven - ordinarily provided by the environment this component runs in */
    public boolean includeProvided = false;
-   /** Should we use the repository tags found to define additional maven repositories to search from.  Setting to true can slow down searches */
+   /** Should we use the repository tags found to define additional maven repositories to search from.  Setting to true can slow down searches
+    * but might be required if a package uses a non-default repository.  Sometimes the repository tag is set to point to an unreachable internal address. */
    public boolean useRepositories = false;
+   /**
+    * Should we use the distributionManagement repository tags found in the POM file of the package to define additional maven repositories to search from.
+    * Setting to true can slow down searches and also for some packages, it might point to an internal maven server.
+    */
+   //public boolean useDistributionRepositories = false;
    // The list of types of files we are to install for this package - null = (the default POM packaging)
-   // other values of the type field for a depenency reference - e.g. test-jar
+   // other values of the type field for a dependency reference - e.g. test-jar
    public ArrayList<String> installFileTypes = new ArrayList<String>();
 
    /** Set these to control which sub-modules of this package are included */

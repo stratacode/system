@@ -111,8 +111,12 @@ public class POMFile extends XMLFileFormat {
          initParent();
       // Must be after we've initialized the parent
       initCanonicalName();
+      // Normal repositories for this package to download dependencies
       if (getUseRepositories())
-         initRepositories();
+         initRepositories("repositories");
+      // TODO: remove this?  This would let us use the repositories defined where this package is published.  Thought we needed this for broadleaf but just needed to set useRepositories instead.
+      //if (getUseDistributionRepositories())
+      //   initRepositories("distributionManagement");
 
       if (required)
          initModules();
@@ -220,9 +224,9 @@ public class POMFile extends XMLFileFormat {
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
    }
 
-   private void initRepositories() {
+   private void initRepositories(String rootTagName) {
       if (projElement != null) {
-         Element[] repos = projElement.getChildTagsWithName("repositories");
+         Element[] repos = projElement.getChildTagsWithName(rootTagName);
          if (repos != null && repos.length > 1)
             MessageHandler.error(msg, "Multiple repositories tags - only using the first one");
          ArrayList<MvnDescriptor> res = new ArrayList<MvnDescriptor>();
@@ -255,6 +259,12 @@ public class POMFile extends XMLFileFormat {
    private boolean getUseRepositories() {
       return pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).useRepositories;
    }
+
+   /*
+   private boolean getUseDistributionRepositories() {
+      return pomPkg instanceof MvnRepositoryPackage && ((MvnRepositoryPackage) pomPkg).useDistributionRepositories;
+   }
+   */
 
    private String getArtifactId() {
       return getProperty("project.artifactId", true, true);

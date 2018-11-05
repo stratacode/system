@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
+import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.sc.IScopeProcessor;
@@ -1266,6 +1267,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   this.children = new ArrayList<Object>(Arrays.asList(children));
                else
                   this.children.addAll(Arrays.asList(children));
+
+               // Because all LayerComponent types do not have a DynChildManager, the children are not created when the parent is
+               // created.  So we need to go through and just access the children here to lazily create them.  This handles nested
+               // RepositoryPackages like those used for the ticketmonster.core integration test.
+               for (Object child:children) {
+                  initLayerComponent(child);
+               }
             }
          }
          catch (RuntimeException exc) {
@@ -1308,6 +1316,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       // Create a map from class name to the full imported name
       initImports();
+   }
+
+   private static void initLayerComponent(Object child) {
+      Object[] children = DynUtil.getObjChildren(child, null, true);
    }
 
    public boolean updateModel(JavaModel newModel) {
