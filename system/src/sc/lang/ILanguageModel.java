@@ -103,4 +103,6 @@ public interface ILanguageModel extends IFileProcessorResult {
    EditorContext getEditorContext();
 
    public boolean isReplacedModel();
+
+   int getNodeCount();
 }

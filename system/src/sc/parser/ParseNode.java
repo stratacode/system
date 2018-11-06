@@ -5,8 +5,6 @@
 package sc.parser;
 
 import sc.lang.ISemanticNode;
-import sc.lang.java.IdentifierExpression;
-import sc.util.StringUtil;
 
 import java.util.IdentityHashMap;
 
@@ -398,5 +396,12 @@ public class ParseNode extends AbstractParseNode {
          }
       }
    }
+   public int getNodeCount() {
+      int ct = 1;
+      if (value instanceof IParseNode)
+         ct += (((IParseNode) value).getNodeCount());
+      return ct;
+   }
+
 }
 

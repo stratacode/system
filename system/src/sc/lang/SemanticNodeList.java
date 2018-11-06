@@ -13,10 +13,10 @@ import java.util.*;
 
 public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, ILifecycle {
    transient public IParseNode parseNode;
-   transient public boolean parseNodeInvalid = false;
    transient public ISemanticNode parentNode;
 
-   // TODO: performance - turn into bitfields
+   // TODO: performance - turn into bitfields - 6 bytes => 1
+   transient public boolean parseNodeInvalid = false;
    transient protected boolean initialized;
    transient protected boolean started;
    transient protected boolean transformed;
@@ -792,6 +792,19 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    @Override
    public boolean getParseErrorNode() {
       return false;
+   }
+
+   public int getNodeCount() {
+      int ct = 1;
+
+      int sz = size();
+      for (int i = 0; i < sz; i++) {
+         Object node = get(i);
+         if (node instanceof ISemanticNode) {
+            ct += ((ISemanticNode) node).getNodeCount();
+         }
+      }
+      return ct;
    }
 
    public int indexOf(Object elem) {

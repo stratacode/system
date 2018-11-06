@@ -26,6 +26,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    String name;
 
+   // TODO: problem with using ids in the parse nodes is that we have no way of mapping back to the language from the parse node... might even use the parselet to get the language in some cases. 
+   //short id = -1; // An index into the Language.parseletsById table representing this parselet - using short for space in parseNodes
+
    public boolean trace = false; // DEBUG ONLY
 
    public Language language;

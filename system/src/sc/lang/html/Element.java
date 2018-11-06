@@ -3226,6 +3226,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("li", "element", emptyArgs, null);
       addTagAttributes("ul", "element", emptyArgs, null);
       addTagAttributes("ol", "element", emptyArgs, null);
+      addTagAttributes("dl", "element", emptyArgs, null);
+      addTagAttributes("dt", "element", emptyArgs, null);
+      addTagAttributes("dd", "element", emptyArgs, null);
       addTagAttributes("table", "element", emptyArgs, null);
       addTagAttributes("tr", "element", emptyArgs, null);
       addTagAttributes("td", "element", emptyArgs, null);

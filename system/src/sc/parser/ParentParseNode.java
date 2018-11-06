@@ -1293,6 +1293,18 @@ public class ParentParseNode extends AbstractParseNode {
       }
       return false;
    }
+
+   public int getNodeCount() {
+      int ct = 1;
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof IParseNode) {
+               ct += ((IParseNode) child).getNodeCount();
+            }
+         }
+      }
+      return ct;
+   }
 }
 
 

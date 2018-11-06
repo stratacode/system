@@ -39,7 +39,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    transient public ISemanticNode parentNode;
 
-   // TODO performance: turn these into bitfields - need to add a set method and change code that uses the protected fields
+   // TODO performance: turn these into bitfields? - it would go from 5 bytes to 1 -- add a set method and need to change code that uses the protected fields
    transient protected boolean initialized;
    transient protected boolean started;
    transient protected boolean validated;
@@ -1050,5 +1050,18 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    /** Override this for types produced in the skipOnErrorParselet */
    public void setParseErrorNode(boolean v) {
       throw new UnsupportedOperationException();
+   }
+
+   public int getNodeCount() {
+      int ct = 1;
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] semanticProps = type.getSemanticPropertyList();
+      for (int i = 0; i < semanticProps.length; i++) {
+         IBeanMapper mapper = semanticProps[i];
+         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         if (val instanceof ISemanticNode)
+            ct += ((ISemanticNode) val).getNodeCount();
+      }
+      return ct;
    }
 }

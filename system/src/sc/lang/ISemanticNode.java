@@ -173,4 +173,6 @@ public interface ISemanticNode {
    /** Returns the value of the parse error node flag.  If your semantic value is used in a skipOnErrorParselet, you can implement this to differentiate error nodes from regularly parsed nodes */
    public boolean getParseErrorNode();
 
+   /** Returns number of nodes in this tree for helping to diagnose memory use */
+   public int getNodeCount();
 }

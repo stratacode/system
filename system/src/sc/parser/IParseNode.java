@@ -132,6 +132,8 @@ public interface IParseNode extends CharSequence, IParseResult {
 
    /** Returns true for error parse-nodes which are partial-parses - i.e. did not parse required chunks */
    boolean isIncomplete();
+
+   int getNodeCount();
 }
 
 

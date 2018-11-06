@@ -89,6 +89,9 @@ public abstract class Language extends LayerFileComponent {
 
    public String defaultExtension = null;
 
+   public Map<String,Parselet> parseletsByName = new HashMap<String,Parselet>();
+   //public ArrayList<Parselet> parseletsList = new ArrayList<Parselet>();
+
    public Language() {
       this(null);
    }
@@ -820,6 +823,8 @@ public abstract class Language extends LayerFileComponent {
          Parselet replaced = parseletsByName.put(key, p);
          if (replaced != null && replaced != p)
             System.err.println("*** Warning: two parselets with the same name: " + p.getName() + " key: " + key);
+         //p.id = parseletsList.size();
+         //parseletsList.add(p);
       }
 
       if (!rootOnly) {
@@ -835,8 +840,6 @@ public abstract class Language extends LayerFileComponent {
          }
       }
    }
-
-   public Map<String,Parselet> parseletsByName = new HashMap<String,Parselet>();
 
    public static String convertNameToKey(String name) {
       int six = name.indexOf(">");
@@ -854,6 +857,12 @@ public abstract class Language extends LayerFileComponent {
    public Parselet getParselet(String name) {
       return parseletsByName.get(name);
    }
+
+/*
+   public Parselet getParseletById(int id) {
+      return parseletsList.get(id);
+   }
+*/
 
    public Parselet findMatchingParselet(Parselet old) {
       String name = convertNameToKey(old.getName());

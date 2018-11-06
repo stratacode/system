@@ -16,6 +16,7 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    boolean errorNode = false; // TODO: performance use a bit in 'startIndex' or use a 'long' to store parselet-id (15), startIndex (32), newStartIndexOffset(15), errorNode(1), and generated(1) flag in ParentParseNode using bitfields
    // Before apn: (java 16) + 4 + 4 + 4  +ppn: 8 + 8 + 8 + 4 = 52  +pn: 8 + 8 + 8 = 48 = 100
    // after  apn: (16) + 8 ppn: 8 + 8 = 40  pn: 8 + 8 = 40  = 80
+   // TODO: Problem with "parseletId" is that we don't have a way to find the language here to map this back to a parselet
 
    public void setParselet(Parselet p) {}
 
@@ -230,5 +231,9 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
 
    public boolean isIncomplete() {
       return errorNode;
+   }
+
+   public int getNodeCount() {
+      return 1;
    }
 }

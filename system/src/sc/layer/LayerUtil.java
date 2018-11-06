@@ -994,7 +994,7 @@ public class LayerUtil implements LayerConstants {
 
       int ct = 0;
       for (Map.Entry<String,ILanguageModel> ent: modelIndex.entrySet()) {
-         if ((ct % 10) == 0)
+         if ((ct % 5) == 0)
             sb.append("\n   ");
          else
             sb.append(", ");
@@ -1002,8 +1002,13 @@ public class LayerUtil implements LayerConstants {
          TypeDeclaration mtype = m.getModelTypeDeclaration();
          if (mtype == null)
             sb.append("no model");
-         else
+         else {
             sb.append(mtype.getTypeName());
+            IParseNode pn = m.getParseNode();
+            if (pn == null)
+               System.out.println("***");
+            sb.append("(sn=" + m.getNodeCount() + ", pn=" + (pn == null ? "<null-pn>" : pn.getNodeCount()) + ")");
+         }
          ct++;
       }
       sb.append("\n\n");
