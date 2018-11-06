@@ -11,7 +11,7 @@ import sc.parser.Symbol;
 public class XMLLanguage extends HTMLLanguage {
    public final static XMLLanguage INSTANCE = new XMLLanguage();
 
-   SymbolSpace xmlControlStart = new SymbolSpace("<?xml");
+   SymbolSpace xmlControlStart = new SymbolSpace("<?");
    SymbolSpace xmlControlClose = new SymbolSpace("?>");
 
    private final static String CDATA_START = "<![CDATA[", CDATA_END = "]]>";
@@ -25,7 +25,8 @@ public class XMLLanguage extends HTMLLanguage {
       return super.validStartTagChar(c) || c == '_';
    }
 
-   Sequence xmlControlTag = new Sequence("XMLControlTag(,attributeList,)", OPTIONAL, xmlControlStart, tagAttributes, xmlControlClose);
+   // NOTE: although "anyTagName" here is really only "xml" from what I can tell in the spec (as in <?xml ?>)  Some maven POM files use: <?SORTPOM IGNORE?> which we need to parse here as well.
+   Sequence xmlControlTag = new Sequence("XMLControlTag(,controlName,attributeList,)", OPTIONAL, xmlControlStart, anyTagName, tagAttributes, xmlControlClose);
 
    {
       UNESCAPED_SET.clear();
