@@ -1319,7 +1319,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    private static void initLayerComponent(Object child) {
-      Object[] children = DynUtil.getObjChildren(child, null, true);
+      Object[] children = DynUtil.getObjChildren(child, null, true); // This will just create the children and add them to their parents (e.g. RepositoryPackage.addSubPackage will be called because it's a LayerComponent)
    }
 
    public boolean updateModel(JavaModel newModel) {
