@@ -11,7 +11,8 @@ import sc.parser.Symbol;
 public class XMLLanguage extends HTMLLanguage {
    public final static XMLLanguage INSTANCE = new XMLLanguage();
 
-   SymbolSpace xmlControlStart = new SymbolSpace("<?");
+   private static final String XML_CONTROL_START = "<?";
+   SymbolSpace xmlControlStart = new SymbolSpace(XML_CONTROL_START);
    SymbolSpace xmlControlClose = new SymbolSpace("?>");
 
    private final static String CDATA_START = "<![CDATA[", CDATA_END = "]]>";
@@ -44,7 +45,8 @@ public class XMLLanguage extends HTMLLanguage {
       // All XML tags are tree tags.
       templateBodyDeclarations.replace(anyTag, treeTag);
       templateBodyDeclarations.put(CDATA_START, cdataString);
-      templateBodyDeclarations.setName("([],[],[],[],[],[],[])");
+      templateBodyDeclarations.put(XML_CONTROL_START, xmlControlTag); // Here for weird <?SORTPOM IGNORE?> tag that shows up in POM XML files
+      templateBodyDeclarations.setName("([],[],[],[],[],[],[],[])");
 
       simpleTemplateDeclarations.set(1, treeTag);
 
