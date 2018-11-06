@@ -27,7 +27,7 @@ public class XMLLanguage extends HTMLLanguage {
    }
 
    // NOTE: although "anyTagName" here is really only "xml" from what I can tell in the spec (as in <?xml ?>)  Some maven POM files use: <?SORTPOM IGNORE?> which we need to parse here as well.
-   Sequence xmlControlTag = new Sequence("XMLControlTag(,controlName,attributeList,)", OPTIONAL, xmlControlStart, anyTagName, tagAttributes, xmlControlClose);
+   Sequence xmlControlTag = new Sequence("XMLControlTag(,tagName,attributeList,)", OPTIONAL, xmlControlStart, anyTagName, tagAttributes, xmlControlClose);
 
    {
       UNESCAPED_SET.clear();
