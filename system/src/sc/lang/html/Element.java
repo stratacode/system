@@ -128,6 +128,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Object repeat;
 
+   /**
+    * For repeat tags, with wrap=true we use the tagName as a wrapper around the content - so there's no wrapping tag around the body as it's repeated.
+    * (i.e. <thisTag>bodyTag0...bodyTagN</thisTag>)
+    * For wrap=false, this tag's name is the enclosing tag <thisTag0>body with repeat[0]</thisTag0>...<thisTagN>body with repeat[n]</thisTagN>
+    */
+   public transient boolean wrap;
+
+   /**
+    * For tags which are created by a repeat tag where 'wrap=true' do not output the start/end tag - just the body.  You can also set this to true explicitly
+    * as an attribute to represents content hiding the outer start/end tag.
+    */
+   public transient boolean bodyOnly;
+
    /** When we have a repeat value, this listener */
    private transient RepeatListener repeatListener = null;
 
@@ -277,6 +290,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (res != null) {
          res.parentNode = this;
          registerSyncInstAndChildren(res);
+         if (wrap)
+            res.bodyOnly = true;
       }
       if (flush)
          SyncManager.flushSyncQueue();
@@ -2805,7 +2820,34 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (tagName != null) {
          // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
          if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl) || !tagName.equals(getExtendsDefaultTagNameForType(tagType))) {
-            addTagTypeBodyStatement(tagType, PropertyAssignment.create("tagName", StringLiteral.create(tagName), "="));
+            PropertyAssignment pa = PropertyAssignment.create("tagName", StringLiteral.create(tagName), "=");
+            if (tagName.equals("dl"))
+               System.out.println("***");
+
+            // For repeat tags, figure out if wrap is set explicitly or we are using the default.  For dl tags in particular it makes
+            // no sense to replicate the "dl" tag inside the loop.  Instead, we just render the contents for each iteration.
+            boolean isRepeatWrap = false;
+            if (repeatWrapper != null) {
+               String wrapStr = getFixedAttribute("wrap");
+               if (wrapStr != null) {
+                  if (wrapStr.equals("true"))
+                     isRepeatWrap = true;
+               }
+               else {
+                  if (defaultWrapTags.contains(lowerTagName())) {
+                     isRepeatWrap = true;
+                     // TODO: if we did a "setTagName()" call instead of tagName = we could infer the default value of wrap from the defaultWrapTags
+                     // but we'd have to also include that logic in the client.  This way, it's only on the server and is put into the generated tag classes.
+                     addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("wrap", BooleanLiteral.create(true), "="));
+                  }
+               }
+            }
+
+            // For repeat tags, if 'wrap' is true it's the repeat wrapper that renders the start/end tags and so needs the tag name
+            if (isRepeatWrap)
+               addTagTypeBodyStatement(repeatWrapper, pa);
+            else
+               addTagTypeBodyStatement(tagType, pa);
          }
       }
 
@@ -2819,6 +2861,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       ArrayList<Attr> attList = getInheritedAttributes();
       if (attList != null) {
          for (Attr att:attList) {
+            if (att.name.equals("wrap"))
+               System.out.println("***");
              if (att.valueExpr != null && att.valueProp != null) {
                 if (!staticContentOnly) {
                    boolean isIdProperty = att.name.equalsIgnoreCase("id");
@@ -2850,7 +2894,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                       // to the element type in case the property is in both.
                       else if (att.name.equals("repeat") || repeatWrapper != null) {
                          Object valuePropType =  ModelUtil.getEnclosingType(att.valueProp);
-                         if (att.name.equals("repeat") || (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
+                         // The repeat and wrap attributes are set on the tag but are applied to the repeatWrapper class, not the tag class
+                         if (att.name.equals("repeat") || att.name.equals("wrap") ||
+                             (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
                             repeatWrapper.addBodyStatementIndent(pa);
                          else
                             tagType.addBodyStatementIndent(pa);
@@ -3281,10 +3327,20 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   static HashSet<String> notInheritedAttributes = new HashSet<String>();
+   static TreeSet<String> notInheritedAttributes = new TreeSet<String>();
    {
       notInheritedAttributes.add("abstract");
       notInheritedAttributes.add("id");
+   }
+
+   // Tags which when used with 'repeat' by default should treat the outer tag as a wrapper, rather than repeating it itself
+   // For these 'wrap' tags, the repeatTags are marked "bodyOnly" which means they will only render the contents.  This lets us
+   // do <dl> which repeats its contents or put the repeat attribute on the ul with the li tags inside the body.
+   // You can override the default by setting wrap=true/false on the tag itself.
+   static TreeSet<String> defaultWrapTags = new TreeSet<String>();
+   {
+      defaultWrapTags.add("dl");
+      defaultWrapTags.add("ul");
    }
 
    static HashSet<String> behaviorAttributes = new HashSet<String>();
@@ -3308,6 +3364,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("cache");
       behaviorAttributes.add("scope");
       behaviorAttributes.add("needsRefresh");
+      behaviorAttributes.add("wrap");
+      behaviorAttributes.add("bodyOnly");
       behaviorAttributes.add(ALT_ID);
 
       // For select only
@@ -3706,7 +3764,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                bodyTxtValid = false;
                invalidateBody();
             }
-            if (isServerTag())
+            if (isServerTag() && !wrap)
                outputRepeatTagMarker(sb);
             if (!bodyValid) {
                StringBuilder bodySB = new StringBuilder();
@@ -3717,20 +3775,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                sb.append(bodyCache);
          }
          else {
-            if (!startTagValid) {
-               StringBuilder newSB = new StringBuilder();
-               callOutputStartTag(newSB);
-               String newStartTagCache = newSB.toString();
+            if (!bodyOnly) {
+               if (!startTagValid) {
+                  StringBuilder newSB = new StringBuilder();
+                  callOutputStartTag(newSB);
+                  String newStartTagCache = newSB.toString();
 
-               // We're rendering the parent again.  If our startTagTxt has changed we need to record the change at this level so we can later
-               // update just this property if it changes on its own.
-               if (isServerTag() && !StringUtil.equalStrings(startTagCache, newStartTagCache))
-                  SyncManager.updateRemoteValue(this, "startTagTxt", newStartTagCache);
+                  // We're rendering the parent again.  If our startTagTxt has changed we need to record the change at this level so we can later
+                  // update just this property if it changes on its own.
+                  if (isServerTag() && !StringUtil.equalStrings(startTagCache, newStartTagCache))
+                     SyncManager.updateRemoteValue(this, "startTagTxt", newStartTagCache);
 
-               startTagCache = newStartTagCache;
+                  startTagCache = newStartTagCache;
+               }
+               if (startTagCache != null)
+                  sb.append(startTagCache);
             }
-            if (startTagCache != null)
-               sb.append(startTagCache);
             if (!bodyValid) {
                StringBuilder bodySB = new StringBuilder();
                callOutputBody(bodySB);
@@ -3753,8 +3813,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    private void outputRepeatBody(Object repeatVal, StringBuilder sb) {
       syncRepeatTags(repeatVal);
       markBodyValid(true);
+      if (wrap) {
+         callOutputStartTag(sb);
+      }
       for (int i = 0; i < repeatTags.size(); i++) {
          repeatTags.get(i).outputTag(sb);
+      }
+      if (wrap) {
+         callOutputEndTag(sb);
       }
    }
 
@@ -3769,8 +3835,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private void callOutputStartTag(StringBuilder sb) {
-      if (this instanceof IRepeatWrapper)
-         return; // No start tag for repeat wrapper
+      if ((this instanceof IRepeatWrapper && !wrap) || bodyOnly)
+         return; // No start tag for repeat wrapper or when we have a tag in 'bodyOnly' mode
       if (dynObj == null)
          outputStartTag(sb);
       else
@@ -3785,7 +3851,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private void callOutputEndTag(StringBuilder sb) {
-      if (this instanceof IRepeatWrapper)
+      if ((this instanceof IRepeatWrapper && !wrap) || bodyOnly)
          return;
       if (dynObj == null)
          outputEndTag(sb);
