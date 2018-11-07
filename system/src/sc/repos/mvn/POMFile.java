@@ -218,7 +218,10 @@ public class POMFile extends XMLFileFormat {
          if (parentPackage != null) {
             // Wait to init the modules until after the parentPOM is set
             parentPOM = mgr.getPOMFile(parentDesc, parentPackage, DependencyContext.child(depCtx, pomPkg), false, null, this);
-            parentPOM.initModules();
+            if (parentPOM != null)
+               parentPOM.initModules();
+            else
+               MessageHandler.error(msg, "Failed to get parent POM: " + parentPackage + " for: " + pomPkg);
          }
       }
       // TODO: else - there is a default POM but so far, we don't need any of the contents since it's all concerned with the build
