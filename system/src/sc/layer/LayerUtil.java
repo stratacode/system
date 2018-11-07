@@ -1005,8 +1005,6 @@ public class LayerUtil implements LayerConstants {
          else {
             sb.append(mtype.getTypeName());
             IParseNode pn = m.getParseNode();
-            if (pn == null)
-               System.out.println("***");
             sb.append("(sn=" + m.getNodeCount() + ", pn=" + (pn == null ? "<null-pn>" : pn.getNodeCount()) + ")");
          }
          ct++;

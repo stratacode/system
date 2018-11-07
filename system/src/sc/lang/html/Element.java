@@ -2821,9 +2821,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
          if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl) || !tagName.equals(getExtendsDefaultTagNameForType(tagType))) {
             PropertyAssignment pa = PropertyAssignment.create("tagName", StringLiteral.create(tagName), "=");
-            if (tagName.equals("dl"))
-               System.out.println("***");
-
             // For repeat tags, figure out if wrap is set explicitly or we are using the default.  For dl tags in particular it makes
             // no sense to replicate the "dl" tag inside the loop.  Instead, we just render the contents for each iteration.
             boolean isRepeatWrap = false;
@@ -2861,8 +2858,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       ArrayList<Attr> attList = getInheritedAttributes();
       if (attList != null) {
          for (Attr att:attList) {
-            if (att.name.equals("wrap"))
-               System.out.println("***");
              if (att.valueExpr != null && att.valueProp != null) {
                 if (!staticContentOnly) {
                    boolean isIdProperty = att.name.equalsIgnoreCase("id");
