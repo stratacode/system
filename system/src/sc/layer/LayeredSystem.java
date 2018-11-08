@@ -876,6 +876,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (model != null) {
          if (model.getLayer() != null && model.getLayer().activated)
             System.out.println("*** Error - renaming activated model to inactive index");
+         if (model.getLayeredSystem() != this)
+            System.out.println("*** Error - renaming model from wrong system");
          inactiveModelIndex.put(newSrcEnt.absFileName, model);
          Layer modelLayer = model.getLayer();
          if (modelLayer != null)
@@ -10205,6 +10207,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * be as easily refreshed
     */
    public void refreshClassCache() {
+      if (otherClassCache == null)
+         return;
       Iterator<Map.Entry<String,Object>> otherIt = otherClassCache.entrySet().iterator();
       while (otherIt.hasNext()) {
          Map.Entry<String,Object> otherEnt = otherIt.next();
@@ -10948,6 +10952,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else {
          if (model.getLayer() != null && model.getLayer().activated)
             System.err.println("*** Invalid attempt to add active model into inactive index");
+         if (model.getLayeredSystem() != this)
+            System.err.println("*** Invalid attempt to add model from another system to index");
          ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
          if (oldModel != null && model instanceof JavaModel && oldModel != model) {
             if (layer != null)
@@ -12219,6 +12225,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                //ParseUtil.initAndStartComponent(model);
                if (model.getLayer() != null && model.getLayer().activated)
                   System.out.println("*** Error - renaming activated model to inactive index");
+               if (model.getLayeredSystem() != this) {
+                  if (model.getLayeredSystem().inactiveModelIndex.put(srcEnt.absFileName, model) != model)
+                     System.out.println("*** Updating model index in model's layered system for: " + srcEnt.absFileName + " to: " + System.identityHashCode(model));
+               }
                if (inactiveModelIndex.put(srcEnt.absFileName, model) != model)
                   System.out.println("*** Updating model index for: " + srcEnt.absFileName + " to: " + System.identityHashCode(model));
             }

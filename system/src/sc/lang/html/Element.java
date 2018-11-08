@@ -1557,7 +1557,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void invalidateBody() {
       if (bodyValid || bodyTxtValid) {
          markBodyValid(false);
-         invalidateParent();
+         // For tags which are 'bodyOnly' i.e. we skip the start/end tag, we can't individually refresh the body because there's no
+         // marker in the HTML tags.  Instead, we'll just have to refresh the body of the parent tag to get these changes.
+         if (bodyOnly) {
+            Element element = getEnclosingTag();
+            if (element != null)
+               element.invalidateBody();
+         }
+         else
+            invalidateParent();
       }
    }
 
@@ -2484,7 +2492,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public String getRepeatObjectName() {
-      return getObjectName() + "_Repeat";
+      // Using a different name here for 'wrapped' repeat tags so that for serverTags we use a different way of refreshing their contents
+      return getObjectName() + (wrap ? "_WrapRepeat" : "_Repeat");
    }
 
    public TypeDeclaration convertToObject(Template template, TypeDeclaration parentType, Object existing, SemanticNodeList<Object> templateModifiers, StringBuilder preTagContent) {
@@ -2542,6 +2551,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       boolean remoteContent = oldExecTag ? isRemoteContent() : false;
 
       boolean isRepeatElement = isRepeatElement();
+      boolean isRepeatWrap = false;
+      boolean isDefaultWrap = false;
       Object repeatWrapperType = null;
       boolean needsWrapperInterface = true;
       if (isRepeatElement && !remoteContent) {
@@ -2564,6 +2575,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (repeatWrapperType != null)
                needsWrapperInterface = !ModelUtil.isAssignableFrom(IRepeatWrapper.class, repeatWrapperType);
          }
+         String wrapStr = getFixedAttribute("wrap");
+         if (wrapStr != null) {
+            if (wrapStr.equals("true"))
+               isRepeatWrap = true;
+         }
+         else {
+            if (defaultWrapTags.contains(lowerTagName())) {
+               isRepeatWrap = true;
+               isDefaultWrap = true;
+            }
+         }
+         if (isRepeatWrap)
+            wrap = true; // Set this before we call getRepeatObjectName so it returns the proper name
          repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(getLayeredSystem(), repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
          if (needsWrapperInterface)
             repeatWrapper.addImplements(JavaType.createJavaType(getLayeredSystem(), IRepeatWrapper.class));
@@ -2823,22 +2847,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             PropertyAssignment pa = PropertyAssignment.create("tagName", StringLiteral.create(tagName), "=");
             // For repeat tags, figure out if wrap is set explicitly or we are using the default.  For dl tags in particular it makes
             // no sense to replicate the "dl" tag inside the loop.  Instead, we just render the contents for each iteration.
-            boolean isRepeatWrap = false;
-            if (repeatWrapper != null) {
-               String wrapStr = getFixedAttribute("wrap");
-               if (wrapStr != null) {
-                  if (wrapStr.equals("true"))
-                     isRepeatWrap = true;
-               }
-               else {
-                  if (defaultWrapTags.contains(lowerTagName())) {
-                     isRepeatWrap = true;
-                     // TODO: if we did a "setTagName()" call instead of tagName = we could infer the default value of wrap from the defaultWrapTags
-                     // but we'd have to also include that logic in the client.  This way, it's only on the server and is put into the generated tag classes.
-                     addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("wrap", BooleanLiteral.create(true), "="));
-                  }
-               }
-            }
+            // TODO: if we did a "setTagName()" call instead of tagName = we could infer the default value of wrap from the defaultWrapTags
+            // but we'd have to also include that logic in the client.  This way, it's only on the server and is put into the generated tag classes.
+            if (isDefaultWrap)
+               addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("wrap", BooleanLiteral.create(true), "="));
 
             // For repeat tags, if 'wrap' is true it's the repeat wrapper that renders the start/end tags and so needs the tag name
             if (isRepeatWrap)
@@ -4871,18 +4883,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
          }
       }
-      // TODO: this syncMode stuff here was a previous attempt to fix the bug for nested tag content.  The problem was that
-      // when we validate the parent we would update the cached state of the children so there was no way to detect the child change
-      // events.  Move that logic to the 'outputTag' method where we see a change in the text.
-      SyncManager.SyncState oldSyncState = null;
-      boolean setSyncModeToPrev = false;
-      if (!startTagValid) // some attribute or other contents of the start tag for this tag object changed - so fire this change event.  The value is retrieved with getStartTagTxt()
-         Bind.sendEvent(IListener.VALUE_CHANGED, this, _startTagTxtProp);
-      if (!bodyTxtValid) { // Some part of our body txt has changed so fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
-         Bind.sendEvent(IListener.VALUE_CHANGED, this, _innerHTMLProp);
-         if (!parentBodyChanged) {
-            setSyncModeToPrev = true;
-            parentBodyChanged = true;
+      if (!bodyOnly) {
+         if (!startTagValid) // some attribute or other contents of the start tag for this tag object changed - so fire this change event.  The value is retrieved with getStartTagTxt()
+            Bind.sendEvent(IListener.VALUE_CHANGED, this, _startTagTxtProp);
+         if (!bodyTxtValid) { // Some part of our body txt has changed so fire the innerHTML property change event.  Anyone interested in that event can call getInnerHTML() which will mark bodyTxtValid
+            Bind.sendEvent(IListener.VALUE_CHANGED, this, _innerHTMLProp);
+            if (!parentBodyChanged) {
+               parentBodyChanged = true;
+            }
          }
       }
 
@@ -4893,22 +4901,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (!visible)
          return;
 
-      //if (setSyncModeToPrev)
-      //   oldSyncState = SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
-
-      try {
-         Object[] children = getObjChildren(false);
-         if (children != null) {
-            for (Object child:children) {
-               if (child instanceof Element) {
-                  ((Element) child).refreshTags(parentBodyChanged);
-               }
+      Object[] children = getObjChildren(false);
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Element) {
+               ((Element) child).refreshTags(parentBodyChanged);
             }
          }
-      }
-      finally {
-         //if (setSyncModeToPrev)
-         //   SyncManager.setSyncState(oldSyncState);
       }
    }
 
