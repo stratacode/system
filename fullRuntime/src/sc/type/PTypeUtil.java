@@ -924,6 +924,10 @@ public class PTypeUtil {
       return Type.get(type).getDefaultObjectValue();
    }
 
+   public static String getThreadName() {
+      return Thread.currentThread().getName();
+   }
+
    public static Object findType(String typeName) {
       try {
          return Class.forName(typeName);

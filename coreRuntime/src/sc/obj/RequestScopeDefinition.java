@@ -29,7 +29,7 @@ public class RequestScopeDefinition extends ScopeDefinition {
    public ScopeContext getScopeContext(boolean create) {
       RequestScopeContext ctx = (RequestScopeContext) PTypeUtil.getThreadLocal("requestScope");
       if (ctx == null && create) {
-         ctx = new RequestScopeContext(Thread.currentThread().getName());
+         ctx = new RequestScopeContext(PTypeUtil.getThreadName());
          PTypeUtil.setThreadLocal("requestScope", ctx);
          ctx.init();
       }

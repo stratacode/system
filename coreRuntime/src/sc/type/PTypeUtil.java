@@ -61,6 +61,10 @@ public class PTypeUtil {
       return threadLocalMap.get(key);
    }
 
+   public static String getThreadName() {
+      return "<no-thread>";
+   }
+
    public static Map getWeakHashMap() {
       return new HashMap();
    }
