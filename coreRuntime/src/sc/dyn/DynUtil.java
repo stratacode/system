@@ -1570,10 +1570,7 @@ public class DynUtil {
    }
 
    public static IDynChildManager getDynChildManager(Object type) {
-      // TODO: these are right now only used on the client and here for the type systems to match.
-      // There's a more efficient implementation though in BodyTypeDeclaration so we
-      // could call through to the dynamicSystem and use that version if this does get used.
-      String className = (String) getAnnotationValue(type, "sc.obj.CompilerSettings", "dynChildManager");
+      String className = (String) getInheritedAnnotationValue(type, "sc.obj.CompilerSettings", "dynChildManager");
       if (className == null)
          return null;
       Object mgrType = findType(className);
@@ -1587,27 +1584,21 @@ public class DynUtil {
    public static void removeChild(Object parent, Object child) {
       Object type = DynUtil.getType(parent);
       IDynChildManager childMgr = getDynChildManager(type);
-      if (childMgr == null)
-         System.out.println("*** No DynChildManager registered for removeChild on parent type: " + type);
-      else
+      if (childMgr != null)
          childMgr.removeChild(parent, child);
    }
 
    public static void addChild(Object parent, Object child) {
       Object type = DynUtil.getType(parent);
       IDynChildManager childMgr = getDynChildManager(type);
-      if (childMgr == null)
-         System.out.println("*** No DynChildManager registered for addChild on parent type: " + type);
-      else
+      if (childMgr != null)
          childMgr.addChild(parent, child);
    }
 
    public static void addChild(int ix, Object parent, Object child) {
       Object type = DynUtil.getType(parent);
       IDynChildManager childMgr = getDynChildManager(type);
-      if (childMgr == null)
-         System.out.println("*** No DynChildManager registered for addChild on parent type: " + type);
-      else
+      if (childMgr != null)
          childMgr.addChild(ix, parent, child);
    }
 

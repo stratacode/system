@@ -6,9 +6,10 @@ package sc.dyn;
 
 /**
  * This interface is implemented by framework components that want to use the StrataCode Object hierarchy with
- * dynamic types and want to manage dynamic instances of those types automatically.  In that case, for each parent/child relationship
- * write a manager class that implements this interface to perform the same logic that you have in your type's objTemplate and newTemplate for managing
- * children - basically the init/add/remove/get operations.  When new instances are added or removed, your IDynChildManager implementation is
+ * dynamic types or compiled types that want to manage a dynamic object tree use this interface.  An instanceof this class
+ * is attached to a framework-level base class - e.g. sc.lang.html.Element to implement tagObjects.
+ * The IDynChildManager class performs logic that for transformed generated types exists in the type's objTemplate and newTemplate for
+ * managing children - basically the init/add/remove/get operations.  When new instances are added or removed, your IDynChildManager implementation is
  * called.
  */
 @sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_")

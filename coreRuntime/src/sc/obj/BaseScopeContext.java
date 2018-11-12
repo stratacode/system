@@ -41,6 +41,10 @@ public abstract class BaseScopeContext extends ScopeContext {
          for (int i = 0; i < keysToDestroy.size(); i++) {
             Object value = valueTable.get(keysToDestroy.get(i));
             if (value != null) {
+               Object parentObj = DynUtil.getOuterObject(value);
+               if (parentObj != null) {
+                  DynUtil.removeChild(parentObj, value);
+               }
                DynUtil.dispose(value);
             }
          }
