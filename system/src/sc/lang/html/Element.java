@@ -4611,6 +4611,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       else {
          if (attributeList != null) {
+            int markerIx = -1;
+            for (int i = 0; i < attributeList.size(); i++) {
+               Attr attr = attributeList.get(i);
+               if (attr.name != null && attr.name.contains(dummyIdentifier)) {
+                  markerIx = i;
+                  break;
+               }
+            }
+            if (markerIx != -1) {
+               return attributeList.get(markerIx).addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+            }
             for (Attr att:attributeList) {
                String res = att.addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
                if (res != null)
