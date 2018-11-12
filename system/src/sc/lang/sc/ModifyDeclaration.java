@@ -1081,6 +1081,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                         childNames.append(", ");
                      childNames.append(childName);
                      nameSet.add(childName);
+                     if (objTypes != null)
+                        objTypes.add(typeDecl);
                      ct++;
                   }
                }
