@@ -7,6 +7,8 @@ package sc.lang;
 import sc.lang.java.JavaSemanticNode;
 import sc.lang.java.TypeContext;
 import sc.lang.java.TypeDeclaration;
+import sc.lang.template.Template;
+import sc.layer.LayeredSystem;
 
 import java.util.EnumSet;
 
@@ -16,7 +18,11 @@ public interface IDefinitionProcessor {
 
    public String getCustomResolver();
 
+   public Template getCustomResolverTemplate(LayeredSystem sys);
+
    public String getCustomSetter();
+
+   public Template getCustomSetterTemplate(LayeredSystem sys);
 
    public String getPreAssignment();
 

@@ -32,13 +32,19 @@ public class TagDynChildManager implements sc.dyn.IDynChildManager {
          parent.children.add(childObj);
       else
          parent.children.add(ix, childObj);
+      // TODO: need to call invalidateBody here?
    }
 
    public boolean removeChild(Object parentObj, Object childObj) {
       Element parent = (Element) parentObj;
-      if (parent.children == null)
-         return false;
-      return parent.children.remove(childObj);
+      boolean res = false;
+      if (parent.children != null)
+         res = parent.children.remove(childObj);
+      // It's possible we are notified of a child tag object being removed - we need to refresh in that case.
+      // One case is where we have a child object that's request scope where the parent is session scoped.   Then child
+      // is removed after each request, forcing the parent to refresh it's body and get a new instance of the child.
+      parent.invalidateBody();
+      return res;
    }
 
    public Object[] getChildren(Object parentObj) {

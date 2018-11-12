@@ -5,17 +5,19 @@
 package sc.lang;
 
 import sc.lang.sc.PropertyAssignment;
+import sc.lang.template.Template;
 import sc.layer.BuildInfo;
 import sc.lang.java.*;
 import sc.layer.LayeredSystem;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.Set;
 
 /** The base class for both annotation processors and scope processors.  Framework components register these classes in the layer definition file to manage the behavior of an annotation like @Sync
  * which has compile time behavior.
  */
 public abstract class DefinitionProcessor implements IDefinitionProcessor {
-
    /**
     * Allows you to group the types attached to this definition into a single global list.
     * If this is set on an annotation processor associated with a method
@@ -56,8 +58,14 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    /** Set to a template string evaluated using the object definition parameters used in place of the field for storing the type. */
    public String customResolver;
 
+   /** Set by customResolver or set this directly if you want to use a template from the file system */
+   public Template customResolverTemplate;
+
    /** Set to a template string evaluated using the object definition parameters used to set the field or store the object in a context object */
    public String customSetter;
+
+   /** Corresponds to customSetter - the template actually used */
+   public Template customSetterTemplate;
 
    /** Override this on an object type which does not need a field to store the value (since it is being looked up in the customGetter/Setter typically) */
    public boolean needsField = true;
@@ -65,14 +73,24 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    /** Set to a template string evaluated using the object definition parameters placed after the instance has been created but before any post-constructor assignments have been run (i.e. before preInit for components, right after new X for classes) */
    public String preAssignment;
 
+   /** Corresponds to the string version - the template actually used */
+   // TODO: cache this here and also allow it to be set as a template for when the string form is awkward?
+   //public Template preAssignmentTemplate;
+
    /** Set to a template string evaluated using the object definition parameters added after the preInit method for components or assignments not compiled in for classes. */
    public String postAssignment;
+
+   /** Corresponds to the string version - the template actually used */
+   //public Template postAssignmentTemplate;
 
    /** Equivalent to CompilerSettings.mixinTemplate but set via an annotation */
    public String mixinTemplate;
 
    /** Equivalent to CompilerSettings.staticMinTemplate but set via an annotation */
    public String staticMixinTemplate;
+
+   /** For JS transformation, any types that are injected through code generation we need for dependency purposes before the transformation step in which we discover these in the template */
+   public Set<Object> dependentTypes;
 
    // TODO : this never gets called cause annot.getFullTypeName() is returning null since boundType for annotation = null.
    public void init(Definition def) {
@@ -220,8 +238,26 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       return customResolver;
    }
 
+   public Template getCustomResolverTemplate(LayeredSystem sys) {
+      if (customResolverTemplate != null)
+         return customResolverTemplate;
+      if (customResolver != null) {
+         customResolverTemplate = TransformUtil.parseTemplate(customResolver, ObjectDefinitionParameters.class, true, sys);
+      }
+      return customResolverTemplate;
+   }
+
    public String getCustomSetter() {
       return customSetter;
+   }
+
+   public Template getCustomSetterTemplate(LayeredSystem sys) {
+      if (customSetterTemplate != null)
+         return customSetterTemplate;
+      if (customSetter != null) {
+         customSetterTemplate = TransformUtil.parseTemplate(customSetter, ObjectDefinitionParameters.class, true, sys);
+      }
+      return customSetterTemplate;
    }
 
    public String getPreAssignment() {

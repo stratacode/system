@@ -4,6 +4,8 @@
 
 package sc.lang.html;
 
+import sc.bind.Bind;
+import sc.bind.IListener;
 import sc.obj.CompilerSettings;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
@@ -24,6 +26,8 @@ import java.util.LinkedHashMap;
 @Sync(syncMode= SyncMode.Default) // Turn back on sync mode for user defined page types so that any fields they defined will be synchronized by default. - TODO call this SyncMode.Unset?
 @CompilerSettings(liveDynamicTypes=true) // An important component - nice to track instances for the command line editor
 public class HtmlPage extends Html {
+   private final static sc.type.IBeanMapper _pageVisitProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HtmlPage.class, "pageVisitCount");
+
    protected boolean isPageElement() {
       return true;
    }
@@ -63,6 +67,17 @@ public class HtmlPage extends Html {
       if (ix == -1)
          return pgurl;
       return pgurl.substring(0, ix);
+   }
+
+   private int pageVisitCount = 0;
+   public int getPageVisitCount() {
+      return pageVisitCount;
+   }
+
+   /** Incremented before rendering for each page view */
+   public void setPageVisitCount(int ct) {
+      pageVisitCount = ct;
+      Bind.sendEvent(IListener.VALUE_CHANGED, this, _pageVisitProp);
    }
 
    // TODO: this only works for the most rudimentary cases and should do escaping etc.
