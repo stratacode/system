@@ -4934,7 +4934,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             Object varType = getTypeForIdentifier(i);
             if (varType != null) {
                if (!(varType instanceof AbstractMethodDefinition))
-                  types.add(varType);
+                  addDependentType(types, varType);
             }
             Object boundType = boundTypes[i];
             if (idTypes != null && boundType != null) {
@@ -4943,7 +4943,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      break;
                   case MethodInvocation:
                   case FieldName:
-                     types.add(ModelUtil.getEnclosingType(boundType));
+                     addDependentType(types, ModelUtil.getEnclosingType(boundType));
                      break;
                }
             }

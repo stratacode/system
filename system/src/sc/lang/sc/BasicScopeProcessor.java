@@ -7,6 +7,11 @@ package sc.lang.sc;
 import sc.lang.DefinitionProcessor;
 import sc.lang.ILanguageModel;
 import sc.lang.java.*;
+import sc.lang.template.Template;
+import sc.util.LinkedIdentityHashSet;
+
+import java.util.ArrayList;
+import java.util.Set;
 
 public class BasicScopeProcessor extends DefinitionProcessor implements IScopeProcessor {
    public String scopeName;
@@ -36,6 +41,34 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
       if (scopeTemplateName != null) {
          TransformUtil.applyTemplateToType(td, scopeTemplateName, "scopeTemplate", useNewTemplate);
       }
+   }
+
+   public void addDependentTypes(BodyTypeDeclaration td, Set<Object> types) {
+      if (dependentTypes != null)
+         types.addAll(dependentTypes);
+      /*
+        TODO: this does not work because we'd have to evaluate the template in order to get the dependencies for JS conversion.
+        We need them in addTypeLibs which is run before the transform.  We could eval the template
+        twice and if this gets used in a way that the dependencies are not just contained to framework packages, already included
+        or rework addTypeLibs so it's run after the transform, at least before it's too late to add entry points and things that break now
+
+      String scopeTemplateName;
+      if (td.getDeclarationType() == DeclarationType.OBJECT)
+         scopeTemplateName = getObjectTemplate();
+      else
+         scopeTemplateName = getNewTemplate();
+      if (scopeTemplateName != null) {
+         // If we are applying this template during the transform, any external types in the generated code will
+         // become dependencies of the runtime.
+         TransformUtil.addDependenciesForTemplate(td, types, scopeTemplateName, "scopeTemplate");
+      }
+      Template customSetterTemplate = getCustomSetterTemplate(td.getLayeredSystem());
+      if (customSetterTemplate != null)
+         customSetterTemplate.addDependentTypes(types);
+      Template customResolverTemplate = getCustomResolverTemplate(td.getLayeredSystem());
+      if (customResolverTemplate != null)
+         customResolverTemplate.addDependentTypes(types);
+      */
    }
 
    public boolean transform(Definition def, ILanguageModel.RuntimeType type) {
@@ -108,5 +141,21 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
    }
    public String getProcessorName() {
       return scopeName;
+   }
+
+   public void addDependentType(Object depType) {
+      if (dependentTypes == null)
+         dependentTypes = new LinkedIdentityHashSet<>();
+      dependentTypes.add(depType);
+   }
+
+   public boolean definesTypeField = false;
+
+   /**
+    * TODO: is this right?  It seems like ListItem scope might be the only one which uses a field to store the obj reference
+    * and all of the others use customResolver.
+    */
+   public boolean getDefinesTypeField() {
+      return customResolver == null;
    }
 }

@@ -234,17 +234,35 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
    }
 
    public String getScopeName() {
+      String scopeName = null;
       if (modifiers != null) {
          for (int i = 0; i < modifiers.size(); i++) {
             Object mod = modifiers.get(i);
-            if (mod instanceof ScopeModifier)
-               return ((ScopeModifier) mod).scopeName;
+            if (mod instanceof ScopeModifier) {
+               scopeName = ((ScopeModifier) mod).scopeName;
+               break;
+            }
             // Do this at the same time so @Scope and scope<...> can override each other in a modify or extends
             else if (mod instanceof Annotation) {
                Annotation annotation = (Annotation) mod;
                String ftn;
                if (annotation.typeName.equals("sc.obj.Scope") || (ftn = annotation.getFullTypeName()) != null && ftn.equals("sc.obj.Scope")) {
-                  return (String) annotation.getAnnotationValue("name");
+                  scopeName = (String) annotation.getAnnotationValue("name");
+                  if (scopeName != null)
+                     break;
+               }
+            }
+         }
+         if (scopeName != null) {
+            JavaModel model = getJavaModel();
+            if (model != null) {
+               LayeredSystem sys = model.getLayeredSystem();
+               Layer refLayer = model.getLayer();
+               if (sys != null && refLayer != null) {
+                  String scopeAlias = sys.getScopeAlias(refLayer, scopeName);
+                  if (scopeAlias != null) {
+                     return scopeAlias;
+                  }
                }
             }
          }
@@ -252,7 +270,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       // Also check for the annotation - in case we've generated it
       // Doing this check here is no good cause it messes up the precedence. Need to do it with the modifiers test above.
       //return (String) ModelUtil.getAnnotationValue(this, "sc.obj.Scope", "name");
-      return null;
+      return scopeName;
    }
 
    public ScopeDefinition getScopeDefinition() {

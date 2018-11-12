@@ -7,6 +7,7 @@ package sc.layer;
 import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.java.Expression;
+import sc.lang.java.JavaModel;
 import sc.lang.java.ModelUtil;
 import sc.lang.java.TypeDeclaration;
 import sc.lang.sc.ModifyDeclaration;
@@ -995,7 +996,7 @@ public class LayerUtil implements LayerConstants {
       int ct = 0;
       for (Map.Entry<String,ILanguageModel> ent: modelIndex.entrySet()) {
          if ((ct % 5) == 0)
-            sb.append("\n   ");
+            sb.append("\n      ");
          else
             sb.append(", ");
          ILanguageModel m = ent.getValue();
@@ -1009,7 +1010,46 @@ public class LayerUtil implements LayerConstants {
          }
          ct++;
       }
+      if (ct == 0)
+         sb.append("      <no models>");
       sb.append("\n\n");
       return sb;
    }
+
+   public static String dumpModelIndexSummary(Map<String,ILanguageModel> modelIndex) {
+      int snCt = 0, pnCt = 0;
+      for (Map.Entry<String,ILanguageModel> ent: modelIndex.entrySet()) {
+         ILanguageModel m = ent.getValue();
+         TypeDeclaration mtype = m.getModelTypeDeclaration();
+         if (mtype != null) {
+            IParseNode pn = m.getParseNode();
+            snCt += m.getNodeCount();
+            pnCt += pn.getNodeCount();
+         }
+      }
+      return "(sn=" + snCt + ", pn=" + pnCt + ")";
+   }
+
+   public static StringBuilder dumpLayerListStats(String layerListType, List<Layer> layers) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("      " + layerListType + " layers:\n");
+      for (Layer l:layers) {
+         sb.append("         " + l.layerDirName + ":");
+         int ct = 0;
+         for (IdentityWrapper<ILanguageModel> wrap:l.layerModels) {
+            if ((ct % 5) == 0)
+               sb.append("\n            ");
+            else
+               sb.append(", ");
+            if (wrap.wrapped instanceof JavaModel) {
+               JavaModel m = (JavaModel) wrap.wrapped;
+               sb.append(m.getModelTypeName() + " (sn=" + m.getNodeCount() + ", pn=" + m.getParseNode().getNodeCount() + ")");
+            }
+            ct++;
+         }
+         sb.append("\n");
+      }
+      return sb;
+   }
+
 }

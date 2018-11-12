@@ -9,6 +9,7 @@ import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.html.Element;
 import sc.lang.java.*;
+import sc.lang.sc.IScopeProcessor;
 import sc.lang.sc.SCModel;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
@@ -16,6 +17,7 @@ import sc.lang.template.Template;
 import sc.layer.*;
 import sc.obj.ComponentImpl;
 import sc.obj.IComponent;
+import sc.obj.ScopeContext;
 import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
@@ -1270,6 +1272,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       if (type.needsSync()) {
          addDependentType(type, SyncManager.class, typeLibFile, typesInFile);
+      }
+      IScopeProcessor scopeProcessor = type.getScopeProcessor();
+      if (scopeProcessor != null) {
+         addDependentType(type, ScopeContext.class, typeLibFile, typesInFile);
+
+
       }
    }
 

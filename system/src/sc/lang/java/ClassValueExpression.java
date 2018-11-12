@@ -224,7 +224,7 @@ public class ClassValueExpression extends Expression {
 
    public void addDependentTypes(Set<Object> types) {
       if (boundType != null)
-         types.add(boundType);
+         addDependentType(types, boundType);
    }
 
    public Statement transformToJS() {

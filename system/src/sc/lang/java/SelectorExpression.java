@@ -294,8 +294,11 @@ public class SelectorExpression extends ChainedExpression {
 
    /** For this.a[i].b returns the type of this.a[i] */
    public Object getParentReferenceType() {
-      if (boundTypes == null || boundTypes.length < 2)
+      if (boundTypes == null || boundTypes.length == 0)
          return null;
+      if (boundTypes.length == 1) {
+         return expression.getTypeDeclaration();
+      }
       return getTypeDeclaration(boundTypes.length-2);
    }
 
@@ -895,10 +898,10 @@ public class SelectorExpression extends ChainedExpression {
             if (boundTypes[i] != null) {
                switch (idTypes[i]) {
                   case MethodInvocation:
-                     types.add(ModelUtil.getEnclosingType(boundTypes[i]));
+                     addDependentType(types, ModelUtil.getEnclosingType(boundTypes[i]));
                      break;
                   default:
-                     types.add(getTypeDeclaration(i));
+                     addDependentType(types, getTypeDeclaration(i));
                }
             }
          }

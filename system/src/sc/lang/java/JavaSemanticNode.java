@@ -649,4 +649,11 @@ public abstract class JavaSemanticNode extends SemanticNode {
    public Statement findStatement(Statement in) {
       return null;
    }
+
+   public static void addDependentType(Set<Object> types, Object type) {
+      // Unwrap here or else we'll add duplicates because the types set is using object identity for efficiency
+      if (type instanceof ParamTypeDeclaration)
+         type = ((ParamTypeDeclaration) type).baseType;
+      types.add(type);
+   }
 }

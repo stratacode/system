@@ -3458,7 +3458,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Map<String,StringBuilder> childNamesByScope = new HashMap<String,StringBuilder>();
       // TODO: performance.  Should refactor addChildNames to first gather children, then turn them into
       // names.  For the dynamic case, we avoid all of that string allocation.
-      numChildren = addChildNames(childNames, childNamesByScope, null, componentsOnly, thisClassOnly, dynamicOnly, new TreeSet<String>());
+      numChildren = addChildNames(childNames, childNamesByScope, null, componentsOnly, thisClassOnly, dynamicOnly, new TreeSet<String>(), null);
       if (scopeName != null) {
          childNames = childNamesByScope.get(scopeName);
          if (childNames == null)
@@ -7076,11 +7076,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public int addChildNames(StringBuilder childNames, Map<String,StringBuilder> childNamesByScope, String prefix, boolean componentsOnly,
-                            boolean thisClassOnly, boolean dynamicOnly, Set<String> nameSet) {
+                            boolean thisClassOnly, boolean dynamicOnly, Set<String> nameSet, ArrayList<Object> objTypes) {
       Object extendsType = getDerivedTypeDeclaration();
       int ct = 0;
       if (extendsType instanceof TypeDeclaration && !thisClassOnly) {
-         ct = ((TypeDeclaration) extendsType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly, thisClassOnly, dynamicOnly, nameSet);
+         ct = ((TypeDeclaration) extendsType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly, thisClassOnly, dynamicOnly, nameSet, objTypes);
       }
       StringBuilder useChildNames;
 
@@ -7160,6 +7160,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                            ct++;
 
                         nameSet.add(childPathName);
+                        if (objTypes != null)
+                           objTypes.add(innerTypeObj);
                      }
                   }
                }
@@ -7812,9 +7814,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (dynChildMgrClassName != null) {
          Object mgrType = findTypeDeclaration(dynChildMgrClassName, false);
          if (mgrType != null)
-            types.add(mgrType);
+            addDependentType(types, mgrType);
          else
             displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClassName, " for: ");
+      }
+      IScopeProcessor scopeProcessor = getScopeProcessor();
+      if (scopeProcessor != null) {
+         scopeProcessor.addDependentTypes(this, types);
       }
    }
 

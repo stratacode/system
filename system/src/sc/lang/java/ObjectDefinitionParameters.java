@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.sc.IScopeProcessor;
+import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.SrcEntry;
 import sc.sync.SyncPropOptions;
@@ -53,7 +55,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public boolean useAltComponent;
 
    public String customResolver;         // Plug in your own code to resolve the existing object - maybe it's not stored in a field but in a context object of some kind
+   public Template customResolverTemplate;
    public String customSetter;           // Plug in your own code to set the existing object in the current context.
+   public Template customSetterTemplate;           // Plug in your own code to set the existing object in the current context.
 
    public boolean customNeedsField;      // Annotation processors can indicate that this type does not need a field - scopes and the like
 
@@ -110,7 +114,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       StringBuilder childNames = new StringBuilder();
       Map<String,StringBuilder> tmpChildNamesByScope = new HashMap<String,StringBuilder>();
       LinkedHashSet<String> objNames = new LinkedHashSet<String>();
-      objType.addChildNames(childNames, tmpChildNamesByScope, null, false, false, false, objNames);
+      ArrayList<Object> objTypes = new ArrayList<Object>();
+      objType.addChildNames(childNames, tmpChildNamesByScope, null, false, false,
+                 false, objNames, objTypes);
       childrenNamesNoPrefix = childNames.toString();
       String tmp = childrenNamesNoPrefix.trim();
       if (objNames.size() == 0)
@@ -121,19 +127,31 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          for (String objName:objNames) {
             if (i != 0)
                fsb.append(", ");
-            fsb.append("(");
-            fsb.append(CTypeUtil.decapitalizePropertyName(objName));
-            fsb.append(")");
+            Object innerObjType = objTypes.get(i);
+            if (innerObjType == null)
+               System.err.println("*** No inner object!");
+            IScopeProcessor sp;
+            if (innerObjType instanceof TypeDeclaration && ((sp = ((TypeDeclaration) innerObjType).getScopeProcessor()) != null && !sp.getDefinesTypeField()))
+               fsb.append(CTypeUtil.decapitalizePropertyName(objName));
+            else {
+               fsb.append("(");
+               fsb.append(CTypeUtil.decapitalizePropertyName(objName));
+               fsb.append(")");
+            }
             i++;
          }
          childrenFieldNames = fsb.toString();
       }
 
-      if (customResolver != null)
-         this.customResolver = TransformUtil.evalTemplate(this, customResolver, true);
-      if (customSetter != null)
-         this.customSetter = TransformUtil.evalTemplate(this, customSetter, true);
+      if (customResolverTemplate != null)
+         customResolver = TransformUtil.evalTemplate(this, customResolverTemplate);
+      else if (customResolver != null)
+         customResolver = TransformUtil.evalTemplate(this, customResolver, true);
 
+      if (customSetterTemplate != null)
+         customSetter = TransformUtil.evalTemplate(this, customSetterTemplate);
+      else if (customResolver != null)
+         customSetter = TransformUtil.evalTemplate(this, customSetter, true);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -143,7 +161,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                               boolean overrideField, boolean overrideGet, boolean needsMemberCast, boolean isComponent,
                               boolean typeIsComponentClass, String childTypeName, String parentName, String rootName, Object currentConstructor,
                               String constDecls, String constParams, TypeDeclaration accessClass, boolean useAltComponent,
-                              String customResolver, String customSetter, boolean needsField, List<String> preAssignments, List<String> postAssignments) {
+                              String customResolver, Template customResolverTemplate, String customSetter, Template customSetterTemplate,
+                              boolean needsField, List<String> preAssignments, List<String> postAssignments) {
       this.objType = objType;
       this.compiledClass = compiledClass;
       this.accessClass = accessClass;
@@ -172,7 +191,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       this.preAssignments = preAssignments;
       this.postAssignments = postAssignments;
       this.customResolver = customResolver;
+      this.customResolverTemplate = customResolverTemplate;
       this.customSetter = customSetter;
+      this.customSetterTemplate = customSetterTemplate;
 
       init();
    }

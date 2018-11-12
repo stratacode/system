@@ -1305,13 +1305,18 @@ public class TransformUtil {
       TransformUtil.addObjectDefinition(td, td, params, null, template, isObject && !useNewTemplate, params.typeIsComponent, true, false);
    }
 
+   public static void addDependenciesForTemplate(BodyTypeDeclaration td, Set<Object> types, String templatePath, String templateTypeName) {
+      Template template = td.findTemplatePath(templatePath, templateTypeName, ObjectDefinitionParameters.class);
+      template.addDependentTypes(types);
+   }
+
    public static ObjectDefinitionParameters createObjectDefinitionParameters(TypeDeclaration td) {
       StringBuilder locChildNames = new StringBuilder();
       Map<String,StringBuilder> locChildNamesByScope = new HashMap<String,StringBuilder>();
 
       // The scope template also runs in the context
       LinkedHashSet<String> objNames = new LinkedHashSet<String>();
-      int locNumChildren = td.addChildNames(locChildNames, locChildNamesByScope, null, false, false, false, objNames);
+      int locNumChildren = td.addChildNames(locChildNames, locChildNamesByScope, null, false, false, false, objNames, null);
 
       Object compiledClass = td.getClassDeclarationForType();
       String objectClassName = ModelUtil.getTypeName(compiledClass, false, true);
@@ -1324,7 +1329,8 @@ public class TransformUtil {
       ObjectDefinitionParameters params = new ObjectDefinitionParameters(compiledClass,
               objectClassName, objectClassName, td, newModifiers,
               locChildNames, locNumChildren, locChildNamesByScope, ModelUtil.convertToCommaSeparatedStrings(objNames), false,
-              false, false, isComponent, typeIsComponentClass, null, null, null, null, "", "", td, false, null, null, true, null, null);
+              false, false, isComponent, typeIsComponentClass, null, null, null,
+              null, "", "", td, false, null, null, null, null, true, null, null);
       return params;
    }
 

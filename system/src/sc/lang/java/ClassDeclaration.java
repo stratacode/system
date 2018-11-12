@@ -455,6 +455,8 @@ public class ClassDeclaration extends TypeDeclaration {
 
       String customResolver = null;
       String customSetter = null;
+      Template customResolverTemplate = null;
+      Template customSetterTemplate = null;
       boolean needsField = true;
       ArrayList<String> preAssignments = null;
       ArrayList<String> postAssignments = null;
@@ -467,17 +469,17 @@ public class ClassDeclaration extends TypeDeclaration {
                   addImplements(scopeType);
                }
             }
-            String procCustomResolver = proc.getCustomResolver();
+            Template procCustomResolver = proc.getCustomResolverTemplate(lsys);
             if (procCustomResolver != null) {
                if (customResolver != null)
                   System.err.println("*** Warning: type - " + typeName + " already has a customResolver: " + customResolver + " being replaced by annotation: " + proc);
-               customResolver = procCustomResolver;
+               customResolverTemplate = procCustomResolver;
             }
-            String procCustomSetter = proc.getCustomSetter();
+            Template procCustomSetter = proc.getCustomSetterTemplate(lsys);
             if (procCustomSetter != null) {
                if (customSetter != null)
                   System.err.println("*** Warning: type - " + typeName + " already has a customSetter: " + customResolver + " being replaced by annotation: " + proc);
-               customSetter = procCustomSetter;
+               customSetterTemplate = procCustomSetter;
             }
             boolean procNeedsField = proc.getNeedsField();
             if (!procNeedsField) {
@@ -672,7 +674,7 @@ public class ClassDeclaration extends TypeDeclaration {
          StringBuilder childNames = new StringBuilder();
          Map<String,StringBuilder> childNamesByScope = new HashMap<String,StringBuilder>();
          LinkedHashSet<String> objNames = new LinkedHashSet<String>();
-         int numChildren = addChildNames(childNames, childNamesByScope, !constructorInit ? CTypeUtil.decapitalizePropertyName(typeName) : null, false, false, false, objNames);
+         int numChildren = addChildNames(childNames, childNamesByScope, !constructorInit ? CTypeUtil.decapitalizePropertyName(typeName) : null, false, false, false, objNames, null);
 
          SemanticNodeList<Statement> assignments = null;
          int transformIx = -1;
@@ -753,12 +755,13 @@ public class ClassDeclaration extends TypeDeclaration {
                Set<String> childObjNames = new LinkedHashSet<String>();
 
                // The scope template also runs in the context
-               int locNumChildren = addChildNames(locChildNames, locChildNamesByScope, null, false, false, false, childObjNames);
+               int locNumChildren = addChildNames(locChildNames, locChildNamesByScope, null, false, false, false, childObjNames, null);
 
                params = new ObjectDefinitionParameters(compiledClass, objectClassName, variableTypeName, this, newModifiers,
                                              locChildNames, locNumChildren, locChildNamesByScope, ModelUtil.convertToCommaSeparatedStrings(childObjNames), isOverrideField,
                                              isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName,
-                                             null, "", "", this, useAltComponent, customResolver, customSetter, needsField, preAssignments, postAssignments);
+                                             null, "", "", this, useAltComponent, customResolver, customResolverTemplate, customSetter, customSetterTemplate,
+                                             needsField, preAssignments, postAssignments);
                TransformUtil.addObjectDefinition(this, this, params,
                        assignments, scopeTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, false);
             }
@@ -772,11 +775,12 @@ public class ClassDeclaration extends TypeDeclaration {
             Set<String> locObjNames = new LinkedHashSet<String>();
 
             // The mixin template, like the constructorInit method is local and so doesn't need the prefix
-            int locNumChildren = addChildNames(locChildNames, locChildNamesByScope, null, false, false, false, locObjNames);
+            int locNumChildren = addChildNames(locChildNames, locChildNamesByScope, null, false, false, false, locObjNames, null);
 
             params = new ObjectDefinitionParameters(compiledClass, objectClassName, variableTypeName, this, newModifiers,
                     locChildNames, locNumChildren, locChildNamesByScope, ModelUtil.convertToCommaSeparatedStrings(locObjNames), isOverrideField,
-                    isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName, null, "", "", this, useAltComponent, customResolver, customSetter, needsField, preAssignments, postAssignments);
+                    isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName, null, "", "", this, useAltComponent,
+                    customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments);
 
             if (mixinTemplates != null) {
                for (Template mixinTemplate:mixinTemplates) {
@@ -823,7 +827,7 @@ public class ClassDeclaration extends TypeDeclaration {
             params = new ObjectDefinitionParameters(compiledClass, objectClassName, variableTypeName, this, newModifiers,
                           childNames, numChildren, childNamesByScope, ModelUtil.convertToCommaSeparatedStrings(objNames), isOverrideField,
                     isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName, currentConstructor,
-                    constDecls, constParams, accessClass, useAltComponent, customResolver, customSetter, needsField, preAssignments, postAssignments);
+                    constDecls, constParams, accessClass, useAltComponent, customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments);
 
             TransformUtil.addObjectDefinition(accessClass, this, params,
                                               assignments, customTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, i == 0);
@@ -991,7 +995,8 @@ public class ClassDeclaration extends TypeDeclaration {
       boolean extendsIsComponent = false;
 
       StringBuilder childCompNames = new StringBuilder();
-      int numCompChildren = addChildNames(childCompNames, null, null, true, true, false, new TreeSet<String>());
+      int numCompChildren = addChildNames(childCompNames, null, null, true,
+                              true, false, new TreeSet<String>(), null);
 
       // If this class does not inherit from IComponent, we need to do more work:
       if (extendsType == null || !(extendsIsComponent = ModelUtil.isComponentType(extendsType))) {

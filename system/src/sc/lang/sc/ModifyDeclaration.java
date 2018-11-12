@@ -1051,7 +1051,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    public int addChildNames(StringBuilder childNames, Map<String,StringBuilder> childNamesByScope, String prefix, boolean componentsOnly,
-                            boolean thisClassOnly, boolean dynamicOnly,  Set<String> nameSet) {
+                            boolean thisClassOnly, boolean dynamicOnly,  Set<String> nameSet, ArrayList<Object> objTypes) {
       int ct = 0;
 
       // Process the extends from the modify type first since it's part of the extends type of the result and it's children are first in the compiled version
@@ -1059,14 +1059,14 @@ public class ModifyDeclaration extends TypeDeclaration {
          for (Object extBoundType:extendsBoundTypes) {
             if (extBoundType instanceof TypeDeclaration)
                ct += ((TypeDeclaration) extBoundType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly,
-                       thisClassOnly, dynamicOnly, nameSet);
+                       thisClassOnly, dynamicOnly, nameSet, objTypes);
          }
       }
 
       Object extendsType = getDerivedTypeDeclaration();
       if (extendsType instanceof TypeDeclaration) {
          ct += ((TypeDeclaration) extendsType).addChildNames(childNames, childNamesByScope, prefix, componentsOnly,
-                                                             thisClassOnly, dynamicOnly, nameSet);
+                                                             thisClassOnly, dynamicOnly, nameSet, objTypes);
       }
 
       if (body != null) {

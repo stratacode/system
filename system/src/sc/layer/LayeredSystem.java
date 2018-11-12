@@ -6816,8 +6816,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       saveTypeIndexFiles();
 
       // TODO: after we rebuild the type index from scratch (at least) it's nice if we go through and cull out unused types
-      // to save memory.  But right now, this does not deal with dependencies between types - and in the normal case will
-      // end up to having modified types which are not reconciled and updated when a new layer is added.
+      // to save memory.  But need to test this again after after updating the code to handle modified types
+      // previously the modified types were not reconciled and therefore updated when a new inactive layer was loaded
+      // - this is a tricky case cause we need to update the modify chain or else references are not updated properly to point to the inserted type.
       //cleanInactiveCache();
    }
 
@@ -6846,11 +6847,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   // TODO: We need a more accurate way of determining when a model is in use before we cull it.  If there is another
-   // type referencing this one for example, and we remove this one from the cache, the one we reference becomes stale...
-   // for example, we won't update it's replacedBy value when it's modified and so we'll miss out.   So minimally we need
-   // to see if there are any models which are modifying this file that are opened
-   private void cleanInactiveCache() {
+   private boolean isInUse(ILanguageModel model) {
+      if (externalModelIndex != null && externalModelIndex.isInUse(model))
+         return true;
+      if (model instanceof JavaModel) {
+         JavaModel jModel = (JavaModel) model;
+         JavaModel modByModel = jModel.getModifiedByModel();
+         if (modByModel != null && isInUse(modByModel))
+            return true;
+      }
+      return false;
+   }
+
+   public void cleanInactiveCache() {
       try {
          acquireDynLock(false);
          ArrayList<String> toCullList = new ArrayList<String>();
@@ -12247,9 +12256,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                System.out.println("*** Error - adding activated model to inactive index");
             addNewModel(model, null, null, null, (model instanceof JavaModel && ((JavaModel) model).isLayerModel), false);
          }
-         else {
+         else if (result != null) {
             error("Parsing inactive type: " + srcEnt + ": " + ((ParseError) result).errorStringWithLineNumbers(srcEnt.absFileName));
          }
+         else
+            error("Parsing type: " + srcEnt + ": returned null");
       }
       if (model instanceof JavaModel)
          return ((JavaModel) model).getModelTypeDeclaration();
@@ -14752,6 +14763,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public IScopeProcessor getScopeProcessor(Layer refLayer, String scopeName) {
       int startIx;
+
+      // We can substitute a different scope on a runtime-by-runtime basis - e.g. for the client, often many scopes collapse into one (e.g. window, session => global)
+      if (scopeName != null) {
+         String scopeAlias = getScopeAlias(refLayer, scopeName);
+         if (scopeAlias != null)
+            scopeName = scopeAlias;
+      }
+
       if (searchActiveTypesForLayer(refLayer)) {
          // In general we search from most recent to original
          startIx = refLayer == null ? layers.size() - 1 : refLayer.getLayerPosition();
@@ -14943,24 +14962,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       StringBuilder sb = new StringBuilder();
       sb.append("LayeredSystem: ");
       sb.append(getProcessIdent());
-      sb.append("\n   activeLayers: ");
+      sb.append("\n   numActiveLayers: ");
       sb.append(layers.size());
-      sb.append(" inactiveLayers: ");
+      sb.append(" numInactiveLayers: ");
       sb.append(inactiveLayers.size());
-      sb.append(" activeModels: ");
-      sb.append(modelIndex.size());
-      sb.append(" activeFiles: ");
+      sb.append(" numActiveFiles: ");
       sb.append(processedFileIndex.size());
-      sb.append(" inactiveModels: ");
-      sb.append(inactiveModelIndex.size());
       sb.append("\n");
       if (typeIndex != null)
          sb.append(typeIndex.dumpCacheStats());
-      int totalLayerModels = 0;
-      for (Layer l:inactiveLayers) {
-         totalLayerModels += l.layerModels.size();
+      int pkgIndexSize = packageIndex.size();
+      for (HashMap<String,PackageEntry> pkgMap:packageIndex.values()) {
+         pkgIndexSize += pkgMap.size();
       }
-      sb.append("\n   layerModels: " + totalLayerModels);
+      sb.append("  Num entries in package index: " + pkgIndexSize + "\n\n");
+      sb.append("   Active model index - total: " + LayerUtil.dumpModelIndexSummary(modelIndex));
+      sb.append(LayerUtil.dumpModelIndexStats(modelIndex));
+
+      sb.append("   Inactive model index - total: " + LayerUtil.dumpModelIndexSummary(inactiveModelIndex));
+      sb.append(LayerUtil.dumpModelIndexStats(inactiveModelIndex));
+
+      sb.append(LayerUtil.dumpLayerListStats("active", layers));
+      sb.append(LayerUtil.dumpLayerListStats("inactive", inactiveLayers));
+
       sb.append(" viewErrors: " + viewedErrors.size());
       sb.append(" globalObjects: " + globalObjects.size());
       sb.append(" pendingActiveLayers: " + pendingActiveLayers.size());
@@ -14978,16 +15002,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       sb.append(" objectNameIndex: " + objectNameIndex.size());
       sb.append(" subTypesByType: " + subTypesByType.size());
 
-      int pkgIndexSize = packageIndex.size();
-      for (HashMap<String,PackageEntry> pkgMap:packageIndex.values()) {
-         pkgIndexSize += pkgMap.size();
-      }
-      sb.append(" packageIndexSize: " + pkgIndexSize + "\n\n");
-      sb.append("   active models:");
-      sb.append(LayerUtil.dumpModelIndexStats(modelIndex));
-
-      sb.append("   inactiveModels:");
-      sb.append(LayerUtil.dumpModelIndexStats(inactiveModelIndex));
 
       if (!peerMode && typeIndexProcessMap != null) {
          sb.append("System type indexes:\n");

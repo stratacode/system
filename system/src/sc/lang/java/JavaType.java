@@ -369,7 +369,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    public void addDependentTypes(Set<Object> types) {
       Object typeDecl = getTypeDeclaration();
       if (typeDecl != null)
-         types.add(typeDecl);
+         addDependentType(types, typeDecl);
 
       List<JavaType> typeArgs = getResolvedTypeArguments();
       if (typeArgs != null) {
