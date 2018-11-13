@@ -14975,7 +14975,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (HashMap<String,PackageEntry> pkgMap:packageIndex.values()) {
          pkgIndexSize += pkgMap.size();
       }
-      sb.append("  Num entries in package index: " + pkgIndexSize + "\n\n");
+      sb.append("   Num entries in package index: " + pkgIndexSize + "\n\n");
       sb.append("   Active model index - total: " + LayerUtil.dumpModelIndexSummary(modelIndex));
       sb.append(LayerUtil.dumpModelIndexStats(modelIndex));
 
@@ -14985,7 +14985,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       sb.append(LayerUtil.dumpLayerListStats("active", layers));
       sb.append(LayerUtil.dumpLayerListStats("inactive", inactiveLayers));
 
-      sb.append(" viewErrors: " + viewedErrors.size());
+      sb.append("\n   viewedErrors: " + viewedErrors.size());
       sb.append(" globalObjects: " + globalObjects.size());
       sb.append(" pendingActiveLayers: " + pendingActiveLayers.size());
       sb.append(" pendingInActiveLayers: " + pendingInactiveLayers.size());
