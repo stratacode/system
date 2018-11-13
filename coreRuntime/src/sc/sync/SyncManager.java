@@ -1172,7 +1172,15 @@ public class SyncManager {
          }
 
          // When adding a new global object which is not marked as on-demand, go and add it to all of the child contexts.  This is the "push new record" operation and so must be synchronized against adding new sessions (though maybe change this to an
-         if (!onDemand && childContexts != null) {
+         if (!onDemand) {
+            initChildContexts(ii, inst, args, syncProps);
+         }
+      }
+
+      private void initChildContexts(InstInfo ii, Object inst, Object[] args, SyncProperties syncProps) {
+         if (childContexts != null) {
+            InstInfo childII = null;
+            ArrayList<SyncContext> initChildContexts = null;
             synchronized (this) {
                for (SyncContext childCtx:childContexts) {
                   InstInfo oldII = childCtx.syncInsts.get(inst);
@@ -1186,10 +1194,18 @@ public class SyncManager {
                      continue;
                   }
                   if (syncProps.broadcast || childCtx.scope.isCurrent()) {
-                     InstInfo childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
+                     childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
                      childII.nameQueued = true;
+                     if (initChildContexts == null)
+                        initChildContexts = new ArrayList<SyncContext>();
+                     initChildContexts.add(childCtx);
                   }
                }
+            }
+            // Once we've released the lock on the parent, we may need to initialize children of our children
+            if (initChildContexts != null) {
+               for (SyncContext initCtx:initChildContexts)
+                  initCtx.initChildContexts(childII, inst, args, syncProps);
             }
          }
       }
@@ -1970,10 +1986,13 @@ public class SyncManager {
       }
 
       /** Called when we receive a property changed either from the data binding event (originalCtx=true) or propagated from a parent context (originalCtx = false) */
-      public boolean valueInvalidated(Object obj, String propName, Object curValue, String syncGroup, boolean originalCtx) {
-         if (originalCtx)
-            updatePropertyValueListener(obj, propName, curValue, syncGroup);
+      public boolean valueInvalidated(Object obj, String propName, Object curValue, String syncGroup) {
+         updatePropertyValueListener(obj, propName, curValue, syncGroup);
+         SyncAction action = getSyncAction(propName);
+         return valueInvalidatedInternal(obj, propName, curValue, syncGroup, action);
+      }
 
+      private boolean valueInvalidatedInternal(Object obj, String propName, Object curValue, String syncGroup, SyncAction action) {
          // Has the id changed
          /*
          if (obj instanceof IObjectId) {
@@ -1994,12 +2013,21 @@ public class SyncManager {
          }
          */
 
-         // Any changes triggered when we are processing a sync just update the previous value - they do not trigger a change, unless there are pending bindingings.  That means we are setting a drived value.
-         SyncAction action = getSyncAction(propName);
+         boolean refreshAfterChildren = false;
+
+         // Action == Previous when we are applying a change made already on the client.  We need to find the ScopeContext
+         // which corresponds to the client and update it's previous value.
+         // that we do not send a dupl
          if (action == SyncAction.Previous) {
-            addPreviousValue(obj, propName, curValue, true, true);
+            if (scope.getScopeDefinition().supportsChangeEvents && scope.isCurrent())
+                addPreviousValue(obj, propName, curValue, true, true);
+            // TODO: does this need to be done after we process the child contexts and update the previous value?
+            else if (refreshProperty(obj, propName, curValue, syncGroup, "Applying remote change to shared context")) {
+                return true;
+            }
          }
          else if (action == SyncAction.Value) {
+            // Returns true if there are no changes
             if (refreshProperty(obj, propName, curValue, syncGroup, "Property change")) {
                Object remValue;
                if ((remValue = removeChangedValue(obj, propName, syncGroup)) != null) {
@@ -2029,7 +2057,7 @@ public class SyncManager {
                   if (childInstInfo.syncContext == this)
                      System.err.println("*** Invalid childInstInfo!");
                   else {
-                     childInstInfo.syncContext.valueInvalidated(obj, propName, curValue, syncGroup, false);
+                     childInstInfo.syncContext.valueInvalidatedInternal(obj, propName, curValue, syncGroup, action);
                   }
                }
             }
@@ -2202,6 +2230,20 @@ public class SyncManager {
                flushSyncQueue();
          }
          return inst;
+      }
+
+      public boolean hasCurrentScope() {
+         if (scope.isCurrent())
+            return true;
+         if (childContexts != null) {
+            synchronized (this) {
+               for (SyncContext childCtx:childContexts) {
+                  if (childCtx.hasCurrentScope())
+                     return true;
+               }
+            }
+         }
+         return false;
       }
    }
 
@@ -2398,7 +2440,11 @@ public class SyncManager {
          String propName = PBindUtil.getPropertyName(prop);
          Object curValue = DynUtil.getPropertyValue(obj, propName);
 
-         return ctx.valueInvalidated(obj, propName, curValue, syncGroup, true);
+         return ctx.valueInvalidated(obj, propName, curValue, syncGroup);
+      }
+
+      public String toString() {
+         return "sync change listener for scope: " + ctx.name;
       }
    }
 
