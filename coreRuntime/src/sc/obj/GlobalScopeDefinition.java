@@ -25,6 +25,13 @@ public class GlobalScopeDefinition extends ScopeDefinition {
       public String getId() {
          return "global";
       }
+
+      // The global context is always current.  This is important for client sync contexts where global is used as the replacement
+      // for other scopes on the server.  We want it to be current on the client even though we are not maintaining a current scope context
+      // over there.
+      public boolean isCurrent() {
+         return true;
+      }
    }
 
    GlobalScopeContext globalContext = new GlobalScopeContext();
@@ -57,6 +64,4 @@ public class GlobalScopeDefinition extends ScopeDefinition {
    IObjectId getDummyObjectId() {
       return null;
    }
-
-
 }
