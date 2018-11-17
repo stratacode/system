@@ -499,15 +499,27 @@ public class PTypeUtil {
       return null;
    }
 
+   /**
+    * We used to use a Java/JS-generated class ScopeEnvironment for appId and this PTypeUtil 'native' approach for windowId because we need
+    * the windowId during the object init code that runs when loading JS files.  That all happens before we can define the ScopeEnvironment
+    * class so there's no easy way to generate the JS version.  Instead we're going 'native' for appId as well and probably tenantId or
+    * any other 'ScopeEnvironment' variables we need to define.  TODO: should this become a native class ScopeEnvironment?
+    */
    public static void setWindowId(int id) {
       setThreadLocal("windowId", id);
    }
-
    public static int getWindowId() {
       Integer res = (Integer) getThreadLocal("windowId");
       if (res == null)
          return -1;
       return res;
+   }
+
+   public static void setAppId(String id) {
+      setThreadLocal("appId", id);
+   }
+   public static String getAppId() {
+      return (String) getThreadLocal("appId");
    }
 
    public static Object clone(Object o) {

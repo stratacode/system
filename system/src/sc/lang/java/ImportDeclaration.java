@@ -71,7 +71,7 @@ public class ImportDeclaration extends AbstractErrorNode {
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
          if (currentType != null)
-            ModelUtil.suggestMembers(origModel, currentType, identifier, candidates, true, true, true, true);
+            ModelUtil.suggestMembers(origModel, currentType, identifier, candidates, true, true, true, true, 20);
       }
       return matchPrefix;
    }

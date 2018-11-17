@@ -1377,7 +1377,7 @@ public class EditorContext extends ClientEditorContext {
       if (command.trim().length() == 0) {
          Object curObj = getCurrentType(true);
          if (curObj != null) {
-            ModelUtil.suggestMembers(getModel(), curObj, "", collector, true, true, true, true);
+            ModelUtil.suggestMembers(getModel(), curObj, "", collector, true, true, true, true, 20);
             convertCollectorToCandidates(collector, candidates);
             return command.length() + (ctxText != null ? ctxText.length() - command.length() : 0);
          }

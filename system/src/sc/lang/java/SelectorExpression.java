@@ -761,7 +761,7 @@ public class SelectorExpression extends ChainedExpression {
          if (!(obj instanceof Class) && !(obj instanceof ITypeDeclaration)) {
             obj = obj.getClass();
          }
-         ModelUtil.suggestMembers(getJavaModel(), obj, lastIdent, candidates, false, true, true, false);
+         ModelUtil.suggestMembers(getJavaModel(), obj, lastIdent, candidates, false, true, true, false, 20);
          return pos;
       }
       else {
@@ -795,7 +795,7 @@ public class SelectorExpression extends ChainedExpression {
                                             //(useTypes == null ? null : useTypes[i-1]);
 
                   if (curType != null)
-                     ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false);
+                     ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false, 20);
                   else
                      System.out.println("*** addNodeCompletions for selector expression - no cur type");
 

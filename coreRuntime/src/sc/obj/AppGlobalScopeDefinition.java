@@ -4,13 +4,15 @@
 
 package sc.obj;
 
+import sc.type.PTypeUtil;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 
 /** 
  * The AppGlobalScopeDefinition implements the ScopeDefinition contract for objects that are shared 
- * by all users in the same application ScopeEnvironment variable 'appId'.  For web applications the
+ * by all users in the same application 'appId'.  For web applications the
  * appId is the base URL of the page, so each page shares global scope but does not share appGlobal scope.
  */
 @TypeSettings(objectType=true)
@@ -56,8 +58,7 @@ public class AppGlobalScopeDefinition extends ScopeDefinition {
       ScopeContext tempCtx = super.getScopeContext(create);
       if (tempCtx != null)
          return tempCtx;
-      ScopeEnvironment env = ScopeEnvironment.getEnv();
-      String appId = env == null ? null : env.appId;
+      String appId = PTypeUtil.getAppId();
 
       synchronized (appGlobalTable) {
          AppGlobalScopeContext ctx = appGlobalTable.get(appId);

@@ -161,7 +161,7 @@ public class SysTypeIndex {
       return null;
    }
 
-   public void addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer, boolean annotTypes) {
+   public boolean addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer, boolean annotTypes, int max) {
       if (inactiveTypeIndex.sys.writeLocked == 0) {
          System.err.println("*** Modifying type index without write lock");
          new Throwable().printStackTrace();
@@ -196,6 +196,8 @@ public class SysTypeIndex {
                   candidates.add(typeName);
                else
                   candidates.add(className);
+               if (candidates.size() >= max)
+                  return false;
             }
          }
       }
@@ -205,9 +207,12 @@ public class SysTypeIndex {
             String typeName = inactiveLayer.layerDirName;
             if (typeName.startsWith(prefix)) {
                candidates.add(typeName);
+               if (candidates.size() >= max)
+                  return false;
             }
          }
       }
+      return true;
    }
 
    public void clearActiveLayers() {

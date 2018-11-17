@@ -29,7 +29,7 @@ public class ScheduledJob {
       boolean released = false;
       CurrentScopeContext envCtx = null;
       if (curScopeCtx != null) {
-         envCtx = CurrentScopeContext.getEnvScopeContextState();
+         envCtx = CurrentScopeContext.getThreadScopeContext();
          if (envCtx != curScopeCtx) {
             if (ScopeDefinition.trace) {
                System.out.println("Restoring scope ctx for scheduled job: " + curScopeCtx + " prev ctx: " + envCtx);

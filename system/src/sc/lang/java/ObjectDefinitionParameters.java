@@ -127,6 +127,16 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          for (String objName:objNames) {
             if (i != 0)
                fsb.append(", ");
+            if (i >= objTypes.size()) {
+               System.err.println("*** Obj types does not match objNames");
+               /* debug code to trace problems where we fail to add an objType when we add an objName
+               objTypes.clear();
+               objNames.clear();
+               tmpChildNamesByScope.clear();
+               objType.addChildNames(childNames, tmpChildNamesByScope, null, false, false,
+                       false, objNames, objTypes);
+               */
+            }
             Object innerObjType = objTypes.get(i);
             if (innerObjType == null)
                System.err.println("*** No inner object!");

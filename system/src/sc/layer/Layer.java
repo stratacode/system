@@ -3162,9 +3162,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return exportImports && (refLayer == null || refLayer == this || refLayer.useGlobalImports || refLayer.extendsLayer(this));
    }
 
-   public void findMatchingSrcNames(String prefix, Set<String> candidates, boolean retFullTypeName) {
+   public boolean findMatchingSrcNames(String prefix, Set<String> candidates, boolean retFullTypeName, int max) {
       if (layerDirName.startsWith(prefix)) {
-         layeredSystem.addMatchingCandidate(candidates, "", layerDirName, retFullTypeName);
+         if (!layeredSystem.addMatchingCandidate(candidates, "", layerDirName, retFullTypeName, max))
+            return false;
       }
       for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
          String srcFile = srcFiles.next();
@@ -3179,39 +3180,46 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                }
                else
                   fullTypeName = CTypeUtil.prefixPath(packagePrefix, FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, "."));
-               layeredSystem.addMatchingCandidate(candidates, CTypeUtil.getPackageName(fullTypeName), CTypeUtil.getClassName(fullTypeName), retFullTypeName);
+               if (!layeredSystem.addMatchingCandidate(candidates, CTypeUtil.getPackageName(fullTypeName), CTypeUtil.getClassName(fullTypeName), retFullTypeName, max))
+                  return false;
             }
          }
       }
+      return true;
    }
 
-   public void findMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, boolean checkBaseLayers) {
+   public boolean findMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, boolean checkBaseLayers, int max) {
       if (!exportImports || excluded || disabled)
-         return;
+         return true;
 
       if (importsByName != null) {
          for (Map.Entry<String,ImportDeclaration> ent:importsByName.entrySet()) {
             String baseName = ent.getKey();
             ImportDeclaration decl = ent.getValue();
-            if (baseName.startsWith(prefix))
-               layeredSystem.addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName);
+            if (baseName.startsWith(prefix)) {
+               if (!layeredSystem.addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName, max))
+                  return false;
+            }
          }
       }
       if (staticImportTypes != null) {
          for (Map.Entry<String,Object> ent:staticImportTypes.entrySet()) {
             String baseName = ent.getKey();
             if (baseName.startsWith(prefix)) {
-               layeredSystem.addMatchingCandidate(candidates, ModelUtil.getPackageName(ent.getValue()), baseName, retFullTypeName);
+               if (!layeredSystem.addMatchingCandidate(candidates, ModelUtil.getPackageName(ent.getValue()), baseName, retFullTypeName, max))
+                  return false;
             }
          }
       }
       if (checkBaseLayers) {
          if (baseLayers != null) {
             for (Layer baseLayer:baseLayers) {
-               baseLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, checkBaseLayers);
+               if (!baseLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, checkBaseLayers, max))
+                  return false;
             }
          }
       }
+      return true;
    }
 
    public String getPackagePath() {
@@ -3439,9 +3447,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                }
             }
 
-            // We are refreshing any models which have changed on disk or had errors last time.  Technically for the error models, we could just restart them perhaps
-            // but we need to clear old all of the references to anything else which has changed.  Seems like this might be more reliable now though obviously a bit slower.
-            if ((lastRefreshTime != -1 && newLastModTime > lastRefreshTime) || (oldModel != null && (oldModel.hasErrors() || (newLastModTime > oldModel.getLastModifiedTime() && oldModel.getLastModifiedTime() != 0)))) {
+            // We are refreshing any models which have changed on disk.  We used to also refresh error models here, but then any model which has an error gets refreshed all of the time
+            // and that caused performance problems.  We should be restarting all open files to clear up any indirect references here now
+            if ((lastRefreshTime != -1 && newLastModTime > lastRefreshTime) || (oldModel != null && ((newLastModTime > oldModel.getLastModifiedTime() && oldModel.getLastModifiedTime() != 0)))) {
                Object res = layeredSystem.refresh(srcEnt, ctx, updateInfo, active);
                if (res != null)
                   changedModels.add(new ModelUpdate(oldModel, res));

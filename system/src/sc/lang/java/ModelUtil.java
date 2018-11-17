@@ -6834,14 +6834,17 @@ public class ModelUtil {
       return true;
    }
 
-   public static void addCompletionCandidate(Set<String> candidates, String prospect) {
+   public static boolean addCompletionCandidate(Set<String> candidates, String prospect, int max) {
       if (prospect.startsWith("_") || prospect.contains("$"))
-         return;
+         return true;
       candidates.add(prospect);
+      if (candidates.size() >= max)
+         return false;
+      return true;
    }
 
-   public static void suggestMembers(JavaModel model, Object type, String prefix, Set<String> candidates, boolean includeGlobals,
-                                     boolean includeProps, boolean includeMethods, boolean includeClassBodyKeywords) {
+   public static boolean suggestMembers(JavaModel model, Object type, String prefix, Set<String> candidates, boolean includeGlobals,
+                                     boolean includeProps, boolean includeMethods, boolean includeClassBodyKeywords, int max) {
       if (type != null) {
          if (includeProps) {
             Object[] props = getProperties(type, null);
@@ -6850,8 +6853,10 @@ public class ModelUtil {
                   Object prop = props[i];
                   if (prop != null) {
                      String pname = ModelUtil.getPropertyName(prop);
-                     if (pname.startsWith(prefix))
-                        addCompletionCandidate(candidates, pname);
+                     if (pname.startsWith(prefix)) {
+                        if (!addCompletionCandidate(candidates, pname, max))
+                           return false;
+                     }
                   }
                }
             }
@@ -6863,8 +6868,10 @@ public class ModelUtil {
                for (int i = 0; i < meths.length; i++) {
                   Object meth = meths[i];
                   String mname = ModelUtil.getMethodName(meth);
-                  if (mname.startsWith(prefix))
-                     addCompletionCandidate(candidates, mname + ModelUtil.getParameterString(meth));
+                  if (mname.startsWith(prefix)) {
+                     if (!addCompletionCandidate(candidates, mname + ModelUtil.getParameterString(meth), max))
+                        return false;
+                  }
                }
             }
          }
@@ -6873,7 +6880,8 @@ public class ModelUtil {
             for (int i = 0; i < types.length; i++) {
                String mname = CTypeUtil.getClassName(ModelUtil.getTypeName(types[i]));
                if (mname.startsWith(prefix))
-                  addCompletionCandidate(candidates, mname);
+                  if (!addCompletionCandidate(candidates, mname, max))
+                     return false;
             }
          }
       }
@@ -6881,29 +6889,33 @@ public class ModelUtil {
          Object encType = getEnclosingType(type);
 
          if (encType != null) // Include members that are visible in the namespace
-            suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false);
-         else if (model != null) // only for the root - search the global ones
-            model.findMatchingGlobalNames(prefix, candidates, false);
+            suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false, 20);
+         else if (model != null) { // only for the root - search the global ones
+            if (!model.findMatchingGlobalNames(prefix, candidates, false, max))
+               return false;
+         }
       }
       if (includeClassBodyKeywords && model != null && model.getLanguage() instanceof JavaLanguage) {
          List<String> keywords = ((JavaLanguage) model.getLanguage()).getClassLevelKeywords();
          for (int i = 0; i < keywords.size(); i++) {
             String keyword = keywords.get(i);
             if (keyword.startsWith(prefix))
-               addCompletionCandidate(candidates, keyword);
+               if (!addCompletionCandidate(candidates, keyword, max))
+                  return false;
          }
       }
+      return true;
    }
 
    public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals) {
-      suggestTypes(model, prefix, lastIdent, candidates, includeGlobals, false);
+      suggestTypes(model, prefix, lastIdent, candidates, includeGlobals, false, 20);
    }
 
-   public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals, boolean annotTypes) {
+   public static boolean suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals, boolean annotTypes, int max) {
       if (prefix == null)
          prefix = "";
       if (model == null)
-         return;
+         return true;
       Set<String> files = model.layeredSystem.getFilesInPackage(prefix);
       if (files != null) {
          for (String file:files) {
@@ -6918,10 +6930,14 @@ public class ModelUtil {
          }
       }
       if (includeGlobals) {
-         if (lastIdent.equals(""))
-            model.findMatchingGlobalNames(prefix, candidates, annotTypes);
-         else
-            model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false, annotTypes);
+         if (lastIdent.equals("")) {
+            if (!model.findMatchingGlobalNames(prefix, candidates, annotTypes, 20))
+               return false;
+         }
+         else {
+            if (!model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false, annotTypes, 20))
+               return false;
+         }
       }
 
       String absName, pkgName, baseName;
@@ -6936,8 +6952,9 @@ public class ModelUtil {
          baseName = lastIdent;
       }
 
-      model.findMatchingGlobalNames(absName, pkgName, baseName, candidates, annotTypes);
-      model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false, annotTypes);
+      if (!model.findMatchingGlobalNames(absName, pkgName, baseName, candidates, annotTypes, 20))
+         return false;
+      return model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false, annotTypes, 20);
    }
 
    public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates) {

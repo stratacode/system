@@ -593,7 +593,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
 
       // TODO: should visible be here?  We also can handle it if there's no object right?
-      return needsObject || getAttribute("visible") != null || getSpecifiedExtendsTypeDeclaration() != null;
+      boolean res = needsObject || getAttribute("visible") != null || getSpecifiedExtendsTypeDeclaration() != null;
+      /*
+       TODO: should <p/> render as <p> or with the self-close.  Right now, needsBody=true by default which means we ignore the self-close if it's there when rendering
+       for tags like iframe, the browser ignores that self-close anyway because it's "illegal" that just confuses things when debugging.  Maybe we should flag it as an error if you add
+       a self-close and 'needsBody' is true - then accurately set this flag based on the tagName.
+      if (!res && selfClose != null && selfClose)
+         needsBody = false;
+      */
+      return res;
    }
 
    public boolean selfClosed() {
@@ -2399,7 +2407,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * just the set of children this element adds to the stream - not
     */
    private SemanticNodeList<Object> getChildren(boolean unique, boolean canInherit) {
-
       SemanticNodeList<Object> res = null;
       Element lastImplElement = null;
 
@@ -3295,6 +3302,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("pre", "element", emptyArgs, null);
       addTagAttributes("code", "element", emptyArgs, null);
       addTagAttributes("em", "element", emptyArgs, null);
+      addTagAttributes("b", "element", emptyArgs, null);
+      addTagAttributes("i", "element", emptyArgs, null);
       addTagAttributes("strong", "element", emptyArgs, null);
       addTagAttributes("header", "element", emptyArgs, null);
       addTagAttributes("footer", "element", emptyArgs, null);
@@ -3328,9 +3337,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private static void addMatchingNamesFromSet(Set<String> attributes, String prefix, Set<String> candidates) {
-      for (String att:attributes) {
-         if (prefix == null || att.startsWith(prefix))
-            candidates.add(att);
+      if (attributes != null)  {
+         for (String att:attributes) {
+            if (prefix == null || att.startsWith(prefix))
+               candidates.add(att);
+         }
       }
    }
 

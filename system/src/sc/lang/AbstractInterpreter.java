@@ -1136,7 +1136,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             cor.pushedCtx = pushCurrentScopeContext();
          if (!hasCurrentObject() || (cor.curObj = getCurrentObject()) == null) {
             // When we need to choose a current object, our first choice is to use the ScopeContext to choose a "singleton" - i.e. one instance of the given type in that CurrentScopeContext.
-            CurrentScopeContext ctx = CurrentScopeContext.getEnvScopeContextState();
+            CurrentScopeContext ctx = CurrentScopeContext.getThreadScopeContext();
             if (ctx != null) {
                Object scopeInst = ctx.getSingletonForType(currentType);
                if (scopeInst != null) {
@@ -1273,7 +1273,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       if (currentScopeCtx != null)
          System.err.println("*** Nested pushCurrentScopeContext calls in interpreter!");
       CurrentScopeContext ctx = CurrentScopeContext.get(scopeStateName);
-      if (ctx != null && ctx != CurrentScopeContext.getEnvScopeContextState()) {
+      if (ctx != null && ctx != CurrentScopeContext.getThreadScopeContext()) {
          CurrentScopeContext.pushCurrentScopeContext(ctx, true);
          currentScopeCtx = ctx;
          return true;
@@ -1861,13 +1861,13 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       job.priority = priority;
       job.toInvoke = r;
       // TODO: performance check if it's different?  Or maybe check on the other end?
-      job.curScopeCtx = CurrentScopeContext.getEnvScopeContextState();
+      job.curScopeCtx = CurrentScopeContext.getThreadScopeContext();
       ScheduledJob.addToJobList(toRunLater, job);
    }
 
    public void execLaterJobs() {
       boolean pushed = false;
-      if (CurrentScopeContext.getEnvScopeContextState() == null)
+      if (CurrentScopeContext.getThreadScopeContext() == null)
          pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
       try {
          int runCt = 0;

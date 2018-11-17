@@ -12,14 +12,15 @@ import java.util.HashMap;
 import java.util.List;
 
 /**
- * Used to capture, save and restore the set of scope contexts from a current context, so we can run code in another thread
- * using the same context.   There are two use cases, but only one of them is currently being used.  The original use case
- * was for when we run data-binding operations in another thread that needs the context from when the binding change event occurred.
- * This happens when an object in session scope receives events from a global object in a context, like a model changed.
- * The session object can get the CurrentContextState when it's defined and push that context state before executing
- * code that depends on the session being available.
+ * Used to define, save and restore the list of scope contexts used in a given operation.
+ * For 'crossScope' data binding expressions, we capture the CurrentScopeContext when the binding is created.
+ * If an event occurs, which is queued to a different context, the data-binding operations will temporarily restore the
+ * CurrentScopeContext before firing the binding so it has access to necessary state and locks required to fire.
+ * For example, when an object in session scope receives events from a global object in a context, like a JavaModel changed and
+ * we want to update the sessions that are viewing that JavaModel.  That binding is marked with @Bindable(crossScope=true) and
+ * we know to queue the binding and save/restore the context before applying the change.
  *
- * The new use case is for allowing the command-line interpreter to control a specific browser window session.  When it opens the
+ * Another use case is for allowing the command-line interpreter to control a specific browser window session.  When it opens the
  * window, it adds the scopeContextName query param which signals the PageDispatcher to get the current scope context and register it
  * with a 'scopeContextName'.  There are methods here which let the command line interpreter wait for the CurrentScopeContext to be 'ready'
  * which basically means the client is waiting for commands.  At that point, we continue the test-script and use that CurrentScopeContext
@@ -113,7 +114,7 @@ public class CurrentScopeContext {
     * from a different scope environment, you can then use the returned CurrentScopeContext to run code again in the context of that original code from the scope perspective.
     */
    public static CurrentScopeContext getCurrentScopeContext() {
-      CurrentScopeContext envCtx = getEnvScopeContextState();
+      CurrentScopeContext envCtx = getThreadScopeContext();
       if (envCtx != null)
          return envCtx;
       ArrayList<ScopeContext> ctxList = new ArrayList<ScopeContext>();
@@ -130,7 +131,7 @@ public class CurrentScopeContext {
    }
 
    /** Returns the currently pushed CurrentScopeContext (or null if there is not one present) */
-   public static CurrentScopeContext getEnvScopeContextState() {
+   public static CurrentScopeContext getThreadScopeContext() {
       ArrayList<CurrentScopeContext> curStateList = (ArrayList<CurrentScopeContext>) PTypeUtil.getThreadLocal("scopeStateStack");
       if (curStateList != null && curStateList.size() > 0) {
          return curStateList.get(curStateList.size() - 1);

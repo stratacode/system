@@ -953,7 +953,7 @@ public class ClassType extends JavaType {
 
       ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
       if (currentType != null)
-         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps, true);
+         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps, true, 20);
 
       IBlockStatement enclBlock = getEnclosingBlockStatement();
       if (enclBlock != null)
@@ -997,7 +997,7 @@ public class ClassType extends JavaType {
             if (dummyIx != -1)
                useTypeName = useTypeName.substring(0, dummyIx);
 
-            ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true);
+            ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true, 20);
          }
       }
       if (parentNode instanceof VariableStatement) {

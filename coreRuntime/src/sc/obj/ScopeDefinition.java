@@ -59,7 +59,7 @@ public abstract class ScopeDefinition {
     * should use it's normal mechanism for looking up the current scope context.
     */
    public ScopeContext getScopeContext(boolean create) {
-      CurrentScopeContext envCtx = CurrentScopeContext.getEnvScopeContextState();
+      CurrentScopeContext envCtx = CurrentScopeContext.getThreadScopeContext();
       if (envCtx != null)
          return envCtx.getScopeContext(scopeId);
       return null;

@@ -9536,11 +9536,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return "<unkown>";
    }
 
-   public void ensureExtendsAreSource() {
-   }
-
    public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
-      ModelUtil.suggestMembers(origModel, this, matchPrefix, candidates, true, true, true, true);
+      ModelUtil.suggestMembers(origModel, this, matchPrefix, candidates, true, true, true, true, 20);
       return matchPrefix;
    }
 

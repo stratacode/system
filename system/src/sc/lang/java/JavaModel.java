@@ -644,20 +644,24 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 
-   public void findMatchingGlobalNames(String prefix, Set<String> candidates, boolean annotTypes) {
-      findMatchingGlobalNames(prefix, CTypeUtil.getPackageName(prefix), CTypeUtil.getClassName(prefix), candidates, annotTypes);
+   public boolean findMatchingGlobalNames(String prefix, Set<String> candidates, boolean annotTypes, int max) {
+      return findMatchingGlobalNames(prefix, CTypeUtil.getPackageName(prefix), CTypeUtil.getClassName(prefix), candidates, annotTypes, max);
    }
 
    // TODO: should we use Pattern matching to make this more flexible?  Or an index to make it faster?
-   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates, boolean annotTypes) {
+   public boolean findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates, boolean annotTypes, int max) {
       initTypeInfo();
 
       if (layeredSystem != null) {
-         layeredSystem.addGlobalImports(isLayerModel, prefixPkgName, prefixBaseName, candidates);
+         if (!layeredSystem.addGlobalImports(isLayerModel, prefixPkgName, prefixBaseName, candidates, max))
+            return false;
       }
       for (String ent:importsByName.keySet()) {
-         if (ent.startsWith(prefix))
+         if (ent.startsWith(prefix)) {
             candidates.add(ent);
+            if (candidates.size() >= max)
+               return false;
+         }
       }
       if (staticImportMethods != null) {
          for (String ent:staticImportMethods.keySet()) {
@@ -668,6 +672,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                      String methTypeName = ModelUtil.getTypeName(methType);
                      if (prefixPkgName == null || methTypeName.equals(prefixPkgName)) {
                         candidates.add(ent + "()"); // TODO: look up the methods here and use getParameterString so we describe them properly in the IDE
+                        if (candidates.size() >= max)
+                           return false;
                         break;
                      }
                   }
@@ -678,16 +684,23 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (staticImportProperties != null) {
          for (String ent:staticImportProperties.keySet()) {
             Object propObj = staticImportProperties.get(ent);
-            if (ent.startsWith(prefixBaseName) && (prefixPkgName == null || StringUtil.equalStrings(prefixPkgName, ModelUtil.getTypeName(ModelUtil.getEnclosingType(propObj)))))
+            if (ent.startsWith(prefixBaseName) && (prefixPkgName == null || StringUtil.equalStrings(prefixPkgName, ModelUtil.getTypeName(ModelUtil.getEnclosingType(propObj))))) {
                candidates.add(ent);
+               if (candidates.size() >= max)
+                  return false;
+            }
          }
       }
       JavaModel modModel = getModifiedModel();
-      if (modModel != null)
-         modModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes);
-      if (layeredSystem != null && layer != null) {
-         layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates, false, false, annotTypes);
+      if (modModel != null) {
+         if (!modModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes, max))
+            return false;
       }
+      if (layeredSystem != null && layer != null) {
+         if (!layeredSystem.findMatchingGlobalNames(null, layer, prefix, prefixPkgName, prefixBaseName, candidates, false, false, annotTypes, max))
+            return false;
+      }
+      return true;
    }
 
    public void setComputedPackagePrefix(String prefix) {

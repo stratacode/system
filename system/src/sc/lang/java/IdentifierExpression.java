@@ -4502,7 +4502,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             boolean includeGlobals = idents.size() == 1;
             if (origModel != null) {
                if (curType != null) {
-                  ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false);
+                  ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false, 20);
                   //System.out.println("*** SuggestMembers returns: " + candidates + " for type: " + curType);
                }
                else if (i == 0) {
@@ -4603,7 +4603,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          return pos;
       boolean includeGlobals = idSize == 1 && !emptyDotName;
       if (obj != null)
-         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true, false);
+         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true, false, 20);
       else {
          ModelUtil.suggestTypes(model, prefix, lastIdent, candidates, includeGlobals);
       }

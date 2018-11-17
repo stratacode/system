@@ -586,7 +586,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          if (currentType == null)
             currentType = origModel.getModelTypeDeclaration();
          if (currentType != null)
-            ModelUtil.suggestMembers(origModel, currentType, matchPrefix, candidates, true, true, true, true);
+            ModelUtil.suggestMembers(origModel, currentType, matchPrefix, candidates, true, true, true, true, 20);
       }
       return matchPrefix;
    }

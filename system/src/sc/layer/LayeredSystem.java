@@ -2817,29 +2817,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return systemClasses.contains(name) ? "java.lang." + name : null;
    }
 
-   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates, boolean retFullTypeName, boolean srcOnly, boolean annotTypes) {
+   public boolean findMatchingGlobalNames(Layer fromLayer, Layer refLayer, String prefix, Set<String> candidates, boolean retFullTypeName, boolean srcOnly, boolean annotTypes, int max) {
       String prefixPkg = CTypeUtil.getPackageName(prefix);
       String prefixBaseName = CTypeUtil.getClassName(prefix);
 
-      findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly, annotTypes);
+      return findMatchingGlobalNames(fromLayer, refLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly, annotTypes, max);
    }
 
-   void addMatchingCandidate(Set<String> candidates, String pkgName, String baseName, boolean retFullTypeName) {
+   boolean addMatchingCandidate(Set<String> candidates, String pkgName, String baseName, boolean retFullTypeName, int max) {
       if (retFullTypeName)
          candidates.add(CTypeUtil.prefixPath(pkgName, baseName));
       else
          candidates.add(baseName);
+      return candidates.size() < max;
    }
 
-   void addMatchingImportMap(Map<String,ImportDeclaration> importsByName, String prefix, Set<String> candidates, boolean retFullTypeName) {
+   boolean addMatchingImportMap(Map<String,ImportDeclaration> importsByName, String prefix, Set<String> candidates, boolean retFullTypeName, int max) {
       if (importsByName != null) {
          for (Map.Entry<String,ImportDeclaration> ent:importsByName.entrySet()) {
             String baseName = ent.getKey();
             ImportDeclaration decl = ent.getValue();
             if (baseName.startsWith(prefix))
-               addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName);
+               return addMatchingCandidate(candidates, CTypeUtil.getPackageName(decl.identifier), baseName, retFullTypeName, max);
          }
       }
+      return true;
    }
 
    /**
@@ -2879,15 +2881,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /** This method is used by the IDE to retrieve names for code-completion, name-lookup, etc.  */
-   public void findMatchingGlobalNames(Layer fromLayer, Layer refLayer,
-                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates, boolean retFullTypeName, boolean srcOnly, boolean annotTypes) {
+   public boolean findMatchingGlobalNames(Layer fromLayer, Layer refLayer,
+                                       String prefix, String prefixPkg, String prefixBaseName, Set<String> candidates, boolean retFullTypeName, boolean srcOnly, boolean annotTypes, int max) {
       acquireDynLock(false);
       try {
          if (prefixPkg == null || prefixPkg.equals("java.lang")) {
             if (systemClasses != null && !srcOnly) {
                for (String sysClass:systemClasses)
                   if (sysClass.startsWith(prefix)) {
-                     addMatchingCandidate(candidates, "java.lang", sysClass, retFullTypeName);
+                     if (!addMatchingCandidate(candidates, "java.lang", sysClass, retFullTypeName, max))
+                        return false;
                   }
             }
 
@@ -2897,60 +2900,76 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (refLayer == null) {
                for (int i = 0; i < inactiveLayers.size(); i++) {
                   Layer inactiveLayer = inactiveLayers.get(i);
-                  if (inactiveLayer.exportImports)
-                     inactiveLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
+                  if (inactiveLayer.exportImports) {
+                     if (!inactiveLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true, max))
+                        return false;
+                  }
 
                   // When we do not have any active layers, we cannot rely on the type cache for finding src file names.
                   // Instead, we go to the srcDir index in the layers.
-                  inactiveLayer.findMatchingSrcNames(prefix, candidates, retFullTypeName);
+                  if (!inactiveLayer.findMatchingSrcNames(prefix, candidates, retFullTypeName, max))
+                     return false;
                }
                if (buildLayer != null) {
                   refLayer = buildLayer;
                   int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
                   for (int i = startIx; i >= 0; i--) {
                      Layer appLayer = layers.get(i);
-                     appLayer.findMatchingSrcNames(prefix, candidates, retFullTypeName);
+                     if (!appLayer.findMatchingSrcNames(prefix, candidates, retFullTypeName, max))
+                        return false;
                   }
                }
             }
 
             if (refLayer == null || !refLayer.activated || refLayer == Layer.ANY_INACTIVE_LAYER) {
-               typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes);
+               if (!typeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes, max))
+                  return false;
 
                if (!peerMode && peerSystems != null) {
                   for (int i = 0; i < peerSystems.size(); i++) {
                      LayeredSystem peerSys = peerSystems.get(i);
                      Layer peerRefLayer = refLayer == null ? null : refLayer.layeredSystem == peerSys ? refLayer : peerSys.getPeerLayerFromRemote(refLayer);
-                     if ((peerRefLayer != Layer.ANY_INACTIVE_LAYER && peerRefLayer != null) || refLayer == null)
-                        peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly, annotTypes);
+                     if ((peerRefLayer != Layer.ANY_INACTIVE_LAYER && peerRefLayer != null) || refLayer == null) {
+                        if (!peerSys.findMatchingGlobalNames(null, peerRefLayer, prefix, prefixPkg, prefixBaseName, candidates, retFullTypeName, srcOnly, annotTypes, max))
+                           return false;
+                     }
                   }
                }
                if (typeIndexProcessMap != null) {
                   for (Map.Entry<String,SysTypeIndex> typeIndexEntry:typeIndexProcessMap.entrySet()) {
                      SysTypeIndex idx = typeIndexEntry.getValue();
-                     idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes);
+                     if (!idx.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes, max))
+                        return false;
                   }
                }
             }
 
             if (!srcOnly) {
                if (refLayer != null && refLayer != Layer.ANY_LAYER && refLayer.inheritImports && refLayer != Layer.ANY_INACTIVE_LAYER && refLayer != Layer.ANY_OPEN_INACTIVE_LAYER) {
-                  refLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true);
+                  if (!refLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, true, max))
+                     return false;
                }
 
                // TODO - remove this part?  We definitely need the above for when are inactive but any reason to include these other names other times?
                int startIx = fromLayer == null ? layers.size() - 1 : fromLayer.getLayerPosition();
                for (int i = startIx; i >= 0; i--) {
                   Layer depLayer = layers.get(i);
-                  if (depLayer.exportImports)
-                     depLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, false);
+                  if (depLayer.exportImports) {
+                     if (!depLayer.findMatchingGlobalNames(prefix, candidates, retFullTypeName, false, max))
+                        return false;
+                  }
                }
 
-               addMatchingImportMap(globalImports, prefix, candidates, retFullTypeName);
+               if (!addMatchingImportMap(globalImports, prefix, candidates, retFullTypeName, max))
+                  return false;
 
-               for (String prim: Type.getPrimitiveTypeNames())
-                   if (prim.startsWith(prefix))
+               for (String prim: Type.getPrimitiveTypeNames()) {
+                   if (prim.startsWith(prefix)) {
                       candidates.add(prim);
+                      if (candidates.size() >= max)
+                         return false;
+                   }
+               }
             }
          }
 
@@ -2965,7 +2984,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   for (Map.Entry<String,PackageEntry> pkgTypeEnt:pkgTypes.entrySet()) {
                      String typeInPkg = pkgTypeEnt.getKey();
                      if (typeInPkg.startsWith(prefixBaseName) && !typeInPkg.contains("$")) {
-                        addMatchingCandidate(candidates, pkgName, typeInPkg, retFullTypeName);
+                        if (!addMatchingCandidate(candidates, pkgName, typeInPkg, retFullTypeName, max))
+                           return false;
                         //candidates.add(CTypeUtil.prefixPath(prefixPkg, typeInPkg));
                         //candidates.add(typeInPkg);
                      }
@@ -3023,7 +3043,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      tailName = pkgName.substring(startIx, matchEndIx);
                   }
                   if (tailName.length() > 0 && tailName.startsWith(prefixBaseName)) {
-                     addMatchingCandidate(candidates, headName, tailName, retFullTypeName);
+                     if (!addMatchingCandidate(candidates, headName, tailName, retFullTypeName, max))
+                        return false;
                   }
                }
             }
@@ -3032,6 +3053,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       finally {
          releaseDynLock(false);
       }
+      return true;
    }
 
    /**
@@ -14920,16 +14942,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return Language.isParseable(fileName);
    }
 
-   public void addGlobalImports(boolean isLayerModel, String prefixPackageName, String prefixBaseName, Set<String> candidates) {
+   public boolean addGlobalImports(boolean isLayerModel, String prefixPackageName, String prefixBaseName, Set<String> candidates, int max) {
       Map<String,ImportDeclaration> importMap = isLayerModel ? globalLayerImports : globalImports;
       for (String impName:importMap.keySet()) {
          ImportDeclaration impDecl = importMap.get(impName);
          if ((prefixPackageName == null || impDecl.identifier.startsWith(prefixPackageName)) && impName.startsWith(prefixBaseName)) {
             String impPkg = CTypeUtil.getPackageName(impDecl.identifier);
-            if (StringUtil.equalStrings(prefixPackageName, impPkg))
+            if (StringUtil.equalStrings(prefixPackageName, impPkg)) {
                candidates.add(impName);
+               if (candidates.size() >= max)
+                  return false;
+            }
          }
       }
+      return true;
    }
 
    public Layer getSameLayerFromRemote(Layer layer) {

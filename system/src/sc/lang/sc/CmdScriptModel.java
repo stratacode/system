@@ -581,12 +581,14 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return super.definesType(typeName, ctx);
    }
 
-   public void findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates, boolean annotTypes) {
-      super.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes);
+   public boolean findMatchingGlobalNames(String prefix, String prefixPkgName, String prefixBaseName, Set<String> candidates, boolean annotTypes, int max) {
+      if (!super.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes, max))
+         return false;
 
       if (!annotTypes) {
          // Also for the command line need to include any properties defined in the cmdObject
-         ModelUtil.suggestMembers(this, cmdObject, prefixBaseName, candidates, false, true, true, false);
+         if (!ModelUtil.suggestMembers(this, cmdObject, prefixBaseName, candidates, false, true, true, false, max))
+            return false;
 
          if ("cmd".startsWith(prefixBaseName))
             candidates.add("cmd");
@@ -597,8 +599,11 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
                   FieldDefinition field = (FieldDefinition) command;
                   if (field.variableDefinitions != null) {
                      for (VariableDefinition varDef:field.variableDefinitions) {
-                        if (varDef.variableName.startsWith(prefixBaseName))
+                        if (varDef.variableName.startsWith(prefixBaseName)) {
                            candidates.add(varDef.variableName);
+                           if (candidates.size() >= max)
+                              return false;
+                        }
                      }
                   }
                }
@@ -608,9 +613,11 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       if (includeCommands != null) {
          for (int incIx = 0; incIx < includeCommands.size(); incIx++) {
             IncludeCommand incCmd = includeCommands.get(incIx);
-            incCmd.includedModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes);
+            if (!incCmd.includedModel.findMatchingGlobalNames(prefix, prefixPkgName, prefixBaseName, candidates, annotTypes, max))
+               return false;
          }
       }
+      return true;
    }
 
    public TypeDeclaration getPreviousDeclaration(String fullClassName) {

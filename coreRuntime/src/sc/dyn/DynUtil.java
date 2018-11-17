@@ -257,7 +257,7 @@ public class DynUtil {
       synchronized (listener) {
          try {
             if (!listener.complete) {
-               curScopeCtx = CurrentScopeContext.getEnvScopeContextState();
+               curScopeCtx = CurrentScopeContext.getThreadScopeContext();
                if (curScopeCtx != null)
                   curScopeCtx.releaseLocks();
                listener.wait(timeout);
