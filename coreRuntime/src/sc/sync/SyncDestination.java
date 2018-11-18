@@ -91,10 +91,11 @@ public abstract class SyncDestination {
 
    /**
     * Applies the changes received from the sync layers received from the remote definition.  When we receive JS, we'll just eval the returned Javascript.
-    * When receiving stratacode or json, we'll parse the layer definition and apply it as a set of changes to the instances.
+    * When receiving SC or json, we'll parse the layer definition and apply it as a set of changes to the instances.
     * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and get the receive language out of the text
+    * The detail is for debug messages - in what context is the applySyncLayer being performed (e.g. init, response)
     */
-   public void applySyncLayer(String input, String receiveLanguage, boolean resetSync) {
+   public void applySyncLayer(String input, String receiveLanguage, boolean resetSync, String detail) {
       SyncManager.SyncState oldSyncState = SyncManager.getSyncState();
 
       // After we've resolved all of the objects which are referenced on the client, we do a "reset" since this will line us
@@ -224,7 +225,7 @@ public abstract class SyncDestination {
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
          try {
-            applySyncLayer(responseText, null, false);
+            applySyncLayer(responseText, null, false, "response");
          }
          finally {
             SyncManager.setCurrentSyncLayers(null);
@@ -287,7 +288,7 @@ public abstract class SyncDestination {
             }
             completeSync(errorCode, error == null ? null : error.toString());
             if (!serverError)
-               applySyncLayer((String) error, null, false);
+               applySyncLayer((String) error, null, false, "error response");
          }
       }
    }

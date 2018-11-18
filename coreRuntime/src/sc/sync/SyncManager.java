@@ -2982,7 +2982,7 @@ public class SyncManager {
    public static void applySyncLayer(String language, String data, String detail) {
       for (SyncManager syncManager:syncManagers) {
          // TODO: compare language and syncDestination.receiveLanguage?
-         syncManager.syncDestination.applySyncLayer(data, language, false);
+         syncManager.syncDestination.applySyncLayer(data, language, false, detail);
       }
    }
 
@@ -3058,7 +3058,8 @@ public class SyncManager {
       // Need to apply the format we were given using some JS code - if stratacode, it's converted to 'js' directly, otherwise ('json') it gets applied in the same language
       if (outputLanguage.equals("js") && res.length() > 0) {
          StringBuilder jsRes = new StringBuilder();
-         jsRes.append("sc_SyncManager_c.applySyncLayer(\"" + syncDestination.getOutputLanguage() + "\", \"");
+         jsRes.append("sc_SyncManager_c." +
+                 "applySyncLayer(\"" + syncDestination.getOutputLanguage() + "\", \"");
          jsRes.append(CTypeUtil.escapeJavaString(res.toString(), false));
          jsRes.append("\", \"init\");\n");
          return jsRes;
