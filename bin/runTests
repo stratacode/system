@@ -75,9 +75,13 @@ if [ -d "$RUN_DIR" ] ; then
       echo "Passed: `wc -l < $RUN_DIR/passed | xargs` Errors: `wc -l < $RUN_DIR/failed | xargs` of total: `wc -l < $RUN_DIR/testsRun | xargs`"
       echo "Failed tests ---- :"
       failIdx=0
+      currentIndex=0
       testArray=($(cat ${RUN_DIR}/failed))
       for testName in "${testArray[@]}"
       do
+          if [[ $failIdx -eq $currentIndex ]] ; then
+             echo -n "*** "
+          fi
           echo "${failIdx}: ${testName}"
           let failIdx=${failIdx}+1
       done
@@ -92,28 +96,36 @@ if [ -d "$RUN_DIR" ] ; then
             failIdx=0
             for testName in "${newTestArray[@]}"
             do
+                if [[ $failIdx -eq $currentIndex ]] ; then
+                   echo -n "*** "
+                fi
                 echo "${failIdx}: ${testName}"
                 let failIdx=${failIdx}+1
             done
-         elif [[ $testAns =~ [oOaAdDvV][0-9]+ ]] ; then
-            testIndex=${testAns:1}
+         elif [[ $testAns =~ [oOadDvV][0-9]* ]] ; then
+            if [[ $testAns =~ [oOadDvV][0-9]+ ]] ; then
+               testIndex=${testAns:1}
+               currentIndex=$testIndex
+            else
+               testIndex=$currentIndex
+            fi
             if [[ $testIndex -gt -1 ]] && [[ $testIndex -lt ${#testArray[@]} ]] ; then
                testName=${testArray[${testIndex}]}
                TEST_DIR="$RUN_DIR/$testName"
                VALID_DIR="$VALID_RESULTS/$testName"
-               if [[ $testAns =~ [oO][0-9]+ ]] ; then
+               if [[ $testAns =~ [oO][0-9]* ]] ; then
                   echo "---- ${testName} new cmd:"
                   cat "$TEST_DIR/cmd"
                   echo "---- new output:"
                   cat "$TEST_DIR/outf" 
                   echo "----------"
-               elif [[ $testAns =~ [vV][0-9]+ ]] ; then
+               elif [[ $testAns =~ [vV][0-9]* ]] ; then
                   echo "---- ${testName} valid cmd:"
                   cat "$VALID_DIR/cmd"
                   echo "---- valid output:"
                   cat "$VALID_DIR/out" 
                   echo "----------"
-               elif [[ $testAns =~ [dD][0-9]+ ]] ; then
+               elif [[ $testAns =~ [dD][0-9]* ]] ; then
                   if ! diff "$TEST_DIR/cmd" "$VALID_DIR/cmd" > /dev/null ; then 
                       echo "---- cmd changed < valid > new:"
                       diff "$VALID_DIR/cmd" "$TEST_DIR/cmd"|| true
@@ -133,7 +145,7 @@ if [ -d "$RUN_DIR" ] ; then
                      fi
                   fi
                   echo "----------"
-               elif [[ $testAns =~ [aA][0-9]+ ]] ; then
+               elif [[ $testAns =~ [a][0-9]* ]] ; then
                   echo "Accepting new results for $testName"
                   cp "$TEST_DIR/outf" "$VALID_DIR/out"
                   cp "$TEST_DIR/status" "$VALID_DIR/status"
@@ -150,11 +162,19 @@ if [ -d "$RUN_DIR" ] ; then
                   fi
                   sed "s/^${testName}\$/+${testName}/" < ${RUN_DIR}/failed > ${RUN_DIR}/new-failed
                   mv ${RUN_DIR}/new-failed ${RUN_DIR}/failed
+                  if [[ ${testIndex} -eq ${currentIndex} ]] ; then
+                      let currentIndex=${currentIndex}+1; 
+                      if [[ ${currentIndex} -ge ${#testArray[@]} ]] ; then
+                          echo "End of tests" 
+                      else
+                          echo "Next test: ${currentIndex}: ${testArray[${testIndex}]}"
+                      fi
+                  fi
                fi
             else 
                echo "Test index outside of the range 0-${#testArray[@]}"
             fi
-         elif [[ $testAns =~ [aA] ]] ; then
+         elif [[ $testAns =~ [A] ]] ; then
 
             for testName in "${testArray[@]}"
             do
@@ -179,7 +199,7 @@ if [ -d "$RUN_DIR" ] ; then
             echo "       [l] - list, [o]<i> - show test output"
             echo "       [v]<i> show valid output, [d]<i> show diffs"
          elif [[ ! $testAns =~ [qQ] ]] ; then
-             echo "Invalid: $testAns - enter [aqlsd][<testIndex>]"
+             echo "Invalid: ${testAns} - enter [aqlsd][<testIndex>]"
          fi
       done
    elif [ -f "$RUN_DIR/passed" ] ; then 
