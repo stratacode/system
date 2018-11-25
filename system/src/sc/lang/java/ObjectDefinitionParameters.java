@@ -478,17 +478,22 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          return "null";
       else {
          StringBuilder sb = new StringBuilder();
-         sb.append("new java.util.HashSet<String>(java.util.Arrays.asList(");
-         int i = 0;
-         for (String syncTypeName:syncTypeNames) {
-            if (i != 0)
-               sb.append(", ");
-            sb.append('"');
-            sb.append(syncTypeName);
-            sb.append('"');
-            i++;
+         if (syncTypeNames.size() == 0) {
+            sb.append("java.util.Collections.emptySet()");
          }
-         sb.append("))");
+         else {
+            sb.append("new java.util.HashSet<String>(java.util.Arrays.asList(");
+            int i = 0;
+            for (String syncTypeName:syncTypeNames) {
+               if (i != 0)
+                  sb.append(", ");
+               sb.append('"');
+               sb.append(syncTypeName);
+               sb.append('"');
+               i++;
+            }
+            sb.append("))");
+         }
          return sb.toString();
       }
    }
