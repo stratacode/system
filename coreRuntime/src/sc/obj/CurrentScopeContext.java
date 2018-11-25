@@ -10,6 +10,7 @@ import sc.type.PTypeUtil;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Used to define, save and restore the list of scope contexts used in a given operation.
@@ -40,6 +41,9 @@ public class CurrentScopeContext {
 
    // Used for debug logging
    public String scopeContextName, traceInfo;
+
+   // Optional set of type names to restrict which types are sent to the client from this context.
+   public Set<String> syncTypeFilter = null;
 
    // Flag set to true when there is a thread waiting for change events for this CurrentScopeContext - it is used as a trigger to wake up the test script (or another waiter) when
    // a scopeContextName has been created, and the corresponding client is waiting for idle events for this window (or another scope).
@@ -339,6 +343,11 @@ public class CurrentScopeContext {
          }
       }
       return null;
+   }
+
+   public void addSyncTypeToFilter(String typeName) {
+      if (syncTypeFilter != null) // null means no filtering in this context
+         syncTypeFilter.add(typeName);
    }
 
 }

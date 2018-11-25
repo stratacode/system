@@ -888,7 +888,7 @@ public class ClassType extends JavaType {
       return res;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       JavaModel model = getJavaModel();
       if (model == null)
          return -1;
@@ -951,13 +951,13 @@ public class ClassType extends JavaType {
 
       boolean includeProps = parentNode instanceof CastExpression;
 
-      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
+      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true, false, max);
       if (currentType != null)
-         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps, true, 20);
+         ModelUtil.suggestMembers(model, currentType, typeName, candidates, true, includeProps, includeProps, true, max);
 
       IBlockStatement enclBlock = getEnclosingBlockStatement();
       if (enclBlock != null)
-         ModelUtil.suggestVariables(enclBlock, typeName, candidates);
+         ModelUtil.suggestVariables(enclBlock, typeName, candidates, max);
 
       if (candidates.size() > 0)
          return pos;
@@ -965,7 +965,7 @@ public class ClassType extends JavaType {
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       String packagePrefix;
       boolean isQualifiedType = false;
       if (matchPrefix.contains(".")) {
@@ -988,7 +988,7 @@ public class ClassType extends JavaType {
          else
             packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null);
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null, false, max);
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
          if (currentType != null) {
@@ -997,7 +997,7 @@ public class ClassType extends JavaType {
             if (dummyIx != -1)
                useTypeName = useTypeName.substring(0, dummyIx);
 
-            ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true, 20);
+            ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true, max);
          }
       }
       if (parentNode instanceof VariableStatement) {
@@ -1009,7 +1009,7 @@ public class ClassType extends JavaType {
          varSt.inactive = true;
          ParseUtil.realInitAndStartComponent(completeIdent);
          varSt.inactive = false;
-         String identMatchPrefix = completeIdent.addNodeCompletions(origModel, completeIdent, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+         String identMatchPrefix = completeIdent.addNodeCompletions(origModel, completeIdent, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
          if (identMatchPrefix != null && !identMatchPrefix.equals(matchPrefix))
             System.out.println("*** match prefixes do not match?");
       }

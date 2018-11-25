@@ -18,9 +18,9 @@ public class LabelStatement extends Statement implements IStatementWrapper {
          statement.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (statement != null)
-         statement.addDependentTypes(types);
+         statement.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

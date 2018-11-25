@@ -7782,8 +7782,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public Set<Object> getDependentTypes() {
-      if (dependentTypes != null)
+   public Set<Object> getDependentTypes(DepTypeCtx mode) {
+      if (mode.mode == DepTypeMode.All && !mode.recursive && dependentTypes != null)
          return dependentTypes;
 
       try {
@@ -7791,36 +7791,38 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Use object identity for hashing the semantic nodes since their hash/equals iterates over all of the properties.
          // Also use a linked hash set so these get returned in the order in which they are added.   If they are returned in a random order, it makes the system behave inconsistently - i.e. not generating JS script files in a consistent order
          LinkedIdentityHashSet<Object> types = new LinkedIdentityHashSet<Object>();
-         addDependentTypes(types);
-         return dependentTypes = types;
+         addDependentTypes(types, mode);
+         if (mode.mode == DepTypeMode.All && !mode.recursive)
+            dependentTypes = types;
+         return types;
       }
       finally {
          PerfMon.end("getDependencies");
       }
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (body != null) {
          for (Statement s:body) {
-            s.addDependentTypes(types);
+            s.addDependentTypes(types, mode);
          }
       }
       if (hiddenBody != null) {
          for (Statement s:hiddenBody) {
-            s.addDependentTypes(types);
+            s.addDependentTypes(types, mode);
          }
       }
       String dynChildMgrClassName = getDynChildManagerClassName();
       if (dynChildMgrClassName != null) {
          Object mgrType = findTypeDeclaration(dynChildMgrClassName, false);
          if (mgrType != null)
-            addDependentType(types, mgrType);
+            addDependentType(types, mgrType, mode);
          else
             displayTypeError("No CompilerSettings.dynChildManager class: ", dynChildMgrClassName, " for: ");
       }
       IScopeProcessor scopeProcessor = getScopeProcessor();
       if (scopeProcessor != null) {
-         scopeProcessor.addDependentTypes(this, types);
+         scopeProcessor.addDependentTypes(this, types, mode);
       }
    }
 
@@ -8599,8 +8601,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       //excludedPropertyNames.add("class");
    }
 
-   private SyncMode getTypeOrLayerSyncMode(Object checkType) {
-      Object parentSyncAnnot = ModelUtil.getTypeOrLayerAnnotation(getLayeredSystem(), checkType, "sc.obj.Sync");
+   static SyncMode getTypeOrLayerSyncMode(LayeredSystem sys, Object checkType) {
+      Object parentSyncAnnot = ModelUtil.getTypeOrLayerAnnotation(sys, checkType, "sc.obj.Sync");
       SyncMode parentSyncMode;
       if (parentSyncAnnot != null) {
          parentSyncMode = (SyncMode) ModelUtil.getAnnotationValue(parentSyncAnnot, "syncMode");
@@ -8612,13 +8614,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return parentSyncMode;
    }
 
-   private SyncMode getInheritedSyncMode(Object checkType, Object parentType, SyncMode defaultSync, boolean includeSuper) {
+   public static SyncMode getInheritedSyncMode(LayeredSystem sys, Object checkType, Object parentType, SyncMode defaultSync, boolean includeSuper) {
       SyncMode res = null;
       // Pick the last annotation we find in the type hierarchy before we find the parent of the property.  This lets
       // you turn on or off the disabled sync mode as you walk from subclass to superclass.
-      LayeredSystem sys = getLayeredSystem();
       while (checkType != null) {
-         SyncMode parentSyncMode = getTypeOrLayerSyncMode(checkType);
+         SyncMode parentSyncMode = getTypeOrLayerSyncMode(sys, checkType);
          if (parentSyncMode != null && (includeSuper || checkType == parentType)) {
             res = parentSyncMode;
          }
@@ -8637,7 +8638,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (derivedType != null && derivedType != extendsType) {
                checkType = derivedType;
                while (checkType != null) {
-                  parentSyncMode = getTypeOrLayerSyncMode(checkType);
+                  parentSyncMode = getTypeOrLayerSyncMode(sys, checkType);
                   if (parentSyncMode != null) {
                      res = parentSyncMode;
                      defaultSync = res;
@@ -8840,11 +8841,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   if (parentType != this) {
                      Object derivedType = getDerivedTypeDeclaration();
 
-                     SyncMode inheritSyncMode = derivedType == null ? null : getInheritedSyncMode(derivedType, parentType, syncMode, includeSuper);
+                     SyncMode inheritSyncMode = derivedType == null ? null : getInheritedSyncMode(sys, derivedType, parentType, syncMode, includeSuper);
                      if (inheritSyncMode == null) {
                         Object checkType = getExtendsTypeDeclaration();
                         if (derivedType != checkType && checkType != null)
-                           inheritSyncMode = getInheritedSyncMode(checkType, parentType, syncMode, includeSuper);
+                           inheritSyncMode = getInheritedSyncMode(sys, checkType, parentType, syncMode, includeSuper);
                      }
                      if (inheritSyncMode != null) {
                         propSyncMode = inheritSyncMode;
@@ -9536,8 +9537,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return "<unkown>";
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
-      ModelUtil.suggestMembers(origModel, this, matchPrefix, candidates, true, true, true, true, 20);
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
+      ModelUtil.suggestMembers(origModel, this, matchPrefix, candidates, true, true, true, true, max);
       return matchPrefix;
    }
 

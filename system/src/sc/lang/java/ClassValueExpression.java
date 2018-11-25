@@ -176,7 +176,7 @@ public class ClassValueExpression extends Expression {
       return true;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       String typeName = typeIdentifier;
       if (typeName == null || typeName.length() == 0 || arrayBrackets != null)
          return -1;
@@ -189,7 +189,7 @@ public class ClassValueExpression extends Expression {
       String leafName = typeName;
       if (pkgName != null) {
          leafName = CTypeUtil.getClassName(leafName);
-         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
+         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false, false, max);
       }
 
       boolean endsWithDot = continuation != null && continuation instanceof Boolean;
@@ -202,7 +202,7 @@ public class ClassValueExpression extends Expression {
          typeName = "";
       }
 
-      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
+      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true, false, max);
 
       int relPos = -1;
 
@@ -222,9 +222,9 @@ public class ClassValueExpression extends Expression {
       }
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (boundType != null)
-         addDependentType(types, boundType);
+         addDependentType(types, boundType, mode);
    }
 
    public Statement transformToJS() {

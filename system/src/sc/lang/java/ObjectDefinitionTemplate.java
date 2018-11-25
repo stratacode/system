@@ -39,6 +39,7 @@ public abstract class ObjectDefinitionTemplate extends ObjectDefinitionParameter
       this.customNeedsField = p.customNeedsField;
       this.preAssignments = p.preAssignments;
       this.postAssignments = p.postAssignments;
+      this.accessHooks = p.accessHooks;
       this.customResolver = p.customResolver;
       this.customSetter = p.customSetter;
    }

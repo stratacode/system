@@ -68,13 +68,13 @@ public class IfStatement extends NonIndentedStatement {
          falseStatement.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
       if (trueStatement != null)
-         trueStatement.addDependentTypes(types);
+         trueStatement.addDependentTypes(types, mode);
       if (falseStatement != null)
-         falseStatement.addDependentTypes(types);
+         falseStatement.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

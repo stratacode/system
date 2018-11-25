@@ -11,7 +11,6 @@ import sc.layer.Layer;
 import sc.parser.GenFileLineIndex;
 import sc.parser.IParseNode;
 import sc.parser.ParseUtil;
-import sc.util.StringUtil;
 
 import java.util.*;
 
@@ -691,20 +690,20 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
       if (parameters != null)
-         parameters.addDependentTypes(types);
+         parameters.addDependentTypes(types, mode);
       if (throwsTypes != null)
          for (JavaType t:throwsTypes)
-            t.addDependentTypes(types);
+            t.addDependentTypes(types, mode);
 
       if (body != null)
-         body.addDependentTypes(types);
+         body.addDependentTypes(types, mode);
 
       if (typeParameters != null)
          for (TypeParameter tp:typeParameters)
-            tp.addDependentTypes(types);
+            tp.addDependentTypes(types, mode);
    }
 
    public JavaType[] getParameterJavaTypes(boolean convertRepeating) {

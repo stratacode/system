@@ -86,9 +86,9 @@ public class TypeParameter extends JavaSemanticNode implements ITypedObject {
          extendsType.refreshBoundType(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (extendsType != null)
-         extendsType.addDependentTypes(types);
+         extendsType.addDependentTypes(types, mode);
    }
 
    /** Using IType and IMethod here so this works for TypeParameters parsed from signatures */

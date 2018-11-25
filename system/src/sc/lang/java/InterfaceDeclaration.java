@@ -477,12 +477,12 @@ public class InterfaceDeclaration extends TypeDeclaration {
       return compiledImpl.toArray(new Object[compiledImpl.size()]);
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
 
       if (extendsTypes != null) {
          for (JavaType extendsType:extendsTypes)
-            extendsType.addDependentTypes(types);
+            extendsType.addDependentTypes(types, mode);
       }
    }
 

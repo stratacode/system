@@ -86,10 +86,10 @@ public class CastExpression extends ChainedExpression {
          type.refreshBoundType(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
       if (type != null)
-         type.addDependentTypes(types);
+         type.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {
@@ -110,11 +110,11 @@ public class CastExpression extends ChainedExpression {
       return sb.toString();
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (expression != null)
-         return super.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return super.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       if (type != null)
-         return type.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return type.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       return -1;
    }
 

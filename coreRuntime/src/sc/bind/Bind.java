@@ -517,10 +517,11 @@ public class Bind {
             System.err.println("*** Bind.addListener failed - no property named: " + propObj + " on type: " + DynUtil.getSType(obj));
             return;
          }
-         addListener(obj, mapper, listener, eventMask);
+         addListener(obj, mapper, listener, eventMask, 0);
       }
       else if (propObj instanceof IBeanMapper || propObj == null) {
          IBeanMapper prop = (IBeanMapper) propObj;
+         BindingListener[] newListeners;
          if (obj instanceof IBindable) {
             IBindable bobj = (IBindable) obj;
             int propPos = prop == null ? 0 : prop.getPropertyPosition(obj);
@@ -528,7 +529,6 @@ public class Bind {
                throw new IllegalArgumentException("Attempt to bind to non-existent property: " + prop + " on: " + DynUtil.getInstanceName(obj));
 
             BindingListener [] oldListeners = bobj.getBindingListeners();
-            BindingListener [] newListeners;
             if (oldListeners == null) {
                newListeners = new BindingListener[DynUtil.getPropertyCount(obj)];
                bobj.setBindingListeners(newListeners);
@@ -588,7 +588,6 @@ public class Bind {
                   bindingListenerRegistry.put(obj, ble);
                }
                BindingListener[] oldListeners = ble.bindingListeners;
-               BindingListener[] newListeners;
                if (oldListeners == null) {
                   newListeners = new BindingListener[isStatic ? DynUtil.getStaticPropertyCount(cl) : DynUtil.getPropertyCount(obj)];
                }
@@ -647,6 +646,19 @@ public class Bind {
                }
             }
             */
+         }
+
+         // Check if there are any listeners on this object (using the default property - propObj = null)
+         // to be notified of new 'addListener' requests.
+         // This way, you can wait till someone is listening for a property change on this object before you
+         // set up downstream listeners.  E.g. the JS tag objects do this so they only register for DOM events which
+         // are being listened too.  The Sync system uses this to lazily pull objects into scopes the first time
+         // a listener is added in a given scope.
+         BindingListener objListener = newListeners[0];
+         while (objListener != null) {
+            if ((objListener.eventMask & IListener.LISTENER_ADDED) != 0)
+               objListener.listener.listenerAdded(obj, propObj, listener, eventMask, priority);
+            objListener = objListener.next;
          }
       }
       else {

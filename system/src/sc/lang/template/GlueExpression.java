@@ -74,11 +74,11 @@ public class GlueExpression extends Expression {
       }
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expressions != null) {
          for (Object expr:expressions)
             if (expr instanceof Expression)
-               ((Expression) expr).addDependentTypes(types);
+               ((Expression) expr).addDependentTypes(types, mode);
       }
    }
 

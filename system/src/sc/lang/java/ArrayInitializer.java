@@ -247,10 +247,10 @@ public class ArrayInitializer extends Expression {
             ex.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (initializers != null)
          for (Expression ex:initializers)
-            ex.addDependentTypes(types);
+            ex.addDependentTypes(types, mode);
    }
 
    public String getBindingTypeName() {

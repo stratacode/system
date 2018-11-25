@@ -9,7 +9,6 @@ import sc.dyn.DynUtil;
 import sc.lang.ISrcStatement;
 import sc.lang.JavaLanguage;
 import sc.lang.ILanguageModel;
-import sc.lang.sc.PropertyAssignment;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.RTypeUtil;
@@ -702,7 +701,7 @@ public class SelectorExpression extends ChainedExpression {
       ParseUtil.restartComponent(this);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       boolean dotCommand = command.endsWith(".");
 
       if (expression == null)
@@ -761,7 +760,7 @@ public class SelectorExpression extends ChainedExpression {
          if (!(obj instanceof Class) && !(obj instanceof ITypeDeclaration)) {
             obj = obj.getClass();
          }
-         ModelUtil.suggestMembers(getJavaModel(), obj, lastIdent, candidates, false, true, true, false, 20);
+         ModelUtil.suggestMembers(getJavaModel(), obj, lastIdent, candidates, false, true, true, false, max);
          return pos;
       }
       else {
@@ -769,7 +768,7 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       if (selectors == null)
          return null;
       SelectorExpression origSel = origNode instanceof SelectorExpression ? (SelectorExpression) origNode : null;
@@ -795,7 +794,7 @@ public class SelectorExpression extends ChainedExpression {
                                             //(useTypes == null ? null : useTypes[i-1]);
 
                   if (curType != null)
-                     ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false, 20);
+                     ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, false, true, true, false, max);
                   else
                      System.out.println("*** addNodeCompletions for selector expression - no cur type");
 
@@ -889,19 +888,19 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
       for (Selector sel:selectors)
-         sel.addDependentTypes(types);
+         sel.addDependentTypes(types, mode);
       if (boundTypes != null) {
          for (int i = 0; i < boundTypes.length; i++) {
             if (boundTypes[i] != null) {
                switch (idTypes[i]) {
                   case MethodInvocation:
-                     addDependentType(types, ModelUtil.getEnclosingType(boundTypes[i]));
+                     addDependentType(types, ModelUtil.getEnclosingType(boundTypes[i]), mode);
                      break;
                   default:
-                     addDependentType(types, getTypeDeclaration(i));
+                     addDependentType(types, getTypeDeclaration(i), mode);
                }
             }
          }

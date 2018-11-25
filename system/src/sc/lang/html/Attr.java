@@ -286,28 +286,31 @@ public class Attr extends Node implements ISrcStatement {
       return res.toString();
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       String attName = name;
       Element enclTag = getEnclosingTag();
       if (enclTag != null) {
          Set<String> attNames = enclTag.getPossibleAttributes();
          if (attNames != null) {
             for (String possName:attNames) {
-               if (possName.startsWith(attName))
+               if (possName.startsWith(attName)) {
                   candidates.add(possName);
+                  if (candidates.size() >= max)
+                     return 0;
+               }
             }
          }
          // The tag object will not have been defined in most cases so just use the extends type from the tag to suggest members
          Object baseClass = enclTag.getExtendsTypeDeclaration();
          if (baseClass != null) {
-            ModelUtil.suggestMembers(getJavaModel(), baseClass, attName, candidates, false, true, false, false, 20);
+            ModelUtil.suggestMembers(getJavaModel(), baseClass, attName, candidates, false, true, false, false, max);
          }
          return 0;
       }
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       String matchPrefix = null;
       if (name != null) {
          int ix = name.indexOf(dummyIdentifier);
@@ -321,7 +324,7 @@ public class Attr extends Node implements ISrcStatement {
             if (parent != null && parent.tagName != null) {
                tagName = parent.tagName;
             }
-            Element.addMatchingAttributeNames(tagName, matchPrefix, candidates);
+            Element.addMatchingAttributeNames(tagName, matchPrefix, candidates, max);
          }
          else {
             if (isString()) {
@@ -333,19 +336,19 @@ public class Attr extends Node implements ISrcStatement {
                   matchPrefix = extMatchPrefix;
 
                if (name.equals("extends") || name.equals("implements")) {
-                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, true);
+                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, true, false, max);
                }
                else if (name.equals("tagMerge")) {
-                  MergeMode.addMatchingModes(matchPrefix, candidates);
+                  MergeMode.addMatchingModes(matchPrefix, candidates, max);
                }
             }
             else if (value instanceof Expression) {
-               return ((Expression) value).addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+               return ((Expression) value).addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
             }
             else if (value instanceof AttrExpr) {
                AttrExpr attExpr = ((AttrExpr) value);
                if (attExpr.expr != null)
-                 return attExpr.expr.addNodeCompletions(origModel, attExpr.expr, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+                 return attExpr.expr.addNodeCompletions(origModel, attExpr.expr, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
             }
          }
       }

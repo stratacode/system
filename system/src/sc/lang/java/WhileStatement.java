@@ -69,9 +69,9 @@ public class WhileStatement extends ExpressionStatement implements IStatementWra
          statement.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (statement != null)
-         statement.addDependentTypes(types);
+         statement.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

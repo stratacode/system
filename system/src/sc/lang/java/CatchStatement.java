@@ -4,8 +4,6 @@
 
 package sc.lang.java;
 
-import sc.parser.GenFileLineIndex;
-
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -66,11 +64,11 @@ public class CatchStatement extends NonIndentedStatement implements IBlockStatem
          statements.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (parameters != null)
-         parameters.addDependentTypes(types);
+         parameters.addDependentTypes(types, mode);
       if (statements != null)
-         statements.addDependentTypes(types);
+         statements.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

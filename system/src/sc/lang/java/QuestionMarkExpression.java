@@ -7,7 +7,6 @@ package sc.lang.java;
 import sc.bind.BindingDirection;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
-import sc.lang.sc.PropertyAssignment;
 
 import java.util.List;
 import java.util.Set;
@@ -122,17 +121,17 @@ public class QuestionMarkExpression extends Expression {
       info.remove(trueChoice);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (falseChoice != null)
-         return falseChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return falseChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       if (command.trim().endsWith(":")) {
-         ModelUtil.suggestTypes(getJavaModel(), prefix, "", candidates, true);
+         ModelUtil.suggestTypes(getJavaModel(), prefix, "", candidates, true, false, max);
          return command.length();
       }
       if (trueChoice != null)
-         return trueChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return trueChoice.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       if (condition != null)
-         return condition.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return condition.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       return -1;
    }
 
@@ -166,13 +165,13 @@ public class QuestionMarkExpression extends Expression {
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (condition != null)
-         condition.addDependentTypes(types);
+         condition.addDependentTypes(types, mode);
       if (trueChoice != null)
-         trueChoice.addDependentTypes(types);
+         trueChoice.addDependentTypes(types, mode);
       if (falseChoice != null)
-         falseChoice.addDependentTypes(types);
+         falseChoice.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

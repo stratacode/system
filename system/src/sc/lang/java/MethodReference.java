@@ -8,7 +8,6 @@ import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -81,16 +80,16 @@ public class MethodReference extends BaseLambdaExpression {
    }
 
    @Override
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       Object ref = resolveReference();
       if (ref instanceof JavaType)
-         ((JavaType) ref).addDependentTypes(types);
+         ((JavaType) ref).addDependentTypes(types, mode);
       else if (ref instanceof Expression)
-         ((Expression) ref).addDependentTypes(types);
+         ((Expression) ref).addDependentTypes(types, mode);
 
       if (typeArguments != null) {
          for (JavaType typeArg:typeArguments)
-            typeArg.addDependentTypes(types);
+            typeArg.addDependentTypes(types, mode);
       }
    }
 

@@ -56,11 +56,14 @@ public enum MergeMode {
       return null;
    }
 
-   public static void addMatchingModes(String prefix, Set<String> candidates) {
+   public static void addMatchingModes(String prefix, Set<String> candidates, int max) {
       for (MergeMode m:values()) {
          String n = m.name().toLowerCase();
-         if (n.startsWith(prefix.toLowerCase()))
+         if (n.startsWith(prefix.toLowerCase())) {
             candidates.add(n);
+            if (candidates.size() >= max)
+               return;
+         }
       }
    }
 }

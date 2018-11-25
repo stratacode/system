@@ -353,6 +353,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public SysTypeIndex typeIndex;
 
+   Set<String> allNames = null; // Cache of all of the system identifiers from the type index - used for IDE (required by intelliJ and needs to be cached)
+
    /**
     * The type index is enabled by calling initTypeIndex on the LayeredSystem right after constructing it.  It's used for tools like the IDE to maintain
     * the set of layers, types, base-classes, etc. in files that are loaded much more quickly than by parsing all of the source code.
@@ -425,6 +427,30 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                sti.refreshReverseTypeIndex(null);
             }
          }
+      }
+      finally {
+         releaseDynLock(false);
+      }
+   }
+
+   public Set<String> getAllNames() {
+      if (peerMode)
+         return getMainLayeredSystem().getAllNames();
+
+      try {
+         acquireDynLock(false);
+         if (allNames != null)
+            return allNames;
+         allNames = new HashSet<String>();
+         if (typeIndex != null)
+            allNames.addAll(typeIndex.getAllNames());
+         if (peerSystems != null) {
+            for (int i = 0; i < peerSystems.size(); i++) {
+               LayeredSystem peerSys = peerSystems.get(i);
+               allNames.addAll(peerSys.typeIndex.getAllNames());
+            }
+         }
+         return allNames;
       }
       finally {
          releaseDynLock(false);
@@ -3871,6 +3897,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return cmd != null;
    }
 
+   /**
+    * For each addSyncType calls in the initSync method, we need to pre-register the type names which will be
+    * synchronized automatically.  This is for the syncTypeFilter - so we can identify which types are
+    * synchronized during code-processing - long before initSync is called which requires the sync manager to
+    * be initialized.
+    */
+   public static HashSet<String> globalSyncTypeNames = new HashSet<String>(Arrays.asList("sc.layer.LayeredSystem",
+           "sc.layer.Options", "sc.lang.sc.ModifyDeclaration", "sc.lang.java.EnumDeclaration",
+           "sc.lang.java.InterfaceDeclaration", "sc.lang.java.AnnotationTypeDeclaration", "sc.lang.java.EnumConstant",
+           "sc.lang.java.ClassDeclaration", "sc.lang.java.ClientTypeDeclaration", "sc.lang.java.VariableDefinition",
+           "sc.lang.sc.PropertyAssignment", "sc.lang.java.JavaModel", "sc.lang.sc.SCModel",  "sc.lang.template.Template",
+           "sc.layer.SrcEntry", "sc.lang.java.ParamTypedMember", "sc.lang.java.ParamTypeDeclaration",
+           "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition",
+           "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer",
+           // From EditorContext (JLineInterpreter is replaced with EditorContext on the client so is implicitly sync'd)
+           "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession"));
+
    // Called by any clients who need to use the LayeredSystem as a sync object.  Because this class is not compiled by StrataCode, we define the sync mappings
    // explicitly through the apis.
    public void initSync() {
@@ -6907,8 +6950,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       finally {
          releaseDynLock(false);
       }
+      if (!peerMode) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+            peerSys.cleanInactiveCache();
+         }
+      }
    }
-
 
    void refreshLayerTypeIndexDir(File srcDirFile, String relDir, String layerName, LayerTypeIndex typeIndex, long lastModified) {
       File[] files = srcDirFile.listFiles();

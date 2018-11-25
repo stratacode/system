@@ -144,7 +144,9 @@ public class TransformUtil {
            "<% if (!overrideField) { %><%=fieldModifiers%> <%=variableTypeName%> <%=lowerClassName%>;<% } %>\n" +
                    "<%= typeSettingsAnnotation %>" +
                    "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() {\n" +
-                   "   return (<%=variableTypeName%>) (<%=lowerClassName%> == null ? <%=lowerClassName%> = new <%=typeName%>() : <%=lowerClassName%>);\n" +
+                   "   <%=variableTypeName%> _<%=lowerClassName%> = (<%=variableTypeName%>) (<%=lowerClassName%> == null ? <%=lowerClassName%> = new <%=typeName%>() : <%=lowerClassName%>);\n" +
+                   "   <%=accessHook%>\n" +
+                   "   return _<%=lowerClassName%>;\n" +
                    "}\n";
 
    private static Template objectDefinitionTemplate;
@@ -208,7 +210,7 @@ public class TransformUtil {
               "<%= postAssignment %>" +
        "      return _<%=lowerClassName%>;\n" +
        "   } \n" +
-       "   else return _<%=lowerClassName%>;\n" +
+       "   else {<%= accessHook %>\n      return _<%=lowerClassName%>;\n   }\n" +
        "<% } else { %>" +
        "   if (<%=lowerClassName%> == null) {\n" +
        "      <%=variableTypeName%> _<%=lowerClassName%> = new <%=typeName%>();\n" +
@@ -218,7 +220,11 @@ public class TransformUtil {
              "<%= postAssignment %>" +
        "      return _<%=lowerClassName%>;\n" +
        "   } \n" +
-       "   else return <%=returnCast%><%=lowerClassName%>;\n" +
+       "   else {\n" +
+       "      <%=variableTypeName%> _<%=lowerClassName%> = <%=returnCast%> <%=lowerClassName%>;" +
+       "      <%=accessHook%>\n" +
+       "      return _<%=lowerClassName%>;\n" +
+       "   }\n" +
        "<% } %>" +
        "}\n";
 
@@ -237,19 +243,24 @@ public class TransformUtil {
                       "<%= customResolver %>" +
                    "<% } %> \n" +
                    "   if (<%=lowerClassName%> == null) {\n" +
-                   "      <%=lowerClassName%> = new <%=typeName%>();\n" +
+                   "      <%=variableTypeName%> _<%=lowerClassName%>;" +
+                   "      _<%=lowerClassName%> = <%=lowerClassName%> = new <%=typeName%>();\n" +
                          "<%= customSetter %>" +
                          "<%= preAssignment %>" +
-                   "      <%=lowerClassName%>.<%=altPrefix%>preInit();\n" +
-                   "      <%=getDynamicTypeDefinition(lowerClassName, 2)%>\n<%=propertyAssignments%>\n" +
+                   "      _<%=lowerClassName%>.<%=altPrefix%>preInit();\n" +
+                   "      <%=getDynamicTypeDefinition('_' + lowerClassName, 2)%>\n<%=propertyAssignments%>\n" +
                          "<%= postAssignment %>" +
                    "      if (doInit) {\n" +
-                   "         <%=lowerClassName%>.<%=altPrefix%>init();\n" +
-                   "         <%=lowerClassName%>.<%=altPrefix%>start();\n" +
+                   "         _<%=lowerClassName%>.<%=altPrefix%>init();\n" +
+                   "         _<%=lowerClassName%>.<%=altPrefix%>start();\n" +
                    "      }\n" +
-                   "      return <%=returnCast%><%=lowerClassName%>;\n" +
+                   "      return <%=returnCast%>_<%=lowerClassName%>;\n" +
                    "   } \n" +
-                   "   else return <%=returnCast%><%=lowerClassName%>;\n" +
+                   "   else {\n" +
+                   "      <%=variableTypeName%> _<%=lowerClassName%> = <%=lowerClassName%>;\n" +
+                   "      <%=accessHook%>\n" +
+                   "      return <%=returnCast%>_<%=lowerClassName%>;\n" +
+                   "   }\n" +
                    "}\n" +
                    "\n" +
                    "<%= typeSettingsAnnotation %>" +
@@ -286,21 +297,21 @@ public class TransformUtil {
    private final static String COMPONENT_CLASS_DEFINITION =
            "<% if (!isAbstract) { %>"+
            "<%=getModifiers%> <%=variableTypeName%> new<%=upperClassName%>(boolean doInit<%=nextConstructorDecls%>) {\n" +
-                   "   <%=variableTypeName%> <%=lowerClassName%> = " +
+                   "   <%=variableTypeName%> _<%=lowerClassName%> = " +
                       "<% if (typeIsCompiledComponent) { %>" +
                          "<%=typeClassName%>.new<%=typeBaseName%>(false<%=nextConstructorParams%>)" +
                       "<% } else { %> " +
                          "new <%=typeName%>(<%=constructorParams%>) " +
                       "<% } %>;\n" +
                       "<%= preAssignment %>" +
-                   "   <%=lowerClassName%>.<%=altPrefix%>preInit();\n" +
-                   "   <%=getDynamicTypeDefinition(lowerClassName, 1)%>\n<%=propertyAssignments%>\n" +
+                   "   _<%=lowerClassName%>.<%=altPrefix%>preInit();\n" +
+                   "   <%=getDynamicTypeDefinition('_' + lowerClassName, 1)%>\n<%=propertyAssignments%>\n" +
                       "<%= postAssignment %>" +
                    "   if (doInit) {\n" +
-                   "      <%=lowerClassName%>.<%=altPrefix%>init();\n" +
-                   "      <%=lowerClassName%>.<%=altPrefix%>start();\n" +
+                   "      _<%=lowerClassName%>.<%=altPrefix%>init();\n" +
+                   "      _<%=lowerClassName%>.<%=altPrefix%>start();\n" +
                    "   }\n" +
-                   "   return <%=returnCast%><%=lowerClassName%>;\n" +
+                   "   return <%=returnCast%>_<%=lowerClassName%>;\n" +
                    "}\n" +
                    "\n" +
           "<%=getModifiers%> <%=variableTypeName%> new<%=upperClassName%>(<%=constructorDecls%>) { return new<%=upperClassName%>(true<%=nextConstructorParams%>); }\n" +
@@ -486,7 +497,8 @@ public class TransformUtil {
          PerfMon.end("parseClassSnippet");
       }
       // This is the case where it's not a component or an object so we do not use a template to redefine the creation semantics of the type.
-      // But we do have pre or post assignments.  They either get inserted into each constructor or
+      // But we do have pre or post assignments.  They either get inserted into each constructor or appended to the initString
+      // which is then added to the class body as a block statement.
       else if (parameters.postAssignments != null || parameters.preAssignments != null) {
          parameters.noCreationTemplate = true;
 
@@ -1305,11 +1317,6 @@ public class TransformUtil {
       TransformUtil.addObjectDefinition(td, td, params, null, template, isObject && !useNewTemplate, params.typeIsComponent, true, false);
    }
 
-   public static void addDependenciesForTemplate(BodyTypeDeclaration td, Set<Object> types, String templatePath, String templateTypeName) {
-      Template template = td.findTemplatePath(templatePath, templateTypeName, ObjectDefinitionParameters.class);
-      template.addDependentTypes(types);
-   }
-
    public static ObjectDefinitionParameters createObjectDefinitionParameters(TypeDeclaration td) {
       StringBuilder locChildNames = new StringBuilder();
       Map<String,StringBuilder> locChildNamesByScope = new HashMap<String,StringBuilder>();
@@ -1330,7 +1337,7 @@ public class TransformUtil {
               objectClassName, objectClassName, td, newModifiers,
               locChildNames, locNumChildren, locChildNamesByScope, ModelUtil.convertToCommaSeparatedStrings(objNames), false,
               false, false, isComponent, typeIsComponentClass, null, null, null,
-              null, "", "", td, false, null, null, null, null, true, null, null);
+              null, "", "", td, false, null, null, null, null, true, null, null, null);
       return params;
    }
 

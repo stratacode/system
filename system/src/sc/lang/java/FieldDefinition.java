@@ -7,13 +7,11 @@ package sc.lang.java;
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.ISrcStatement;
-import sc.lang.SCLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSTypeParameters;
 import sc.lang.js.JSUtil;
-import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
 import sc.parser.*;
@@ -174,11 +172,11 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
             v.refreshBoundType(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
       if (variableDefinitions != null)
          for (VariableDefinition v:variableDefinitions)
-            v.addDependentTypes(types);
+            v.addDependentTypes(types, mode);
    }
 
    public void initDynStatement(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean inherit) {

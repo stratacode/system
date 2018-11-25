@@ -4,8 +4,6 @@
 
 package sc.lang.java;
 
-import sc.classfile.CFClass;
-import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
@@ -15,9 +13,7 @@ import sc.util.StringUtil;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.WildcardType;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 
@@ -366,15 +362,15 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       throw new IllegalArgumentException("Invalid set type");
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       Object typeDecl = getTypeDeclaration();
       if (typeDecl != null)
-         addDependentType(types, typeDecl);
+         addDependentType(types, typeDecl, mode);
 
       List<JavaType> typeArgs = getResolvedTypeArguments();
       if (typeArgs != null) {
          for (JavaType type:typeArgs)
-            type.addDependentTypes(types);
+            type.addDependentTypes(types, mode);
       }
    }
 

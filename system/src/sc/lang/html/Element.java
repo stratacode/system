@@ -157,7 +157,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    /** Set to true in the runtime version of the tag object for tags which are to be run on the server only */
    public transient boolean serverTag = false;
 
-   public transient boolean needsRefresh = false;
+   /** Set to true to call 'refreshBindings' before each page refresh - in case there are events missing for a binding */
+   public transient boolean refreshBindings = false;
+
+   // TODO: false would be a better default but need to see what problems that might cause
+   /** Set to false to prevent the page from being re-drawn in JS during the initial page load  */
+   public transient boolean refreshOnLoad = true;
 
    private transient String cachedObjectName = null;
 
@@ -2868,8 +2873,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
 
       /* done below as part of the normal attribute to code process
-      if (getBooleanAttribute("needsRefresh")) {
-         tagType.addBodyStatement(PropertyAssignment.create("needsRefresh", BooleanLiteral.create(true), "="));
+      if (getBooleanAttribute("refreshBindings")) {
+         tagType.addBodyStatement(PropertyAssignment.create("refreshBindings", BooleanLiteral.create(true), "="));
       }
       */
 
@@ -3318,29 +3323,34 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       singletonTagNames.add("html");
    }
 
-   private static void addMatchingTagNames(String prefix, Set<String> candidates) {
+   private static void addMatchingTagNames(String prefix, Set<String> candidates, int max) {
       for (String tagName:htmlAttributeMap.keySet()) {
          if (tagName.startsWith(prefix)) {
             if (tagName.equals("element"))
                continue;
             candidates.add(tagName);
+            if (candidates.size() >= max)
+               return;
          }
       }
    }
 
-   static void addMatchingAttributeNames(String tagName, String prefix, Set<String> candidates) {
+   static void addMatchingAttributeNames(String tagName, String prefix, Set<String> candidates, int max) {
       Set<String> attList = getPossibleAttributesForTag(tagName);
-      addMatchingNamesFromSet(attList, prefix, candidates);
-      addMatchingNamesFromSet(behaviorAttributes, prefix, candidates);
-      addMatchingNamesFromSet(notInheritedAttributes, prefix, candidates);
-      addMatchingNamesFromSet(HTMLElement.domAttributes.keySet(), prefix, candidates);
+      addMatchingNamesFromSet(attList, prefix, candidates, max);
+      addMatchingNamesFromSet(behaviorAttributes, prefix, candidates, max);
+      addMatchingNamesFromSet(notInheritedAttributes, prefix, candidates, max);
+      addMatchingNamesFromSet(HTMLElement.domAttributes.keySet(), prefix, candidates, max);
    }
 
-   private static void addMatchingNamesFromSet(Set<String> attributes, String prefix, Set<String> candidates) {
+   private static void addMatchingNamesFromSet(Set<String> attributes, String prefix, Set<String> candidates, int max) {
       if (attributes != null)  {
          for (String att:attributes) {
-            if (prefix == null || att.startsWith(prefix))
+            if (prefix == null || att.startsWith(prefix)) {
                candidates.add(att);
+               if (candidates.size() >= max)
+                  return;
+            }
          }
       }
    }
@@ -3381,7 +3391,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("stateless");
       behaviorAttributes.add("cache");
       behaviorAttributes.add("scope");
-      behaviorAttributes.add("needsRefresh");
+      behaviorAttributes.add("refreshBindings");
       behaviorAttributes.add("wrap");
       behaviorAttributes.add("bodyOnly");
       behaviorAttributes.add(ALT_ID);
@@ -4598,19 +4608,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return this;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (children != null) {
          // This is in the inside body of the tag.  Until we start a new tag, it's just template text right?
          return -1;
       }
       if (tagName != null) {
-         addMatchingTagNames(tagName, candidates);
+         addMatchingTagNames(tagName, candidates, max);
          return 0;
       }
       return -1;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       if (tagName == null)
          return null;
 
@@ -4618,7 +4628,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       int ix = tagName.indexOf(dummyIdentifier);
       if (ix != -1) {
          matchPrefix = tagName.substring(0, ix);
-         addMatchingTagNames(matchPrefix, candidates);
+         addMatchingTagNames(matchPrefix, candidates, max);
       }
       else {
          if (attributeList != null) {
@@ -4631,10 +4641,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                }
             }
             if (markerIx != -1) {
-               return attributeList.get(markerIx).addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+               return attributeList.get(markerIx).addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
             }
             for (Attr att:attributeList) {
-               String res = att.addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+               String res = att.addNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
                if (res != null)
                   return res;
             }
@@ -4783,7 +4793,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return null;
    }
 
-   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag) {
+   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag, Set<String> syncTypeFilter) {
       if (defaultServerTag || serverTag) {
 
          String tagId = getId();
@@ -4791,14 +4801,20 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             tagId = tagName;
          }
          if (tagId != null) {
-            ServerTag serverTag = getServerTagInfo();
-            if (serverTag != null) {
+            ServerTag serverTagInfo = getServerTagInfo();
+            if (serverTagInfo != null) {
                // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
-               if (serverTag.eventSource) {
+               if (serverTagInfo.eventSource) {
                   if (serverTags == null)
                      serverTags = new LinkedHashMap<String,ServerTag>();
 
-                  serverTags.put(tagId, serverTag);
+                  serverTags.put(tagId, serverTagInfo);
+               }
+
+               if (syncTypeFilter != null) {
+                  syncTypeFilter.add(DynUtil.getTypeName(DynUtil.getType(this), false));
+                  if (serverTag && !defaultServerTag) // These need to be added the first time only
+                     syncTypeFilter.addAll(Arrays.asList("sc.js.ServerTagManager", "sc.js.ServerTag"));
                }
 
                if (scopeDef != null) {
@@ -4838,7 +4854,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (children != null) {
          for (Object child:children) {
             if (child instanceof Element) {
-               serverTags = ((Element) child).addServerTags(scopeDef, serverTags, defaultServerTag);
+               serverTags = ((Element) child).addServerTags(scopeDef, serverTags, defaultServerTag, syncTypeFilter);
             }
          }
       }

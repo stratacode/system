@@ -399,7 +399,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
          return super.getFromStatement();
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (rhs == null)
          return -1;
       // Remove the data binding info since that gets in the way here...
@@ -407,14 +407,14 @@ public class AssignmentExpression extends TwoOperatorExpression {
       if (bindingDirection != null)
          rhs.setBindingInfo(null, null, false);
       */
-      return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      return rhs.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       if (rhs != null) {
-         return rhs.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+         return rhs.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
       }
-      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
    }
 
    public boolean applyPartialValue(Object partial) {

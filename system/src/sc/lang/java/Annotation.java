@@ -365,7 +365,7 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
       }
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       String packagePrefix;
       if (typeName == null)
          return matchPrefix;
@@ -387,7 +387,7 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
          else
             packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null);
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null, false, max);
       return matchPrefix;
    }
 

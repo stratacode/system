@@ -75,11 +75,11 @@ public class VariableStatement extends TypedDefinition implements IClassBodyStat
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
       if (definitions != null)
          for (VariableDefinition v:definitions)
-            v.addDependentTypes(types);
+            v.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

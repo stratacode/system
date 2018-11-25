@@ -274,12 +274,12 @@ public class DynUtil {
       Object evalRes = listener.result;
       long now = System.currentTimeMillis();
       if (listener.errorCode != null) {
-         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " - returns error: " + listener.errorCode + ":" + listener.error + " after: " + (now - startTime) + " millis");
-         throw new IllegalArgumentException("invokeRemoteSync of method returns error: " + listener.errorCode);
+         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + " - returns error: " + listener.errorCode + ":" + listener.error + " after: " + (now - startTime) + " millis for: " + curScopeCtx);
+         throw new IllegalArgumentException("invokeRemoteSync of method returns error: " + listener.errorCode + " for: " + curScopeCtx);
       }
       else if (!listener.success) {
-         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + "(" + Arrays.asList(paramValues) + ") - timed out after: " + (now - startTime) + " millis");
-         throw new IllegalArgumentException("invokeRemoteSync of method timed out: " + listener.errorCode);
+         System.err.println("*** invokeRemoteSync of method: " + getMethodName(method) + "(" + Arrays.asList(paramValues) + ") - timed out after: " + (now - startTime) + " millis for: " + curScopeCtx);
+         throw new IllegalArgumentException("invokeRemoteSync of method timed out: " + listener.errorCode + " for: " + curScopeCtx);
       }
       return evalRes;
    }

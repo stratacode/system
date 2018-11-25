@@ -52,6 +52,10 @@ public abstract class AbstractListener implements IListener {
       return valueInvalidated(obj, prop, dims, apply);
    }
 
+   public boolean listenerAdded(Object obj, Object prop, Object listener, int eventMask, int priority) {
+      return true;
+   }
+
    /** Remap Java bean style events */
    /*
    public void propertyChange(PropertyChangeEvent evt) {

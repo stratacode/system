@@ -5,7 +5,6 @@
 package sc.lang.java;
 
 import sc.lang.ISrcStatement;
-import sc.parser.ParseUtil;
 
 import java.util.Set;
 
@@ -30,9 +29,9 @@ public abstract class ExpressionStatement extends Statement {
          expression.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {
@@ -50,9 +49,9 @@ public abstract class ExpressionStatement extends Statement {
       return res;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (expression != null)
-         return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       return -1;
    }
 

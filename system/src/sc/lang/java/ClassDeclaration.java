@@ -460,6 +460,7 @@ public class ClassDeclaration extends TypeDeclaration {
       boolean needsField = true;
       ArrayList<String> preAssignments = null;
       ArrayList<String> postAssignments = null;
+      ArrayList<String> accessHooks = null;
       if (defProcs != null) {
          for (IDefinitionProcessor proc:defProcs) {
             String[] scopeInterfaces = proc.getAppendInterfaces();
@@ -497,6 +498,13 @@ public class ClassDeclaration extends TypeDeclaration {
                if (postAssignments == null)
                   postAssignments = new ArrayList<String>();
                postAssignments.add(procPostAssignment);
+            }
+
+            String procAccessHook = proc.getAccessHook();
+            if (procAccessHook != null) {
+               if (accessHooks == null)
+                  accessHooks = new ArrayList<String>();
+               accessHooks.add(procAccessHook);
             }
 
             String procMixin = proc.getMixinTemplate();
@@ -761,7 +769,7 @@ public class ClassDeclaration extends TypeDeclaration {
                                              locChildNames, locNumChildren, locChildNamesByScope, ModelUtil.convertToCommaSeparatedStrings(childObjNames), isOverrideField,
                                              isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName,
                                              null, "", "", this, useAltComponent, customResolver, customResolverTemplate, customSetter, customSetterTemplate,
-                                             needsField, preAssignments, postAssignments);
+                                             needsField, preAssignments, postAssignments, accessHooks);
                TransformUtil.addObjectDefinition(this, this, params,
                        assignments, scopeTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, false);
             }
@@ -780,7 +788,7 @@ public class ClassDeclaration extends TypeDeclaration {
             params = new ObjectDefinitionParameters(compiledClass, objectClassName, variableTypeName, this, newModifiers,
                     locChildNames, locNumChildren, locChildNamesByScope, ModelUtil.convertToCommaSeparatedStrings(locObjNames), isOverrideField,
                     isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName, null, "", "", this, useAltComponent,
-                    customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments);
+                    customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments, accessHooks);
 
             if (mixinTemplates != null) {
                for (Template mixinTemplate:mixinTemplates) {
@@ -827,7 +835,7 @@ public class ClassDeclaration extends TypeDeclaration {
             params = new ObjectDefinitionParameters(compiledClass, objectClassName, variableTypeName, this, newModifiers,
                           childNames, numChildren, childNamesByScope, ModelUtil.convertToCommaSeparatedStrings(objNames), isOverrideField,
                     isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName, currentConstructor,
-                    constDecls, constParams, accessClass, useAltComponent, customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments);
+                    constDecls, constParams, accessClass, useAltComponent, customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments, accessHooks);
 
             TransformUtil.addObjectDefinition(accessClass, this, params,
                                               assignments, customTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, i == 0);
@@ -1362,7 +1370,7 @@ public class ClassDeclaration extends TypeDeclaration {
          extendsType.refreshBoundType(flags);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (extendsType != null) {
          String extName = extendsType.getFullTypeName();
          // We may have completed a fragment inside of the body so extName is not the proper completion to use.  Instead we bail on completing this node
@@ -1370,9 +1378,9 @@ public class ClassDeclaration extends TypeDeclaration {
          if (parseNode != null && parseNode.toString().endsWith(extName)) {
             JavaModel model = getJavaModel();
             if (currentType != null)
-               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false, false, 20);
-            ModelUtil.suggestTypes(model, extName, "", candidates, true);
-            ModelUtil.suggestTypes(model, prefix, extName, candidates, true);
+               ModelUtil.suggestMembers(model, currentType, extName, candidates, true, false, false, false, max);
+            ModelUtil.suggestTypes(model, extName, "", candidates, true, false, max);
+            ModelUtil.suggestTypes(model, prefix, extName, candidates, true, false, max);
             if (extName.equals(""))
                return command.length();
             else
@@ -1397,11 +1405,11 @@ public class ClassDeclaration extends TypeDeclaration {
       return getInheritedAnnotation("sc.obj.Enumerated") != null;
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
 
       if (extendsType != null)
-         extendsType.addDependentTypes(types);
+         extendsType.addDependentTypes(types, mode);
    }
 
 

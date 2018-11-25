@@ -12,7 +12,6 @@ import sc.type.*;
 import sc.util.StringUtil;
 
 import java.lang.reflect.Constructor;
-import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
@@ -163,7 +162,7 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
 
    public void refreshBoundTypes(int flags) {}
 
-   public void addDependentTypes(Set<Object> types) {}
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {}
 
    public String toString() {
       if (value != null)

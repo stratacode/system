@@ -658,6 +658,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          String typeName = ModelUtil.getTypeName(type);
          boolean hasCurrentObject = hasCurrentObject();
          boolean checkCurrentObject = parentType == null || hasCurrentObject;
+         if (currentScopeCtx != null)
+            currentScopeCtx.addSyncTypeToFilter(typeName);
 
          Object parentObj = getCurrentObjectWithDefault();
          currentTypes.add(type);

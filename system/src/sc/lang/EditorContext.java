@@ -1483,7 +1483,7 @@ public class EditorContext extends ClientEditorContext {
             ParseUtil.initAndStartComponent(node);
 
          HashSet<String> collector = new HashSet<String>();
-         int res = node.suggestCompletions(defaultPackage, currentType, execContext, command, cursor, collector, continuationValue);
+         int res = node.suggestCompletions(defaultPackage, currentType, execContext, command, cursor, collector, continuationValue, 20);
          convertCollectorToCandidates(collector, candidates);
          return res;
       }

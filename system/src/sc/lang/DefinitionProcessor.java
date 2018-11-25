@@ -83,6 +83,9 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    /** Corresponds to the string version - the template actually used */
    //public Template postAssignmentTemplate;
 
+   /** Set to a template string evaluated using the object definition parameters before returning an existing instance */
+   public String accessHook;
+
    /** Equivalent to CompilerSettings.mixinTemplate but set via an annotation */
    public String mixinTemplate;
 
@@ -266,6 +269,10 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
 
    public String getPostAssignment() {
       return postAssignment;
+   }
+
+   public String getAccessHook() {
+      return accessHook;
    }
 
    public String getMixinTemplate() {

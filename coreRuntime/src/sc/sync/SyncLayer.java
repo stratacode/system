@@ -565,7 +565,7 @@ public class SyncLayer {
 
    private final String noPackageNameSentinel = "$no-package-name";
 
-   public SyncSerializer serialize(SyncManager.SyncContext parentContext, HashSet<String> createdTypes, boolean fetchesOnly) {
+   public SyncSerializer serialize(SyncManager.SyncContext parentContext, HashSet<String> createdTypes, boolean fetchesOnly, Set<String> syncTypeFilter) {
       SyncManager syncManager = syncContext.getSyncManager();
       SyncSerializer ser = syncManager.syncDestination.createSerializer();
 
@@ -595,7 +595,7 @@ public class SyncLayer {
             continue;
          }
 
-         addChangedObject(parentContext, ser, change, prevChange, changeCtx, createdTypes);
+         addChangedObject(parentContext, ser, change, prevChange, changeCtx, createdTypes, syncTypeFilter);
 
          prevChange = change;
          change = change.next;
@@ -631,7 +631,7 @@ public class SyncLayer {
    }
 
    private void addChangedObject(SyncManager.SyncContext parentContext, SyncSerializer ser, SyncChange change, SyncChange prevChange,
-                                   SyncChangeContext changeCtx, HashSet<String> createdTypes) {
+                                   SyncChangeContext changeCtx, HashSet<String> createdTypes, Set<String> syncTypeFilter) {
       Object changedObj = change.obj;
       String objName = null;
 
@@ -660,6 +660,12 @@ public class SyncLayer {
          newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).args : isNew ? parentContext.getNewArgs(changedObj) : null;
          Object changedObjType = syncHandler.getObjectType(changedObj);
          objTypeName = DynUtil.getTypeName(changedObjType, false);
+
+         if (syncTypeFilter != null && !parentContext.matchesTypeFilter(syncTypeFilter, objTypeName)) {
+            if (SyncManager.trace)
+               System.out.println("Omitting sync for type: " + objTypeName + ": to client - no reference in page");
+            return;
+         }
 
          // TODO: should we add an option to suppress redundant changes?  How can we tell when there are side effects or not?
          // if change.value != changeMap.get(prop) this guy has been been overridden.
@@ -938,7 +944,7 @@ public class SyncLayer {
             else
                depChange.next = depChanges.get(dix+1);
 
-            addChangedObject(parentContext, ser, depChange, prevChange, changeCtx, createdTypes);
+            addChangedObject(parentContext, ser, depChange, prevChange, changeCtx, createdTypes, syncTypeFilter);
             prevChange = depChange;
             dix++;
          }

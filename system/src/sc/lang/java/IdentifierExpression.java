@@ -10,7 +10,6 @@ import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
-import sc.lang.html.Attr;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
 import sc.lang.sc.PropertyAssignment;
@@ -4443,7 +4442,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       List<IString> idents = getAllIdentifiers();
       if (idents == null)
          return null;
@@ -4502,21 +4501,21 @@ public class IdentifierExpression extends ArgumentsExpression {
             boolean includeGlobals = idents.size() == 1;
             if (origModel != null) {
                if (curType != null) {
-                  ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false, 20);
+                  ModelUtil.suggestMembers(origModel, curType, matchPrefix, candidates, includeGlobals, true, true, false, max);
                   //System.out.println("*** SuggestMembers returns: " + candidates + " for type: " + curType);
                }
                else if (i == 0) {
-                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals);
+                  ModelUtil.suggestTypes(origModel, origModel.getPackagePrefix(), matchPrefix, candidates, includeGlobals, false, max);
                   //System.out.println("*** SuggestTypes returns: " + candidates);
                }
                else if (i > 0) {
-                  ModelUtil.suggestTypes(origModel, getQualifiedClassIdentifier(), matchPrefix, candidates, includeGlobals);
+                  ModelUtil.suggestTypes(origModel, getQualifiedClassIdentifier(), matchPrefix, candidates, includeGlobals, false, max);
                }
             }
 
             IBlockStatement enclBlock = getEnclosingBlockStatement();
             if (enclBlock != null && i == 0)
-               ModelUtil.suggestVariables(enclBlock, matchPrefix, candidates);
+               ModelUtil.suggestVariables(enclBlock, matchPrefix, candidates, max);
 
             return matchPrefix;
          }
@@ -4528,7 +4527,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return null;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       List<IString> idents = getAllIdentifiers();
       if (idents == null)
          return -1;
@@ -4536,7 +4535,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (arguments != null) {
          if (arguments.size() > 0) {
             // TODO: fill in the expected type here based on the argument type?
-            return arguments.get(arguments.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+            return arguments.get(arguments.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
          }
          return -1;
       }
@@ -4603,14 +4602,14 @@ public class IdentifierExpression extends ArgumentsExpression {
          return pos;
       boolean includeGlobals = idSize == 1 && !emptyDotName;
       if (obj != null)
-         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true, false, 20);
+         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true, false, max);
       else {
-         ModelUtil.suggestTypes(model, prefix, lastIdent, candidates, includeGlobals);
+         ModelUtil.suggestTypes(model, prefix, lastIdent, candidates, includeGlobals, false, max);
       }
 
       IBlockStatement enclBlock = getEnclosingBlockStatement();
       if (enclBlock != null)
-         ModelUtil.suggestVariables(enclBlock, lastIdent, candidates);
+         ModelUtil.suggestVariables(enclBlock, lastIdent, candidates, max);
 
       return pos;
    }
@@ -4928,13 +4927,13 @@ public class IdentifierExpression extends ArgumentsExpression {
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (boundTypes != null)
          for (int i = 0; i < boundTypes.length; i++) {
             Object varType = getTypeForIdentifier(i);
             if (varType != null) {
                if (!(varType instanceof AbstractMethodDefinition))
-                  addDependentType(types, varType);
+                  addDependentType(types, varType, mode);
             }
             Object boundType = boundTypes[i];
             if (idTypes != null && boundType != null) {
@@ -4943,17 +4942,17 @@ public class IdentifierExpression extends ArgumentsExpression {
                      break;
                   case MethodInvocation:
                   case FieldName:
-                     addDependentType(types, ModelUtil.getEnclosingType(boundType));
+                     addDependentType(types, ModelUtil.getEnclosingType(boundType), mode);
                      break;
                }
             }
          }
       // Is this used anyplace?
       if (innerCreator != null)
-         innerCreator.addDependentTypes(types);
+         innerCreator.addDependentTypes(types, mode);
       if (arguments != null) {
          for (Expression expr:arguments)
-            expr.addDependentTypes(types);
+            expr.addDependentTypes(types, mode);
       }
    }
 

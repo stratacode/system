@@ -79,6 +79,18 @@ public abstract class JavaSemanticNode extends SemanticNode {
       }
    }
 
+   public enum DepTypeMode {
+      All,
+      SyncTypes
+   }
+
+   /** Mode parameter for addDependentTypes family of methods */
+   public static class DepTypeCtx {
+      public DepTypeMode mode;
+      public boolean recursive;
+      public Set<Object> visited;
+   }
+
    static class MemberCacheEnt {
       EnumSet<MemberType> types;
       Object member;
@@ -475,7 +487,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
     * can be used to suggest candidates.  This is useful in live-programming situations.
     * The command String parameter is used to determine the offset returned for where the completion starts for the case where the parseNode tree is not available.
     */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       return -1;
    }
 
@@ -484,7 +496,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
     * and have access (possibly) to the original model and original node which most closely approximates this node which is being parsed (so we can use more context to do a better
     * job of matching because those values are all resolved).
     */
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       return null;
    }
 
@@ -650,10 +662,24 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return null;
    }
 
-   public static void addDependentType(Set<Object> types, Object type) {
+   public static void addDependentType(Set<Object> types, Object type, DepTypeCtx ctx) {
       // Unwrap here or else we'll add duplicates because the types set is using object identity for efficiency
       if (type instanceof ParamTypeDeclaration)
          type = ((ParamTypeDeclaration) type).baseType;
+      if (ctx.recursive) {
+         if (ctx.visited.contains(type))
+            return;
+         ctx.visited.add(type);
+         if (type instanceof BodyTypeDeclaration) {
+            Set<Object> depTypes = ((BodyTypeDeclaration) type).getDependentTypes(ctx);
+            if (depTypes != null)
+               types.addAll(depTypes);
+         }
+      }
+      if (ctx.mode == DepTypeMode.SyncTypes) {
+         if (!ModelUtil.isSyncEnabled(type))
+            return;
+      }
       types.add(type);
    }
 }

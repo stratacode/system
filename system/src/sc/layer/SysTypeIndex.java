@@ -162,57 +162,7 @@ public class SysTypeIndex {
    }
 
    public boolean addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer, boolean annotTypes, int max) {
-      if (inactiveTypeIndex.sys.writeLocked == 0) {
-         System.err.println("*** Modifying type index without write lock");
-         new Throwable().printStackTrace();
-      }
-
-      // For each type in the type index, add the type if it matches
-      for (Map.Entry<String,LayerTypeIndex> typeIndexEnt:inactiveTypeIndex.typeIndex.entrySet()) {
-         //String layerName = typeIndexEnt.getKey();
-         LayerTypeIndex layerTypeIndex = typeIndexEnt.getValue();
-         String layerName = typeIndexEnt.getKey();
-
-         if (inactiveTypeIndex.sys == null) {
-            continue;
-         }
-
-         if (refLayer != null && inactiveTypeIndex.sys != null && layerName != null) {
-            // Using lookup here so we only look through layers that have been loaded.  Otherwise there's a concurrent modification exception as we modify this index
-            Layer indexLayer = inactiveTypeIndex.sys.lookupInactiveLayer(layerName, true, true);
-            // Only search layers which this layer can depend upon
-            if (indexLayer == null || refLayer == Layer.ANY_INACTIVE_LAYER || refLayer == Layer.ANY_LAYER || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
-               continue;
-         }
-         HashMap<String,TypeIndexEntry> layerTypeMap = layerTypeIndex.layerTypeIndex;
-         for (Map.Entry<String,TypeIndexEntry> typeEnt:layerTypeMap.entrySet()) {
-            String typeName = typeEnt.getKey();
-            String className = CTypeUtil.getClassName(typeName);
-            if (className.startsWith(prefix)) {
-               TypeIndexEntry ent = typeEnt.getValue();
-               if (annotTypes != (ent.declType == DeclarationType.ANNOTATION))
-                  continue;
-               if (retFullTypeName)
-                  candidates.add(typeName);
-               else
-                  candidates.add(className);
-               if (candidates.size() >= max)
-                  return false;
-            }
-         }
-      }
-      // Indexing layers as types but only with the full type name
-      if (inactiveTypeIndex.layersList != null && !annotTypes) {
-         for (Layer inactiveLayer : inactiveTypeIndex.layersList) {
-            String typeName = inactiveLayer.layerDirName;
-            if (typeName.startsWith(prefix)) {
-               candidates.add(typeName);
-               if (candidates.size() >= max)
-                  return false;
-            }
-         }
-      }
-      return true;
+      return inactiveTypeIndex.addMatchingGlobalNames(prefix, candidates, retFullTypeName, refLayer, annotTypes, max);
    }
 
    public void clearActiveLayers() {
@@ -233,6 +183,10 @@ public class SysTypeIndex {
 
    public void fileRenamed(String oldFileName, String newFileName) {
       inactiveTypeIndex.updateFileName(oldFileName, newFileName);
+   }
+
+   public Set<String> getAllNames() {
+      return inactiveTypeIndex.getAllNames();
    }
 
    public StringBuilder dumpCacheStats() {

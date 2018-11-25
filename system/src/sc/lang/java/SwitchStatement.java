@@ -163,12 +163,12 @@ public class SwitchStatement extends Statement implements IBlockStatement {
             st.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
       if (statements != null)
          for (Statement st:statements)
-            st.addDependentTypes(types);
+            st.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

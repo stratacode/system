@@ -14,7 +14,7 @@ public class IncompleteStatement extends Statement {
    }
 
    @Override
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
    }
 
    @Override
@@ -38,9 +38,9 @@ public class IncompleteStatement extends Statement {
       return type != null && type.getNotFoundError();
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       if (type != null)
-         return type.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+         return type.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
       return matchPrefix;
    }
 

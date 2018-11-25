@@ -28,6 +28,8 @@ public interface IDefinitionProcessor {
 
    public String getPostAssignment();
 
+   public String getAccessHook();
+
    public String getMixinTemplate();
 
    //public Object getInnerType(TypeDeclaration srcType, String name);

@@ -187,6 +187,13 @@ public class Options {
    /** For schtml pages, should they use caching by default for runtimes that support it? */
    @Constant public boolean defaultPageCache = true;
 
+   /**
+    * For web applications that use scopes shared across different apps (web pages) like 'global' and 'session' do we
+    * build a set of type names needed by each web-page, so we don't try to serialize objects which are not referenced in
+    * that page (which will general a sync error)
+    */
+   @Constant public boolean syncTypeFilter = true;
+
    boolean restartArg = false;
    boolean headlessSet = false;
    List<String> includeFiles = null;  // List of files to process

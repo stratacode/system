@@ -13,6 +13,7 @@ import sc.type.IResponseListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Set;
 
 import static sc.sync.SyncManager.verbose;
 
@@ -103,7 +104,7 @@ public abstract class SyncDestination {
       // TODO: maybe the client should send two different layers during a reset - for the committed and uncommitted changes.
       // That way, all of the committed changes would be applied before the resetSync.  As it is now, those changes will be applied after this sendSync call.
       if (resetSync) {
-         SyncManager.sendSync(name, null, true, null);
+         SyncManager.sendSync(name, null, true, null, null);
       }
 
       // Queuing up events so they are all fired after the sync has completed
@@ -238,7 +239,7 @@ public abstract class SyncDestination {
          // to the server to reset it's data to what we have.
          if (errorCode == 205) {
             connected = true;
-            CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null);
+            CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null, null);
             if (SyncManager.trace) {
                if (initSync.length() == 0) {
                   System.out.println("No initial sync for reset");
@@ -249,7 +250,7 @@ public abstract class SyncDestination {
             StringBuilder sb = new StringBuilder();
             sb.append(initSync.toString());
             // TODO: Remove this?   Right now, this works because we sync the properties which manage the fetched state - so the fetched changes get pushed automatically.
-            // We've serialized all of the client's changes in the resync, including changes in the requests which errored.
+            // We've serialized all of the client's changes in the resync, including changes in the requests which had an error.
             // But if there were any fetch properties, those will just be lost so we need to collect them and add them to the end
             // of the resync.
             /*
@@ -311,14 +312,14 @@ public abstract class SyncDestination {
    public void postCompleteSync() {
    }
 
-   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync, CharSequence codeUpdates) {
+   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync, CharSequence codeUpdates, Set<String> syncTypeFilter) {
       SyncSerializer lastSer = null;
       HashSet<String> createdTypes = new HashSet<String>();
       // Going in sorted order - e.g. global, then session.
       // Changes found during the traversal of the global graph adds changes to the session so we miss these if we go in the reverse order.
       for (int i = 0; i < layers.size(); i++) {
          SyncLayer layer = layers.get(i);
-         SyncSerializer nextSer = layer.serialize(parentContext, createdTypes, false);
+         SyncSerializer nextSer = layer.serialize(parentContext, createdTypes, false, syncTypeFilter);
          layer.markSyncPending();
          if (lastSer == null)
             lastSer = nextSer;

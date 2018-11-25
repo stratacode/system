@@ -35,9 +35,9 @@ public class NewSelector extends Selector {
          innerCreator.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (innerCreator != null)
-         innerCreator.addDependentTypes(types);
+         innerCreator.addDependentTypes(types, mode);
    }
 
    public void transformToJS() {

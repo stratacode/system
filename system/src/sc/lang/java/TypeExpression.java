@@ -59,11 +59,11 @@ public class TypeExpression extends Statement {
    }
 
    @Override
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (type != null)
-         type.addDependentTypes(types);
+         type.addDependentTypes(types, mode);
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

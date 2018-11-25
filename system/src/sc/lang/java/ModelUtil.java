@@ -21,6 +21,7 @@ import sc.lang.template.TemplateStatement;
 import sc.layer.*;
 import sc.obj.*;
 import sc.sync.SyncDestination;
+import sc.sync.SyncManager;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -6957,7 +6958,7 @@ public class ModelUtil {
       return model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false, annotTypes, 20);
    }
 
-   public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates) {
+   public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates, int max) {
       List<Statement> statements = enclBlock.getBlockStatements();
       if (statements != null) {
          for (Statement st:statements) {
@@ -6968,6 +6969,8 @@ public class ModelUtil {
                      String varName = varDef.variableName;
                      if (varName != null && varName.startsWith(prefix)) {
                         candidates.add(varName);
+                        if (candidates.size() >= max)
+                           return;
                      }
                   }
                }
@@ -6978,13 +6981,16 @@ public class ModelUtil {
       if (enclMethod != null && enclMethod.parameters != null) {
          for (Parameter param:enclMethod.parameters.getParameterList()) {
             String varName = param.variableName;
-            if (varName != null && varName.startsWith(prefix))
+            if (varName != null && varName.startsWith(prefix)) {
                candidates.add(varName);
+               if (candidates.size() >= max)
+                  return;
+            }
          }
       }
       enclBlock = enclBlock.getEnclosingBlockStatement();
       if (enclBlock != null)
-         suggestVariables(enclBlock, prefix, candidates);
+         suggestVariables(enclBlock, prefix, candidates, max);
    }
 
    public static Object getReturnType(Object method, boolean boundParams) {
@@ -8454,7 +8460,7 @@ public class ModelUtil {
    }
 
    public static Object getLayerAnnotation(Layer layer, String annotName) {
-      return ModelUtil.getAnnotation(layer.model.getModelTypeDeclaration(), annotName);
+      if (layer.model == null) return null; return ModelUtil.getAnnotation(layer.model.getModelTypeDeclaration(), annotName);
    }
 
    public static Object getLayerAnnotationValue(Layer layer, String annotName, String attName) {
@@ -8996,6 +9002,55 @@ public class ModelUtil {
       else {
          throw new UnsupportedOperationException();
       }
+   }
+
+   /**
+    * For compile time access to whether or not we are dealing with a synchronize type.  TODO:
+    * calls to 'addSyncType' are not reflected here which breaks the syncTypeFilter.  For now, we're leaving
+    * the syncTypeFilter in as a system option to workaround this problem.  But you can update globalSyncTypes
+    * to include other types as synchronized for when you need the syncTypeFilter.
+    */
+   public static boolean isSyncEnabled(Object type) {
+      if (type instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
+         if (typeDecl.getSyncProperties() != null)
+            return true;
+         // Because type is defined on the client, it may not have sync properties but still be synchronized
+         // on the server.  To include "ServerToClient" mode, need to check the annotation and see if it's disabled.
+         // Erring on the side of having sync enabled since this is for the type filter.
+         SyncMode syncMode = BodyTypeDeclaration.getInheritedSyncMode(typeDecl.getLayeredSystem(), typeDecl, typeDecl, SyncMode.Disabled, false);
+         if (syncMode != null && syncMode != SyncMode.Disabled)
+            return true;
+      }
+      String typeName = ModelUtil.getTypeName(type);
+      return LayeredSystem.globalSyncTypeNames.contains(typeName);
+   }
+
+   public static Set<String> getJSSyncTypes(LayeredSystem sys, Object type) {
+      if (!(type instanceof BodyTypeDeclaration))
+         System.err.println("*** Unable to get sync types from compiled class!");
+      else {
+         if (!sys.hasActiveRuntime("js"))
+            return null;
+         LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
+         Object jsType = jsSys.getRuntimeTypeDeclaration(ModelUtil.getTypeName(type));
+         if (jsType instanceof BodyTypeDeclaration) {
+            BodyTypeDeclaration jsTypeDecl = (BodyTypeDeclaration) jsType;
+            JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
+            ctx.mode = JavaSemanticNode.DepTypeMode.SyncTypes;
+            ctx.recursive = true;
+            ctx.visited = new IdentityHashSet<Object>();
+            Set<Object> syncTypes = jsTypeDecl.getDependentTypes(ctx);
+            HashSet<String> syncTypeNames = new HashSet<String>(syncTypes.size());
+            for (Object syncType:syncTypes) {
+               syncTypeNames.add(ModelUtil.getTypeName(syncType));
+            }
+            if (jsTypeDecl.getSyncProperties() != null)
+               syncTypeNames.add(jsTypeDecl.getFullTypeName());
+            return syncTypeNames;
+         }
+      }
+      return null;
    }
 
 }

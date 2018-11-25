@@ -4,8 +4,6 @@
 
 package sc.lang.java;
 
-import sc.lang.ISrcStatement;
-
 import java.util.List;
 import java.util.Set;
 
@@ -38,10 +36,10 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
             st.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (block != null && block.statements != null)
          for (Statement st:block.statements)
-            st.addDependentTypes(types);
+            st.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

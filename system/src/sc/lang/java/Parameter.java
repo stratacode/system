@@ -191,11 +191,11 @@ public class Parameter extends AbstractVariable implements IVariable {
          nextParameter.refreshBoundType(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (type != null)
-         type.addDependentTypes(types);
+         type.addDependentTypes(types, mode);
       if (nextParameter != null)
-         nextParameter.addDependentTypes(types);
+         nextParameter.addDependentTypes(types, mode);
    }
 
    public String toString() {

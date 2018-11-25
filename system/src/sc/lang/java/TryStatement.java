@@ -83,15 +83,15 @@ public class TryStatement extends Statement implements IBlockStatement {
          finallyStatement.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (block != null && block.statements != null)
          for (Statement st : block.statements)
-            st.addDependentTypes(types);
+            st.addDependentTypes(types, mode);
       if (catchStatements != null)
          for (CatchStatement cs : catchStatements)
-            cs.addDependentTypes(types);
+            cs.addDependentTypes(types, mode);
       if (finallyStatement != null)
-         finallyStatement.addDependentTypes(types);
+         finallyStatement.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

@@ -12,7 +12,6 @@ import sc.lifecycle.ILifecycle;
 import sc.parser.IString;
 import sc.lang.java.*;
 import sc.parser.IStyleAdapter;
-import sc.util.StringUtil;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -159,11 +158,11 @@ public class GlueStatement extends Statement implements ITemplateDeclWrapper {
          }
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (declarations != null)
          for (Object d:declarations)
             if (d instanceof Statement)
-               ((Statement) d).addDependentTypes(types);
+               ((Statement) d).addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

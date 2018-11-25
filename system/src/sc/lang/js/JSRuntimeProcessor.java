@@ -1042,7 +1042,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
             addExtendsTypeLibsToFile(type, typesInFile, typeLibFile);
 
-            Set<Object> depTypes = type.getDependentTypes();
+            JavaSemanticNode.DepTypeCtx depTypeCtx = new JavaSemanticNode.DepTypeCtx();
+            depTypeCtx.mode = JavaSemanticNode.DepTypeMode.All;
+            depTypeCtx.recursive = false;
+            Set<Object> depTypes = type.getDependentTypes(depTypeCtx);
             for (Object depType:depTypes) {
                if (!ModelUtil.isOuterType(type, depType)) // If we are in the midst of starting an outer type, and we end up finding that outer type is a dependency of some inner type - don't go and add that dependency as it causes us to restart the outer type
                   addDependentType(type, depType, typeLibFile, typesInFile);
@@ -2790,7 +2793,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                if (enclType == null) {
                   // Since the dependent types for the parent type include the inner type we are only processing them for the outer type
-                  Set<Object> depTypes = type.getDependentTypes();
+                  JavaSemanticNode.DepTypeCtx depTypeCtx = new JavaSemanticNode.DepTypeCtx();
+                  depTypeCtx.mode = JavaSemanticNode.DepTypeMode.All;
+                  depTypeCtx.recursive = false;
+                  Set<Object> depTypes = type.getDependentTypes(depTypeCtx);
 
                   if (depTypes.contains(Bind.class))
                      depTypes.add(system.getSrcTypeDeclaration("sc.js.bind.Bind", null, true, false, false));

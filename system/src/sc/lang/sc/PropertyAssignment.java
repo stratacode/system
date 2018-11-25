@@ -648,10 +648,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          assignedProperty = ModelUtil.refreshBoundProperty(getLayeredSystem(), assignedProperty, flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       Expression init = getInitializerExpr();
       if (init != null)
-         init.addDependentTypes(types);
+         init.addDependentTypes(types, mode);
    }
 
    public boolean hasModifier(String modifier) {
@@ -908,9 +908,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return DynUtil.getObjectId(this, null, "MD_" + typeName + "_" + propertyName);
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (initializer != null) {
-         return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       }
 
       Object obj = ctx.getCurrentObject();
@@ -940,7 +940,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
       JavaModel model = getJavaModel();
       if (obj != null)
-         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, false, true, true, false, 20);
+         ModelUtil.suggestMembers(model, obj, lastIdent, candidates, false, true, true, false, max);
 
       return pos;
    }

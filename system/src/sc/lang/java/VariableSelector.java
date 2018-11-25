@@ -4,7 +4,6 @@
 
 package sc.lang.java;
 
-import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.sc.PropertyAssignment;
@@ -15,8 +14,6 @@ import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
-
-import static sc.lang.java.IdentifierExpression.IdentifierType.SetVariable;
 
 public class VariableSelector extends Selector {
    public String identifier;
@@ -88,10 +85,10 @@ public class VariableSelector extends Selector {
             expr.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (arguments != null)
          for (Expression expr:arguments)
-            expr.addDependentTypes(types);
+            expr.addDependentTypes(types, mode);
    }
 
    public void transformToJS() {

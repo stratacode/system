@@ -21,7 +21,7 @@ public abstract class Selector extends JavaSemanticNode {
 
    public abstract void refreshBoundType(int flags);
 
-   public abstract void addDependentTypes(Set<Object> types);
+   public abstract void addDependentTypes(Set<Object> types, DepTypeCtx mode);
 
    public abstract void transformToJS();
 

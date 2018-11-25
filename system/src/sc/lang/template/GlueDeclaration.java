@@ -43,11 +43,11 @@ public class GlueDeclaration extends Statement implements ITemplateDeclWrapper {
                ((Statement) o).refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (declarations != null)
          for (Object o:declarations)
             if (o instanceof Statement)
-               ((Statement) o).addDependentTypes(types);
+               ((Statement) o).addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

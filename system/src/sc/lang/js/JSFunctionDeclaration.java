@@ -44,7 +44,7 @@ public class JSFunctionDeclaration extends Expression {
    }
 
    @Override
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
 
    }
 

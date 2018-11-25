@@ -806,29 +806,29 @@ public class NewExpression extends IdentifierExpression {
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
 
       if (arrayDimensions != null) {
          for (Expression ad:arrayDimensions) {
             if (ad != null)
-               ad.addDependentTypes(types);
+               ad.addDependentTypes(types, mode);
          }
       }
 
       if (boundType != null)
-         types.add(boundType);
+         addDependentType(types, boundType, mode);
 
       if (arrayInitializer != null)
-         arrayInitializer.addDependentTypes(types);
+         arrayInitializer.addDependentTypes(types, mode);
 
       if (typeArguments != null)
          for (JavaType ta:typeArguments)
-            ta.addDependentTypes(types);
+            ta.addDependentTypes(types, mode);
 
       if (classBody != null)
          for (Statement cb:classBody)
-            cb.addDependentTypes(types);
+            cb.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {
@@ -1011,7 +1011,7 @@ public class NewExpression extends IdentifierExpression {
    }
 
    /** TODO: very similar to ClassValueExpression.suggestCompletions - try to share this code? */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       String typeName = typeIdentifier;
       if (typeName == null || typeName.length() == 0 || arrayDimensions != null || arrayInitializer != null || classBody != null)
          return -1;
@@ -1024,10 +1024,10 @@ public class NewExpression extends IdentifierExpression {
       String leafName = typeName;
       if (pkgName != null) {
          leafName = CTypeUtil.getClassName(leafName);
-         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
+         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false, false, max);
       }
 
-      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true);
+      ModelUtil.suggestTypes(model, prefix, typeName, candidates, true, false, max);
 
       int relPos = -1;
 
@@ -1085,10 +1085,10 @@ public class NewExpression extends IdentifierExpression {
       return classBody;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String extMatchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       // TODO: for some reason this results in the completion including the 'new' keyword - e.g. "new Foo" rather than just "Foo".  Not sure how to remove that but it's better than it not completing at all.
       if (extMatchPrefix.startsWith("new "))
          extMatchPrefix = extMatchPrefix.substring(4);
-      return addStatementNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+      return addStatementNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
    }
 }

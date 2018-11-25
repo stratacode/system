@@ -633,10 +633,10 @@ public class BinaryExpression extends Expression {
    }
 
    /** Try completing the last operand */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (operands.size() == 0)
          return -1;
-      return operands.get(operands.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      return operands.get(operands.size()-1).suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
    }
 
    public boolean applyPartialValue(Object partial) {
@@ -680,16 +680,16 @@ public class BinaryExpression extends Expression {
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (lhs != null)
-         lhs.addDependentTypes(types);
+         lhs.addDependentTypes(types, mode);
       if (rhs instanceof JavaType) {
-         ((JavaType) rhs).addDependentTypes(types);
+         ((JavaType) rhs).addDependentTypes(types, mode);
       }
       else {
          Expression rhsExpr = getRhsExpr();
          if (rhsExpr != null)
-            rhsExpr.addDependentTypes(types);
+            rhsExpr.addDependentTypes(types, mode);
       }
    }
 

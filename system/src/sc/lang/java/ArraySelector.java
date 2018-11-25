@@ -49,9 +49,9 @@ public class ArraySelector extends Selector {
          expression.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
    }
 
    public void transformToJS() {

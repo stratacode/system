@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.lang.java.DeclarationType;
+import sc.type.CTypeUtil;
 import sc.util.FileUtil;
 
 import java.util.*;
@@ -49,11 +51,19 @@ public class LayerListTypeIndex {
       modifyTypeIndex.clear();
       reverseIndexBuilt = false;
       reverseIndexValid = false;
+      clearAllNames();
+   }
+
+   private void clearAllNames() {
+      if (sys == null)
+         return;
+      sys.getMainLayeredSystem().allNames = null;
    }
 
    public void clearTypeIndex() {
       typeIndex.clear();
       sys = null;
+      clearAllNames();
       // do not clear layersList here - it is the list managed by the LayeredSystems
    }
 
@@ -159,6 +169,7 @@ public class LayerListTypeIndex {
       if (reverseIndexValid)
          return;
       reverseIndexBuilt = false;
+      clearAllNames();
       buildReverseTypeIndex(sys);
    }
 
@@ -231,6 +242,7 @@ public class LayerListTypeIndex {
       subTypeIndex.remove(oldTypeName);
       saveLayerTypeIndexes(layerNamesToSave);
       reverseIndexValid = false;
+      clearAllNames();
    }
 
    public void updateFileName(String oldFileName, String newFileName) {
@@ -282,15 +294,18 @@ public class LayerListTypeIndex {
    public void addLayerTypeIndex(String layerName, LayerTypeIndex layerTypeIndex) {
       typeIndex.put(layerName, layerTypeIndex);
       reverseIndexValid = false;
+      clearAllNames();
    }
 
    public void removeLayerTypeIndex(String layerName) {
       typeIndex.remove(layerName);
       reverseIndexValid = false;
+      clearAllNames();
    }
 
    public void layerTypeIndexChanged() {
       reverseIndexValid = false;
+      clearAllNames();
    }
 
    /**
@@ -320,4 +335,65 @@ public class LayerListTypeIndex {
       }
       return indexLayersCache;
    }
+
+   public Set<String> getAllNames() {
+      HashSet<String> allNames = new HashSet<String>();
+      addMatchingGlobalNames("", allNames, false, null, false, 10000000);
+      return allNames;
+   }
+
+   public boolean addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, Layer refLayer, boolean annotTypes, int max) {
+      if (sys.writeLocked == 0) {
+         System.err.println("*** Modifying type index without write lock");
+         new Throwable().printStackTrace();
+      }
+
+      // For each type in the type index, add the type if it matches
+      for (Map.Entry<String,LayerTypeIndex> typeIndexEnt:typeIndex.entrySet()) {
+         //String layerName = typeIndexEnt.getKey();
+         LayerTypeIndex layerTypeIndex = typeIndexEnt.getValue();
+         String layerName = typeIndexEnt.getKey();
+
+         if (sys == null) {
+            continue;
+         }
+
+         if (refLayer != null && sys != null && layerName != null) {
+            // Using lookup here so we only look through layers that have been loaded.  Otherwise there's a concurrent modification exception as we modify this index
+            Layer indexLayer = sys.lookupInactiveLayer(layerName, true, true);
+            // Only search layers which this layer can depend upon
+            if (indexLayer == null || refLayer == Layer.ANY_INACTIVE_LAYER || refLayer == Layer.ANY_LAYER || (!refLayer.getLayerName().equals(indexLayer.getLayerName()) && !refLayer.extendsLayer(indexLayer)))
+               continue;
+         }
+         HashMap<String,TypeIndexEntry> layerTypeMap = layerTypeIndex.layerTypeIndex;
+         for (Map.Entry<String,TypeIndexEntry> typeEnt:layerTypeMap.entrySet()) {
+            String typeName = typeEnt.getKey();
+            String className = CTypeUtil.getClassName(typeName);
+            if (className.startsWith(prefix)) {
+               TypeIndexEntry ent = typeEnt.getValue();
+               if (annotTypes != (ent.declType == DeclarationType.ANNOTATION))
+                  continue;
+               if (retFullTypeName)
+                  candidates.add(typeName);
+               else
+                  candidates.add(className);
+               if (candidates.size() >= max)
+                  return false;
+            }
+         }
+      }
+      // Indexing layers as types but only with the full type name
+      if (layersList != null && !annotTypes) {
+         for (Layer inactiveLayer : layersList) {
+            String typeName = inactiveLayer.layerDirName;
+            if (typeName.startsWith(prefix)) {
+               candidates.add(typeName);
+               if (candidates.size() >= max)
+                  return false;
+            }
+         }
+      }
+      return true;
+   }
+
 }

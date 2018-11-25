@@ -15,7 +15,6 @@ import sc.parser.IStyleAdapter;
 import sc.parser.Language;
 import sc.parser.ParentParseNode;
 import sc.parser.ParseUtil;
-import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.Type;
 import sc.util.StringUtil;
@@ -603,9 +602,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          initializer.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (initializer != null)
-         initializer.addDependentTypes(types);
+         initializer.addDependentTypes(types, mode);
    }
 
    public void transformToJS() {
@@ -726,9 +725,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return variableName;
    }
 
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (initializer != null)
-         return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+         return initializer.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
       return -1;
    }
 
@@ -845,11 +844,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       throw new UnsupportedOperationException();
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       if (initializer != null) {
-         return initializer.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+         return initializer.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
       }
-      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+      return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
    }
 }
 

@@ -7,10 +7,8 @@ package sc.lang.sc;
 import sc.lang.DefinitionProcessor;
 import sc.lang.ILanguageModel;
 import sc.lang.java.*;
-import sc.lang.template.Template;
 import sc.util.LinkedIdentityHashSet;
 
-import java.util.ArrayList;
 import java.util.Set;
 
 public class BasicScopeProcessor extends DefinitionProcessor implements IScopeProcessor {
@@ -18,6 +16,8 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
 
    // Marker annotation to add to the transformed type
    public boolean includeScopeAnnotation;
+
+   public boolean needsSyncAccessHook;
 
    public BasicScopeProcessor(String scopeName) {
       this.scopeName = scopeName;
@@ -43,8 +43,8 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
       }
    }
 
-   public void addDependentTypes(BodyTypeDeclaration td, Set<Object> types) {
-      if (dependentTypes != null)
+   public void addDependentTypes(BodyTypeDeclaration td, Set<Object> types, JavaSemanticNode.DepTypeCtx mode) {
+      if (dependentTypes != null && mode.mode != JavaSemanticNode.DepTypeMode.SyncTypes)
          types.addAll(dependentTypes);
       /*
         TODO: this does not work because we'd have to evaluate the template in order to get the dependencies for JS conversion.
@@ -157,5 +157,14 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
     */
    public boolean getDefinesTypeField() {
       return customResolver == null;
+   }
+
+   /** For scopes that need a call made to accessSyncInst for contexts which use this component.
+    * This includes any scope that has child contexts right now... maybe this should be computed rather than specified? */
+   public void setNeedsSyncAccessHook(boolean needsSyncAccessHook) {
+      this.needsSyncAccessHook = needsSyncAccessHook;
+   }
+   public boolean getNeedsSyncAccessHook() {
+      return needsSyncAccessHook;
    }
 }

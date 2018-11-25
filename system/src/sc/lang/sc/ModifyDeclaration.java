@@ -2505,13 +2505,13 @@ public class ModifyDeclaration extends TypeDeclaration {
          modifyTypeDecl.setCompiledOnly(val);
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
       if (modifyTypeDecl != null)
-         modifyTypeDecl.addDependentTypes(types);
+         modifyTypeDecl.addDependentTypes(types, mode);
       if (extendsTypes != null) {
          for (JavaType t:extendsTypes)
-            t.addDependentTypes(types);
+            t.addDependentTypes(types, mode);
       }
    }
 
@@ -2821,7 +2821,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    /** Complete the modified type */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (currentType == null)
          return -1;
       String currentTypeName = ModelUtil.getTypeName(currentType);

@@ -4,19 +4,9 @@
 
 package sc.lang.java;
 
-import sc.lang.ILanguageModel;
-import sc.lang.ISemanticNode;
-import sc.lang.JavaLanguage;
-import sc.lang.SemanticNodeList;
-import sc.parser.IString;
-import sc.parser.PString;
 import sc.parser.ParseUtil;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.WildcardType;
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -54,11 +44,11 @@ public class LambdaExpression extends BaseLambdaExpression implements IStatement
    }
 
    @Override
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (lambdaParams instanceof Parameter)
-         ((Parameter) lambdaParams).addDependentTypes(types);
+         ((Parameter) lambdaParams).addDependentTypes(types, mode);
       if (lambdaBody != null)
-         lambdaBody.addDependentTypes(types);
+         lambdaBody.addDependentTypes(types, mode);
    }
 
    public String toGenerateString() {

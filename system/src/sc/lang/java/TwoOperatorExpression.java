@@ -66,11 +66,12 @@ public abstract class TwoOperatorExpression extends Expression {
       if (rhs != null)
          rhs.refreshBoundTypes(flags);
    }
-   public void addDependentTypes(Set<Object> types) {
+
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (lhs != null)
-         lhs.addDependentTypes(types);
+         lhs.addDependentTypes(types, mode);
       if (rhs != null)
-         rhs.addDependentTypes(types);
+         rhs.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.lang.sc.IScopeProcessor;
 import sc.lang.template.Template;
 import sc.layer.Layer;
+import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
@@ -63,6 +64,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
    public List<String> preAssignments;   // Code run after the object is created before any assignments
    public List<String> postAssignments;  // Code run after the object has had it's property assignments applied
+   public List<String> accessHooks;  // Code run before returning an existing instance
 
    public boolean noCreationTemplate;    // True for object definitions which are applied without a creation template
 
@@ -172,7 +174,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                               boolean typeIsComponentClass, String childTypeName, String parentName, String rootName, Object currentConstructor,
                               String constDecls, String constParams, TypeDeclaration accessClass, boolean useAltComponent,
                               String customResolver, Template customResolverTemplate, String customSetter, Template customSetterTemplate,
-                              boolean needsField, List<String> preAssignments, List<String> postAssignments) {
+                              boolean needsField, List<String> preAssignments, List<String> postAssignments, List<String> accessHooks) {
       this.objType = objType;
       this.compiledClass = compiledClass;
       this.accessClass = accessClass;
@@ -200,6 +202,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       this.customNeedsField = needsField;
       this.preAssignments = preAssignments;
       this.postAssignments = postAssignments;
+      this.accessHooks = accessHooks;
       this.customResolver = customResolver;
       this.customResolverTemplate = customResolverTemplate;
       this.customSetter = customSetter;
@@ -313,6 +316,16 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return objType.needsSync();
    }
 
+   public boolean getNeedsSyncAccessHook() {
+      if (!objType.needsSync())
+         return false;
+
+      IScopeProcessor scopeProc = objType.getScopeProcessor();
+      if (scopeProc != null)
+         return scopeProc.getNeedsSyncAccessHook();
+      return false;
+   }
+
    public boolean getSyncOnDemand() {
       return objType.getSyncOnDemand();
    }
@@ -326,14 +339,21 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    }
 
    /**
-    * When referring to the instance variable defined there are two cases.  If there's no creation template the code
+    * When referring to the instance variable, when the instance is created.  Either in the 'init' code section if there
+    * is no constructor, the constructor, or a chunk of code in the getX method.
+    *
+    * If there's no creation template the code
     * gets placed into the constructor or as init code and so uses 'this'.  If it's in a getX or newX method we generate
     * the local variable name is used.
     *
-    * For some reason components use just the lowerClassName, without the "_".
+    * For accessHooks, the lowerClassName should be used or maybe the getX method.  This logic only applies for the create.
+    *
+    * TODO IMPORTANT: For some reason components use just the lowerClassName, without the "_".  We should clean this up because these
+    * conventions are an important part of the API.
     */
    public String getInstanceVariableName() {
-      return noCreationTemplate ? "this" : (typeIsComponent ? lowerClassName : "_" + lowerClassName);
+      //return noCreationTemplate ? "this" : (typeIsComponent ? lowerClassName : "_" + lowerClassName);
+      return noCreationTemplate ? "this" : "_" + lowerClassName;
    }
 
    public String getPreAssignment() {
@@ -364,6 +384,21 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          }
       }
       return postAssignment;
+   }
+
+   public String getAccessHook() {
+      String accessHookStr = "";
+      if (accessHooks != null) {
+         for (String accessHookTemplate:accessHooks) {
+            try {
+               accessHookStr += TransformUtil.evalTemplate(this, accessHookTemplate, true);
+            }
+            catch (IllegalArgumentException exc) {
+               objType.displayError("Invalid accessHook template: " + accessHookTemplate + ": " + exc.toString() + " for type: ");
+            }
+         }
+      }
+      return accessHookStr;
    }
 
    public Layer getLayer() {
@@ -434,5 +469,27 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public ArrayList<String> getPropertiesAlreadyBindable() {
       ArrayList<String> res = objType.propertiesAlreadyBindable;
       return res == null ? StringUtil.EMPTY_STRING_LIST : res;
+   }
+
+   public String getSyncTypeNames() {
+      LayeredSystem sys = objType.getLayeredSystem();
+      Set<String> syncTypeNames = sys.options.syncTypeFilter ? ModelUtil.getJSSyncTypes(sys, objType) : null;
+      if (syncTypeNames == null)
+         return "null";
+      else {
+         StringBuilder sb = new StringBuilder();
+         sb.append("new java.util.HashSet<String>(java.util.Arrays.asList(");
+         int i = 0;
+         for (String syncTypeName:syncTypeNames) {
+            if (i != 0)
+               sb.append(", ");
+            sb.append('"');
+            sb.append(syncTypeName);
+            sb.append('"');
+            i++;
+         }
+         sb.append("))");
+         return sb.toString();
+      }
    }
 }

@@ -13,15 +13,12 @@ import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.template.Template;
 import sc.lang.template.TemplateDeclaration;
-import sc.layer.IFileProcessorResult;
 import sc.layer.SrcEntry;
 import sc.obj.IComponent;
 import sc.layer.LayeredSystem;
-import sc.parser.GenFileLineIndex;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.util.IdentityHashSet;
-import sc.util.StringUtil;
 import sc.lang.sc.IScopeProcessor;
 import sc.layer.Layer;
 import sc.type.PTypeUtil;
@@ -1518,12 +1515,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return any;
    }
 
-   public void addDependentTypes(Set<Object> types) {
-      super.addDependentTypes(types);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
+      super.addDependentTypes(types, mode);
 
       if (implementsTypes != null) {
          for (JavaType t:implementsTypes)
-            t.addDependentTypes(types);
+            t.addDependentTypes(types, mode);
       }
    }
 

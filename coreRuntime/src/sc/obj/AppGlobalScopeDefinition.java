@@ -32,14 +32,18 @@ public class AppGlobalScopeDefinition extends ScopeDefinition {
       public String getId() {
          return "appGlobal:" + appId;
       }
+
+      public String getAppId() {
+         return appId;
+      }
    }
 
    static AppGlobalScopeDefinition appGlobalScopeDef = new AppGlobalScopeDefinition();
 
    static HashMap<String,AppGlobalScopeContext> appGlobalTable = new HashMap<String,AppGlobalScopeContext>();
 
-   public static ScopeContext getAppGlobalScope() {
-      return appGlobalScopeDef.getScopeContext(true);
+   public static AppGlobalScopeContext getAppGlobalScope() {
+      return (AppGlobalScopeContext) appGlobalScopeDef.getScopeContext(true);
    }
 
    public static AppGlobalScopeDefinition getAppGlobalScopeDefinition() {

@@ -2642,11 +2642,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return prependLayerPackage;
    }
 
-   public void addDependentTypes(Set<Object> resultTypes) {
+   public void addDependentTypes(Set<Object> resultTypes, DepTypeCtx mode) {
       if (types == null)
          return;
       for (TypeDeclaration type:types)
-         type.addDependentTypes(resultTypes);
+         type.addDependentTypes(resultTypes, mode);
    }
 
    public String getUserVisibleName() {

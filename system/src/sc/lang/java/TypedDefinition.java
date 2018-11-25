@@ -22,9 +22,9 @@ public abstract class TypedDefinition extends Statement {
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (type != null)
-         type.addDependentTypes(types);
+         type.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() { return this; }

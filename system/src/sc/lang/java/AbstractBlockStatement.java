@@ -7,7 +7,6 @@ package sc.lang.java;
 import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
-import sc.type.CTypeUtil;
 
 import java.util.EnumSet;
 import java.util.IdentityHashMap;
@@ -254,10 +253,10 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
    }
 
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (statements != null) {
          for (Statement st:statements)
-            st.addDependentTypes(types);
+            st.addDependentTypes(types, mode);
       }
    }
 

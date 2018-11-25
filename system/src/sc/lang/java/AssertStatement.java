@@ -39,11 +39,11 @@ public class AssertStatement extends Statement {
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
       if (otherExpression != null)
-         otherExpression.addDependentTypes(types);
+         otherExpression.addDependentTypes(types, mode);
    }
 
    public void start() {

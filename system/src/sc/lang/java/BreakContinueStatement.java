@@ -18,7 +18,7 @@ public class BreakContinueStatement extends Statement {
    public void refreshBoundTypes(int flags) {
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
    }
 
    public Statement transformToJS() { return this; }

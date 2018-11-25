@@ -30,11 +30,11 @@ public class SynchronizedStatement extends Statement implements IStatementWrappe
          expression.addChildBodyStatements(sts);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
       if (statement != null)
-         statement.addDependentTypes(types);
+         statement.addDependentTypes(types, mode);
    }
 
    public Statement transformToJS() {

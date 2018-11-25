@@ -52,7 +52,7 @@ public class ImportDeclaration extends AbstractErrorNode {
    }
 
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       String packagePrefix;
       boolean isQualifiedType = false;
 
@@ -67,11 +67,11 @@ public class ImportDeclaration extends AbstractErrorNode {
       else {
          packagePrefix = origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, !isQualifiedType);
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, !isQualifiedType, false, max);
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
          if (currentType != null)
-            ModelUtil.suggestMembers(origModel, currentType, identifier, candidates, true, true, true, true, 20);
+            ModelUtil.suggestMembers(origModel, currentType, identifier, candidates, true, true, true, true, max);
       }
       return matchPrefix;
    }

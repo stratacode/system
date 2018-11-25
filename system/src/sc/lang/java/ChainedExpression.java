@@ -39,11 +39,11 @@ public abstract class ChainedExpression extends Expression {
    }
 
    /** Try completing the last operand */
-   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation) {
+   public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {
       if (expression == null) {
          return -1;
       }
-      return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation);
+      return expression.suggestCompletions(prefix, currentType, ctx, command, cursor, candidates, continuation, max);
    }
 
    public boolean applyPartialValue(Object partial) {
@@ -59,9 +59,9 @@ public abstract class ChainedExpression extends Expression {
          expression.refreshBoundTypes(flags);
    }
 
-   public void addDependentTypes(Set<Object> types) {
+   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (expression != null)
-         expression.addDependentTypes(types);
+         expression.addDependentTypes(types, mode);
    }
 
    @Override

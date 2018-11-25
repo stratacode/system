@@ -8,6 +8,7 @@ import sc.lang.IDefinitionProcessor;
 import sc.lang.ILanguageModel;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.Definition;
+import sc.lang.java.JavaSemanticNode;
 import sc.lang.java.TypeDeclaration;
 
 import java.util.Set;
@@ -51,11 +52,13 @@ public interface IScopeProcessor extends IDefinitionProcessor {
     * For scope="request" this will add RequestScopeDefinition and ScopeContext because those are found in the template applied
     * during transformation. TODO: maybe the need for this method could be avoided by running addTypeLibs after we've transformed from SC to Java? Right now, we need to know the dependencies (especially entry points) during the addTypeLibs which is called from 'start'
     */
-   public void addDependentTypes(BodyTypeDeclaration td, Set<Object> types);
+   public void addDependentTypes(BodyTypeDeclaration td, Set<Object> types, JavaSemanticNode.DepTypeCtx mode);
 
    /** Return true for scopes which use a field with the name of the object name.  This is used to avoid creating the scope object if it
     * does not exist.  TODO: we should replace this with a way to call the getValue(create=false) variant on ScopeDefinition.  Requires
     * some rework though to how we generate the create=false case of the generated getObjChildren (see childrenFieldNames in ObjectDefinitionParameters)
     */
    public boolean getDefinesTypeField();
+
+   public boolean getNeedsSyncAccessHook();
 }

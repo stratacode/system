@@ -189,7 +189,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public abstract void refreshBoundTypes(int flags);
 
-   public abstract void addDependentTypes(Set<Object> types);
+   public abstract void addDependentTypes(Set<Object> types, DepTypeCtx mode);
 
    public abstract Statement transformToJS();
 
@@ -567,7 +567,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       }
    }
 
-   public static String addStatementNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
+   public static String addStatementNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
       String packagePrefix;
       boolean isQualifiedType = false;
       if (matchPrefix.contains(".")) {
@@ -586,13 +586,13 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          if (currentType == null)
             currentType = origModel.getModelTypeDeclaration();
          if (currentType != null)
-            ModelUtil.suggestMembers(origModel, currentType, matchPrefix, candidates, true, true, true, true, 20);
+            ModelUtil.suggestMembers(origModel, currentType, matchPrefix, candidates, true, true, true, true, max);
       }
       return matchPrefix;
    }
 
-   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath) {
-      return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath);
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
+      return addStatementNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
    }
 
    /** When choosing in which runtimes to run this statement, returns the member or type of the method or field used in the expression.  Not always possible to determine so return null in those other cases. */
