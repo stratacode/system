@@ -3917,6 +3917,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // Called by any clients who need to use the LayeredSystem as a sync object.  Because this class is not compiled by StrataCode, we define the sync mappings
    // explicitly through the apis.
    public void initSync() {
+      // We don't pick these types up reliably because the compiled types are used for incremental compiles so just add them all to the global filter whenever the sync system is initialized.
+      SyncManager.globalSyncTypeNames.addAll(globalSyncTypeNames);
+
       syncInited = true;
       SyncManager.SyncState old = SyncManager.getOldSyncState();
       try {

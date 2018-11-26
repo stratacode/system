@@ -54,7 +54,7 @@ public class SyncManager {
    private static Map<String,SyncManager> syncManagersByDest = new HashMap<String,SyncManager>();
    private static List<SyncManager> syncManagers = new ArrayList<SyncManager>();
    private static Map<Object, SyncProperties> globalSyncTypes = new IdentityHashMap<Object, SyncProperties>();
-   private static Set<String> globalSyncTypeNames = null;
+   public static Set<String> globalSyncTypeNames = null;
 
    private static HashMap<Object, Class> syncHandlerRegistry = new HashMap<Object, Class>();
 

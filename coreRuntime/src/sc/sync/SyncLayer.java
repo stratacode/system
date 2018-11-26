@@ -663,7 +663,7 @@ public class SyncLayer {
 
          if (syncTypeFilter != null && !parentContext.matchesTypeFilter(syncTypeFilter, objTypeName)) {
             //if (SyncManager.trace)
-               System.out.println("Omitting sync for type: " + objTypeName + ": to client - no reference in page - syncTypeFilter: " + syncTypeFilter);
+               System.out.println("Omitting sync for type: " + objTypeName + ": to client - no reference in filter for: " + parentContext);
             return;
          }
 
