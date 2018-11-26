@@ -21,7 +21,6 @@ import sc.lang.template.TemplateStatement;
 import sc.layer.*;
 import sc.obj.*;
 import sc.sync.SyncDestination;
-import sc.sync.SyncManager;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -9013,12 +9012,12 @@ public class ModelUtil {
    public static boolean isSyncEnabled(Object type) {
       if (type instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
-         if (typeDecl.getSyncProperties() != null)
+         if (typeDecl.getInheritedSyncProperties() != null)
             return true;
          // Because type is defined on the client, it may not have sync properties but still be synchronized
          // on the server.  To include "ServerToClient" mode, need to check the annotation and see if it's disabled.
          // Erring on the side of having sync enabled since this is for the type filter.
-         SyncMode syncMode = BodyTypeDeclaration.getInheritedSyncMode(typeDecl.getLayeredSystem(), typeDecl, typeDecl, SyncMode.Disabled, false);
+         SyncMode syncMode = BodyTypeDeclaration.getInheritedSyncMode(typeDecl.getLayeredSystem(), typeDecl);
          if (syncMode != null && syncMode != SyncMode.Disabled)
             return true;
       }

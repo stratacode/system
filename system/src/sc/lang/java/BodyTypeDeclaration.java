@@ -8571,6 +8571,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return syncProperties;
    }
 
+   public List<SyncProperties> getInheritedSyncProperties() {
+      List<SyncProperties> res = getSyncProperties();
+      if (res != null)
+         return res;
+      Object type = getDerivedTypeDeclaration();
+      if (type instanceof BodyTypeDeclaration) {
+         return ((BodyTypeDeclaration) type).getInheritedSyncProperties();
+      }
+      return null;
+   }
+
    public boolean isSynced(String prop) {
       JavaModel model = getJavaModel();
       // At runtime...
@@ -8614,13 +8625,47 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return parentSyncMode;
    }
 
-   public static SyncMode getInheritedSyncMode(LayeredSystem sys, Object checkType, Object parentType, SyncMode defaultSync, boolean includeSuper) {
+   /** To find out whether a type is synchronized at either the type or layer level by walking the type hierarchy */
+   public static SyncMode getInheritedSyncMode(LayeredSystem sys, Object origType) {
+      Object checkType = origType;
+      while (checkType != null) {
+         SyncMode syncMode = getTypeOrLayerSyncMode(sys, origType);
+         if (syncMode != null)
+            return syncMode;
+
+         Object extendsType = ModelUtil.getExtendsClass(checkType);
+         // Before checking the extendsType, walk down the modify chain to see if this type has an @Sync annotation in a previous layer
+         if (checkType instanceof ModifyDeclaration) {
+            ModifyDeclaration modType = (ModifyDeclaration) checkType;
+            Object derivedType = modType.getDerivedTypeDeclaration();
+            if (derivedType != null && derivedType != extendsType) {
+               checkType = derivedType;
+               while (checkType != null) {
+                  syncMode = getTypeOrLayerSyncMode(sys, checkType);
+                  if (syncMode != null) {
+                     return syncMode;
+                  }
+                  checkType = ModelUtil.getSuperclass(checkType);
+
+                  // Note: you might think that for modify types we should also be checking the extends type here.  But if we've already processed
+                  // one extends type, we have processed the extends type that will be used in the compiled result, so only have to process other modified
+                  // types here.
+               }
+            }
+         }
+         checkType = extendsType;
+      }
+      return null;
+   }
+
+   /** Called with the current type and the properties parentType.  Walks the type tree to find the first syncMode annotation at either the type or layer level. */
+   public static SyncMode getInheritedSyncModeForProp(LayeredSystem sys, Object checkType, Object propParentType, SyncMode defaultSync, boolean includeSuper) {
       SyncMode res = null;
       // Pick the last annotation we find in the type hierarchy before we find the parent of the property.  This lets
       // you turn on or off the disabled sync mode as you walk from subclass to superclass.
       while (checkType != null) {
          SyncMode parentSyncMode = getTypeOrLayerSyncMode(sys, checkType);
-         if (parentSyncMode != null && (includeSuper || checkType == parentType)) {
+         if (parentSyncMode != null && (includeSuper || checkType == propParentType)) {
             res = parentSyncMode;
          }
          else {
@@ -8628,7 +8673,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                defaultSync = parentSyncMode;
             res = null;
          }
-         if (checkType == parentType) {
+         if (checkType == propParentType) {
             return res == null ? includeSuper ? defaultSync : null : res;
          }
          Object extendsType = ModelUtil.getExtendsClass(checkType);
@@ -8646,7 +8691,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   else {
                      res = null;
                   }
-                  if (checkType == parentType) {
+                  if (checkType == propParentType) {
                      return res == null ? includeSuper ? defaultSync : null : res;
                   }
                   checkType = ModelUtil.getSuperclass(checkType);
@@ -8841,11 +8886,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   if (parentType != this) {
                      Object derivedType = getDerivedTypeDeclaration();
 
-                     SyncMode inheritSyncMode = derivedType == null ? null : getInheritedSyncMode(sys, derivedType, parentType, syncMode, includeSuper);
+                     SyncMode inheritSyncMode = derivedType == null ? null : getInheritedSyncModeForProp(sys, derivedType, parentType, syncMode, includeSuper);
                      if (inheritSyncMode == null) {
                         Object checkType = getExtendsTypeDeclaration();
                         if (derivedType != checkType && checkType != null)
-                           inheritSyncMode = getInheritedSyncMode(sys, checkType, parentType, syncMode, includeSuper);
+                           inheritSyncMode = getInheritedSyncModeForProp(sys, checkType, parentType, syncMode, includeSuper);
                      }
                      if (inheritSyncMode != null) {
                         propSyncMode = inheritSyncMode;
