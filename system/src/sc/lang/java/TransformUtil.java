@@ -244,7 +244,7 @@ public class TransformUtil {
                    "<% } %> \n" +
                    "   if (<%=lowerClassName%> == null) {\n" +
                    "      <%=variableTypeName%> _<%=lowerClassName%>;" +
-                   "      _<%=lowerClassName%> = <%=lowerClassName%> = new <%=typeName%>();\n" +
+                   "      <%=lowerClassName%> = _<%=lowerClassName%> = new <%=typeName%>();\n" +
                          "<%= customSetter %>" +
                          "<%= preAssignment %>" +
                    "      _<%=lowerClassName%>.<%=altPrefix%>preInit();\n" +
@@ -257,9 +257,9 @@ public class TransformUtil {
                    "      return <%=returnCast%>_<%=lowerClassName%>;\n" +
                    "   } \n" +
                    "   else {\n" +
-                   "      <%=variableTypeName%> _<%=lowerClassName%> = <%=lowerClassName%>;\n" +
+                   "      <%=variableTypeName%> _<%=lowerClassName%> = <%=returnCast%><%=lowerClassName%>;\n" +
                    "      <%=accessHook%>\n" +
-                   "      return <%=returnCast%>_<%=lowerClassName%>;\n" +
+                   "      return _<%=lowerClassName%>;\n" +
                    "   }\n" +
                    "}\n" +
                    "\n" +

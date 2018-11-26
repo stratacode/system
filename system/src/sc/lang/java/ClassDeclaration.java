@@ -682,7 +682,7 @@ public class ClassDeclaration extends TypeDeclaration {
          StringBuilder childNames = new StringBuilder();
          Map<String,StringBuilder> childNamesByScope = new HashMap<String,StringBuilder>();
          LinkedHashSet<String> objNames = new LinkedHashSet<String>();
-         int numChildren = addChildNames(childNames, childNamesByScope, !constructorInit ? CTypeUtil.decapitalizePropertyName(typeName) : null, false, false, false, objNames, null);
+         int numChildren = addChildNames(childNames, childNamesByScope, !constructorInit ? "_" + CTypeUtil.decapitalizePropertyName(typeName) : null, false, false, false, objNames, null);
 
          SemanticNodeList<Statement> assignments = null;
          int transformIx = -1;
