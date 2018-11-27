@@ -662,7 +662,7 @@ public class SyncLayer {
          objTypeName = DynUtil.getTypeName(changedObjType, false);
 
          if (syncTypeFilter != null && !parentContext.matchesTypeFilter(syncTypeFilter, objTypeName)) {
-            //if (SyncManager.trace)
+            if (SyncManager.trace)
                System.out.println("Omitting sync for type: " + objTypeName + ": to client - no reference in filter for: " + parentContext);
             return;
          }

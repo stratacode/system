@@ -37,9 +37,7 @@ public class ClassDeclaration extends TypeDeclaration {
       return cd;
    }
 
-   public void init() {
-      if (initialized) return;
-
+   private void initDeclType() {
       if (operator == null) {
          displayError("Invalid class - no operator - ");
       }
@@ -56,6 +54,12 @@ public class ClassDeclaration extends TypeDeclaration {
                throw new UnsupportedOperationException();
          }
       }
+   }
+
+   public void init() {
+      if (initialized) return;
+
+      initDeclType();
       super.init();
    }
 
@@ -283,7 +287,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public DeclarationType getDeclarationType() {
       if (declarationType == null && !initialized)
-         init();
+         initDeclType();
       return declarationType;
    }
 

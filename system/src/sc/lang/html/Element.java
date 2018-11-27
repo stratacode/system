@@ -4950,6 +4950,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    /**
+    * This is called when a tagObject in a shared scope is accessed from a new child scope.  We need to refresh the
+    * page in this context so that all referenced objects that need to be synchronized on the client are accessed
+    * via the "accessSyncInst" accessHook.
+    */
+   public void resetPageContext() {
+
+   }
+
+   /**
     * Can be called at startup by frameworks to allow synchronization of tag objects.  This is helpful for 'serverTags' which
     * are always rendered on the server, but the important properties can be synchronized to the client and parsed and managed with
     * a smaller code footprint, or to mix and match Javascript client tag objects with html server-side rendered objects in a single page.
