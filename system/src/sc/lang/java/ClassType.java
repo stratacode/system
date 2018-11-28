@@ -929,7 +929,7 @@ public class ClassType extends JavaType {
       if (pkgName != null) {
          if (endsWithDot)
             leafName = "";
-         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false);
+         ModelUtil.suggestTypes(model, pkgName, leafName, candidates, false, false, max);
          int csize = candidates.size();
          if (csize > 0) {
             // TODO: we had this code commented out for the rtext thing but now need it for IntelliJ
@@ -988,7 +988,8 @@ public class ClassType extends JavaType {
          else
             packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null, false, max);
+      if (!ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, packagePrefix == null, false, max))
+         return matchPrefix;
       if (origModel != null && !isQualifiedType) {
          Object currentType = origNode == null ? origModel.getModelTypeDeclaration() : origNode.getEnclosingType();
          if (currentType != null) {
@@ -997,7 +998,8 @@ public class ClassType extends JavaType {
             if (dummyIx != -1)
                useTypeName = useTypeName.substring(0, dummyIx);
 
-            ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true, max);
+            if (!ModelUtil.suggestMembers(origModel, currentType, useTypeName, candidates, true, true, true, true, max))
+               return matchPrefix;
          }
       }
       if (parentNode instanceof VariableStatement) {

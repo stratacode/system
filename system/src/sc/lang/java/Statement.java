@@ -578,7 +578,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       else {
          packagePrefix = origModel == null ? null : origModel.getPackagePrefix();
       }
-      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true);
+      ModelUtil.suggestTypes(origModel, packagePrefix, matchPrefix, candidates, true, false, max);
       if (origModel != null && !isQualifiedType) {
          Object currentType = null;
          if (origNode != null)

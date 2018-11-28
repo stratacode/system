@@ -6888,8 +6888,10 @@ public class ModelUtil {
       if (includeGlobals) {
          Object encType = getEnclosingType(type);
 
-         if (encType != null) // Include members that are visible in the namespace
-            suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false, 20);
+         if (encType != null) {// Include members that are visible in the namespace
+            if (!suggestMembers(model, encType, prefix, candidates, true, includeProps, includeMethods, false, 20))
+               return false;
+         }
          else if (model != null) { // only for the root - search the global ones
             if (!model.findMatchingGlobalNames(prefix, candidates, false, max))
                return false;
@@ -6907,8 +6909,8 @@ public class ModelUtil {
       return true;
    }
 
-   public static void suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals) {
-      suggestTypes(model, prefix, lastIdent, candidates, includeGlobals, false, 20);
+   public static boolean suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals) {
+      return suggestTypes(model, prefix, lastIdent, candidates, includeGlobals, false, 20);
    }
 
    public static boolean suggestTypes(JavaModel model, String prefix, String lastIdent, Set<String> candidates, boolean includeGlobals, boolean annotTypes, int max) {
@@ -6924,18 +6926,21 @@ public class ModelUtil {
                int dix = file.indexOf("$");
                int uix = file.indexOf("__");
                // We skip stub classes which have __ in the name
-               if (dix == -1 && (uix == -1 || uix == 0 || uix >= file.length()-2))
+               if (dix == -1 && (uix == -1 || uix == 0 || uix >= file.length()-2)) {
                   candidates.add(file);
+                  if (candidates.size() >= max)
+                     return false;
+               }
             }
          }
       }
       if (includeGlobals) {
          if (lastIdent.equals("")) {
-            if (!model.findMatchingGlobalNames(prefix, candidates, annotTypes, 20))
+            if (!model.findMatchingGlobalNames(prefix, candidates, annotTypes, max))
                return false;
          }
          else {
-            if (!model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false, annotTypes, 20))
+            if (!model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), lastIdent, candidates, false, false, annotTypes, max))
                return false;
          }
       }
@@ -6952,9 +6957,9 @@ public class ModelUtil {
          baseName = lastIdent;
       }
 
-      if (!model.findMatchingGlobalNames(absName, pkgName, baseName, candidates, annotTypes, 20))
+      if (!model.findMatchingGlobalNames(absName, pkgName, baseName, candidates, annotTypes, max))
          return false;
-      return model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false, annotTypes, 20);
+      return model.layeredSystem.findMatchingGlobalNames(null, model.getLayer(), absName, pkgName, baseName, candidates, false, false, annotTypes, max);
    }
 
    public static void suggestVariables(IBlockStatement enclBlock, String prefix, Set<String> candidates, int max) {

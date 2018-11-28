@@ -196,7 +196,7 @@ public class ClassValueExpression extends Expression {
 
       // For a.b. completions
       if (endsWithDot) {
-         ModelUtil.suggestTypes(model, typeName, "", candidates, true);
+         ModelUtil.suggestTypes(model, typeName, "", candidates, true, false, max);
 
          prefix = CTypeUtil.prefixPath(prefix, typeName);
          typeName = "";
