@@ -3878,14 +3878,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (dynObj == null)
          outputStartTag(sb, ctx);
       else
-         dynObj.invokeFromWrapper(this, "outputStartTag", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx", sb, ctx);
+         dynObj.invokeFromWrapper(this, "outputStartTag", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx;", sb, ctx);
    }
 
    private void callOutputBody(StringBuilder sb, OutputCtx ctx) {
       if (dynObj == null)
          outputBody(sb, ctx);
       else
-         dynObj.invokeFromWrapper(this, "outputBody", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx", sb);
+         dynObj.invokeFromWrapper(this, "outputBody", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx;", sb, ctx);
    }
 
    private void callOutputEndTag(StringBuilder sb, OutputCtx ctx) {
@@ -3894,7 +3894,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (dynObj == null)
          outputEndTag(sb, ctx);
       else
-         dynObj.invokeFromWrapper(this, "outputEndTag", "Ljava/lang/StringBuilder;", sb);
+         dynObj.invokeFromWrapper(this, "outputEndTag", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx;", sb, ctx);
    }
 
    public void outputStartTag(StringBuilder sb, OutputCtx ctx) {

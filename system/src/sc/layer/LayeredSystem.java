@@ -10550,6 +10550,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       //allTypesProcessed = true;
       if (sysInfo == null || sysInfo.updateInfo == null)
          return;
+      setCurrent(this);
       sysInfo.updateInfo.updateInstances(ctx);
 
       if (peerSystems != null && peerRefreshInfos != null) {
