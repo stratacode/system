@@ -89,7 +89,7 @@ if [ -d "$RUN_DIR" ] ; then
       testAns=""
       while [[ ! $testAns =~ [qQ] ]] ; 
       do
-         read -p "Enter: [h] for help or [qalovd][<i>]: " testAns
+         read -p "Enter: [h] for help or [qalovdn][<i>]: " testAns
          if [[ $testAns =~ [lL] ]] ; then
             newTestArray=($(cat ${RUN_DIR}/failed))
             echo "Failed tests:"
@@ -194,12 +194,20 @@ if [ -d "$RUN_DIR" ] ; then
                   rm -rf "$VALID_DIR/pages" 
                fi
             done
+         elif [[ $testAns =~ [nN] ]] ; then
+            let currentIndex=${currentIndex}+1; 
+            if [[ ${currentIndex} -ge ${#testArray[@]} ]] ; then
+                echo "End of tests" 
+            else
+                echo "Next test: ${currentIndex}: ${testArray[${testIndex}]}"
+            fi
          elif [[ $testAns =~ [hH] ]] ; then
-            echo "Enter: [q] - quit, [a][<i>] - accept all or one by index"
+            echo "Enter: [q] - quit, [a][<i>] - accept by index"
             echo "       [l] - list, [o]<i> - show test output"
-            echo "       [v]<i> show valid output, [d]<i> show diffs"
+            echo "       [v]<i> - show valid output, [d]<i> - show diffs"
+            echo "       [d], [o], [v] - show current diffs/output/valid, [a] accept current + next, [n] next"
          elif [[ ! $testAns =~ [qQ] ]] ; then
-             echo "Invalid: ${testAns} - enter [aqlsd][<testIndex>]"
+             echo "Invalid: ${testAns} - enter [aqlsdn][<testIndex>]"
          fi
       done
    elif [ -f "$RUN_DIR/passed" ] ; then 
