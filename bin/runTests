@@ -167,7 +167,7 @@ if [ -d "$RUN_DIR" ] ; then
                       if [[ ${currentIndex} -ge ${#testArray[@]} ]] ; then
                           echo "End of tests" 
                       else
-                          echo "Next test: ${currentIndex}: ${testArray[${testIndex}]}"
+                          echo "Next test: ${currentIndex}: ${testArray[${currentIndex}]}"
                       fi
                   fi
                fi
@@ -199,7 +199,7 @@ if [ -d "$RUN_DIR" ] ; then
             if [[ ${currentIndex} -ge ${#testArray[@]} ]] ; then
                 echo "End of tests" 
             else
-                echo "Next test: ${currentIndex}: ${testArray[${testIndex}]}"
+                echo "Next test: ${currentIndex}: ${testArray[${currentIndex}]}"
             fi
          elif [[ $testAns =~ [hH] ]] ; then
             echo "Enter: [q] - quit, [a][<i>] - accept by index"
