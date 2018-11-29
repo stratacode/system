@@ -5,6 +5,7 @@
 package sc.bind;
 
 import sc.dyn.DynUtil;
+import sc.sync.SyncManager;
 
 public abstract class AbstractMethodBinding extends DestinationListener {
    Object methObj; // Usually equal to dstObj but can be different with nested types
@@ -460,6 +461,50 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          return 0;
       }
       return 0;
+   }
+
+   public void accessBinding() {
+      if (!activated)
+         return;
+      if (direction.doForward() && !direction.doReverse() && !isRefreshDisabled()) {
+         accessBindingInternal(null);
+         return;
+      }
+   }
+
+   void accessBindingInternal(Object obj) {
+      if (activated) {
+         try {
+            // When we don't have a method object and there is no current value, we can't apply the method
+            // or it will get an RTE.
+            if (obj == null && (needsMethodObj() && methObj == null))
+               return;
+            else {
+               Object toAccess = obj == null ? methObj : obj;
+               if (toAccess != null) {
+                  accessObj(toAccess);
+
+                  if (paramValues != null) {
+                     for (int i = 0; i < paramValues.length; i++) {
+                        IBinding boundParam = boundParams[i];
+                        if (boundParam instanceof DestinationListener)
+                           ((DestinationListener) boundParam).accessBinding();
+                        Object paramValue = paramValues[i];
+                        if (paramValue != null) {
+                           accessObj(paramValue);
+                        }
+                     }
+                  }
+               }
+            }
+         }
+         catch (Throwable exc) {
+            System.err.println("*** Error accessing binding: " + this + " exception: " + exc.toString());
+            exc.printStackTrace();
+         }
+      }
+
+      // If we are not activated, we need to call applyBinding on the parent.  When it activates us, we'll be re-validated.
    }
 
    // Methods are not receiving values from reverse-only bindings.

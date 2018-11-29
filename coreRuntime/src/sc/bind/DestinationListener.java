@@ -4,7 +4,9 @@
 
 package sc.bind;
 
+import sc.dyn.DynUtil;
 import sc.obj.CurrentScopeContext;
+import sc.sync.SyncManager;
 
 /**
  * The base class for binding objects which can be the root level binding - i.e. that have
@@ -64,6 +66,14 @@ public abstract class DestinationListener extends AbstractListener implements IB
    public abstract boolean isValid();
 
    public abstract int refreshBinding();
+
+   public abstract void accessBinding();
+
+   protected void accessObj(Object obj) {
+      String scopeName = DynUtil.getScopeName(obj);
+      if (scopeName != null)
+         SyncManager.accessSyncInst(obj, scopeName);
+   }
 
    protected boolean isValidObject(Object obj) {
       return obj != null && obj != UNSET_VALUE_SENTINEL && obj != PENDING_VALUE_SENTINEL;

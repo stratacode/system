@@ -465,6 +465,36 @@ public class Bind {
       return ct;
    }
 
+   public static void accessBindings(Object dstObj, boolean doChildren) {
+      List<DestinationListener> bindings;
+      int ct = 0;
+      if (dstObj instanceof IBindingContainer) {
+         IBindingContainer bc = (IBindingContainer) dstObj;
+         bindings = bc.getBindings();
+      }
+      else {
+         synchronized (bindingContainerRegistry) {
+            bindings = bindingContainerRegistry.get(dstObj);
+         }
+      }
+      if (bindings != null) {
+         for (int i = 0; i < bindings.size(); i++)
+            bindings.get(i).accessBinding();
+      }
+
+      // We'll also remove all of the bindings on any child objects so this method becomes a simple way to dispose of
+      // a declarative tree.
+      if (doChildren) {
+         Object[] children = DynUtil.getObjChildren(dstObj, null, false);
+         if (children != null) {
+            for (Object child:children) {
+               if (child != null)
+                  accessBindings(child, true);
+            }
+         }
+      }
+   }
+
    /**
     * Refreshes the bindings attached to a single named property of the supplied destination object.  You can use this to
     * force a specific binding to be re-validated.  If the bound value has changed, the destination object's property is

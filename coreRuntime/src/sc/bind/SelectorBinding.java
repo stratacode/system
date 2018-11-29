@@ -588,6 +588,14 @@ public class SelectorBinding extends DestinationListener {
       return 0;
    }
 
+   public void accessBinding() {
+      if (!activated)
+         return;
+
+      if (direction.doForward() && !direction.doReverse()) {
+         accessObj(dstObj);
+      }
+   }
 
    public boolean isReversible() {
       return true;

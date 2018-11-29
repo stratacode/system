@@ -1158,7 +1158,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * a little confusing.
     *
     * For "OutputAll" when this tag needs an object, it is added to the parent's outputTag method
-    *      objectName.outputTag(sb);
+    *      objectName.outputTag(sb, ctx);
     *
     * For static tags (deprecated), we add the expressions needed to render this tag as content in the parent method.
     *
@@ -3023,8 +3023,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             outputBodyMethod.setProperty("parameters", template.getDefaultOutputParameters());
             outputBodyMethod.fromStatement = this;
             outputBodyMethod.initBody();
-            SemanticNodeList<Expression> outArgs = new SemanticNodeList<Expression>();
-            outArgs.add(IdentifierExpression.create("out"));
+            SemanticNodeList<Expression> outArgs = getOutputArgs(template);
             // TODO: add Options here to do this inside of the body via a new special case of "super" with no args or anything.  Manually wrap the sub-page's content.  Not sure this is necessary because of the flexibility of merging.
             // ? Optional feature: rename the outputBody method via an attribute on the super-class so that you can do customized add-ons to template types (e.g. "BodyPages" where the html, head, etc. are generated from a common wrapper template) - NOTE - now thinking this is not necessary because of the flexibility of merging
             if (bodyMerge == MergeMode.Append || bodyMerge == MergeMode.Merge) {
@@ -3520,8 +3519,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public StringBuilder output() {
+      return output(null);
+   }
+
+   public StringBuilder output(OutputCtx ctx) {
       StringBuilder sb = new StringBuilder();
-      outputTag(sb);
+      outputTag(sb, ctx);
       return sb;
    }
 
@@ -3756,7 +3759,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return repeatVal != null || this instanceof IRepeatWrapper;
    }
 
-   public void outputTag(StringBuilder sb) {
+   public void outputTag(StringBuilder sb, OutputCtx ctx) {
       if (!visible) {
          if (invisTags == null) {
             invisTags = getChildrenById(getElementId() + "_" + ALT_ID);
@@ -3764,7 +3767,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                invisTags = EMPTY_ELEMENT_ARRAY;
          }
          for (Element et:invisTags)
-            et.outputTag(sb);
+            et.outputTag(sb, ctx);
          return;
       }
 
@@ -3778,12 +3781,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (!cacheEnabled) {
          // Just re-render all tags all of the time when cache is not enabled
          if (isRepeatTag) {
-            outputRepeatBody(repeatVal, sb);
+            outputRepeatBody(repeatVal, sb, ctx);
          }
          else {
-            callOutputStartTag(sb);
-            callOutputBody(sb);
-            callOutputEndTag(sb);
+            callOutputStartTag(sb, ctx);
+            callOutputBody(sb, ctx);
+            callOutputEndTag(sb, ctx);
          }
       }
       else {
@@ -3796,7 +3799,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                outputRepeatTagMarker(sb);
             if (!bodyValid) {
                StringBuilder bodySB = new StringBuilder();
-               outputRepeatBody(repeatVal, bodySB);
+               outputRepeatBody(repeatVal, bodySB, ctx);
+               bodyCache = bodySB.toString();
+            }
+            else if (ctx != null && ctx.validateCache) {
+               StringBuilder bodySB = new StringBuilder();
+               outputRepeatBody(repeatVal, bodySB, ctx);
+               // TODO: we don't send the innerHTML event for the repeatWrapper but if we do, we'd compare the
+               // bodyCache to bodySB and only send it if it had changed.
                bodyCache = bodySB.toString();
             }
             if (bodyCache != null)
@@ -3804,9 +3814,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
          else {
             if (!bodyOnly) {
-               if (!startTagValid) {
+               if (!startTagValid || (ctx != null && ctx.validateCache)) {
                   StringBuilder newSB = new StringBuilder();
-                  callOutputStartTag(newSB);
+                  callOutputStartTag(newSB, ctx);
                   String newStartTagCache = newSB.toString();
 
                   // We're rendering the parent again.  If our startTagTxt has changed we need to record the change at this level so we can later
@@ -3819,9 +3829,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                if (startTagCache != null)
                   sb.append(startTagCache);
             }
-            if (!bodyValid) {
+            if (!bodyValid || (ctx != null && ctx.validateCache)) {
                StringBuilder bodySB = new StringBuilder();
-               callOutputBody(bodySB);
+               callOutputBody(bodySB, ctx);
                String newBody = bodySB.toString();
                if (isServerTag() && !StringUtil.equalStrings(bodyCache, newBody))
                   SyncManager.updateRemoteValue(this, "innerHTML", newBody);
@@ -3829,7 +3839,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
             if (bodyCache != null)
                sb.append(bodyCache);
-            callOutputEndTag(sb);
+            callOutputEndTag(sb, ctx);
          }
       }
    }
@@ -3838,17 +3848,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       sb.append("<span id=\'" + getId() + "' style='display:none'></span>"); // Warning - span tag cannot be 'self-closed' - TODO: is there a better tag to use here?  Meta is only supposed to be in the head section.
    }
 
-   private void outputRepeatBody(Object repeatVal, StringBuilder sb) {
+   private void outputRepeatBody(Object repeatVal, StringBuilder sb, OutputCtx ctx) {
       syncRepeatTags(repeatVal);
       markBodyValid(true);
       if (wrap) {
-         callOutputStartTag(sb);
+         callOutputStartTag(sb, ctx);
       }
       for (int i = 0; i < repeatTags.size(); i++) {
-         repeatTags.get(i).outputTag(sb);
+         repeatTags.get(i).outputTag(sb, ctx);
       }
       if (wrap) {
-         callOutputEndTag(sb);
+         callOutputEndTag(sb, ctx);
       }
    }
 
@@ -3862,32 +3872,32 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   private void callOutputStartTag(StringBuilder sb) {
+   private void callOutputStartTag(StringBuilder sb, OutputCtx ctx) {
       if ((this instanceof IRepeatWrapper && !wrap) || bodyOnly)
          return; // No start tag for repeat wrapper or when we have a tag in 'bodyOnly' mode
       if (dynObj == null)
-         outputStartTag(sb);
+         outputStartTag(sb, ctx);
       else
-         dynObj.invokeFromWrapper(this, "outputStartTag", "Ljava/lang/StringBuilder;", sb);
+         dynObj.invokeFromWrapper(this, "outputStartTag", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx", sb, ctx);
    }
 
-   private void callOutputBody(StringBuilder sb) {
+   private void callOutputBody(StringBuilder sb, OutputCtx ctx) {
       if (dynObj == null)
-         outputBody(sb);
+         outputBody(sb, ctx);
       else
-         dynObj.invokeFromWrapper(this, "outputBody", "Ljava/lang/StringBuilder;", sb);
+         dynObj.invokeFromWrapper(this, "outputBody", "Ljava/lang/StringBuilder;Lsc/lang/html/OutputCtx", sb);
    }
 
-   private void callOutputEndTag(StringBuilder sb) {
+   private void callOutputEndTag(StringBuilder sb, OutputCtx ctx) {
       if ((this instanceof IRepeatWrapper && !wrap) || bodyOnly)
          return;
       if (dynObj == null)
-         outputEndTag(sb);
+         outputEndTag(sb, ctx);
       else
          dynObj.invokeFromWrapper(this, "outputEndTag", "Ljava/lang/StringBuilder;", sb);
    }
 
-   public void outputStartTag(StringBuilder sb) {
+   public void outputStartTag(StringBuilder sb, OutputCtx ctx) {
       startTagValid = true;
       sb.append("<");
       sb.append(lowerTagName());
@@ -3899,7 +3909,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       sb.append(">");
    }
 
-   public void outputBody(StringBuilder sb) {
+   public void outputBody(StringBuilder sb, OutputCtx ctx) {
       markBodyValid(true);
    }
 
@@ -3913,7 +3923,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       startTagValid = val;
    }
 
-   public void outputEndTag(StringBuilder sb) {
+   public void outputEndTag(StringBuilder sb, OutputCtx ctx) {
       sb.append("</");
       sb.append(lowerTagName());
       sb.append(">");
@@ -3937,14 +3947,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       StringBuilder sb = new StringBuilder();
       if (repeatVal == null) {
-         outputBody(sb);
+         outputBody(sb, null);
       }
       else {
          // Do not include the repeatTagMarker in the innerHTML.  We will have rendered it already with the initial page and currently we just replace all of the
          // elements after it so if we send it again, we'd just have to remove it from the DOM.
          //if (isServerTag())
          //   outputRepeatTagMarker(sb);
-         outputRepeatBody(repeatVal,  sb);
+         outputRepeatBody(repeatVal,  sb, null);
       }
       String newInnerHTML = sb.toString();
       if (cacheEnabled)
@@ -3966,7 +3976,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             return startTagCache == null ? "" : startTagCache;
       }
       StringBuilder sb = new StringBuilder();
-      outputStartTag(sb);
+      outputStartTag(sb, null);
       String newStartTagTxt = sb.toString();
       if (cacheEnabled)
          startTagCache = newStartTagTxt;
@@ -4268,12 +4278,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (o != null)
             return o;
       }
-      if (mtype.contains(MemberType.Variable) && name.equals("out")) {
+      if (mtype.contains(MemberType.Variable)) {
          Template template = getEnclosingTemplate();
-         if (template != null) {
-            Parameter param = template.getDefaultOutputParameters();
-            param.parentNode = this;
-            return param;
+         Parameter param = template.getDefaultOutputParameters();
+         while (param != null) {
+            if (param.variableName.equals(name))
+               return param;
+            param = param.nextParameter;
          }
       }
       o = super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);

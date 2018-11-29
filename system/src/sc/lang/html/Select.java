@@ -67,32 +67,32 @@ public class Select<RE> extends HTMLElement<RE> {
    }
 
    /** Output the contents of the select tag.  If there are no options, render any option tags with the 'empty' id, or if none, render the default body of the tag. */
-   public void outputTag(StringBuilder sb) {
+   public void outputTag(StringBuilder sb, OutputCtx ctx) {
       if (optionDataSource == null || optionDataSource.size() == 0) {
            Element[] emptyIds = getChildrenById("empty");
            if (emptyIds == null) {
               // No data source specified - do the default action so this conforms to what the static HTML would produce
               if (optionDataSource == null)
-                 super.outputTag(sb);
+                 super.outputTag(sb, ctx);
               else {
                  // If there's a data source and no elements and no empty tag, just output the start and end tags.
-                 outputStartTag(sb);
-                 outputEndTag(sb);
+                 outputStartTag(sb, ctx);
+                 outputEndTag(sb, ctx);
               }
            }
            else {
-              outputStartTag(sb);
+              outputStartTag(sb, ctx);
               for (Element emptyElement:emptyIds) {
-                 emptyElement.outputTag(sb);
+                 emptyElement.outputTag(sb, ctx);
               }
-              outputEndTag(sb);
+              outputEndTag(sb, ctx);
            }
            return;
       }
 
       Element[] defChildren = getChildrenByIdAndType(null, Option.class);
 
-      outputStartTag(sb);
+      outputStartTag(sb, ctx);
       int ix = 0;
       int selIndex = getSelectedIndex();
       for (Object val: optionDataSource) {
@@ -109,11 +109,11 @@ public class Select<RE> extends HTMLElement<RE> {
             // in the canonical tag?
             Option subOption = (Option) defChildren[ix % defChildren.length];
             subOption.setOptionData(val);
-            subOption.outputTag(sb);
+            subOption.outputTag(sb, ctx);
          }
          ix++;
       }
-      outputEndTag(sb);
+      outputEndTag(sb, ctx);
    }
 
    public Map<String,IBeanMapper> getCustomServerTagProps() {

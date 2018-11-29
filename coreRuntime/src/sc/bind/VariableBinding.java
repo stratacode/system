@@ -5,6 +5,7 @@
 package sc.bind;
 
 import sc.dyn.DynUtil;
+import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
 import sc.util.CoalescedHashSet;
 import sc.util.ISet;
@@ -828,6 +829,17 @@ public class VariableBinding extends DestinationListener {
       }
       // Can't refresh bi-directional bindings
       return 0;
+   }
+
+   public void accessBinding() {
+      if (!activated)
+         return;
+      if (direction.doForward() && !direction.doReverse()) {
+         if (srcObj != null) {
+            accessObj(srcObj);
+         }
+         // TODO: should we access the boundValues here?
+      }
    }
 
    public boolean isReversible() {

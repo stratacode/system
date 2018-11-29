@@ -427,6 +427,14 @@ public class AssignmentBinding extends DestinationListener {
       return 0;
    }
 
+   public void accessBinding() {
+      if (dstObj != null)
+         accessObj(dstObj);
+      lhsBinding.accessBinding();
+      if (rhsBinding instanceof DestinationListener)
+         ((DestinationListener)rhsBinding).accessBinding();
+   }
+
    public boolean isReversible() {
       return false;
    }

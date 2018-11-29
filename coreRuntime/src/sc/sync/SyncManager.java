@@ -1206,7 +1206,7 @@ public class SyncManager {
                      if (!childII.nameQueued)
                         childII.nameQueued = true;
                   }
-                  if (syncProps.broadcast || childCtx.scope.isCurrent()) {
+                  if ((syncProps != null && syncProps.broadcast) || childCtx.scope.isCurrent()) {
                      if (childII == null) {
                         childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
                         childII.nameQueued = true;

@@ -40,8 +40,9 @@ public @interface Sync {
    /** 
     * When an object is first synchronized, the initial values for the properties are sometimes already known on the remote side.  For example, if you initialize the
     * property in code which is shared by the client and the server.  If the initial value is not known on the other side, a change is sent for that property when
-    * the object is created.  You use initDefault=true to send the initial value.  You use initDefault=false when the initial value is already known on the remote side.
-    * If you are using the auto-sync mode, the value of this property is computed automatically by comparing the initializers in the client and server runtimes.
+    * the object is created.  You use initDefault=true to send the initial value even if it's initialized in both runtimes.
+    * You can set initDefault=false when the initial value is already known on the remote side even if it's not initialized.
+    * By default, the initializers of both runtimes are compared.  If they are the same initDefault is false.
     */
    boolean initDefault() default false;
    /** 

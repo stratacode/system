@@ -9,6 +9,7 @@ import sc.lang.*;
 import sc.lang.html.ControlTag;
 import sc.lang.html.Element;
 import sc.lang.html.IStatefulPage;
+import sc.lang.html.OutputCtx;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.SCModel;
 import sc.lang.sc.ModifyDeclaration;
@@ -1243,11 +1244,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       // This tag is defined via an object definition - output the three
       SemanticNodeList<Expression> outArgs = new SemanticNodeList<Expression>();
       outArgs.add(IdentifierExpression.create("out"));
+      outArgs.add(IdentifierExpression.create("ctx"));
       return outArgs;
    }
 
    public Parameter getDefaultOutputParameters() {
-      return Parameter.create(getLayeredSystem(), new Object[] {StringBuilder.class}, new String[] {"out"}, null, getModelTypeDeclaration());
+      return Parameter.create(getLayeredSystem(), new Object[] {StringBuilder.class, OutputCtx.class}, new String[] {"out", "ctx"}, null, getModelTypeDeclaration());
    }
 
    public static Statement getExprStringOutputStatement(String exprStr) {

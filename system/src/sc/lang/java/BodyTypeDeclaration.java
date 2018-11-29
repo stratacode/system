@@ -8812,6 +8812,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       List<Object> allProps = getAllProperties(null, false);
 
+      if (typeName.contains("HelloWorld2"))
+         System.out.println("***");
+
       // If the type exists in another runtime which we are sync'ing to we should make it @Sync by default.
       BitSet matchedFilterNames = filterDestinations == null ? null : new BitSet(filterDestinations.size());
       for (int sysIx = 0; sysIx < syncSystems.size(); sysIx++) {
@@ -8862,6 +8865,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                Object propSyncAnnot = ModelUtil.getAnnotation(prop, "sc.obj.Sync");
                SyncMode propSyncMode;
                boolean propOnDemand = false;
+               boolean propInitDefault = false;
                if (propSyncAnnot != null) {
                   propSyncMode = (SyncMode) ModelUtil.getAnnotationValue(propSyncAnnot, "syncMode");
                   if (propSyncMode == null)
@@ -8870,6 +8874,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   propOnDemand = propOnDemandObj != null && propOnDemandObj;
                   if (propOnDemand)
                      propFlags |= SyncPropOptions.SYNC_ON_DEMAND;
+                  Boolean propInitDefaultObj = (Boolean) ModelUtil.getAnnotationValue(propSyncAnnot, "initDefault");
+                  propInitDefault = propInitDefaultObj != null && propInitDefaultObj;
+                  if (propInitDefault)
+                     propFlags |= SyncPropOptions.SYNC_INIT;
                }
                else {
                   propSyncMode = null;
