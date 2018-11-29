@@ -1409,11 +1409,11 @@ public class ClassDeclaration extends TypeDeclaration {
       return getInheritedAnnotation("sc.obj.Enumerated") != null;
    }
 
-   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
-      super.addDependentTypes(types, mode);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx ctx) {
+      super.addDependentTypes(types, ctx);
 
       if (extendsType != null)
-         extendsType.addDependentTypes(types, mode);
+         extendsType.addDependentTypes(types, ctx);
    }
 
 

@@ -690,20 +690,27 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return ix;
    }
 
-   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
-      super.addDependentTypes(types, mode);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx ctx) {
+      super.addDependentTypes(types, ctx);
       if (parameters != null)
-         parameters.addDependentTypes(types, mode);
+         parameters.addDependentTypes(types, ctx);
       if (throwsTypes != null)
          for (JavaType t:throwsTypes)
-            t.addDependentTypes(types, mode);
+            t.addDependentTypes(types, ctx);
 
       if (body != null)
-         body.addDependentTypes(types, mode);
+         body.addDependentTypes(types, ctx);
 
       if (typeParameters != null)
          for (TypeParameter tp:typeParameters)
-            tp.addDependentTypes(types, mode);
+            tp.addDependentTypes(types, ctx);
+      // Any remote methods?  If so, the parent type needs to be in the sync type filter so we can
+      // send replies to the method calls.
+      if (ctx.mode == DepTypeMode.RemoteMethodTypes && remoteRuntimes != null) {
+         TypeDeclaration enclType = getEnclosingType();
+         if (enclType != null)
+            types.add(enclType);
+      }
    }
 
    public JavaType[] getParameterJavaTypes(boolean convertRepeating) {

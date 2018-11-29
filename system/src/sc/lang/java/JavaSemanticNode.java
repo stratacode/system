@@ -81,7 +81,8 @@ public abstract class JavaSemanticNode extends SemanticNode {
 
    public enum DepTypeMode {
       All,
-      SyncTypes
+      SyncTypes,
+      RemoteMethodTypes
    }
 
    /** Mode parameter for addDependentTypes family of methods */
@@ -89,6 +90,10 @@ public abstract class JavaSemanticNode extends SemanticNode {
       public DepTypeMode mode;
       public boolean recursive;
       public Set<Object> visited;
+
+      public String toString() {
+         return mode + " recursive=" + recursive;
+      }
    }
 
    static class MemberCacheEnt {
@@ -677,9 +682,15 @@ public abstract class JavaSemanticNode extends SemanticNode {
          }
       }
       if (ctx.mode == DepTypeMode.SyncTypes) {
-         if (!ModelUtil.isSyncEnabled(type))
-            return;
+         if (ModelUtil.isSyncEnabled(type))
+            types.add(type);
       }
-      types.add(type);
+      // The remote method types are added from the AbstractMethodDefinition which is remote
+      else if (ctx.mode == DepTypeMode.RemoteMethodTypes)
+         return;
+      else if (ctx.mode == DepTypeMode.All)
+         types.add(type);
+      else
+         System.err.println("** Unrecognized DepTypeMode");
    }
 }

@@ -2505,13 +2505,13 @@ public class ModifyDeclaration extends TypeDeclaration {
          modifyTypeDecl.setCompiledOnly(val);
    }
 
-   public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
-      super.addDependentTypes(types, mode);
+   public void addDependentTypes(Set<Object> types, DepTypeCtx ctx) {
+      super.addDependentTypes(types, ctx);
       if (modifyTypeDecl != null)
-         modifyTypeDecl.addDependentTypes(types, mode);
+         modifyTypeDecl.addDependentTypes(types, ctx);
       if (extendsTypes != null) {
          for (JavaType t:extendsTypes)
-            t.addDependentTypes(types, mode);
+            t.addDependentTypes(types, ctx);
       }
    }
 

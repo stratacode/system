@@ -7782,17 +7782,21 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public Set<Object> getDependentTypes(DepTypeCtx mode) {
-      if (mode.mode == DepTypeMode.All && !mode.recursive && dependentTypes != null)
+   public Set<Object> getDependentTypes(DepTypeCtx ctx) {
+      if (ctx.mode == DepTypeMode.All && !ctx.recursive && dependentTypes != null)
          return dependentTypes;
+
+      if (ctx.visited != null) {
+         ctx.visited.add(this);
+      }
 
       try {
          PerfMon.start("getDependencies");
          // Use object identity for hashing the semantic nodes since their hash/equals iterates over all of the properties.
          // Also use a linked hash set so these get returned in the order in which they are added.   If they are returned in a random order, it makes the system behave inconsistently - i.e. not generating JS script files in a consistent order
          LinkedIdentityHashSet<Object> types = new LinkedIdentityHashSet<Object>();
-         addDependentTypes(types, mode);
-         if (mode.mode == DepTypeMode.All && !mode.recursive)
+         addDependentTypes(types, ctx);
+         if (ctx.mode == DepTypeMode.All && !ctx.recursive)
             dependentTypes = types;
          return types;
       }
@@ -8811,9 +8815,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       List<Object> allProps = getAllProperties(null, false);
-
-      if (typeName.contains("HelloWorld2"))
-         System.out.println("***");
 
       // If the type exists in another runtime which we are sync'ing to we should make it @Sync by default.
       BitSet matchedFilterNames = filterDestinations == null ? null : new BitSet(filterDestinations.size());

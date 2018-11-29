@@ -9035,9 +9035,10 @@ public class ModelUtil {
          System.err.println("*** Unable to get sync types from compiled class!");
       else {
          if (!sys.hasActiveRuntime("js"))
-            return null;
+            return Collections.emptySet();
          LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
          Object jsType = jsSys.getRuntimeTypeDeclaration(ModelUtil.getTypeName(type));
+         HashSet<String> syncTypeNames = null;
          if (jsType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration jsTypeDecl = (BodyTypeDeclaration) jsType;
             JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
@@ -9045,16 +9046,34 @@ public class ModelUtil {
             ctx.recursive = true;
             ctx.visited = new IdentityHashSet<Object>();
             Set<Object> syncTypes = jsTypeDecl.getDependentTypes(ctx);
-            HashSet<String> syncTypeNames = new HashSet<String>(syncTypes.size());
-            for (Object syncType:syncTypes) {
-               syncTypeNames.add(ModelUtil.getTypeName(syncType));
+            if (syncTypes.size() > 0) {
+               syncTypeNames = new HashSet<String>(syncTypes.size());
+               for (Object syncType:syncTypes) {
+                  syncTypeNames.add(ModelUtil.getTypeName(syncType));
+               }
             }
-            if (jsTypeDecl.getSyncProperties() != null)
+            if (jsTypeDecl.getSyncProperties() != null) {
+               if (syncTypeNames == null)
+                  syncTypeNames = new HashSet<String>(syncTypes.size());
                syncTypeNames.add(jsTypeDecl.getFullTypeName());
-            return syncTypeNames;
+            }
          }
+         BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
+         JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
+         ctx.mode = JavaSemanticNode.DepTypeMode.RemoteMethodTypes;
+         ctx.recursive = true;
+         ctx.visited = new IdentityHashSet<Object>();
+         Set<Object> methTypes = typeDecl.getDependentTypes(ctx);
+         if (methTypes.size() > 0) {
+            if (syncTypeNames == null)
+               syncTypeNames = new HashSet<String>(methTypes.size());
+            for (Object methType:methTypes) {
+               syncTypeNames.add(ModelUtil.getTypeName(methType));
+            }
+         }
+         return syncTypeNames;
       }
-      return null;
+      return Collections.emptySet();
    }
 
 }
