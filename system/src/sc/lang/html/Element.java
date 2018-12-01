@@ -3014,8 +3014,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          */
 
          if (uniqueChildren != null) {
-            if (tagName != null && tagName.equals("head"))
-               System.out.println("***");
             // Generate the outputBody method
             MethodDefinition outputBodyMethod = new MethodDefinition();
             outputBodyMethod.name = "outputBody";
