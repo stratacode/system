@@ -30,6 +30,12 @@ public class Attr extends Node implements ISrcStatement {
    // Is this an href or other URL reference
    public transient boolean link = false;
 
+   enum QuoteType {
+      Single, Double, Unknown
+   }
+
+   public transient QuoteType quoteType;
+
    // The Element tag which defined this attribute
    public transient Element declaringTag;
 
@@ -121,6 +127,15 @@ public class Attr extends Node implements ISrcStatement {
       Object attValue = value;
       Expression init = null;
       String op = "=";
+      HTMLLanguage htmlLang = HTMLLanguage.getHTMLLanguage();
+      Parselet p = getValueParselet();
+
+      if (p == htmlLang.attributeValueSQLiteral)
+         quoteType = QuoteType.Single;
+      else if (p == htmlLang.attributeValueLiteral)
+         quoteType = QuoteType.Double;
+      else
+         quoteType = QuoteType.Unknown;
       if (PString.isString(attValue)) {
          String attStr = attValue.toString();
          String opStr = getOperationFromExpression(attStr);
@@ -236,6 +251,24 @@ public class Attr extends Node implements ISrcStatement {
          valueExpr = init;
          this.op = op;
       }
+   }
+
+   private Parselet getValueParselet() {
+      if (parseNode instanceof ParentParseNode) {
+         ParentParseNode ppn = (ParentParseNode) parseNode;
+         if (ppn.children != null && ppn.children.size() == 3) {
+            Object valueChild = ppn.children.get(1);
+            if (valueChild instanceof ParentParseNode) {
+               ParentParseNode cpn = (ParentParseNode) valueChild;
+               if (cpn.children != null && cpn.children.size() == 2) {
+                  Object childChild = cpn.children.get(1);
+                  if (childChild instanceof IParseNode)
+                     return ((IParseNode) childChild).getParselet();
+               }
+            }
+         }
+      }
+      return null;
    }
 
    public Attr deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {

@@ -9034,9 +9034,11 @@ public class ModelUtil {
       if (!(type instanceof BodyTypeDeclaration))
          System.err.println("*** Unable to get sync types from compiled class!");
       else {
+         LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
          if (!sys.hasActiveRuntime("js"))
             return Collections.emptySet();
-         LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
+         if (jsSys == null)
+            System.out.println("*** getJSSyncTypes called on wrong system: " + sys.getProcessIdent()); // Happens if we call it from the JS system itself
          Object jsType = jsSys.getRuntimeTypeDeclaration(ModelUtil.getTypeName(type));
          HashSet<String> syncTypeNames = null;
          if (jsType instanceof BodyTypeDeclaration) {

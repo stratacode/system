@@ -1201,6 +1201,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         continue; // draw nothing for =: bindings that happen to be on HTML attributes
                      Expression outputExpr = att.getOutputExpr();
                      boolean isConstant = outputExpr == null || outputExpr instanceof StringLiteral;
+                     char quoteChar = att.quoteType == Attr.QuoteType.Single ? '\'' : '"';
                      if (!inactive && (!staticContentOnly || isConstant)) {
                         if (isBooleanAttribute(att.name) && outputExpr != null && !(outputExpr instanceof StringLiteral)) {
                            if (str.length() > 0) {
@@ -1217,7 +1218,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            str.append("=");
                            if (outputExpr == null || (outputExpr instanceof StringLiteral && StringUtil.equalStrings(att.op, "="))) {
                               if (att.isString()) {
-                                 str.append("\'");
+                                 str.append(quoteChar);
 
                                  if (att.name.equals("id") && needsObject) {
                                     Expression expr = StringLiteral.create(str.toString());
@@ -1231,19 +1232,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                                  else {
                                     str.append(att.getOutputString());
                                  }
-                                 str.append("\'");
+                                 str.append(quoteChar);
                               }
                               else {
                                  System.err.println("*** unrecognized type in attribute list");
                               }
                            }
                            else {
-                              str.append("\"");
+                              str.append(quoteChar);
                               Expression strExpr = StringLiteral.create(str.toString());
                               strExpr.fromStatement = att;
                               strExprs.add(strExpr);
                               str = new StringBuilder();
-                              str.append("\"");
+                              str.append(quoteChar);
                               Expression outputExprCopy = (Expression) outputExpr.deepCopy(ISemanticNode.CopyNormal, null);
                               // If this is a comparison operator like foo != bar it needs to be wrapped to be combined with a + b + ...
                               if (outputExpr.needsParenWrapper())
@@ -1255,7 +1256,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                               if (exprType != null && ModelUtil.isString(exprType)) {
                                  SemanticNodeList<Expression> escArgs = new SemanticNodeList<Expression>();
                                  escArgs.add(outputExprCopy);
-                                 Expression escExpr = IdentifierExpression.createMethodCall(escArgs, "escAtt");
+                                 escArgs.add(BooleanLiteral.create(att.quoteType == Attr.QuoteType.Single));
+                                 Expression escExpr = IdentifierExpression.createMethodCall(escArgs, "sc.lang.html.Element.escAtt");
                                  escExpr.fromStatement = att;
                                  strExprs.add(escExpr);
                               }
@@ -3012,6 +3014,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          */
 
          if (uniqueChildren != null) {
+            if (tagName != null && tagName.equals("head"))
+               System.out.println("***");
             // Generate the outputBody method
             MethodDefinition outputBodyMethod = new MethodDefinition();
             outputBodyMethod.name = "outputBody";
@@ -4576,15 +4580,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void setHovered(boolean ignored) {
    }
 
-
-   // TODO: make escAtt and escBody static?
-   public String escAtt(CharSequence in) {
+   public static String escAtt(CharSequence in, boolean singleQuote) {
       if (in == null)
          return null;
-      return StringUtil.escapeQuotes(in);
+      return StringUtil.escapeQuotes(in, singleQuote);
    }
 
-   public String escBody(Object in) {
+   public static String escBody(Object in) {
       if (in == null)
          return null;
       return StringUtil.escapeHTML(in.toString(), false).toString();

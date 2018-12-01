@@ -337,9 +337,15 @@ public class CurrentScopeContext {
       String scopeName = DynUtil.getScopeNameForType(typeObj);
       if (scopeName != null) {
          for (ScopeContext ctx:scopeContexts) {
-            if (ctx.getScopeDefinition().name.equals(scopeName)) {
+            if (ctx.getScopeDefinition().getExternalName().equals(scopeName))
                return ctx.getSingletonForType(typeObj);
-            }
+         }
+         // TODO: including the parent scopes in this search but maybe we should create the CurrentScopeContext with all required scopes?
+         // thinking of adding a compile time search for "dependent scopes" that uses the getDependentTypes code.
+         for (ScopeContext ctx:scopeContexts) {
+            ScopeContext parCtx = ctx.getParentContext(scopeName);
+            if (parCtx != null)
+               return parCtx.getSingletonForType(typeObj);
          }
       }
       return null;

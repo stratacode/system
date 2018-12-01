@@ -1182,8 +1182,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    private boolean mergeStringInOutput(BlockStatement block, Expression expr, String str, ISrcStatement nextSrcSt) {
       if ((expr == null || expr instanceof StringLiteral) && (block.statements != null && block.statements.size() > 1)) {
          Statement st = block.statements.get(getLastOutStatementPos(block));
+         // This got escaped when we made the StringLiteral so need to unescape before we combine it
          if (str == null && expr != null)
-            str = ((StringLiteral) expr).value;
+            str = CTypeUtil.unescapeJavaString(((StringLiteral) expr).value);
          if (st != null && st instanceof IdentifierExpression) {
             IdentifierExpression lastOutExpr = (IdentifierExpression) st;
             if (lastOutExpr.arguments != null && lastOutExpr.arguments.size() == 1 && lastOutExpr.identifiers.size() == 2 && lastOutExpr.identifiers.get(0).equals("out") && lastOutExpr.identifiers.get(1).equals("append")) {

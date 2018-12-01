@@ -182,4 +182,19 @@ public abstract class ScopeContext {
       return firstInst;
    }
 
+   public ScopeContext getParentContext(String scopeName) {
+      if (parentContexts != null) {
+         for (ScopeContext ctx:parentContexts) {
+            if (ctx.getScopeDefinition().getExternalName().equals(scopeName))
+               return ctx;
+         }
+         for (ScopeContext ctx:parentContexts) {
+            ScopeContext parCtx = ctx.getParentContext(scopeName);
+            if (parCtx != null)
+               return null;
+         }
+      }
+      return null;
+   }
+
 }

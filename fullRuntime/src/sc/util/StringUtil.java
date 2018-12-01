@@ -223,8 +223,11 @@ public class StringUtil {
       return sb;
    }
 
-   public static String escapeQuotes(CharSequence in) {
-      return in.toString().replace("'","&apos;").replace("\"", "&quot;");
+   public static String escapeQuotes(CharSequence in, boolean singleQuote) {
+      if (singleQuote)
+         return in.toString().replace("'","&apos;");
+      else
+         return in.toString().replace("\"", "&quot;");
    }
 
    private static StringBuilder appendBuffer(StringBuilder sb, String str, CharSequence input, int i) {

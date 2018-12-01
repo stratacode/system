@@ -2071,6 +2071,15 @@ public class IdentifierExpression extends ArgumentsExpression {
             case GetSetMethodInvocation:
                isType = false;
                Object thisObj = getRootFieldThis(this, boundTypes[0], ctx, false);
+               if (thisObj == null) {
+                  jmodel = getJavaModel();
+                  if (jmodel.commandInterpreter != null) {
+                     TypeDeclaration exprEnclType = getEnclosingType();
+                     if (exprEnclType instanceof AbstractInterpreter.CmdClassDeclaration) {
+                        thisObj = DynUtil.resolveName("cmd", true);
+                     }
+                  }
+               }
                value = getPropertyValueForType(thisObj, 0);
                break;
 
