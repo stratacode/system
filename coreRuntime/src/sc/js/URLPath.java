@@ -5,14 +5,13 @@
 package sc.js;
 
 import sc.obj.Constant;
-import sc.type.CTypeUtil;
 
 /**
  * A simple model object used to represent the information required to render a link for a URL
  * for the URLPaths property in a tag object.
  */
 @JSSettings(jsLibFiles="js/tags.js", prefixAlias="sc_")
-public class URLPath {
+public class URLPath implements Comparable {
    @Constant
    public String url;
    @Constant
@@ -82,5 +81,16 @@ public class URLPath {
 
    public String toString() {
       return name + ":" + url + " (key=" + keyName + ")";
+   }
+
+   public void convertToRelativePath() {
+      if (url.startsWith("/") && url.length() > 1)
+         url = url.substring(1);
+   }
+
+   public int compareTo(Object o) {
+      if (!(o instanceof URLPath))
+         return -1;
+      return name.compareTo(((URLPath) o).name);
    }
 }

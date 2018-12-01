@@ -691,6 +691,9 @@ public class BuildInfo {
                if (memb.hasAnnotation("sc.html.URL"))
                   continue;
                URLPath path = new URLPath(memb.templatePathName);
+               if (!system.serverEnabled) {
+                  path.convertToRelativePath();
+               }
                if (!res.contains(path))
                   res.add(path);
             }
@@ -719,6 +722,9 @@ public class BuildInfo {
                }
                if (annotURL != null && system.serverEnabled)
                   path.url = annotURL;
+               if (!system.serverEnabled) {
+                  path.convertToRelativePath();
+               }
                if (!res.contains(path))
                   res.add(path);
             }
@@ -727,6 +733,7 @@ public class BuildInfo {
       finally {
          system.releaseDynLock(false);
       }
+      Collections.sort(res);
       return res;
    }
 
