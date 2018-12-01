@@ -191,7 +191,7 @@ public abstract class ScopeContext {
          for (ScopeContext ctx:parentContexts) {
             ScopeContext parCtx = ctx.getParentContext(scopeName);
             if (parCtx != null)
-               return null;
+               return parCtx;
          }
       }
       return null;
