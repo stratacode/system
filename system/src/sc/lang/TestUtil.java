@@ -747,6 +747,17 @@ public class TestUtil {
 
                Object modelObj = getTestResult(node);
 
+               if (modelObj instanceof ISemanticNode) {
+                  String serFileName = FileUtil.replaceExtension(fileName, "binf");
+                  ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName);
+
+                  ISemanticNode deserModel = (ISemanticNode) ParseUtil.deserializeModel(serFileName);
+                  if (!deserModel.equals(modelObj))
+                     error("Deserialize - results do not match!");
+                  else
+                     out("Serialized models match");
+               }
+
                StringBuilder sb = new StringBuilder();
 
                if (opts.enableModelToString)

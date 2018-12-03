@@ -5671,7 +5671,9 @@ public class ModelUtil {
       Object innerType = ModelUtil.getInnerType(baseType, typeName, null);
       if (innerType != null)
          return innerType;
-      return sys.getTypeDeclaration(typeName, false, refLayer, false);
+      if (sys != null)
+         return sys.getTypeDeclaration(typeName, false, refLayer, false);
+      return null;
    }
 
    public static Object resolveSrcTypeDeclaration(LayeredSystem sys, Object type) {

@@ -219,7 +219,7 @@ public class ChainedResultSequence extends Sequence {
    /**
     * If there is a propagated element we'll only apply the mappings to that guy.
     */
-   protected Class getSemanticValueSlotClass() {
+   public Class getSemanticValueSlotClass() {
       return slotResultClass;
    }
 

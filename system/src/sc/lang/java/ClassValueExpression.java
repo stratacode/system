@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.bind.ConstantBinding;
 import sc.lang.SemanticNodeList;
+import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.util.StringUtil;
@@ -73,9 +74,10 @@ public class ClassValueExpression extends Expression {
                   typeDecl.enableNeedsCompiledClass();
             }
             else {
+               LayeredSystem sys = typeDecl.getLayeredSystem();
                // Do not optimize away this class when someone needs that class.
                // Don't set this during the transform phase for ClassValue expressions we create at runtime.  We'll already have compiled the code for the
-               if (!typeDecl.getLayeredSystem().allTypesProcessed) {
+               if (sys != null && !sys.allTypesProcessed) {
                   typeDecl.needsOwnClass = true;
                }
             }

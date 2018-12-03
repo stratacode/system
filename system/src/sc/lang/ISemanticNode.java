@@ -4,6 +4,8 @@
 
 package sc.lang;
 
+import sc.binf.BinfInStream;
+import sc.binf.BinfOutStream;
 import sc.js.JSSettings;
 import sc.obj.EditorSettings;
 import sc.parser.IParseNode;
@@ -29,6 +31,8 @@ import java.util.List;
 public interface ISemanticNode {
    public void setParseNode(IParseNode pn);
    public IParseNode getParseNode();
+
+   public void setParseletId(int id);
 
    @EditorSettings(visible=false)
    public ISemanticNode getParentNode();
@@ -175,4 +179,6 @@ public interface ISemanticNode {
 
    /** Returns number of nodes in this tree for helping to diagnose memory use */
    public int getNodeCount();
+
+   public void serialize(BinfOutStream out);
 }

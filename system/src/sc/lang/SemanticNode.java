@@ -4,6 +4,9 @@
 
 package sc.lang;
 
+import sc.binf.BinfConstants;
+import sc.binf.BinfOutStream;
+import sc.binf.BinfInStream;
 import sc.js.JSSettings;
 import sc.lang.java.*;
 import sc.layer.SrcEntry;
@@ -35,6 +38,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
     * contains the model's definition in its parsed value.
     */
    transient public IParseNode parseNode;
+   transient public int parseletId = -1;
    transient public boolean parseNodeInvalid = false;
 
    transient public ISemanticNode parentNode;
@@ -232,7 +236,17 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    public void setParseNode(IParseNode pn) {
+      // We want the parselet which first creates each semantic value - it's SemanticValueClass will match the class of the type.
+      // Ordinarily the parseNode is set to the last parselet to modify the semanticValue - it can be a more generic parselet which has
+      // populated additional properties.
+      if (parseNode == null && pn != null) {
+         parseletId = pn.getParselet().id;
+      }
       parseNode = pn;
+   }
+
+   public void setParseletId(int id) {
+      parseletId = id;
    }
 
    @EditorSettings(visible=false)
@@ -512,7 +526,9 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
          if (thisProp != otherProp &&
                 (thisProp == null || otherProp == null ||
-                   !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp)))) {
+                   !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) :
+                           // If thisProp is a String and otherProp is an IString we need to compare it the other way around
+                           (thisProp instanceof String ? otherProp.equals(thisProp) : thisProp.equals(otherProp))))) {
             return false;
          }
       }
@@ -1064,4 +1080,37 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       }
       return ct;
    }
+
+   public void serialize(BinfOutStream out) {
+      if (parseletId == -1) {
+         if (out.currentListId == -1)
+            System.err.println("** Unable to serialize semantic node without parseletId");
+         else {
+            if (((NestedParselet) out.lang.getParseletById(out.currentListId)).getSemanticValueComponentClass() != getClass())
+               System.err.println("*** Mismatching parslet list slot class!");
+            out.writeUInt(BinfConstants.ListElementId);
+         }
+      }
+      else {
+         out.writeUInt(parseletId);
+         if (out.lang.getParseletById(parseletId).getSemanticValueSlotClass() != getClass())
+            System.err.println("*** Mismatching parslet slot class!");
+      }
+         /*
+      if (parseNode != null) {
+         if (parseNode.getParselet().id != parseletId)
+            System.err.println("*** Mismatching parselet and id!");
+         if (parseNode.getParselet().getSemanticValueClass() != getClass())
+            System.err.println("*** Mismatching parselet semantic value class!");
+      }
+         */
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] semanticProps = type.getSemanticPropertyList();
+      for (int i = 0; i < semanticProps.length; i++) {
+         IBeanMapper mapper = semanticProps[i];
+         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         out.writeValue(val);
+      }
+   }
+
 }

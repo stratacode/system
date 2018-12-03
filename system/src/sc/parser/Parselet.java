@@ -26,8 +26,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    String name;
 
-   // TODO: problem with using ids in the parse nodes is that we have no way of mapping back to the language from the parse node... might even use the parselet to get the language in some cases. 
-   //short id = -1; // An index into the Language.parseletsById table representing this parselet - using short for space in parseNodes
+   // TODO: problem with using ids in the parse nodes to replace the parselet pointer is that we have no way of mapping back to the language from the parse node... might even use the parselet to get the language in some cases.
+   // We had this as an optimization where we used a short for the id
+
+   public int id = -1; // An index into the Language.parseletsById table representing this parselet
 
    public boolean trace = false; // DEBUG ONLY
 
@@ -896,7 +898,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     *
     * @return the class for the semantic value for this slot.
     */
-   protected Class getSemanticValueSlotClass() {
+   public Class getSemanticValueSlotClass() {
       return getSemanticValueClass();
    }
 

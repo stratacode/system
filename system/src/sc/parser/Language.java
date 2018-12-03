@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.binf.BinfConstants;
 import sc.dyn.RDynUtil;
 import sc.lang.ILanguageModel;
 import sc.layer.*;
@@ -90,7 +91,7 @@ public abstract class Language extends LayerFileComponent {
    public String defaultExtension = null;
 
    public Map<String,Parselet> parseletsByName = new HashMap<String,Parselet>();
-   //public ArrayList<Parselet> parseletsList = new ArrayList<Parselet>();
+   public ArrayList<Parselet> parseletsList = new ArrayList<Parselet>();
 
    public Language() {
       this(null);
@@ -823,8 +824,8 @@ public abstract class Language extends LayerFileComponent {
          Parselet replaced = parseletsByName.put(key, p);
          if (replaced != null && replaced != p)
             System.err.println("*** Warning: two parselets with the same name: " + p.getName() + " key: " + key);
-         //p.id = parseletsList.size();
-         //parseletsList.add(p);
+         p.id = BinfConstants.NumReservedIds + parseletsList.size();
+         parseletsList.add(p);
       }
 
       if (!rootOnly) {
@@ -858,11 +859,9 @@ public abstract class Language extends LayerFileComponent {
       return parseletsByName.get(name);
    }
 
-/*
    public Parselet getParseletById(int id) {
-      return parseletsList.get(id);
+      return parseletsList.get(id - BinfConstants.NumReservedIds);
    }
-*/
 
    public Parselet findMatchingParselet(Parselet old) {
       String name = convertNameToKey(old.getName());

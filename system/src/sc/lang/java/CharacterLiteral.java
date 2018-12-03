@@ -7,7 +7,7 @@ package sc.lang.java;
 import sc.type.CTypeUtil;
 
 public class CharacterLiteral extends AbstractLiteral {
-   public char charValue;
+   public transient char charValue; // Computed from 'value' which is set in the grammar
 
    public void init() {
       if (value != null) {
@@ -34,6 +34,7 @@ public class CharacterLiteral extends AbstractLiteral {
    public static CharacterLiteral create(Character literalValue) {
       CharacterLiteral cl = new CharacterLiteral();
       cl.charValue = literalValue.charValue();
+      cl.value = literalValue.toString();
       return cl;
    }
 

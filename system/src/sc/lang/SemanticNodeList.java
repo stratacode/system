@@ -4,6 +4,8 @@
 
 package sc.lang;
 
+import sc.binf.BinfConstants;
+import sc.binf.BinfOutStream;
 import sc.lifecycle.ILifecycle;
 import sc.parser.*;
 import sc.type.CTypeUtil;
@@ -17,6 +19,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
    // TODO: performance - turn into bitfields - 6 bytes => 1
    transient public boolean parseNodeInvalid = false;
+   transient public int parseletId = -1;
    transient protected boolean initialized;
    transient protected boolean started;
    transient protected boolean transformed;
@@ -58,10 +61,20 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    }
 
    public void setParseNode(IParseNode pn) {
+      // We want the parselet which first creates each semantic value - it's SemanticValueClass will match the class of the type.
+      // Ordinarily the parseNode is set to the last parselet to modify the semanticValue - it can be a more generic parselet which has
+      // populated additional properties.
+      if (parseNode == null && pn != null) {
+         parseletId = pn.getParselet().id;
+      }
       parseNode = pn;
    }
    public IParseNode getParseNode() {
       return parseNode;
+   }
+
+   public void setParseletId(int id) {
+      parseletId = id;
    }
 
    public ISemanticNode getParentNode() {
@@ -683,8 +696,11 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          Object thisProp = get(i);
          if (thisProp != otherProp &&
                  (thisProp == null || otherProp == null ||
-                         !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) : thisProp.equals(otherProp))))
+                         !(thisProp instanceof ISemanticNode ? ((ISemanticNode) thisProp).deepEquals(otherProp) :
+                                 // If thisProp is a String and otherProp is an IString we need to compare it the other way around
+                                 (thisProp instanceof String ? otherProp.equals(thisProp) : thisProp.equals(otherProp))))) {
             return false;
+         }
       }
       return true;
    }
@@ -817,5 +833,26 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          if (get(i) == elem)
             return i;
       return -1;
+   }
+
+   public void serialize(BinfOutStream out) {
+      int saveCurrentListId = out.currentListId;
+      out.currentListId = parseletId;
+      if (parseNode != null && !parseNode.getParselet().getSemanticValueIsArray()) {
+         // This is a generic list of different sub-types.  The class of the sub-type is determined in the sub-parselet like normal
+         out.writeUInt(BinfConstants.ListId);
+      }
+      else {
+         // Here we save the lists parseletId because we need to use it's component type as the element type since the element may not have it's own parseNode
+         out.writeUInt(parseletId);
+      }
+
+      int sz = size();
+      out.writeUInt(sz);
+      for (int i = 0; i < sz; i++) {
+         Object val = get(i);
+         out.writeValue(val);
+      }
+      out.currentListId = saveCurrentListId;
    }
 }

@@ -4,6 +4,8 @@
 
 package sc.parser;
 
+import sc.binf.BinfInStream;
+import sc.binf.BinfOutStream;
 import sc.lang.*;
 import sc.lang.java.JavaModel;
 import sc.lang.java.JavaSemanticNode;
@@ -1263,5 +1265,49 @@ public class ParseUtil  {
       }
       // Is this reached?  Shouldn't there always be a common parent?
       return null;
+   }
+
+   public static void serializeModel(ISemanticNode node, String serFileName, String origFileName) {
+      FileOutputStream fos = null;
+      DataOutputStream dos = null;
+      try {
+         fos = new FileOutputStream(serFileName);
+         dos = new DataOutputStream(new BufferedOutputStream(fos));
+         BinfOutStream out = new BinfOutStream(dos);
+         out.serialize(node, FileUtil.getExtension(origFileName));
+         dos.flush();
+      }
+      catch (FileNotFoundException fnf) {
+         throw new IllegalArgumentException("File not found: " + serFileName + ": " + fnf);
+      }
+      catch (IOException exc) {
+         throw new IllegalArgumentException("IOException: " + serFileName + ": " + exc);
+      }
+      finally {
+         FileUtil.safeClose(dos);
+         FileUtil.safeClose(fos);
+      }
+   }
+
+   public static ISemanticNode deserializeModel(String serFileName) {
+      FileInputStream fis = null;
+      DataInputStream dis = null;
+      try {
+         fis = new FileInputStream(serFileName);
+         dis = new DataInputStream(new BufferedInputStream(fis));
+         BinfInStream in = new BinfInStream(dis);
+         in.initStream();
+         Object rootNode = in.readValue();
+         if (rootNode instanceof ISemanticNode)
+            return (ISemanticNode) rootNode;
+         throw new IllegalArgumentException("Invalid type of rootNode in deserializeModel");
+      }
+      catch (FileNotFoundException fnf) {
+            throw new IllegalArgumentException("File not found: " + serFileName + ": " + fnf);
+      }
+      finally {
+         FileUtil.safeClose(dis);
+         FileUtil.safeClose(fis);
+      }
    }
 }
