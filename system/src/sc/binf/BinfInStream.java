@@ -2,6 +2,7 @@ package sc.binf;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.lang.java.PrimitiveType;
 import sc.parser.*;
 import sc.type.*;
 
@@ -72,7 +73,6 @@ public class BinfInStream {
          int parseletId = readUInt();
          Object res;
          Class cl;
-         boolean listElem = false;
          if (parseletId < 0) {
             System.err.println("*** Unable to read parselet with invalid id");
             return null;
@@ -141,8 +141,11 @@ public class BinfInStream {
                      // Using "SemanticValueSlotClass" instead of just SemanticValueClass because of classes like ChainedResultSequence.  SemanticValueClass is the parent class of the
                      // child and this match - e.g. Expression.  SlotValueClass is the class when this parselets rule is used - e.g. BinaryExpression.  If the child matches, it's parseNode
                      // will already have been set and so it's parseletId will be the child's parselet.  So I think we always want to use the SlotValueClass.
-                     cl = parselet.getSemanticValueSlotClass();
-                     isList = parselet.getSemanticValueIsArray();
+                     isList = parselet.getNewSemanticValueIsArray();
+                     if (isList)
+                        cl = parselet.getSemanticValueComponentClass();
+                     else
+                        cl = parselet.getSemanticValueSlotClass();
                   }
                   if (isList) {
                      int saveCurrentListId = currentListId;
@@ -150,6 +153,7 @@ public class BinfInStream {
                      SemanticNodeList<Object> resList = readList();
                      currentListId = saveCurrentListId;
                      res = resList;
+                     resList.setParseletId(parseletId);
                      cl = null; // No need to do conversion here
                   }
                   else {

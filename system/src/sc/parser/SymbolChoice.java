@@ -4,6 +4,8 @@
 
 package sc.parser;
 
+import sc.lang.ISemanticNode;
+
 import java.util.*;
 
 public class SymbolChoice extends Parselet {
@@ -472,6 +474,15 @@ public class SymbolChoice extends Parselet {
          else
             return parseError(parser, customError, this);
       }
+   }
+
+   // Only should be called for parselets that produce a node which needs to be re-registered.  SymbolChoice produces
+   // a string that will be a property in the model which can be skipped during the restore operation.
+   public Object restore(Parser parser, ISemanticNode oldModel, RestoreCtx rctx, boolean inherited) {
+      if (oldModel != null)
+         System.err.println("*** Invalid symbol choice restore!");
+
+      return parse(parser); // We really just need to advance the pointer here but for now just do a normal parse
    }
 
    public String toHeaderString(Map<Parselet,Integer> visited) {

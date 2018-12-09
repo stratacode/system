@@ -8,6 +8,7 @@ import sc.dyn.DynUtil;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.BodyTypeDeclaration;
+import sc.lang.java.PrimitiveType;
 import sc.lifecycle.ILifecycle;
 import sc.type.RTypeUtil;
 import sc.util.StringUtil;
@@ -129,6 +130,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    // Was this parselet named directly by a field of the language it was defined in (as opposed to being a child of one of the parselets with a field)
    public boolean fieldNamed = false;
+
+   public boolean semanticValueMultiTypedArray = false;
 
    /** For syntax coloring, represents the style name for this element */
 
@@ -279,6 +282,23 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return parser.parseResult(this, value, skipSemanticValue);
    }
 
+   public Object restoreResult(Parser parser, ISemanticNode oldModel, Object value, boolean skipSemanticValue) {
+      Object res = parseResult(parser, value, skipSemanticValue);
+
+      if (res instanceof IParseNode) {
+         if (oldModel != null) {
+            oldModel.setParseNode((IParseNode) res);
+            ((IParseNode) res).setSemanticValue(oldModel, false);
+         }
+      }
+      return res;
+   }
+
+   public void restoreOldNode(IParseNode pn, ISemanticNode oldModel) {
+      oldModel.setParseNode(pn);
+      pn.setSemanticValue(oldModel, false);
+   }
+
    public boolean addResultToParent(Object node, ParentParseNode parent, int index, Parser parser) {
       // Exclude this entirely from the result
       if (getDiscard() || getLookahead())
@@ -394,6 +414,10 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    public boolean getSemanticValueIsArray() {
       return repeat && !treatValueAsScalar;
+   }
+
+   public boolean getNewSemanticValueIsArray() {
+      return getSemanticValueIsArray();
    }
 
    public Class getSemanticValueComponentClass() {
@@ -600,6 +624,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     * The main parse method for the parselet.  Use the supplied parser and generate a 'result' either a CharSequence or an IParseNode.
     */
    public abstract Object parse(Parser p);
+
+   /** The parselet method to re-create the parse node tree given the resulting model. */
+   public abstract Object restore(Parser p, ISemanticNode oldModel, RestoreCtx ctx, boolean inherited);
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
       //dctx.updateStateForPosition(parser.currentIndex);
@@ -826,6 +853,12 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return (other == this) || (other.language != language && other.getName().equals(getName()));
    }
 
+   public boolean producesParseletId(int otherId) {
+      if (id == otherId)
+         return true;
+      return false;
+   }
+
    public boolean typeMatches(Object sv, boolean isElement) {
       if (isElement)
          return elementTypeMatches(sv);
@@ -944,10 +977,19 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
          IParseNode resNode = (IParseNode) res;
          Object resVal = resNode.getSemanticValue();
          if (resVal instanceof ISemanticNode) {
-            ((ISemanticNode) resVal).setParseNode(resNode);
+            ISemanticNode resSN = (ISemanticNode) resVal;
+            // If we were the original parselet to produce the cached result, need to update it.  Otherwise, we might be
+            // caching up higher on the parselet hierarchy - i.e. where we are using a parent node in a different context.  In this
+            // case, it's the child node's parselet which still produces the node (TODO: is this always true?)
+            if (resNode.getParselet() == this)
+               resSN.setParseNode(null); // Need to set it to null first, so this acts like a new parselet updating this for the first time (i.e. to update the parseletId)
+            resSN.setParseNode(resNode);
          }
          ((IParseNode) res).setErrorNode(false);
       }
    }
 
+   public boolean getSemanticValueMultiTypedArray() {
+      return semanticValueMultiTypedArray;
+   }
 }

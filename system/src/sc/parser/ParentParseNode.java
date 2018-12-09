@@ -113,6 +113,72 @@ public class ParentParseNode extends AbstractParseNode {
       }
    }
 
+   /**
+    * Adds a child parse node to this parent node for the given child parselet for the 'restore operation'.  The svIndex can be used for multi-valued
+    * parselets to add the semantic-value to a specific array index for reparsing.  Usually it's -1 for appending the element.
+    * The index specifies the slot index of the parselet 'p' in the parent.  If skipSemanticValue is true, the parse node is
+    * added without updating the semantic value.
+    */
+   public int addForRestore(Object node, Parselet p, int svIndex, int index, boolean skipSemanticValue, Parser parser, boolean reparsed) {
+      if (reparsed)
+         return add(node, p, svIndex, index, skipSemanticValue, parser);
+
+      if (children == null)
+         children = new ArrayList<Object>(parselet.parselets.size());
+
+      boolean addChild = true;
+
+      // Special case for adding a string to an "omitted" node.  In this case,
+      // we'll just accumulate one string as our value.  When this guy gets
+      // added to its parentNode, it will get removed and the string goes on to represent
+      // all of this element's children.
+      if (node instanceof StringToken || node == null) {
+         if (p.getDiscard() || p.getLookahead()) {
+            if (node != null)
+               return 0;
+            // TODO: else - is this the right code path here?
+         }
+         if (p.skip && !(parselet.needsChildren())) {
+            if (children.size() == 1) {
+               Object child = children.get(0);
+               if (child instanceof StringToken) {
+                  // For null nodes, be careful not to add an empty slot here cause then the next string won't get appended
+                  if (node != null)
+                     children.set(0, StringToken.concatTokens((StringToken) child, (StringToken) node));
+                  addChild = false;
+               }
+            }
+         }
+      }
+      else if (node instanceof String) {
+         if (p.discard || p.lookahead)
+            return 0;
+         if (p.skip && !(parselet.needsChildren())) {
+            if (children.size() == 1) {
+               Object child = children.get(0);
+               if (child instanceof String) { // TODO: should this be PString.isString?  See issue#24 where we are not collapsing string tokens into a single parse node
+                  // this is n*n - the need to avoid the Strings...
+                  children.set(0, ((String) child) + ((String) node));
+                  addChild = false;
+               }
+            }
+         }
+      }
+      else if (node instanceof IParseNode) {
+         IParseNode pnode = (IParseNode) node;
+         Parselet childParselet = pnode.getParselet();
+
+         if (!childParselet.addResultToParent(pnode, this, index, parser))
+            return 0;
+      }
+
+      if (addChild)
+         children.add(node);
+
+      // Only nested parselets should be using the ParentParseNode
+      return parselet.restoreSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false, null);
+   }
+
    public void cullUnparsedNodes(Parser parser, int svCount, int startChild, DiffContext dctx) {
       int sz = children.size();
       for (int c = startChild; c < sz; c++) {

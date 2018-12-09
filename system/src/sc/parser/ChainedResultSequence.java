@@ -8,14 +8,14 @@ import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.type.TypeUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This class alters the behavior of how the result is produced for this sequence.  If the second value
- * in the sequence is null, we use the first value.  If both values are defined, we choose the default
- * production for a sequence using the mappings.
- * During the parsing process, the addResultToParent method will select the semantic value of the first slot if
- * the second slot is null.
+ * A ChainedResultSequence is a special type of Sequence that always has 2 children.  The second child is
+ * always parsed as 'optional'.  If the second child is not parsed, the sequence just passes through the semantic
+ * value of the first child - the specific property mapping of this parselet is ignored.  If the second child is parsed,
+ * the normal rules for a Sequence are used to produce the semantic value are applied.
  */
 public class ChainedResultSequence extends Sequence {
    Class slotResultClass;
@@ -79,8 +79,9 @@ public class ChainedResultSequence extends Sequence {
 
    public Object propagateResult(Object node) {
       ParentParseNode pnode = (ParentParseNode) node;
-      if (pnode.children.get(1) == null)
-         return pnode.children.get(0);
+      ArrayList<Object> pc = pnode.children;
+      if (pc.get(1) == null)
+         return pc.get(0);
       return pnode;
    }
 
@@ -296,6 +297,15 @@ public class ChainedResultSequence extends Sequence {
       return parselets.get(1).producesParselet(other);
    }
 
+   public boolean producesParseletId(int otherId) {
+      if (super.producesParseletId(otherId))
+         return true;
+
+      if (parselets.get(0).producesParseletId(otherId))
+         return true;
+      return parselets.get(1).producesParseletId(otherId);
+   }
+
    public boolean dataTypeMatches(Object other) {
       if (super.dataTypeMatches(other))
          return true;
@@ -346,5 +356,129 @@ public class ChainedResultSequence extends Sequence {
     */
    protected boolean disableExtendedErrors() {
       return true;
+   }
+
+   protected Object getSlotSemanticValue(int slotIx, ISemanticNode semanticValue, RestoreCtx rctx) {
+      boolean chainedSlotMatches = getSemanticValueSlotClass().isInstance(semanticValue);
+      Parselet defaultParselet = parselets.get(0);
+      boolean defaultSlotMatches = defaultParselet.getSemanticValueClass().isInstance(semanticValue);
+      int pId = semanticValue.getParseletId();
+      boolean producedByParent = false;
+      if (pId != -1) {
+         // The result may have been produced by this parselet (e.g. BinaryExpression), or one of the children.
+         if (pId != id) {
+            if (defaultParselet.producesParseletId(pId)) {
+               if (!defaultSlotMatches)
+                  System.err.println("*** Invalid case!");
+            }
+            else if (defaultSlotMatches)
+               defaultSlotMatches = false;
+
+            if (parselets.get(1).producesParseletId(pId)) {
+               if (!chainedSlotMatches)
+                  System.err.println("*** Invalid case!");
+            }
+            else {
+               if (chainedSlotMatches)
+                  chainedSlotMatches = false;
+            }
+         }
+         else {
+            producedByParent = true;
+            if (defaultSlotMatches)
+               defaultSlotMatches = false;
+         }
+      }
+
+      if (slotIx == 0) {
+         if (chainedSlotMatches) {
+            Object mapping = slotMapping[0];
+            try
+            {
+               Object chainValue = rctx.getPropertyValue(semanticValue, mapping);
+
+               if (chainValue == null && defaultSlotMatches)
+                  return semanticValue;
+               else if (chainValue == null)
+                  return SKIP_CHILD;
+               else if (!defaultSlotMatches)
+                  return chainValue;
+               else
+                  return semanticValue;
+            }
+            catch (IllegalArgumentException exc) {
+               System.err.println("*** Unable to map chain slot for parselet");
+            }
+         }
+         if (!defaultSlotMatches)
+            System.err.println("*** Warning - invalid case?");
+         return semanticValue;
+      }
+      else if (slotIx == 1) {
+         if (chainedSlotMatches) {
+            if (parameterMapping[1] == ParameterMapping.PROPAGATE)
+               return semanticValue;
+            else {
+               try {
+                  Object slotVal = rctx.getPropertyValue(semanticValue, slotMapping[1]);
+                  if (slotVal instanceof List) {
+                     rctx.listProp = true;
+                  }
+                  return slotVal;
+               }
+               catch (IllegalArgumentException exc) {
+                  System.err.println("*** Unable to map chain slot for parselet");
+               }
+            }
+         }
+      }
+
+      if (chainedSlotMatches)
+         return semanticValue;
+      return SKIP_CHILD;
+   }
+
+   public Object restore(Parser parser, ISemanticNode oldNode, RestoreCtx rctx, boolean inherited) {
+      Object mapping = slotMapping[0];
+      Object chainedValue = null;
+
+      // Look at the value for the first slot.  If there is no property at all, it
+      // may have been produced from the first slot - the default which does not apply the mapping.
+      // It is also possible the semantic value has that property mapping but is was not when parsed originally.
+      // In either case, this will restore only the first slot and from getSlotMapping above, return SKIP_CHILD
+      // for the second slot.
+      //
+      // The weird case is when there is a value for the property, but it does not match the default parselet.  We need to
+      // then use the rule for the second slot to do the restore, but where we hide the chained property so that child
+      // ChainedResultSequences won't see this property and take the wrong path.  The property was not set by the child
+      // when it was originally parsed - instead it's set as it passes through this node, hence the need to hide it here.
+
+      Parselet defaultParselet = parselets.get(0);
+
+      boolean chainedSlotMatches = getSemanticValueSlotClass().isInstance(oldNode);
+      //boolean defaultSlotMatches = defaultParselet.getSemanticValueClass().isInstance(oldNode);
+
+      if (chainedSlotMatches) {
+         try {
+            chainedValue = rctx.getPropertyValue(oldNode, mapping);
+         }
+         catch (IllegalArgumentException exc)
+         {}
+      }
+
+      boolean masked = false;
+      // Though we have a chained value, it's type does not match the slot.  We need to mask that property off
+      // so that it does not confused the parent match.
+      if (chainedValue != null && !defaultParselet.dataTypeMatches(chainedValue)) {
+         rctx.maskProperty(oldNode, mapping, null);
+         masked = true;
+      }
+
+      Object res = super.restore(parser, oldNode, rctx, inherited);
+
+      if (masked)
+         rctx.unmaskProperty(oldNode, mapping);
+
+      return res;
    }
 }

@@ -4,6 +4,8 @@
 
 package sc.parser;
 
+import sc.lang.ISemanticNode;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -145,6 +147,15 @@ public class Symbol extends Parselet {
          err.eof = hitEOF;
          return err;
       }
+   }
+
+   // Only should be called for parselets that produce a node which needs to be re-registered.  Symbol always produces
+   // a string that will be a property in the model which can be skipped during the restore operation.
+   public Object restore(Parser parser, ISemanticNode oldModel, RestoreCtx rctx, boolean inherited) {
+      if (oldModel != null)
+         System.err.println("*** Invalid symbol restore!");
+
+      return parse(parser); // We really just need to advance the pointer here but for now just do a normal parse
    }
 
    String acceptMatch(Parser parser, StringToken matchedValue, int lastStart, int current) {

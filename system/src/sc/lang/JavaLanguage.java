@@ -169,7 +169,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public Sequence expressionList = new Sequence("([],[])", expression,
                                           new Sequence("(,[])", OPTIONAL | REPEAT, comma, expression));
    Sequence optExpressionList = new Sequence("(.)", OPTIONAL, expressionList);
-   Sequence arguments = new SemanticSequence("<arguments>(,[],)", openParen, new Sequence("([])", OPTIONAL, expressionList), closeParenSkipOnError);
+   Sequence arguments = new SemanticSequence("<arguments>(,[],)", openParen, new Sequence("([])", OPTIONAL, expressionList), closeParenSkipOnError); // TODO: replace 'expressList' here with optExpressionList which is a clone of expressionList where we set OPTIONAL as a flag.  That way we eliminate one parselet in the grammar and don't replicate the code for expressionList.
    Sequence optArguments = new Sequence("(.)", OPTIONAL, arguments);
    {
       // If there are no arguments here, we still need to generate output for the "arguments" sequence so we do not
@@ -369,7 +369,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    */
    public SymbolSpace endStatement = semicolonEOL;
    ChainedResultSequence primaryExpression =
-                                // If the optional second part matches, we get either a SelectorExpress or PostFixUnary.  Set that's chainedExpression
+                                // If the optional second part matches, we get either a SelectorExpression or PostFixUnaryExpression.  Set that's chainedExpression
                                 // property to the primary part of the expression.
       new ChainedResultSequence("<primaryExpression>(chainedExpression,.)", primary,
                                 // When selectorExpression and postfixUnaryExpression match, set the expression property of the postFixUnary and return that

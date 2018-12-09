@@ -33,6 +33,7 @@ public interface ISemanticNode {
    public IParseNode getParseNode();
 
    public void setParseletId(int id);
+   public int getParseletId();
 
    @EditorSettings(visible=false)
    public ISemanticNode getParentNode();

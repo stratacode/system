@@ -751,11 +751,40 @@ public class TestUtil {
                   String serFileName = FileUtil.replaceExtension(fileName, "binf");
                   ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName);
 
-                  ISemanticNode deserModel = (ISemanticNode) ParseUtil.deserializeModel(serFileName);
+                  long startDeserTime = System.currentTimeMillis();
+                  ISemanticNode deserModel = ParseUtil.deserializeModel(serFileName);
+                  long endDeserTime = System.currentTimeMillis();
+
+                  out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
+
                   if (!deserModel.equals(modelObj))
                      error("Deserialize - results do not match!");
-                  else
+                  else {
                      out("Serialized models match");
+
+                     long startRestoreTime = System.currentTimeMillis();
+                     Object restored = lang.restore(fileName, deserModel, false);
+                     long endRestoreTime = System.currentTimeMillis();
+                     out("Restored: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
+
+                     if (restored instanceof ParseError || restored == null)
+                        error("Invalid return from restore - should always restore to a valid parse node.");
+
+                     if (restored instanceof IParseNode) {
+                        if (deserModel.getParseNode() != restored)
+                           error("*** Error - model not updated with parse node tree!");
+
+                        if (!restored.toString().equals(result.toString()))
+                           error("Restored parse node does not match");
+                        else {
+                           // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
+                           out("Restored parse node successfully");
+                        }
+                     }
+
+                  }
+
+
                }
 
                StringBuilder sb = new StringBuilder();

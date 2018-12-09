@@ -106,8 +106,7 @@ public class ParseUtil  {
          return (String) result;
       if (result instanceof ParentParseNode)
          return ((ParentParseNode) result).toString();
-      if (result instanceof ParseNode)
-      {
+      if (result instanceof ParseNode) {
          ParseNode node = (ParseNode) result;
          if (node.value == null)
              return null;
@@ -1310,4 +1309,73 @@ public class ParseUtil  {
          FileUtil.safeClose(fis);
       }
    }
+
+   /*
+    * TODO: to do the validation properly we really need to involve the parselet and basically replicate the entire
+    * parse method logic so we know how to navigate from parse-node parent to child and semantic value parent to child
+    * in a way that's consistent with the grammar.
+   public static boolean validateParseNode(IParseNode pn) {
+      return validateParseNode(pn, true);
+   }
+
+   private static boolean validateParseNode(IParseNode pn, boolean checkPN) {
+      Object semVal = pn.getSemanticValue();
+      Parselet p = pn.getParselet();
+      if (semVal instanceof ISemanticNode) {
+         ISemanticNode semNode = (ISemanticNode) semVal;
+         if (checkPN && semNode.getParseNode() != pn) {
+            System.err.println("Mismatching parse node and semantic value for: " + p);
+            return false;
+         }
+      }
+
+      if (semVal == null && !p.optional) {
+         System.err.println("*** Null value for required parselet: " + p);
+         return false;
+      }
+
+      if (pn instanceof ParentParseNode) {
+         ParentParseNode ppn = (ParentParseNode) pn;
+         if (!(p instanceof NestedParselet)) {
+            System.err.println("*** non-nested parselet for nested parse node: " + p);
+            return false;
+         }
+         NestedParselet np = (NestedParselet) p;
+         if (ppn.children == null) {
+            System.err.println("*** No children for parent parse node: " + p);
+            return false;
+         }
+
+         int numPN = ppn.children.size();
+         int numP = np.parselets.size();
+         if (numPN != numP) {
+            if (!np.repeat) {
+               System.err.println("*** Wrong number of children for nested parselet " + np);
+               return false;
+            }
+            else if (p instanceof Sequence && numPN != 0 && numPN < numP) {
+               System.err.println("*** Wrong number of children for repeat sequence nested parselet " + np);
+               return false;
+            }
+         }
+
+         for (int i = 0; i < numPN; i++) {
+            Object child = ppn.children.get(i);
+            Parselet childP = np.parselets.get(i % numPN);
+            if (child == null) {
+               if (!childP.optional) {
+                  System.err.println("*** Null parse node for required child: " + childP);
+                  return false;
+               }
+            }
+            if (child instanceof IParseNode) {
+               if (!validateParseNode(((IParseNode) child))) {
+                  return false;
+               }
+            }
+         }
+      }
+      return true;
+   }
+   */
 }

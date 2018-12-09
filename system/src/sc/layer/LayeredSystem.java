@@ -4004,7 +4004,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private void initLayerIndexSync() {
       for (LayerIndexInfo lii:allLayerIndex.values()) {
-         lii.layer.initSync();;
+         lii.layer.initSync();
       }
    }
 

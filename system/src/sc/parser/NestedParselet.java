@@ -66,6 +66,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     */
    Object[] slotMapping = null;
 
+   /** Override's parameterMapping when specified - TODO: can we remove this? */
    String[] genMapping = null;
 
    int propagatedValueIndex = -1;
@@ -805,7 +806,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                      if (!getSemanticValueIsArray()) {
                         // Child is a scalar...
-                        if (!childParselet.getSemanticValueIsArray() && !List.class.isAssignableFrom(childParselet.getSemanticValueClass())) {
+                        if (!childIsArray && !List.class.isAssignableFrom(childParselet.getSemanticValueClass())) {
                            if (currentValueIndex == index) {
                               if (language.trackChanges || !(element instanceof ISemanticNode)) {
                                  GenerateError err = regenerateChild(parentParseNode, childParselet, element, i, changeType);
@@ -987,6 +988,10 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
    public boolean getSemanticValueIsArray() {
       return repeat && chainedPropertyMappings == null;
+   }
+
+   public boolean getNewSemanticValueIsArray() {
+      return getSemanticValueIsArray() || parameterType == ParameterType.ARRAY;
    }
 
    /**
@@ -1795,6 +1800,386 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return valueCount;
    }
 
+   public int restoreSemanticValue(ParentParseNode parent, Object node, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, boolean replaceValue, boolean reparse, Object replacedValue) {
+      if (trace && parser.enablePartialValues)
+         System.out.println("*** setting semantic value of traced element");
+
+      // The number to add onto childIndex for the next child node - 0 (skip this node - use the same index, 1 = for scalar semantic values, > 0 when concatenating arrays
+      int valueCount = skipSemanticValue ? 0 : 1;
+
+      int sequenceSize = parselets.size();
+
+      if (!skipSemanticValue && !parser.matchOnly) {
+         if ((resultClass != null || resultDynType != null) && !getSkip()) {
+            if (parent.value == null) {
+               // If we are propagating a value and have a result class specified, we wait to create this until
+               // we see if the propagated value is null or not.  It only gets created if it is null.
+               if (propagatedValueIndex == -1) {
+                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()), !reparse);
+                  System.out.println("*** Should not get here because value should be set right?");
+               }
+            }
+
+            // If this is a repeating sequence which produces an object for each element, we create that first element here when setting the first slot (e.g. maybe the '.' in a ClassType)
+            // Later in processSlotMappings, we'll grab this element and update it's properties.  For the reparse case, it's possible we already have an element we can just update.
+            if (slotIndex == 0 && getSemanticValueIsArray()) {
+               SemanticNodeList parentList = (SemanticNodeList) parent.value;
+               if (childIndex == -1 || parentList.size() <= childIndex) {
+                  System.out.println("*** Also should not get here because value should be set right?");
+                  Object newElement = createInstance(parser, resultClass);
+                  parentList.add(newElement, true, false);
+               }
+               // TODO: else - do we need to check if the element parentList.get(childIndex) is an instanceof resultClass?
+            }
+         }
+
+         if (parameterMapping != null) {
+            if (slotIndex >= parameterMapping.length)
+               System.out.println("*** Invalid slot index in parameter mapping!");
+            switch (parameterMapping[slotIndex]) {
+               case SKIP:
+                  valueCount = 0;
+                  break;
+
+               case NAMED_SLOT:
+                  // For named slots with arrays we only count a value when we match the last node (i.e. we process the slot mappings
+                  if (getSemanticValueIsArray()) {
+                     valueCount = slotIndex == sequenceSize - 1 ? 1 : 0;
+                  }
+                  break;
+
+               case PROPAGATE:
+                  Object sval = ParseUtil.nodeToSemanticValue(node);
+
+                  // This is the case where we have both a resultClass and are propagating a child value up.
+                  // If the child value is null, we create an instance of the class specified by the parent.
+                  if (sval == null && resultClassName != null) {
+                     sval = createInstance(parser, getSemanticValueClass());
+                  }
+
+                  // If we are reparsing, do not clear the semantic value - That ends up clearing all properties and
+                  // for example when we are propagating slot mappings, we'll clear out properties we need to reset them
+                  // on the new value.
+                  parent.setSemanticValue(sval, !reparse);
+
+                  // We are propagating the node's value - override the node we store for
+                  // this semantic node's parse node.
+                  if (parent.value instanceof ISemanticNode && node instanceof ISemanticNode) {
+                     ((ISemanticNode) node).setParentNode((ISemanticNode) parent.value);
+                  }
+                  break;
+
+               case STRING:
+                  /* Concatenate the node to the current string - if we have StringTokens, try to keep
+                     the string tokens and just increment the length to avoid string copying.
+                   */
+                  if (node instanceof IParseNode) {
+                     Object sv = ((IParseNode) node).getSemanticValue();
+                     if (sv != null) {
+                        if (parent.value == null)
+                           parent.value = sv;
+                        else if (parent.value instanceof StringToken && sv instanceof StringToken)
+                           parent.value = StringToken.concatTokens((StringToken) parent.value, (StringToken) sv);
+                        else {
+                           parent.value = parent.value.toString() + sv.toString();
+                        }
+                     }
+                  }
+                  else if (parent.value == null) {
+                     parent.value = node;
+                  }
+                  else if (node instanceof StringToken) {
+                     if (parent.value instanceof StringToken) {
+                        parent.value = StringToken.concatTokens((StringToken) parent.value, (StringToken) node);
+                        //((StringToken)parentNode.value).len += ((StringToken) node).len;
+                     }
+                     else {
+                        parent.value = PString.toIString(parent.value.toString() + node.toString());
+                     }
+                  }
+                  else if (node instanceof CharSequence) {
+                     parent.value = PString.toIString(parent.value.toString() + node.toString());
+                  }
+                  break;
+
+               case ARRAY:
+                  boolean appendArray = repeat || (slotIndex > 0 && hasPreviousArray(slotIndex));
+                  //if (appendArray && repeat && (!hasPreviousArray(slotIndex) || slotIndex == 0))
+                  //   System.out.println("***");
+                  if (node instanceof IParseNode) {
+                     IParseNode childNode = (IParseNode) node;
+                     Object sv = childNode.getSemanticValue();
+                     if (sv instanceof List) {
+                        if (parent.value == null) {
+                           parent.setSemanticValue(sv, !reparse);
+                           valueCount = childNode.getNumSemanticValues();
+                        }
+                        else if (replaceValue) {
+                           parent.value = sv;
+                           valueCount = childNode.getNumSemanticValues();
+                        }
+                        else {
+                           if (childIndex == -1) {
+                              SemanticNodeList parentNode = (SemanticNodeList) parent.value;
+                              if (parentNode != sv)
+                                 parentNode.addAll((List) sv, true, false);
+                           }
+                           else if (sv != parent.value) {
+                              // Two different cases here - if we have a pattern like ([], []) we are combining two arrays and
+                              // so need to replace the old one starting at childIndex with the new one.  This case probably requires
+                              // more work in more complex situations of reparsing
+                              // The other case is (,[],) where we have childIndex == 1 but it is all one array.
+                              if (childIndex > 0 && appendArray) {
+                                 SemanticNodeList parentList = (SemanticNodeList) parent.value;
+                                 List newList = (List) sv;
+                                 int newSize = newList.size();
+                                 int oldSize = parentList.size();
+                                 // The new list is smaller than the old one so trim the old one down first
+                                 while (oldSize > newSize + childIndex) {
+                                    parentList.remove(oldSize - 1, false);
+                                    oldSize--;
+                                 }
+                                 for (int newIx = 0; newIx < newSize; newIx++) {
+                                    if (newIx + childIndex < parentList.size())
+                                       parentList.set(newIx + childIndex, newList.get(newIx), true, false);
+                                    else
+                                       parentList.add(newList.get(newIx), true, false);
+                                 }
+                                 valueCount = newSize;
+                              }
+                              else {
+                                 // TODO: Are there any cases where this is not the right thing?
+                                 parent.value = sv;
+                                 valueCount = childNode.getNumSemanticValues();
+                              }
+                           }
+                           else {
+                              // Here we need to figure out how many elements were produced as part of the 'node'
+                              // so that the upstream parselet can figure out how many to skip.
+                              valueCount = childNode.getNumSemanticValues();
+                           }
+                        }
+                     }
+                     else if (sv != null) {
+                        SemanticNodeList snl;
+                        if (parent.value == null)
+                           parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                        else
+                           snl = (SemanticNodeList) parent.value;
+                        if (childIndex == -1 || snl.size() <= childIndex)
+                           snl.add(sv, true, false);
+                        else
+                           snl.set(childIndex, sv, true, false);
+                     }
+                     // sv == null has no value so don't increment the svcount
+                     else
+                        valueCount = 0;
+                  }
+                  else if (node != null) {
+                     SemanticNodeList snl;
+                     if (parent.value == null)
+                        parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                     else
+                        snl = (SemanticNodeList) parent.value;
+                     if (childIndex == -1 || snl.size() <= childIndex)
+                        snl.add(node, true, false);
+                     else
+                        snl.set(childIndex, node, true, false);
+                  }
+                  // TODO: should this be optional?  We need some empty list to hold the semantic value to differentiate
+                  // between foo() and foo.
+                  else {
+                     SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
+                     if (values == null) {
+                        values = new SemanticNodeList(0);
+                        parent.setSemanticValue(values, !reparse);
+                     }
+                     if (childIndex == -1 || values.size() <= childIndex) {
+                        // If we are just propagating the array value of one of our children and that value has a null we clear the value we are propagating.
+                        // Maybe we should set this to null here?
+                        if (propagatesArray() && !allowNullElements) {
+                           if (values.size() > 0)
+                              values.clear(false);
+                        }
+                        else {
+                           // This is false for typical identifier expression "a." but for partial values we need
+                           // to preserve that null
+                           if (allowNullElements)
+                              values.add(null, true, false);
+                           else if (allowEmptyPartialElements && parser.enablePartialValues)
+                              values.add(PString.EMPTY_STRING, true, false);
+                        }
+                     }
+                     else {
+                        // If this parselet is adding to a regular array deal with the specific index.  If it's propagating an array value, the null
+                        // needs to clear out the old value
+                        if (!propagatesArray()) {
+                           if (allowNullElements)
+                              values.set(childIndex, null, true, false);
+                           else if (allowEmptyPartialElements && parser.enablePartialValues)
+                              values.set(childIndex, PString.EMPTY_STRING, true, false);
+                           else
+                              values.remove(childIndex, false);
+                        }
+                        else {
+                           // TODO: for the cases when we are combining two arrays, how can we map from slot index to array range
+                           // to update this correctly?
+                           values.clear(false);
+                        }
+                     }
+                  }
+
+                  break;
+               /*
+                * This is the case where we want to set properties on the parentNode node from the child node
+                * as we walk up the tree.  The parentNode node specifies "*" in the slot for the child node.
+                * The child node just lists the properties it wants to set on the parentNode.
+                */
+               case INHERIT:
+                  if (node instanceof ParentParseNode) {
+                     ParentParseNode pnode = (ParentParseNode) node;
+                     NestedParselet childParselet = pnode.parselet;
+                     processInheritedSlotMappings(parent, childParselet, pnode, childIndex, reparse);
+                  }
+                  else if (node != null && !(node instanceof ErrorParseNode))
+                     System.err.println("*** The '*' operator produced a parse node of type: " + node.getClass() + " when it should have produced a ParentParseNode");
+                     // This is the case where we are reparsing and we now have a null where we used to have a value with inherited property assignments.  We need to
+                     // process these assignments with the null value on the old-node's child parselet
+                  else if (reparse && replacedValue instanceof ParentParseNode && node == null) {
+                     ParentParseNode replacedNode = (ParentParseNode) replacedValue;
+                     processInheritedSlotMappings(parent, replacedNode.parselet, null, childIndex, reparse);
+                  }
+                  break;
+            }
+         }
+      }
+
+      // This is the case where we have an error in the slot - when we are reparsing, we can't always skip the update as we
+      // may need to update it to remove whatever was in this slot.
+      if (skipSemanticValue && reparse) {
+         if (parameterMapping != null && slotIndex != -1) {
+            switch (parameterMapping[slotIndex]) {
+               case SKIP:
+                  break;
+
+               case PROPAGATE:
+                  break;
+
+               case STRING:
+                  break;
+
+               case ARRAY:
+                  SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
+                  if (values != null) {
+                     if (propagatesArray())
+                        values.clear(false);
+                     else if (childIndex != -1 && values.size() > childIndex)
+                        values.remove(childIndex, false);
+                  }
+                  break;
+               /*
+                * This is the case where we want to set properties on the parentNode node from the child node
+                * as we walk up the tree.  The parentNode node specifies "*" in the slot for the child node.
+                * The child node just lists the properties it wants to set on the parentNode.
+                */
+               case INHERIT:
+                  break;
+            }
+         }
+      }
+
+      if (slotIndex == sequenceSize - 1) {
+         int childrenSize = parent.children.size();
+
+         int startIx = childrenSize - sequenceSize;
+         if (startIx < 0)
+            startIx = 0;
+
+         // For non string/array parslets, we should always expect an even number of children for a parse.  But when reparsing or parsing partial values
+         // we might have a null where we expect a value and so end up with the wrong parse index using the above algorithm.  This is a quick fix for those types
+         // of problems.  It's at least a good way to catch those problems but for now is a workaround.
+         if (startIx != 0 && childrenSize % sequenceSize != sequenceSize - 1 && parameterType != ParameterType.STRING && parameterType != ParameterType.ARRAY) {
+            int newStartIx = (((childrenSize + 1) / sequenceSize) - 1) * sequenceSize;
+
+            startIx = newStartIx;
+         }
+
+         // We're given the starting index during the reparse case.  For reparse, we are not always using the childrenSize to figure out how many elements to process.
+         if (reparse && childIndex != -1 && repeat && getSemanticValueIsArray()) {
+            startIx = childIndex * sequenceSize;
+         }
+
+         Object toProcess = null;
+
+         if (chainedPropertyMappings != null) {
+
+            /* The last element of the second and subsequent sequences starts this processing */
+            if (childrenSize > sequenceSize) {
+               // Create a new parent parse node - pull off the last three children from "parent"
+               // set new value as the semantic value for the new parse node
+               ParentParseNode newParent = (ParentParseNode) newParseNode();
+
+               for (int tm = startIx; tm < parent.children.size(); )
+                  newParent.addGeneratedNode(parent.children.remove(startIx));
+
+               /* Create the new parse node which will hold this result */
+               Object newValue = createInstance(parser, getSemanticValueClass());
+               newParent.setSemanticValue(newValue, !reparse);
+
+               Object lastParent = parent.getSemanticValue();
+               Object lastNode = TypeUtil.getPropertyValue(lastParent, chainedPropertyMappings[1]);
+               ParentParseNode lastParseNode = parent;
+               while (lastParseNode.children.size() == 3) {
+                  lastParseNode = (ParentParseNode) lastParseNode.children.get(2);
+                  lastParent = lastNode;
+                  lastNode = TypeUtil.getPropertyValue(lastNode, chainedPropertyMappings[1]);
+                  if (lastNode == null)
+                     throw new IllegalArgumentException("Unable to follow chained property for: " + this);
+               }
+               /*
+               for (int ix = sequenceSize-1; ix < parent.children.size(); ix++) {
+                  lastParent = lastNode;
+                  lastNode = TypeUtil.getPropertyValue(lastNode, chainedPropertyMappings[1]);
+                  if (lastNode == null)
+                     throw new IllegalArgumentException("Unable to follow chained property for: " + this);
+               }
+               */
+
+               /* Set the chained property in the old node to point to this new one */
+               setSemanticProperty(newValue, chainedPropertyMappings[0], lastNode);
+               setSemanticProperty(lastParent, chainedPropertyMappings[1], newValue);
+
+               // We always set the properties on the new guy
+               toProcess = newValue;
+
+               //startIx = childrenSize - sequenceSize;
+               lastParseNode.children.add(newParent);
+               parent = newParent;
+               startIx = 0;
+            }
+            else
+               startIx = 0;
+         }
+
+         if (slotMapping != null && parameterType != ParameterType.INHERIT) {
+            // Unless the chainedProperty mapping overrode this, we set this on the top level object
+            if (toProcess == null)
+               toProcess = parent.getSemanticValue();
+
+            // Process the mappings when we are on the last item in the sequence.
+            // Two reasons to wait: 1) for chained sequences and 2) for propagated values
+            // so that we don't try to set the value before the propagated slot has been
+            // processed.
+            processSlotMappings(startIx, parent, toProcess, false, childIndex, reparse);
+
+            if (trace && parser.enablePartialValues)
+               System.out.println("*** Semantic value of: " + this + FileUtil.LINE_SEPARATOR +
+                       "    " + parent + " => " + parent.getSemanticValue());
+         }
+      }
+      return valueCount;
+   }
+
    private void processInheritedSlotMappings(ParentParseNode parent, NestedParselet childParselet, ParentParseNode pnode, int childIndex, boolean reparse) {
       // TODO: are we missing any cases here that are not being processed?
       if (childParselet.slotMapping != null) {
@@ -2261,8 +2646,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      else if (newClass != null) {
                         if (componentClass == null)
                            componentClass = newClass;
-                        else
+                        else {
+                           if (componentClass != newClass)
+                              semanticValueMultiTypedArray = true;
                            componentClass = findCommonSuperClass(componentClass, newClass, i);
+                        }
                      }
                      else if (newClass == null)
                         unresolved = true;
@@ -2700,6 +3088,25 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
          switch (parameterMapping[i]) {
             case PROPAGATE:
                return child.producesParselet(other);
+         }
+      }
+      return false;
+   }
+
+   public boolean producesParseletId(int otherId) {
+      if (super.producesParseletId(otherId))
+         return true;
+
+      if (parselets == null)
+         return false;
+      if (parameterMapping == null)
+         return false;
+      int sz = parselets.size();
+      for (int i = 0; i < sz; i++) {
+         Parselet child = parselets.get(i);
+         switch (parameterMapping[i]) {
+            case PROPAGATE:
+               return child.producesParseletId(otherId);
          }
       }
       return false;

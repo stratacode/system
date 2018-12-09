@@ -7,6 +7,7 @@ package sc.parser;
 import sc.binf.BinfConstants;
 import sc.dyn.RDynUtil;
 import sc.lang.ILanguageModel;
+import sc.lang.ISemanticNode;
 import sc.layer.*;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
@@ -311,6 +312,77 @@ public abstract class Language extends LayerFileComponent {
       }
 
       return parseTree;
+   }
+
+   public Object restore(String fileName, ISemanticNode oldModel, boolean enablePartialValues) {
+      try {
+         return restore(fileName, new FileReader(fileName), oldModel, startParselet, enablePartialValues, Parser.DEFAULT_BUFFER_SIZE);
+      }
+      catch (FileNotFoundException exc) {
+         throw new IllegalArgumentException(exc.toString());
+      }
+   }
+
+   /**
+    * Given a deserialized semantic node (usually a JavaModel) and an unchanged file, this method quickly restores the parseNode tree.  It basically
+    * does a parse but where we know the result ahead of time and don't need to parse anything that's a string - because that's not represented in the
+    * parse node tree anyway.
+    * TODO: how do we deal with error models?  Maybe not cache them at all?  If so we can remove a lot of code and replace it with an assertion because should never
+    * hit the error code paths in those cases.
+    */
+   public Object restore(String fileName, Reader reader, ISemanticNode oldModel, Parselet start, boolean enablePartialValues, int bufSize) {
+      try {
+         if (!start.initialized) {
+            // First make sure the language is initialized
+            initialize();
+            // If this parselet is not reachable from the children of the startParselet, it may not yet be started so start it here just in case
+            if (!start.initialized)
+               ParseUtil.initAndStartComponent(start);
+         }
+         Parser p = new Parser(this, reader, bufSize);
+         p.enablePartialValues = enablePartialValues;
+         Object parseTree = p.restoreStart(start, oldModel);
+         if (parseTree instanceof IParseNode) {
+            if (!p.atEOF()) {
+               if (enablePartialValues) {
+                  parseTree = wrapPartialParseNode(parseTree, p);
+                  IParseNode parseNode = (IParseNode) parseTree;
+                  postProcessResult(parseTree, fileName);
+                  if (debugReparse) {
+                     System.out.println("*** EOF - parsed: " + parseNode.length() + " out of: " + p.length() + " characters");
+                     globalParseCt += p.totalParseCt;
+                  }
+                  return p.parseError(start, parseTree, null, "Invalid text at end of file", 0, p.length());
+               }
+               else {
+                  // TODO: maybe for this case, we should always enable partial values and reparse so we get better error messages?
+                  // For now, we're letting subclasses determine the error in this case.  If the current parse is some recognizable string - e.g.
+                  // a mismatching close tag, we can provide a nice specific error rather than a jumble of failed attempts to parse
+                  parseTree = incompleteParse(p);
+               }
+            }
+         }
+         else if (parseTree instanceof ParseError) {
+            if (!p.atEOF()) {
+               wrapPartialValues((ParseError) parseTree, p);
+            }
+         }
+
+         if (debugReparse) {
+            globalParseCt += p.totalParseCt;
+         }
+
+         postProcessResult(parseTree, fileName);
+         return parseTree;
+      }
+      finally {
+         try {
+            reader.close();
+         }
+         catch (IOException exc) {
+            System.err.println("*** Failed to close the reader for parsing: " + fileName + ": " + exc);
+         }
+      }
    }
 
    public void postProcessResult(Object res, String fileName) {

@@ -6,6 +6,7 @@ package sc.lang;
 
 import sc.binf.BinfConstants;
 import sc.binf.BinfOutStream;
+import sc.lang.java.AssignmentExpression;
 import sc.lifecycle.ILifecycle;
 import sc.parser.*;
 import sc.type.CTypeUtil;
@@ -64,7 +65,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       // We want the parselet which first creates each semantic value - it's SemanticValueClass will match the class of the type.
       // Ordinarily the parseNode is set to the last parselet to modify the semanticValue - it can be a more generic parselet which has
       // populated additional properties.
-      if (parseNode == null && pn != null) {
+      if (parseNode == null && pn != null && parseletId == -1) {
          parseletId = pn.getParselet().id;
       }
       parseNode = pn;
@@ -75,6 +76,9 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
    public void setParseletId(int id) {
       parseletId = id;
+   }
+   public int getParseletId() {
+      return parseletId;
    }
 
    public ISemanticNode getParentNode() {
@@ -838,8 +842,9 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
    public void serialize(BinfOutStream out) {
       int saveCurrentListId = out.currentListId;
       out.currentListId = parseletId;
-      if (parseNode != null && !parseNode.getParselet().getSemanticValueIsArray()) {
-         // This is a generic list of different sub-types.  The class of the sub-type is determined in the sub-parselet like normal
+      // This is a generic list of different sub-types.  The class of the sub-type is determined in the sub-parselet like normal
+      //if (parseNode != null && !parseNode.getParselet().getSemanticValueIsArray()){
+      if (parseNode != null && parseNode.getParselet().getSemanticValueMultiTypedArray()) {
          out.writeUInt(BinfConstants.ListId);
       }
       else {

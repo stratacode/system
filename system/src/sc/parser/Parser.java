@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.lang.ISemanticNode;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
 
@@ -280,6 +281,41 @@ public class Parser implements IString {
       return result;
    }
 
+   public final Object restoreStart(Parselet parselet, ISemanticNode oldModel) {
+      initParseState(parselet);
+
+      Object result = restoreNext(parselet, oldModel, new RestoreCtx(), false);
+
+      // Always return the error which occurred furthers into the stream.  Probably should return the whole
+      // list of these errors if there is more than one.
+      if ((result == null || result instanceof ParseError) && currentErrors != null) {
+         if (enablePartialValues && result != null) {
+            ParseError err = (ParseError) result;
+            if (err.partialValue != null && err.endIndex != length()) {
+               if (language.debug)
+                  System.out.println("Partial value did not consume all of file - wrapping error node to parent element!");
+
+            }
+            // Sometimes the produced partial value is say 0-1273 and the currentErrors all are 1274-1274.  We always choose
+            // an error that makes it further but in this case, the error with the information is the one returned in the partial value so
+            // we are adding it back in.
+            if (!currentErrors.contains(err))
+               currentErrors.add(err);
+         }
+         if (language.debug) {
+            for (int i = 0; i < currentErrors.size(); i++)
+               System.out.println("Errors: " + i + ": " + currentErrors.get(i));
+         }
+         result = wrapErrors();
+      }
+
+      if (ENABLE_STATS) {
+         System.out.println("*** cache stats:");
+         System.out.println(getCacheStats());
+      }
+      return result;
+   }
+
    public final ParseError wrapErrors() {
       if (currentErrors.size() == 1)
          return currentErrors.get(0);
@@ -500,6 +536,86 @@ public class Parser implements IString {
                }
             }
          }
+
+         totalParseCt++;
+
+         if (ENABLE_STATS) {
+            parselet.attemptCount++;
+            testedNodes++;
+
+            if (!(value instanceof ParseError) && value != null) {
+               parselet.successCount++;
+               matchedNodes++;
+            }
+         }
+      }
+      finally {
+         inProgressCount--;
+         currentParselet = saveParselet;
+         lastStartIndex = saveLastStartIndex;
+
+         if (ENABLE_RESULT_TRACE && disableDebug)
+            language.debug = false;
+         if (parselet.trace)
+            traceCt--;
+         if (parselet.negated)
+            negatedCt--;
+      }
+
+      /*
+      if (language.debug || parselet.trace) {
+         if (value instanceof ParseError) {
+            if (!language.debugSuccessOnly)
+               System.out.println(indent(inProgressCount) + "Error" +
+                       (parselet.getName() != null ? "<" + parselet.getName() + ">: " : ": ") +
+                       value + " next: " + getLookahead(8));
+         }
+         else
+            System.out.println(indent(inProgressCount) + "Result" +
+                    (parselet.getName() != null ? "<" + parselet.getName() + ">:" : ":") +
+                    ParseUtil.escapeObject(value) + " next: " + getLookahead(8));
+      }
+      */
+      return value;
+   }
+
+   /**
+    * This method is called by recognizers which are nested.
+    * it will do all of the work necessary before/after calling the recognizer.recognize method
+    * (i.e. rolling back changes if there are errors, dealing with the parse error
+    * returned - add it to the parser).
+    */
+   public final Object restoreNext(Parselet parselet, ISemanticNode oldModel, RestoreCtx rctx, boolean inherited) {
+      Parselet saveParselet = null;
+      int saveLastStartIndex = -1;
+      Object value;
+
+      if (!enablePartialValues && parselet.partialValuesOnly)
+         return PARSELET_DISABLED;
+
+      /*
+      if ((language.debug || parselet.trace) && !language.debugSuccessOnly)
+         System.out.println(indent(inProgressCount) + "Next: " + getLookahead(8) + " testing rule: " + parselet.toString());
+      */
+
+      boolean disableDebug = false;
+      if (parselet.negated)
+         negatedCt++;
+      if (parselet.trace && ENABLE_RESULT_TRACE) {
+         if (traceCt == 0 && !language.debug) {
+            disableDebug = true;
+            language.debug = true;
+         }
+         traceCt++;
+      }
+      try {
+         saveLastStartIndex = lastStartIndex;
+         lastStartIndex = currentIndex;
+         inProgressCount++;
+         saveParselet = currentParselet;
+         currentParselet = parselet;
+
+         value = parselet.restore(this, oldModel, rctx, inherited);
 
          totalParseCt++;
 

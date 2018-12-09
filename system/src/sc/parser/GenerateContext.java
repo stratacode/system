@@ -10,7 +10,7 @@ import sc.util.StringUtil;
 
 import java.util.*;
 
-public class GenerateContext {
+public class GenerateContext extends BaseRebuildContext {
    int levels;
    public boolean finalGeneration = false;
 
@@ -87,58 +87,6 @@ public class GenerateContext {
          */
    }
 
-   IdentityHashMap<Object,Map<Object,Object>> maskTable;
-
-   public void maskProperty(Object obj, Object mapping, Object value) {
-      if (maskTable == null)
-         maskTable = new IdentityHashMap<Object,Map<Object,Object>>();
-
-      Map<Object,Object> objMasks = maskTable.get(obj);
-
-      if (objMasks == null)
-      {
-         // TODO: get a more efficient small map here - usually only a couple of values
-         objMasks = new HashMap<Object,Object>(7);
-         maskTable.put(obj,objMasks);
-      }
-      objMasks.put(mapping,value);
-   }
-
-   public void unmaskProperty(Object obj, Object mapping) {
-      if (maskTable == null)
-          throw new IllegalArgumentException("No mask to remove");
-
-      Map<Object,Object> objMasks = maskTable.get(obj);
-
-      if (objMasks == null)
-         throw new IllegalArgumentException("No mask to remove");
-
-      if (!objMasks.containsKey(mapping))
-         throw new IllegalArgumentException("No mask to remove");
-
-     objMasks.remove(mapping);
-
-      if (objMasks.size() == 0)
-      {
-         maskTable.remove(obj);
-         if (maskTable.size() == 0)
-            maskTable = null;
-      }
-   }
-
-   public Object getPropertyValue(Object parent, Object mapping) {
-      if (maskTable != null)
-      {
-         Map<Object,Object> objMasks = maskTable.get(parent);
-
-         if (objMasks != null)
-            if (objMasks.containsKey(mapping))
-                return objMasks.get(mapping);
-      }
-
-      return TypeUtil.getPropertyValue(parent, mapping);
-   }
-
    String valueToString(Object value) {
       if (value == null)
          return "null";
@@ -175,5 +123,9 @@ public class GenerateContext {
          errors.add(err);
       }
       return err;
+   }
+
+   public String toString() {
+      return "generate: " + super.toString();
    }
 }

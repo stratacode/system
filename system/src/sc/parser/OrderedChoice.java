@@ -6,12 +6,15 @@ package sc.parser;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.lang.java.ParenExpression;
 import sc.util.IntStack;
 import sc.util.PerfMon;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static sc.parser.NestedParselet.ParameterMapping.INHERIT;
 
 /**
  * A NestedParselet which represents a choice of parselets.  You provide the list of child parselets and it matches them
@@ -359,6 +362,73 @@ public class OrderedChoice extends NestedParselet  {
       if (bestError != null) {
          return bestError;
       }
+      return parseError(parser, "Expecting one of: {0}", this);
+   }
+
+   public Object restore(Parser parser, ISemanticNode oldModel, RestoreCtx rctx, boolean inherited) {
+      if (repeat)
+         return restoreRepeatingChoice(parser, oldModel, rctx);
+
+      int startIndex = parser.currentIndex;
+
+      // Using this even in restore because of parselets like memberDeclaration which have 2 paths to MethodDefinition - via <genericMethodOrConstructorDecl> or <methodDeclaration>.
+      List<Parselet> matchingParselets = getMatchingParselets(parser);
+      ParseError bestError = null;
+
+      int pid = oldModel == null ? -1 : oldModel.getParseletId();
+
+      int numMatches = matchingParselets.size();
+      for (int i = 0; i < numMatches; i++) {
+         Parselet subParselet = matchingParselets.get(i);
+
+         // Skip any choices which don't produce the right type - unless it's a '*' - INHERIT, slot.  In that case, we might be setting properties on a type created from a parent parselet (e.g. formalParameterDeclRest.0 has variableDeclaratorId as an inherit slot)
+         // TODO: performance - we could probably cache the ids in each parselet that could be produced to speed this call up
+         if (pid != -1 && !inherited && !subParselet.producesParseletId(pid))
+            continue;
+
+         Object nestedValue = parser.restoreNext(subParselet, oldModel, rctx, inherited);
+         if (!(nestedValue instanceof ParseError)) {
+            // Do any parselet specific processing on the sub-value that would be done in addResultToParent
+            nestedValue = subParselet.propagateResult(nestedValue);
+            if (lookahead) {
+               // Reset back to the beginning of the sequence
+               parser.changeCurrentIndex(startIndex);
+            }
+
+            // IndexedChoice returns a special type which lets us get the position of the match in the list so
+            // we can process the semantic value properly.   OrderedChoice will just return i since in that case
+            // we go through all parselets.
+            int slotIx = getSlotIndex(matchingParselets, i);
+            boolean skipSemanticValue = skipSemanticValue(slotIx);
+            if (skipSemanticValue)
+               oldModel = null; // TODO: do we need this?
+            return restoreResult(parser, oldModel, nestedValue, skipSemanticValue);
+         }
+         else {
+            if (parser.semanticContext != null) {
+               parser.semanticContext.resetToIndex(parser.lastStartIndex);
+            }
+            if (parser.enablePartialValues) {
+               ParseError error = (ParseError) nestedValue;
+               // Use replace=false for isBetterError because we want the first error which matches the longest text for the partial errors thing
+               if (bestError == null || Parser.isBetterError(bestError.startIndex, bestError.endIndex, error.startIndex, error.endIndex, false))
+                  bestError = error;
+            }
+         }
+      }
+      if (optional) {
+         parser.changeCurrentIndex(startIndex);
+
+         /*
+         if (parser.enablePartialValues && bestError != null && bestError.partialValue != null) {
+            //bestError.optionalContinuation = true;
+            return bestError;
+         }
+         */
+         return null;
+      }
+      if (bestError != null)
+         return bestError;
       return parseError(parser, "Expecting one of: {0}", this);
    }
 
@@ -779,6 +849,133 @@ public class OrderedChoice extends NestedParselet  {
       }
    }
 
+   public Object restoreRepeatingChoice(Parser parser, ISemanticNode oldModel, RestoreCtx rctx) {
+      int startIndex = parser.currentIndex;
+      int lastMatchStart;
+      ParentParseNode value = null;
+      boolean matched;
+      ParseError bestError = null;
+      int bestErrorSlotIx = -1;
+
+      if (trace)
+         trace = trace;
+
+      boolean emptyMatch = false;
+      boolean arrElement;
+
+      do {
+         matched = false;
+         lastMatchStart = parser.currentIndex;
+         int arrIndex = rctx.arrIndex;
+
+         Object childOldObj;
+         ISemanticNode childOldNode = null;
+         if (oldModel instanceof List) {
+            List oldList = (List) oldModel;
+            if (arrIndex >= oldList.size())
+               break;
+            childOldObj = oldList.get(arrIndex);
+            arrElement = true;
+         }
+         else {
+            childOldObj = oldModel;
+            arrElement = false;
+         }
+         if (childOldObj instanceof ISemanticNode)
+            childOldNode = (ISemanticNode) childOldObj;
+
+         List<Parselet> matchingParselets = getMatchingParselets(parser);
+
+         int numMatches = matchingParselets.size();
+         for (int i = 0; i < numMatches; i++) {
+            Parselet matchedParselet = matchingParselets.get(i);
+
+            if (childOldNode != null && !matchedParselet.producesParseletId(childOldNode.getParseletId()))
+               continue;
+
+            int saveArrIndex = 0;
+            if (arrElement) {
+               saveArrIndex = rctx.arrIndex;
+               rctx.arrIndex = 0;
+            }
+
+            Object nestedValue = parser.restoreNext(matchedParselet, childOldNode, rctx, false);
+
+            if (arrElement)
+               rctx.arrIndex = saveArrIndex;
+
+            emptyMatch = nestedValue == null;
+            if (!(nestedValue instanceof ParseError)) {
+               if (value == null)
+                  value = newParseNode(lastMatchStart);
+
+               if (nestedValue != null || parser.peekInputChar(0) != '\0') {
+                  int slotIx = getSlotIndex(matchingParselets, i);
+                  value.add(nestedValue, matchedParselet, -1, slotIx, false, parser);
+
+                  matched = true;
+                  if (arrElement) {
+                     rctx.arrIndex++;
+                  }
+                  break;
+               }
+            }
+            else if (parser.enablePartialValues) {
+               ParseError error = (ParseError) nestedValue;
+               if (bestError == null || bestError.endIndex < error.endIndex) {
+                  bestError = error;
+                  bestErrorSlotIx = matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes[i] : i;
+               }
+            }
+            /* Nice place to set a break for when a large file fails to restore
+            else {
+               if (toString().contains("<classBodyDeclarations>"))
+                  System.out.println("***");
+            }
+            */
+         }
+      } while (matched && !emptyMatch);
+
+      if (value == null) {
+         if (optional) {
+            // TODO: this rule will technically break the parse in some weird situations since an optional choice should return null
+            // even if there's an error in which there's some semantic value present.  Adding back the "eof" test since that seems like a safer bet
+            /*
+            if (parser.enablePartialValues && bestError != null && bestError.partialValue != null && bestError.eof) {
+               return parsePartialErrorValue(parser, bestError, lastMatchStart, bestErrorSlotIx);
+            }
+            */
+            parser.changeCurrentIndex(startIndex);
+
+            // If we are a repeat optional choice with mappings of '' and we match no elements, we should return an empty string, not null.
+            if (!lookahead && repeat && isStringParameterMapping() && parser.peekInputChar(0) != '\0') {
+               return restoreResult(parser, oldModel, "", false);
+            }
+            return null;
+         }
+         if (bestError != null) {
+            if (parser.enablePartialValues && bestError.partialValue != null) {
+               return parsePartialErrorValue(parser, bestError, lastMatchStart, bestErrorSlotIx);
+            }
+            // NOTE: In this case, we are possibly returning the error from a scalar parselet for a repeating one.  It won't matter unless we have partial values enabled and partialValue
+            return bestError;
+         }
+         return parseError(parser, "Expecting one or more of: {0}", this);
+      }
+      else {
+         // If we are doing the partial values case, we might have partially matched one more statement.  if so, this is part of the partial results
+         if (parser.enablePartialValues && bestError != null && /*bestError.eof && */ bestError.partialValue != null && bestError.startIndex == lastMatchStart) {
+            value.add(bestError.partialValue, bestError.parselet, -1, bestErrorSlotIx, false, parser);
+
+            return parsePartialError(parser, value, bestError, bestError.parselet, bestError.errorCode, bestError.errorArgs);
+         }
+         if (lookahead)
+            parser.changeCurrentIndex(startIndex);
+         else
+            parser.changeCurrentIndex(lastMatchStart);
+         return restoreResult(parser, oldModel, value, false);
+      }
+   }
 
    private int getSlotIndex(List<Parselet> matchingParselets, int i) {
       return matchingParselets instanceof MatchResult ? ((MatchResult) matchingParselets).slotIndexes[i] : i;
@@ -1468,6 +1665,21 @@ public class OrderedChoice extends NestedParselet  {
       for (int i = 0; i < sz; i++) {
          Parselet child = parselets.get(i);
          if (child.producesParselet(other))
+            return true;
+      }
+      return false;
+   }
+
+   public boolean producesParseletId(int otherId) {
+      if (super.producesParseletId(otherId))
+         return true;
+
+      if (parselets == null)
+         return false;
+      int sz = parselets.size();
+      for (int i = 0; i < sz; i++) {
+         Parselet child = parselets.get(i);
+         if (child.producesParseletId(otherId))
             return true;
       }
       return false;

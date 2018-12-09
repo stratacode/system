@@ -103,7 +103,7 @@ public class TypedMethodExpression extends IdentifierExpression {
       if (identifiers == null || typeArguments == null || typedIdentifier == null || arguments == null)
          return "<uninitialized TypedMethodExpression>";
 
-      generateIdentString(sb, identifiers.size() - 1);
+      generateIdentString(sb, identifiers.size());
 
       sb.append(".<");
       int ix = 0;

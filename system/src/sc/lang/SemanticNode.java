@@ -239,7 +239,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       // We want the parselet which first creates each semantic value - it's SemanticValueClass will match the class of the type.
       // Ordinarily the parseNode is set to the last parselet to modify the semanticValue - it can be a more generic parselet which has
       // populated additional properties.
-      if (parseNode == null && pn != null) {
+      if (parseNode == null && pn != null && parseletId == -1) {
          parseletId = pn.getParselet().id;
       }
       parseNode = pn;
@@ -247,6 +247,10 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    public void setParseletId(int id) {
       parseletId = id;
+   }
+
+   public int getParseletId() {
+      return parseletId;
    }
 
    @EditorSettings(visible=false)
@@ -1093,8 +1097,9 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       }
       else {
          out.writeUInt(parseletId);
-         if (out.lang.getParseletById(parseletId).getSemanticValueSlotClass() != getClass())
-            System.err.println("*** Mismatching parslet slot class!");
+         Class slotClass = out.lang.getParseletById(parseletId).getSemanticValueSlotClass();
+         if (slotClass != getClass())
+            System.err.println("*** Mismatching parseletId class: " + slotClass + " and node class: " + getClass());
       }
          /*
       if (parseNode != null) {

@@ -63,7 +63,8 @@ public class SwitchLabel extends ExpressionStatement {
          if (operator != null)
             sb.append(operator);
          sb.append(" ");
-         sb.append(expression.toSafeLanguageString());
+         if (expression != null)
+            sb.append(expression.toSafeLanguageString());
          return sb.toString();
       }
       return super.toSafeLanguageString();
