@@ -7,7 +7,7 @@ package sc.lang.java;
 import sc.type.CTypeUtil;
 
 public class CharacterLiteral extends AbstractLiteral {
-   public transient char charValue; // Computed from 'value' which is set in the grammar
+   public char charValue;  // this needs to be non-transient even though it's not in the grammar because I believe it needs to be copied in deepCopy.
 
    public void init() {
       if (value != null) {
