@@ -115,6 +115,10 @@ public class BinfInStream {
                   res = readUInt();
                   cl = Integer.class;
                   break;
+               case BinfConstants.CharId:
+                  res = in.readChar();
+                  cl = Character.class;
+                  break;
                case BinfConstants.ListId:
                   res = readList();
                   cl = null; // No need to do conversion here

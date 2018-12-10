@@ -2,6 +2,7 @@ package sc.binf;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
+import sc.lang.java.CharacterLiteral;
 import sc.parser.IParseNode;
 import sc.parser.Language;
 import sc.parser.PString;
@@ -175,7 +176,7 @@ public class BinfOutStream {
 
    public void writeChar(char v) {
       try {
-         out.writeChar(BinfConstants.CharId);
+         out.writeByte(BinfConstants.CharId);
          out.writeChar(v);
       }
       catch (IOException exc) {

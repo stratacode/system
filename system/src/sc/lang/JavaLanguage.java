@@ -168,15 +168,18 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
 
    public Sequence expressionList = new Sequence("([],[])", expression,
                                           new Sequence("(,[])", OPTIONAL | REPEAT, comma, expression));
-   Sequence optExpressionList = new Sequence("(.)", OPTIONAL, expressionList);
-   Sequence arguments = new SemanticSequence("<arguments>(,[],)", openParen, new Sequence("([])", OPTIONAL, expressionList), closeParenSkipOnError); // TODO: replace 'expressList' here with optExpressionList which is a clone of expressionList where we set OPTIONAL as a flag.  That way we eliminate one parselet in the grammar and don't replicate the code for expressionList.
+   Sequence optExpressionList = (Sequence) expressionList.copyWithOptions(OPTIONAL);
+   Sequence arguments = new SemanticSequence("<arguments>(,[],)", openParen, optExpressionList, closeParenSkipOnError);
+   // TODO: this should work and be a little faster but causes an error when generating the LayeredSystem.java file
+   //Sequence optArguments = (Sequence) arguments.copyWithOptions(OPTIONAL);
    Sequence optArguments = new Sequence("(.)", OPTIONAL, arguments);
    {
       // If there are no arguments here, we still need to generate output for the "arguments" sequence so we do not
       // skip generation if there is an empty list.
       optArguments.ignoreEmptyList = false;
    }
-   Sequence classCreatorRest = new Sequence("(arguments, classBody)", arguments, new Sequence("(.)", OPTIONAL, classBody));
+   Sequence optClassBody = (Sequence) classBody.copyWithOptions(OPTIONAL);
+   Sequence classCreatorRest = new Sequence("(arguments, classBody)", arguments, optClassBody);
    OrderedChoice typeOrQuestion = new OrderedChoice(argType, new Sequence("ExtendsType(questionMark)", questionMark));
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
            new Sequence("([],[])", OPTIONAL, typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
@@ -202,7 +205,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public SymbolChoice floatTypeSuffix = new SymbolChoice("f","F","d","D");
    public Symbol notUnderscore = new Symbol(LOOKAHEAD | NOT, "_");
    Sequence exponent = new Sequence("('', '',,'')", new SymbolChoice("e","E"), new SymbolChoice(OPTIONAL, "+", "-"), notUnderscore, digits);
-   Sequence optExponent = new Sequence("('')", OPTIONAL, exponent);
+   Sequence optExponent = (Sequence) exponent.copyWithOptions(OPTIONAL);
    Sequence optFloatTypeSuffix = new Sequence("('')", OPTIONAL, floatTypeSuffix);
 
    SymbolChoice hexPrefix = new SymbolChoice("0x","0X");
@@ -729,8 +732,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       classBodyDeclarations.skipOnErrorParselet = skipBodyError;
 
       // Turn back on spacing for inner class definitions
-      classBody.enableSpacing = true;
+      optClassBody.enableSpacing = classBody.enableSpacing = true;
       classBody.set(openBraceEOL, classBodyDeclarations, closeBraceEOL);
+      optClassBody.set(openBraceEOL, classBodyDeclarations, closeBraceEOL);
    }
 
    /**
@@ -773,8 +777,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    }
 
    Sequence enumConstant = new Sequence("EnumConstant(modifiers,typeName,arguments,body)", annotations, identifier,
-                                        optArguments,
-                                        new Sequence("(.)", OPTIONAL, classBody));
+                                        optArguments, optClassBody);
 
    public Sequence enumBodyDeclaration = new Sequence("([],[],,[])", OPTIONAL, new Sequence("(.)", OPTIONAL, enumConstant), new Sequence("(,[])", OPTIONAL | REPEAT, comma, enumConstant),
                    new Sequence(OPTIONAL, comma),

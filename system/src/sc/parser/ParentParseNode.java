@@ -176,7 +176,7 @@ public class ParentParseNode extends AbstractParseNode {
          children.add(node);
 
       // Only nested parselets should be using the ParentParseNode
-      return parselet.restoreSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false, null);
+      return parselet.setSemanticValue(this, node, svIndex, index, skipSemanticValue, parser, false, false, null);
    }
 
    public void cullUnparsedNodes(Parser parser, int svCount, int startChild, DiffContext dctx) {

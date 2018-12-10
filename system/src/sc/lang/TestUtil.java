@@ -762,29 +762,31 @@ public class TestUtil {
                   else {
                      out("Serialized models match");
 
-                     long startRestoreTime = System.currentTimeMillis();
-                     Object restored = lang.restore(fileName, deserModel, false);
-                     long endRestoreTime = System.currentTimeMillis();
-                     out("Restored: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
+                     int rc = 0;
+                     do {
+                        long startRestoreTime = System.currentTimeMillis();
+                        Object restored = lang.restore(fileName, deserModel, false);
+                        long endRestoreTime = System.currentTimeMillis();
+                        out("Restored: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
 
-                     if (restored instanceof ParseError || restored == null)
-                        error("Invalid return from restore - should always restore to a valid parse node.");
+                        if (restored instanceof ParseError || restored == null)
+                           error("Invalid return from restore - should always restore to a valid parse node.");
 
-                     if (restored instanceof IParseNode) {
-                        if (deserModel.getParseNode() != restored)
-                           error("*** Error - model not updated with parse node tree!");
+                        if (restored instanceof IParseNode) {
+                           if (deserModel.getParseNode() != restored)
+                              error("*** Error - model not updated with parse node tree!");
 
-                        if (!restored.toString().equals(result.toString()))
-                           error("Restored parse node does not match");
-                        else {
-                           // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
-                           out("Restored parse node successfully");
+                           if (!restored.toString().equals(result.toString()))
+                              error("Restored parse node does not match");
+                           else {
+                              // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
+                              out("Restored parse node successfully");
+                           }
                         }
-                     }
+                        rc++;
+                     } while (rc < 5);
 
                   }
-
-
                }
 
                StringBuilder sb = new StringBuilder();

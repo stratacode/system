@@ -608,6 +608,17 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       return (Parselet) clone();
    }
 
+   public Parselet copyWithOptions(int options) {
+      Parselet res = copy();
+      res.initOptions(options);
+      // Need to strip off any name part on the original parselet since this will create a duplicate name.  We can use the assigned name here.
+      if (res.name.startsWith("<")) {
+         int ix = res.name.indexOf(">");
+         res.name = res.name.substring(ix+1);
+      }
+      return res;
+   }
+
    /**
     * The generate phase generate parse nodes in the output.  The formatting phase turns these gene
     * into string values.  The parselet steers both of these operations through its generate and fo

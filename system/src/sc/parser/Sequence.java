@@ -7,9 +7,6 @@ package sc.parser;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaSemanticNode;
-import sc.lang.java.NewExpression;
-import sc.lang.java.ParenExpression;
-import sc.lang.java.PostfixUnaryExpression;
 import sc.type.TypeUtil;
 
 import java.util.ArrayList;
