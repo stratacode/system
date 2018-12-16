@@ -1,44 +1,39 @@
 package sc.binf;
 
-import sc.lang.ISemanticNode;
-import sc.lang.SemanticNode;
-import sc.lang.java.CharacterLiteral;
-import sc.parser.IParseNode;
 import sc.parser.Language;
-import sc.parser.PString;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-public class BinfOutStream {
+public abstract class BinfOutStream {
    public DataOutputStream out;
-   public ISemanticNode rootNode;
    public Language lang;
-   public int currentListId = -1;
 
    public BinfOutStream(DataOutputStream out) {
       this.out = out;
    }
 
-   public void serialize(ISemanticNode rootNode, String origFileExt) {
-      this.rootNode = rootNode;
-      IParseNode pn = rootNode.getParseNode();
-      if (pn != null) {
-         lang = pn.getParselet().getLanguage();
-         if (origFileExt == null)
-            origFileExt = lang.defaultExtension;
-         else {
-            Language extLang = Language.getLanguageByExtension(origFileExt);
-            if (extLang != lang)
-               System.out.println("*** Warning: mismatching languages in serialize!");
-         }
-      }
-      if (origFileExt == null)
-         throw new IllegalArgumentException("No file extension for serialize of semantic node");
+   public void initOutStream(String origFileExt) {
       try {
+         if (lang != null) {
+            if (origFileExt == null)
+               origFileExt = lang.defaultExtension;
+            else {
+               Language extLang = Language.getLanguageByExtension(origFileExt);
+               if (extLang != lang)
+                  System.out.println("*** Warning: mismatching languages in model/parse stream!");
+            }
+         }
+         if (origFileExt == null)
+            throw new IllegalArgumentException("*** Error - no language specified for model/parse stream");
+         else if (lang == null) {
+            lang = Language.getLanguageByExtension(origFileExt);
+            if (lang == null)
+               throw new IllegalArgumentException("No language found for extension: " + origFileExt + " serializing model/parse stream");
+         }
+
          out.writeUTF(origFileExt);
-         writeValue(rootNode);
       }
       catch (IOException exc) {
          throw new UncheckedIOException(exc);
@@ -46,6 +41,7 @@ public class BinfOutStream {
    }
 
    /**
+    *
     * To handle parseletId, and size - writes 1-5 bytes depending upon the value using the MSB of each byte as a flag
     * to indicate whether there's another byte
     * TODO: need to handle negative numbers or at least -1 here?  This should catch all of the common cases - size, parseletId etc. and we have read/writeInt for those others
@@ -99,38 +95,6 @@ public class BinfOutStream {
       }
       catch (IOException exc) {
          throw new UncheckedIOException(exc);
-      }
-   }
-
-   public void writeValue(Object v) {
-      if (v instanceof ISemanticNode) {
-         ISemanticNode sn = (ISemanticNode) v;
-         sn.serialize(this);
-      }
-      else if (PString.isString(v))
-         writeString(v.toString());
-      else if (v instanceof Boolean) {
-         writeUInt((Boolean) v ? BinfConstants.BoolTrue : BinfConstants.BoolFalse);
-      }
-      else if (v == null)
-         writeNull();
-      else if (v instanceof Integer) {
-         writeInt((Integer) v);
-      }
-      else if (v instanceof Long) {
-         writeLong((Long) v);
-      }
-      else if (v instanceof Float) {
-         writeFloat((Float) v);
-      }
-      else if (v instanceof Double) {
-         writeDouble((Double) v);
-      }
-      else if (v instanceof Character) {
-         writeChar((Character) v);
-      }
-      else {
-         System.err.println("*** Unrecognized value type for BinfOutStream");
       }
    }
 

@@ -6,6 +6,7 @@ package sc.lang;
 
 import sc.binf.BinfConstants;
 import sc.binf.BinfOutStream;
+import sc.binf.ModelOutStream;
 import sc.lang.java.AssignmentExpression;
 import sc.lifecycle.ILifecycle;
 import sc.parser.*;
@@ -839,7 +840,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return -1;
    }
 
-   public void serialize(BinfOutStream out) {
+   public void serialize(ModelOutStream out) {
       int saveCurrentListId = out.currentListId;
       out.currentListId = parseletId;
       // This is a generic list of different sub-types.  The class of the sub-type is determined in the sub-parselet like normal

@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.binf.ParseInStream;
 import sc.lang.ISemanticNode;
 import sc.util.FileUtil;
 import sc.util.StringUtil;
@@ -281,10 +282,10 @@ public class Parser implements IString {
       return result;
    }
 
-   public final Object restoreStart(Parselet parselet, ISemanticNode oldModel) {
+   public final Object restoreStart(Parselet parselet, ISemanticNode oldModel, ParseInStream pIn) {
       initParseState(parselet);
 
-      Object result = restoreNext(parselet, oldModel, new RestoreCtx(), false);
+      Object result = restoreNext(parselet, oldModel, new RestoreCtx(pIn), false);
 
       // Always return the error which occurred furthers into the stream.  Probably should return the whole
       // list of these errors if there is more than one.

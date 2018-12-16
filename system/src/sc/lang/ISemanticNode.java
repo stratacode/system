@@ -4,8 +4,7 @@
 
 package sc.lang;
 
-import sc.binf.BinfInStream;
-import sc.binf.BinfOutStream;
+import sc.binf.ModelOutStream;
 import sc.js.JSSettings;
 import sc.obj.EditorSettings;
 import sc.parser.IParseNode;
@@ -14,7 +13,6 @@ import sc.parser.Language;
 import sc.parser.Parselet;
 
 import java.util.IdentityHashMap;
-import java.util.List;
 
 /**
  * The semantic node interface is implemented by primarily SemanticNode and SemanticNodeList.  Instances of this interface
@@ -181,5 +179,5 @@ public interface ISemanticNode {
    /** Returns number of nodes in this tree for helping to diagnose memory use */
    public int getNodeCount();
 
-   public void serialize(BinfOutStream out);
+   public void serialize(ModelOutStream out);
 }

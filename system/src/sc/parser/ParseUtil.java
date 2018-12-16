@@ -4,8 +4,7 @@
 
 package sc.parser;
 
-import sc.binf.BinfInStream;
-import sc.binf.BinfOutStream;
+import sc.binf.*;
 import sc.lang.*;
 import sc.lang.java.JavaModel;
 import sc.lang.java.JavaSemanticNode;
@@ -1272,7 +1271,7 @@ public class ParseUtil  {
       try {
          fos = new FileOutputStream(serFileName);
          dos = new DataOutputStream(new BufferedOutputStream(fos));
-         BinfOutStream out = new BinfOutStream(dos);
+         ModelOutStream out = new ModelOutStream(dos);
          out.serialize(node, FileUtil.getExtension(origFileName));
          dos.flush();
       }
@@ -1294,7 +1293,7 @@ public class ParseUtil  {
       try {
          fis = new FileInputStream(serFileName);
          dis = new DataInputStream(new BufferedInputStream(fis));
-         BinfInStream in = new BinfInStream(dis);
+         ModelInStream in = new ModelInStream(dis);
          in.initStream();
          Object rootNode = in.readValue();
          if (rootNode instanceof ISemanticNode)
@@ -1307,6 +1306,43 @@ public class ParseUtil  {
       finally {
          FileUtil.safeClose(dis);
          FileUtil.safeClose(fis);
+      }
+   }
+
+   public static void serializeParseNode(IParseNode node, String serFileName, String origFileName) {
+      FileOutputStream fos = null;
+      DataOutputStream dos = null;
+      try {
+         fos = new FileOutputStream(serFileName);
+         dos = new DataOutputStream(new BufferedOutputStream(fos));
+         ParseOutStream out = new ParseOutStream(dos);
+         out.serialize(node, (ISemanticNode) node.getSemanticValue(), FileUtil.getExtension(origFileName));
+         dos.flush();
+      }
+      catch (FileNotFoundException fnf) {
+         throw new IllegalArgumentException("File not found: " + serFileName + ": " + fnf);
+      }
+      catch (IOException exc) {
+         throw new IllegalArgumentException("IOException: " + serFileName + ": " + exc);
+      }
+      finally {
+         FileUtil.safeClose(dos);
+         FileUtil.safeClose(fos);
+      }
+   }
+
+   public static ParseInStream openParseNodeStream(String serFileName) {
+      FileInputStream fis = null;
+      DataInputStream dis = null;
+      try {
+         fis = new FileInputStream(serFileName);
+         dis = new DataInputStream(new BufferedInputStream(fis));
+         ParseInStream in = new ParseInStream(dis);
+         in.initStream();
+         return in;
+      }
+      catch (FileNotFoundException fnf) {
+         throw new IllegalArgumentException("File not found: " + serFileName + ": " + fnf);
       }
    }
 

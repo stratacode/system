@@ -5,6 +5,7 @@
 package sc.parser;
 
 import sc.binf.BinfConstants;
+import sc.binf.ParseInStream;
 import sc.dyn.RDynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.ISemanticNode;
@@ -314,9 +315,9 @@ public abstract class Language extends LayerFileComponent {
       return parseTree;
    }
 
-   public Object restore(String fileName, ISemanticNode oldModel, boolean enablePartialValues) {
+   public Object restore(String fileName, ISemanticNode oldModel, ParseInStream pIn, boolean enablePartialValues) {
       try {
-         return restore(fileName, new FileReader(fileName), oldModel, startParselet, enablePartialValues, Parser.DEFAULT_BUFFER_SIZE);
+         return restore(fileName, new FileReader(fileName), oldModel, startParselet, pIn, enablePartialValues, Parser.DEFAULT_BUFFER_SIZE);
       }
       catch (FileNotFoundException exc) {
          throw new IllegalArgumentException(exc.toString());
@@ -330,7 +331,7 @@ public abstract class Language extends LayerFileComponent {
     * TODO: how do we deal with error models?  Maybe not cache them at all?  If so we can remove a lot of code and replace it with an assertion because should never
     * hit the error code paths in those cases.
     */
-   public Object restore(String fileName, Reader reader, ISemanticNode oldModel, Parselet start, boolean enablePartialValues, int bufSize) {
+   public Object restore(String fileName, Reader reader, ISemanticNode oldModel, Parselet start, ParseInStream pIn, boolean enablePartialValues, int bufSize) {
       try {
          if (!start.initialized) {
             // First make sure the language is initialized
@@ -341,7 +342,7 @@ public abstract class Language extends LayerFileComponent {
          }
          Parser p = new Parser(this, reader, bufSize);
          p.enablePartialValues = enablePartialValues;
-         Object parseTree = p.restoreStart(start, oldModel);
+         Object parseTree = p.restoreStart(start, oldModel, pIn);
          if (parseTree instanceof IParseNode) {
             if (!p.atEOF()) {
                if (enablePartialValues) {
@@ -382,6 +383,8 @@ public abstract class Language extends LayerFileComponent {
          catch (IOException exc) {
             System.err.println("*** Failed to close the reader for parsing: " + fileName + ": " + exc);
          }
+         if (pIn != null)
+            pIn.close();
       }
    }
 

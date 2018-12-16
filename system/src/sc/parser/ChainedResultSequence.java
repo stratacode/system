@@ -4,6 +4,7 @@
 
 package sc.parser;
 
+import sc.binf.ParseInStream;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.type.TypeUtil;
@@ -358,7 +359,7 @@ public class ChainedResultSequence extends Sequence {
       return true;
    }
 
-   protected Object getSlotSemanticValue(int slotIx, ISemanticNode semanticValue, RestoreCtx rctx) {
+   protected Object getSlotSemanticValue(int slotIx, ISemanticNode semanticValue, SaveRestoreCtx rctx) {
       boolean chainedSlotMatches = getSemanticValueSlotClass().isInstance(semanticValue);
       Parselet defaultParselet = parselets.get(0);
       boolean defaultSlotMatches = defaultParselet.getSemanticValueClass().isInstance(semanticValue);
@@ -438,6 +439,63 @@ public class ChainedResultSequence extends Sequence {
       return SKIP_CHILD;
    }
 
+   public void saveParse(IParseNode pn, ISemanticNode oldNode, SaveParseCtx sctx) {
+      Object mapping = slotMapping[0];
+      Object chainedValue = null;
+
+      // Look at the value for the first slot.  If there is no property at all, it
+      // may have been produced from the first slot - the default which does not apply the mapping.
+      // It is also possible the semantic value has that property mapping but is was not when parsed originally.
+      // In either case, this will restore only the first slot and from getSlotMapping above, return SKIP_CHILD
+      // for the second slot.
+      //
+      // The weird case is when there is a value for the property, but it does not match the default parselet.  We need to
+      // then use the rule for the second slot to do the restore, but where we hide the chained property so that child
+      // ChainedResultSequences won't see this property and take the wrong path.  The property was not set by the child
+      // when it was originally parsed - instead it's set as it passes through this node, hence the need to hide it here.
+
+      Parselet defaultParselet = parselets.get(0);
+
+      Parselet pnParselet = pn.getParselet();
+
+      if (pnParselet != this) {
+         if (pnParselet == defaultParselet || defaultParselet.producesParselet(pnParselet)) {
+            // Flag indicates we parsed the default slot
+            sctx.pOut.writeUInt(0);
+            defaultParselet.saveParse(pn, oldNode, sctx);
+            // TODO: do we need to save the parseletId or something here or can we do the restore properly from the semantic node tree?
+            return;
+         }
+         System.out.println("*** Warning - unknown case in saveParse for chain result sequence");
+      }
+      // Flag to indicate we took the default path
+      sctx.pOut.writeUInt(1);
+
+      boolean chainedSlotMatches = getSemanticValueSlotClass().isInstance(oldNode);
+      //boolean defaultSlotMatches = defaultParselet.getSemanticValueClass().isInstance(oldNode);
+
+      if (chainedSlotMatches) {
+         try {
+            chainedValue = sctx.getPropertyValue(oldNode, mapping);
+         }
+         catch (IllegalArgumentException exc)
+         {}
+      }
+
+      boolean masked = false;
+      // Though we have a chained value, it's type does not match the slot.  We need to mask that property off
+      // so that it does not confused the parent match.
+      if (chainedValue != null && !defaultParselet.dataTypeMatches(chainedValue)) {
+         sctx.maskProperty(oldNode, mapping, null);
+         masked = true;
+      }
+
+      super.saveParse(pn, oldNode, sctx);
+
+      if (masked)
+         sctx.unmaskProperty(oldNode, mapping);
+   }
+
    public Object restore(Parser parser, ISemanticNode oldNode, RestoreCtx rctx, boolean inherited) {
       Object mapping = slotMapping[0];
       Object chainedValue = null;
@@ -454,6 +512,13 @@ public class ChainedResultSequence extends Sequence {
       // when it was originally parsed - instead it's set as it passes through this node, hence the need to hide it here.
 
       Parselet defaultParselet = parselets.get(0);
+
+      ParseInStream pIn = rctx.pIn;
+      if (pIn != null) {
+         int val = pIn.readUInt();
+         if (val == 0)
+            return defaultParselet.restore(parser, oldNode, rctx, inherited);
+      }
 
       boolean chainedSlotMatches = getSemanticValueSlotClass().isInstance(oldNode);
       //boolean defaultSlotMatches = defaultParselet.getSemanticValueClass().isInstance(oldNode);

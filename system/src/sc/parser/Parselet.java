@@ -61,7 +61,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    // Set this to true to discard the results from this parselet and all sub-parselets from
    // the output.
-   public boolean discard = false;
+   //public boolean discard = false;
 
    // Do we report errors for a failure on this node?
    public boolean reportError = true;
@@ -257,7 +257,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       negated = (options & NOT) != 0;
       lookahead = (options & LOOKAHEAD) != 0;
       skip = (options & SKIP) != 0;
-      discard = (options & DISCARD) != 0;
+      //discard = (options & DISCARD) != 0;
       reportError = (options & NOERROR) == 0;
       trace = (options & TRACE) != 0;
       skipOnError = (options & SKIP_ON_ERROR) != 0;
@@ -334,7 +334,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    /**
     * This method replicates the functionality of addResultToParent for the special case where we are parsing errors
     * and we've reparsed the value of a node and need to replace it in it's parent before returning.  It only handles
-    * a few of the samentic value mappings so far... another approach would be to throw away and rebuild the parent's value
+    * a few of the semantic value mappings so far... another approach would be to throw away and rebuild the parent's value
     * entirely.   The key here is that when we update the parse node for a child, we also update the semantic value so
     * the two are consistent.
     */
@@ -383,7 +383,8 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
    }
 
    public boolean getDiscard() {
-      return discard;
+      return false;
+      //return discard;
    }
 
    public boolean getLookahead() {
@@ -638,6 +639,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
 
    /** The parselet method to re-create the parse node tree given the resulting model. */
    public abstract Object restore(Parser p, ISemanticNode oldModel, RestoreCtx ctx, boolean inherited);
+
+   /** The parselet method to save parselet ids, offsets, string-lengths etc.  The info that when augmented by a de-serialized semantic node quickly reproduces the parse-node tree and attaches it to the model  */
+   public abstract void saveParse(IParseNode pn, ISemanticNode oldNode, SaveParseCtx spctx);
 
    protected boolean anyReparseChanges(Parser parser, Object oldParseNode, DiffContext dctx, boolean forceReparse) {
       //dctx.updateStateForPosition(parser.currentIndex);

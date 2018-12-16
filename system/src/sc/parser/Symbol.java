@@ -158,6 +158,10 @@ public class Symbol extends Parselet {
       return parse(parser); // We really just need to advance the pointer here but for now just do a normal parse
    }
 
+   public void saveParse(IParseNode pn, ISemanticNode sn, SaveParseCtx spctx) {
+      System.err.println("*** is this reached");
+   }
+
    String acceptMatch(Parser parser, StringToken matchedValue, int lastStart, int current) {
       String customError = accept(parser.semanticContext, matchedValue, lastStart, current);
       if (customError != null)
@@ -290,5 +294,7 @@ public class Symbol extends Parselet {
       for (String val:values)
          excludedValues.add(PString.toIString(val));
    }
+
+
 
 }

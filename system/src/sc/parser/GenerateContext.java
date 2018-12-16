@@ -5,12 +5,10 @@
 package sc.parser;
 
 import sc.lang.SemanticNode;
-import sc.type.TypeUtil;
-import sc.util.StringUtil;
 
 import java.util.*;
 
-public class GenerateContext extends BaseRebuildContext {
+public class GenerateContext extends BaseRebuildCtx {
    int levels;
    public boolean finalGeneration = false;
 

@@ -172,4 +172,16 @@ public class ErrorParseNode extends AbstractParseNode {
    public boolean isIncomplete() {
       return true;
    }
+
+   public boolean equals(Object other) {
+      if (!super.equals(other))
+         return false;
+
+      ErrorParseNode opn = (ErrorParseNode) other;
+      if (!StringUtil.equalStrings(errorText, opn.errorText))
+         return false;
+
+      // TODO: compare the parseErrors here?
+      return false;
+   }
 }

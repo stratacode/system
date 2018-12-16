@@ -18,7 +18,7 @@ import java.util.Map;
  * these properties so they are not visible - return null - to the logic checking for the next slot value.
  * The mask is added before we restore/generate the child, and cleared afterwards.
  */
-abstract public class BaseRebuildContext {
+abstract public class BaseRebuildCtx {
    IdentityHashMap<Object,Map<Object,Object>> maskTable;
 
    public void maskProperty(Object obj, Object mapping, Object value) {

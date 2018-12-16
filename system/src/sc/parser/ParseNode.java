@@ -403,5 +403,20 @@ public class ParseNode extends AbstractParseNode {
       return ct;
    }
 
+   public boolean equals(Object other) {
+      if (!super.equals(other))
+         return false;
+
+      ParseNode opn = (ParseNode) other;
+      if (value == null) {
+         if (opn.value != null)
+            return false;
+         else
+            return true;
+      }
+      if (opn.value == null)
+         return false;
+      return value.equals(opn.value);
+   }
 }
 

@@ -4,6 +4,8 @@
 
 package sc.parser;
 
+import sc.binf.ParseInStream;
+import sc.binf.ParseOutStream;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaSemanticNode;
@@ -312,7 +314,7 @@ public class Sequence extends NestedParselet  {
          }
 
          if (value == null)
-            value = (ParentParseNode) newParseNode(startIndex);
+            value = newParseNode(startIndex);
 
          if (!childParselet.getLookahead()) {
             if (nestedValue instanceof IParseNode) {
@@ -841,7 +843,7 @@ public class Sequence extends NestedParselet  {
    }
 
    /** For restoring the parseNode tree onto oldNode, for this sequence figure out which child node was produced by the the given slot index */
-   protected Object getSlotSemanticValue(int slotIx, ISemanticNode oldNode, RestoreCtx rctx) {
+   protected Object getSlotSemanticValue(int slotIx, ISemanticNode oldNode, SaveRestoreCtx rctx) {
       if (parameterMapping == null || parameterMapping[slotIx] == ParameterMapping.SKIP) {
          return null;
       }
@@ -898,7 +900,7 @@ public class Sequence extends NestedParselet  {
       return null;
    }
 
-   private Object getArraySemanticValue(ISemanticNode oldNode, int slotIx, RestoreCtx rctx) {
+   private Object getArraySemanticValue(ISemanticNode oldNode, int slotIx, SaveRestoreCtx rctx) {
       if (oldNode == null)
          return null;
 
@@ -927,6 +929,10 @@ public class Sequence extends NestedParselet  {
                      System.out.println("*** Unhandled array size case");
                }
                else {
+                  // When we've hit the end of the array, we won't have a parse-node and so don't go into the 'restoreNext' case.  We need to just go into pIn.readChild
+                  int sz = oldList.size();
+                  if (sz == rctx.arrIndex)
+                     return null;
                   return oldList;
                }
             }
@@ -975,14 +981,39 @@ public class Sequence extends NestedParselet  {
       ErrorParseNode pendingError = null;
       int pendingErrorIx = -1;
       boolean arrElement;
+      ParseInStream pIn = rctx.pIn;
 
+      // TODO: need to handle more than 31 parselets?
       int numParselets = parselets.size();
+      int excludeChildMask = pIn == null ? 0 : pIn.readUInt();
+      int bit = 1;
       for (int i = 0; i < numParselets; i++) {
+         boolean skipRestore = false;
          Parselet childParselet = parselets.get(i);
 
+         // When we have the parse node input stream, we do not have to parse non-parsed objects because we'll restore stuff
+         // properly.  But when there's no input stream, we still need to validate lookahead parselets.
+         if (pIn != null) {
+            if (childParselet.getDiscard() || childParselet.getLookahead()) {
+               /*
+               if (slotMapping != null) {
+                  bit = bit << 1;
+               }
+               continue;
+               */
+               if (slotMapping == null)
+                  continue;
+            }
+         }
+
+         if ((excludeChildMask & bit) != 0) {
+            skipRestore = true;
+         }
+         bit = bit << 1;
+
          boolean childInherited = false;
-         boolean skipRestore = false;
          boolean listProp = false;
+         Object nestedValue = null;
          Object oldChildObj;
          if (oldNode != null) {
             oldChildObj = getSlotSemanticValue(i, oldNode, rctx);
@@ -1018,12 +1049,19 @@ public class Sequence extends NestedParselet  {
          }
          else {
             // Need to reparse this node
-            // TODO: performance - most of the time it's identifier<sp> so we could at least skip the identifier part?  Change oldnode to an Object and pass down the value, then skip the string part and only reparse the spacing.
-            // Or in the oldModel save a variant of StringToken - we need start/len of both the string value and the entire node so we pull out the entire space, comment or whatever.
+            // TODO: performance - most of the time it's identifier<sp> so we could at least skip the identifier part even in the semantic model only by Changing the type of oldNode to Object and passing down the string value.
+            // Then either with or without the ParseInStream, we could reduce the work here.  It's probably a modest optimization though so keeping things simple for now.
+            // Another modest optimization might be to save a variant of StringToken in the oldModel that includes start+len of both the string value and the entire node so we pull out the entire space, comment or whatever.  That might reduce the need for the ParseInStream altogether
+            if (pIn != null && !skipRestore) {
+               // Reads the parselet-id, offsets, etc. to recreate this parse-node since it's not defined in the semantic model
+               nestedValue = pIn.readChild(parser, childParselet, rctx);
+               skipRestore = true;
+            }
             oldChildNode = null;
          }
 
-         Object nestedValue = skipRestore ? null : parser.restoreNext(childParselet, oldChildNode, rctx, childInherited);
+         if (!skipRestore)
+            nestedValue = parser.restoreNext(childParselet, oldChildNode, rctx, childInherited);
 
          if (nestedValue instanceof ParseError) {
             if (negated) {
@@ -1326,6 +1364,148 @@ public class Sequence extends NestedParselet  {
       else {
          return null;
       }
+   }
+
+   public void saveParse(IParseNode pn, ISemanticNode oldNode, SaveParseCtx sctx) {
+      if (repeat) {
+         saveParseRepeatingSequence(pn, oldNode, sctx);
+         return;
+      }
+      ParseOutStream pOut = sctx.pOut;
+
+      if (pn == null)
+         System.out.println("*** Null parse node for saveParse");
+
+      Object sv = pn.getSemanticValue();
+      ISemanticNode sn = null;
+      if (sv instanceof ISemanticNode)
+         sn = (ISemanticNode) sv;
+      else if (sv == null)
+         sn = oldNode;
+
+      ParentParseNode ppn = (ParentParseNode) pn;
+
+      boolean arrElement;
+
+      int numParselets = parselets.size();
+
+      List pnChildren = ppn.children;
+
+      // TODO: fix this by writing multiple mask UInts if someone needs a grammar like this
+      if (numParselets >= 32)
+         throw new IllegalArgumentException("Unable to save sequence with more than 31 parselets");
+
+      int mask = getExcludeMask(pnChildren);
+      pOut.writeUInt(mask);
+
+      int bit = 1;
+      int ct = 0;
+      for (int i = 0; i < numParselets; i++) {
+         Parselet childParselet = parselets.get(i);
+
+         // These are not added to the output parse node so need to skip the in ct but keep them in i
+         if (childParselet.getDiscard() || childParselet.getLookahead()) {
+            if (slotMapping != null) {
+               bit = bit << 1;
+               ct++;
+            }
+            continue;
+         }
+
+         int nextBit = bit << 1;
+         if ((mask & bit) != 0) {
+            bit = nextBit;
+            ct++;
+            continue;
+         }
+         bit = nextBit;
+
+         Object childPN = pnChildren.get(ct);
+         ct++;
+
+         boolean skipRestore = false;
+         boolean listProp = false;
+         Object oldChildObj;
+         if (sn != null) {
+            oldChildObj = getSlotSemanticValue(i, sn, sctx);
+            if (oldChildObj == SKIP_CHILD) {
+               skipRestore = true;
+               oldChildObj = null;
+            }
+
+            // If we are passing the parent object through to the child, we will have already matched the parseletId in the semantic node when the slot uses "*" (produced from the top parselet using properties set from the child)
+            // and not "." (produced from the child)
+            listProp = sctx.listProp;
+            sctx.listProp = false;
+         }
+         else
+            oldChildObj = null; // Need to reparse - no hint about what's next from the oldModel
+
+         // Set in getSlotSemanticValue - need to grab this value before we call reparse on a child because it will reset it
+         arrElement = sctx.arrElement;
+         sctx.arrElement = false;
+
+         IParseNode childPNNode = childPN instanceof IParseNode ? (IParseNode) childPN : null;
+
+         // There's a tricky distinction here.  If there's a string oldChildObj, it could be a case like the typeIdentifier in NewExpression which converts from 'PrimitiveType' to String.  If we use the child semantic value,
+         // the restore will not be able to match it and uses pIn.readChild instead of childParselet.restore.  But if oldChildObj == null, it's a case where we are meant to propagate the semantic value.
+         if (oldChildObj instanceof ISemanticNode || (oldChildObj == null && (childPNNode != null && childPNNode.getSemanticValue() instanceof ISemanticNode))) {
+            ISemanticNode oldChildNode = oldChildObj instanceof ISemanticNode ? (ISemanticNode) oldChildObj : null;
+            if (childPNNode != null) {
+               Object pnChildSV = childPNNode.getSemanticValue();
+               if (pnChildSV instanceof ISemanticNode)
+                  oldChildNode = (ISemanticNode) pnChildSV;
+            }
+            childParselet.saveParse(childPNNode, oldChildNode, sctx);
+
+            /* Normally the parent parselet should not have sent the restore if the child is not going to match so this test is redundant
+            int childPid = oldChildNode.getParseletId();
+            if (childPid != -1 && !childParselet.producesParseletId(childPid)) {
+            }
+            */
+         }
+         else {
+            Parselet pnParselet = childParselet;
+            boolean needsParseletType = false;
+            if (childPNNode != null) {
+               pnParselet = childPNNode.getParselet();
+               needsParseletType = true;
+            }
+
+            // Need to reparse this node
+            // TODO: performance - most of the time it's identifier<sp> so we could at least skip the identifier part even in the semantic model only by Changing the type of oldNode to Object and passing down the string value.
+            // Then either with or without the ParseInStream, we could reduce the work here.  It's probably a modest optimization though so keeping things simple for now.
+            // Another modest optimization might be to save a variant of StringToken in the oldModel that includes start+len of both the string value and the entire node so we pull out the entire space, comment or whatever.  That might reduce the need for the ParseInStream altogether
+            if (!skipRestore) {
+               pOut.saveChild(pnParselet, childPN, sctx, needsParseletType);
+            }
+         }
+
+         // Increment the current array index if we just successfully processed an index in the current array value
+         if (arrElement) {
+            //sctx.arrIndex++;
+         }
+
+         // After we've completed the save for a list property, need to clear out the list index so it's restored back to the value expected the parent
+         if (listProp)
+            sctx.arrIndex = 0;
+      }
+   }
+
+   private int getExcludeMask(List<Object> pnChildren) {
+      int ct = 0;
+      int mask = 0;
+      int numParselets = parselets.size();
+      for (int i = 0; i < numParselets; i++) {
+         Parselet p = parselets.get(i);
+         if (slotMapping == null && (p.getDiscard() || p.getLookahead())) {
+            continue;
+         }
+         if (pnChildren == null || pnChildren.size() <= ct || pnChildren.get(ct) == null)
+            mask |= 1 << ct;
+         ct++;
+      }
+      return mask;
    }
 
    private Parselet getExitParselet(int ix) {
@@ -1984,40 +2164,48 @@ public class Sequence extends NestedParselet  {
 
       boolean anyContent;
       boolean extendedErrorMatches = false;
-      int matchedIx = 0;
       int listSize = oldModel instanceof List ? ((List) oldModel).size() : -1;
+
+      ParseInStream pIn = rctx.pIn;
+
+      int repeatCount = pIn == null ? -1 : pIn.readUInt();
+
+      // Skip the parse loop entirely if we matched nothing and break out of the loop when we have parsed the expected number of parse-nodes
+      matched = repeatCount != 0; // true for either "not known" or we have entries to parse
 
       //int saveArrIndex = rctx.arrIndex;
       //rctx.arrIndex = 0;
+      lastMatchIndex = parser.currentIndex;
 
-      do {
-         lastMatchIndex = parser.currentIndex;
+      while (matched) {
+         lastMatchIndex = parser.currentIndex; // TODO: move this one to the end of the loop?  It's already set there but in an 'if' but need to be careful because matched might not be at the end of the loop.
 
          matchedValues = null;
 
-         matched = true;
          anyContent = false;
          boolean arrElement;
-         boolean reparsed = false;
          numParselets = parselets.size();
          for (i = 0; i < numParselets; i++) {
             childParselet = parselets.get(i);
             Object oldChildObj = getArraySemanticValue(oldModel, i, rctx);
             ISemanticNode oldChildNode;
+            boolean skipRestore = false;
 
             // Set in getArraySemanticValue if oldChildObj is an element of the list oldModel
             arrElement = rctx.arrElement;
             rctx.arrElement = false;
 
-            /* TODO: performance - any cases we can skip here?
-            if (oldChildObj == null)
-               continue;
-            */
-            if (oldChildObj instanceof ISemanticNode)
+            Object nestedValue = null;
+
+            if (oldChildObj instanceof ISemanticNode) {
                oldChildNode = (ISemanticNode) oldChildObj;
+            }
             else {
-               oldChildNode = null; // Need to reparse in this case
-               reparsed = true;
+               if (pIn != null) {
+                  nestedValue = pIn.readChild(parser, childParselet, rctx);
+                  skipRestore = true;
+               }
+               oldChildNode = null;
             }
 
             int saveArrIndex = 0;
@@ -2026,7 +2214,8 @@ public class Sequence extends NestedParselet  {
                rctx.arrIndex = 0;
             }
 
-            Object nestedValue = parser.restoreNext(childParselet, oldChildNode, rctx, false);
+            if (!skipRestore)
+               nestedValue = parser.restoreNext(childParselet, oldChildNode, rctx, false);
 
             if (arrElement) {
                rctx.arrIndex = saveArrIndex;
@@ -2062,7 +2251,7 @@ public class Sequence extends NestedParselet  {
                   for (i = 0; i < numMatchedValues; i++) {
                      Object nv = matchedValues.get(i);
                      //if (nv != null) // need an option to preserve nulls?
-                     value.addForRestore(nv, parselets.get(i), -1, i, false, parser, reparsed);
+                     value.add(nv, parselets.get(i), -1, i, false, parser);
                   }
                }
                matched = true;
@@ -2106,7 +2295,12 @@ public class Sequence extends NestedParselet  {
             lastMatchIndex = parser.currentIndex;
             break;
          }
-      } while (matched);
+         if (repeatCount != -1 && value != null && value.children.size() == repeatCount) {
+            lastMatchIndex = parser.currentIndex;
+            break;
+         }
+
+      }
 
       //rctx.arrIndex = saveArrIndex;
 
@@ -2191,6 +2385,67 @@ public class Sequence extends NestedParselet  {
          restoreOldNode(value, oldModel);
       }
       return value;
+   }
+
+   private void saveParseRepeatingSequence(IParseNode pn, ISemanticNode oldNode, SaveParseCtx sctx) {
+      Parselet childParselet = null;
+      int numParselets;
+
+      Object sv = pn.getSemanticValue();
+      ISemanticNode sn = null;
+      if (sv instanceof ISemanticNode)
+         sn = (ISemanticNode) sv;
+
+      ParseOutStream pOut = sctx.pOut;
+
+      ParentParseNode ppn = (ParentParseNode) pn;
+
+      // Skip the parse loop entirely if we matched nothing
+      int numPNChild = ppn.children == null ? 0 : ppn.children.size(); // true for either "not known" or we have entries to parse
+
+      pOut.writeUInt(numPNChild);
+
+      // Looping until we've processed all parse nodes.  We might add more than one from different child parselets
+      for (int pnCt = 0; pnCt < numPNChild; ) {
+         boolean arrElement;
+         numParselets = parselets.size();
+         for (int i = 0; i < numParselets; i++) {
+            childParselet = parselets.get(i);
+            if (childParselet.getDiscard() || childParselet.getLookahead())
+               continue;
+
+            Object oldChildObj = getArraySemanticValue(sn, i, sctx);
+
+            Object childObj = ppn.children.get(pnCt++);
+
+            // Set in getArraySemanticValue if oldChildObj is an element of the list oldModel
+            arrElement = sctx.arrElement;
+            sctx.arrElement = false;
+
+            if (oldChildObj instanceof ISemanticNode && childObj instanceof IParseNode) {
+               ISemanticNode oldChildNode = (ISemanticNode) oldChildObj;
+               IParseNode childPN = (IParseNode) childObj;
+               Object childSV = childPN.getSemanticValue();
+               if (childSV instanceof ISemanticNode)
+                  oldChildNode = (ISemanticNode) childSV;
+
+               // Doing nothing here because we'll have already saved the ISemanticNode in the model index.  We can get right back here in 'restore' and know how to
+               // restore the children parselets from the node value.  It's only when we have no trace of the parse node in the semantic model that we need to write anything to pOut
+               childParselet.saveParse((IParseNode) childPN, oldChildNode, sctx);
+            }
+            else {
+               pOut.saveChild(childParselet, childObj, sctx, false);
+            }
+
+            int saveArrIndex = 0;
+            if (arrElement) {
+               saveArrIndex = sctx.arrIndex;
+               sctx.arrIndex = saveArrIndex;
+               // Increment the current array index if we just saved an element in the current array value
+               //sctx.arrIndex++;
+            }
+         }
+      }
    }
 
    public Object parseExtendedErrors(Parser parser, Parselet exitParselet) {
@@ -2785,6 +3040,21 @@ public class Sequence extends NestedParselet  {
    }
 
    public Parselet getChildParselet(Object parseNode, int index) {
+      return getChildParseletForIndex(index);
+   }
+
+   public Parselet getChildParseletForIndex(int index) {
+      if (slotMapping == null) {
+         // When there's no slot mapping, we skip lookahead slots so make sure to pick the right parselet for those cases (e.g. fasterFloatPointLiteral)
+         int useIndex = index;
+         int sz = parselets.size();
+         for (int i = 0; i < index; i++) {
+            Parselet p = parselets.get(i % sz);
+            if (p.getDiscard() || p.getLookahead())
+               useIndex++;
+         }
+         return parselets.get(useIndex % sz);
+      }
       return parselets.get(index % parselets.size());
    }
 

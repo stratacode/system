@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.binf.ParseInStream;
 import sc.lang.java.JavaModel;
 import sc.lang.java.TransformUtil;
 import sc.lang.js.JSLanguage;
@@ -748,45 +749,50 @@ public class TestUtil {
                Object modelObj = getTestResult(node);
 
                if (modelObj instanceof ISemanticNode) {
-                  String serFileName = FileUtil.replaceExtension(fileName, "binf");
+                  String serFileName = FileUtil.replaceExtension(fileName, "mbinf");
                   ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName);
 
-                  long startDeserTime = System.currentTimeMillis();
-                  ISemanticNode deserModel = ParseUtil.deserializeModel(serFileName);
-                  long endDeserTime = System.currentTimeMillis();
+                  String parseFileName = FileUtil.replaceExtension(fileName, "pbinf");
+                  ParseUtil.serializeParseNode(node, parseFileName, fileName);
 
-                  out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
+                  int rc = 0;
+                  do {
+                     long startDeserTime = System.currentTimeMillis();
+                     ISemanticNode deserModel = ParseUtil.deserializeModel(serFileName);
+                     long endDeserTime = System.currentTimeMillis();
 
-                  if (!deserModel.equals(modelObj))
-                     error("Deserialize - results do not match!");
-                  else {
-                     out("Serialized models match");
+                     out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
 
-                     int rc = 0;
-                     do {
-                        long startRestoreTime = System.currentTimeMillis();
-                        Object restored = lang.restore(fileName, deserModel, false);
-                        long endRestoreTime = System.currentTimeMillis();
-                        out("Restored: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
+                     if (!deserModel.equals(modelObj))
+                        error("Deserialize - results do not match!");
+                     else {
+                        out("Serialized models match");
+                     }
 
-                        if (restored instanceof ParseError || restored == null)
-                           error("Invalid return from restore - should always restore to a valid parse node.");
+                     long startRestoreTime = System.currentTimeMillis();
+                     ParseInStream pIn = rc % 2 == 0 ? ParseUtil.openParseNodeStream(parseFileName) : null;
+                     Object restored = lang.restore(fileName, deserModel,  pIn, false);
+                     long endRestoreTime = System.currentTimeMillis();
+                     out("Restored " + (pIn == null ? " with no parse stream" : " with parse stream") + ": " + fileName +  " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
 
-                        if (restored instanceof IParseNode) {
-                           if (deserModel.getParseNode() != restored)
-                              error("*** Error - model not updated with parse node tree!");
+                     if (restored instanceof ParseError || restored == null)
+                        error("Invalid return from restore - should always restore to a valid parse node.");
 
-                           if (!restored.toString().equals(result.toString()))
-                              error("Restored parse node does not match");
-                           else {
-                              // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
-                              out("Restored parse node successfully");
-                           }
+                     if (restored instanceof IParseNode) {
+                        if (deserModel.getParseNode() != restored)
+                           error("*** Error - model not updated with parse node tree!");
+
+                        if (!restored.toString().equals(result.toString()))
+                           error("Restored parse node text does not match");
+                        else if (!restored.equals(result))
+                           error("Restored parse nodes do not match");
+                        else {
+                           // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
+                           out("Restored parse node successfully");
                         }
-                        rc++;
-                     } while (rc < 5);
-
-                  }
+                     }
+                     rc++;
+                  } while (rc < 2);
                }
 
                StringBuilder sb = new StringBuilder();

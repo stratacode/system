@@ -209,6 +209,13 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence optFloatTypeSuffix = new Sequence("('')", OPTIONAL, floatTypeSuffix);
 
    SymbolChoice hexPrefix = new SymbolChoice("0x","0X");
+
+   //
+   // To define an Integer, we have different representations.  Each of these lower-level parselets maps to a '*' production of integerLiteral.  The
+   // grammar will call setHexValue, or setBinaryValue, etc. so we can convert from String to integer value and keep track of what type of IntegerLiteral we
+   // have to go in the opposite direction for formatting when the model object changes.
+   //
+
    Sequence hexLiteral = new Sequence("(hexPrefix,,hexValue)", hexPrefix, notUnderscore, hexDigits);
    SymbolChoice binaryPrefix = new SymbolChoice("0b","0B");
    // Aded in Java7
@@ -333,7 +340,12 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    {
       primary.put("(", parenExpression);
       primary.put("new", newExpression);
-      primary.addDefault(literal, classValueExpression, identifierExpression);
+      primary.put("'", literal);
+      primary.put("\"", literal);
+      primary.put("true", literal);
+      primary.put("false", literal);
+      primary.put("null", literal);
+      primary.addDefault(classValueExpression, identifierExpression, literal);
       // Caching because MethodReference may well match a primary then reject it - removing this one slows down nested expressions exponentially
       primary.cacheResults = true;
    }

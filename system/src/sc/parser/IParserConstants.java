@@ -14,7 +14,7 @@ public interface IParserConstants {
    public static int LOOKAHEAD = 4;
    public static int NOT = 8;
    public static int SKIP = 16;
-   public static int DISCARD = 32;
+   //public static int DISCARD = 32;
    public static int NOERROR = 64;
    public static int TRACE = 128;
    public static int SKIP_ON_ERROR = 256;

@@ -485,6 +485,14 @@ public class SymbolChoice extends Parselet {
       return parse(parser); // We really just need to advance the pointer here but for now just do a normal parse
    }
 
+   public void saveParse(IParseNode pn, ISemanticNode sn, SaveParseCtx sctx) {
+      Parselet pnParselet = pn.getParselet();
+      if (pnParselet == this)
+         sctx.pOut.saveChild(pnParselet, pn, sctx, false);
+      else
+         pnParselet.saveParse(pn, sn, sctx);
+   }
+
    public String toHeaderString(Map<Parselet,Integer> visited) {
       if (name != null)
          return name;

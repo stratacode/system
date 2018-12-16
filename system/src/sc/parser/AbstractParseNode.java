@@ -236,4 +236,19 @@ public abstract class AbstractParseNode implements IParseNode, Cloneable {
    public int getNodeCount() {
       return 1;
    }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof AbstractParseNode))
+         return false;
+      AbstractParseNode opn = (AbstractParseNode) other;
+      if (opn.errorNode != errorNode)
+         return false;
+      if (opn.getParselet() != getParselet())
+         return false;
+      if (opn.getClass() != getClass())
+         return false;
+      if (opn.startIndex != startIndex)
+         return false;
+      return true;
+   }
 }

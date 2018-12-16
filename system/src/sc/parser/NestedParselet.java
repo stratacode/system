@@ -82,9 +82,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     */
    Object[] chainedPropertyMappings = null;
 
-   enum ParameterType {DEFAULT, ARRAY, STRING, PROPAGATE /* slot has a '.' */, INHERIT /* slot has a '*' */}
-
-   ;
+   enum ParameterType {DEFAULT, ARRAY, STRING, PROPAGATE /* slot has a '.' */, INHERIT /* slot has a '*' */};
 
    ParameterType parameterType = ParameterType.DEFAULT;
 
@@ -2416,7 +2414,11 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       return sub;
    }
 
+   /** Best effort at returning the parselet for a given parent parse node with the specified index into the children's array.  Works well for Sequence but OrderedChoice must use the data type or context in the parse node and that's not always available */
    public abstract Parselet getChildParselet(Object parseNode, int index);
+
+   /** Like the above, but returns null when the childParselet cannot be determined solely based on the index (i.e. for any OrderedChoice) */
+   public abstract Parselet getChildParseletForIndex(int index);
 
    static int _x = 0;
 

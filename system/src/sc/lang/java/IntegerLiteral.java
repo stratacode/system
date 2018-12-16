@@ -44,6 +44,11 @@ public class IntegerLiteral extends AbstractLiteral {
       return expr;
    }
 
+   //
+   // These setOctal,Hex, etc. methods are used by the JavaLanguage grammar to define the Integer literal and keep track of how
+   // it should be formatted if we need to convert the value back to a value in the source.
+   //
+
    public void setOctal(boolean o) {
       valueType = OCTAL;
    }

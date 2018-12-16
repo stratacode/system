@@ -10,11 +10,11 @@ public class StringToken extends AbstractString {
    public int startIndex;
    public int len;
 
-   StringToken(IString p) {
+   public StringToken(IString p) {
       baseString = p;
    }
 
-   StringToken(IString p, int start, int l) {
+   public StringToken(IString p, int start, int l) {
       this(p); 
       startIndex = start;
       len = l;

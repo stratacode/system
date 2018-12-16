@@ -5,8 +5,7 @@
 package sc.lang;
 
 import sc.binf.BinfConstants;
-import sc.binf.BinfOutStream;
-import sc.binf.BinfInStream;
+import sc.binf.ModelOutStream;
 import sc.js.JSSettings;
 import sc.lang.java.*;
 import sc.layer.SrcEntry;
@@ -1085,7 +1084,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return ct;
    }
 
-   public void serialize(BinfOutStream out) {
+   public void serialize(ModelOutStream out) {
       if (parseletId == -1) {
          if (out.currentListId == -1)
             System.err.println("** Unable to serialize semantic node without parseletId");

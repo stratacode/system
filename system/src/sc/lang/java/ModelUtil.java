@@ -1094,6 +1094,16 @@ public class ModelUtil {
       return ModelUtil.methodNamesMatch(m1, m2) && ModelUtil.sameMethodParameters(m1, m2);
    }
 
+   public static boolean anyUnresolvedParamTypes(Object m) {
+      Object[] pTypes = ModelUtil.getParameterTypes(m);
+      if (pTypes == null)
+         return false;
+      for (Object pType:pTypes)
+         if (pType == null)
+            return true;
+      return false;
+   }
+
    /**
     * Returns true for two methods which are not only the same name, signature but also defined in the same layer.
     * Will consider two methods in
