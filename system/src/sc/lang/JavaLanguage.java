@@ -345,6 +345,17 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
       primary.put("true", literal);
       primary.put("false", literal);
       primary.put("null", literal);
+      primary.put("0", literal);
+      primary.put("1", literal);
+      primary.put("2", literal);
+      primary.put("3", literal);
+      primary.put("4", literal);
+      primary.put("5", literal);
+      primary.put("6", literal);
+      primary.put("7", literal);
+      primary.put("8", literal);
+      primary.put("9", literal);
+
       primary.addDefault(classValueExpression, identifierExpression, literal);
       // Caching because MethodReference may well match a primary then reject it - removing this one slows down nested expressions exponentially
       primary.cacheResults = true;

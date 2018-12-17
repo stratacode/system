@@ -190,6 +190,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** Time to pause in between commands - useful for playing back scripts */
    public int pauseTime = 0;
 
+   /** Set enableBatchMode = true to prevent releasing locks in between commands.  In other words, the commands run all at once until the next wait */
+   public boolean enableBatchMode = false;
+
    public boolean autoObjectSelect = true;
 
    /** When set to true, we turn off the prompt, mostly for auto tests but it's also not helpful when stdin is redirected */
@@ -1068,7 +1071,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          recordOutput(recordString, origIndent);
       }
 
-      if (pauseTime != 0)
+      if (pauseTime != 0 && !enableBatchMode)
          sleep(pauseTime);
    }
 

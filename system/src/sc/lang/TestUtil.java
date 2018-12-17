@@ -198,6 +198,14 @@ public class TestUtil {
                      System.err.println("*** Unrecognized option: " + opt);
                   }
                   break;
+               case 'o':
+                  if (args.length < i + 1)
+                     System.err.println("*** No output directory argument to -o option. ");
+                  else {
+                     i++;
+                     opts.outDir = args[i];
+                  }
+                  break;
                case 'd':
                   if (opt.length() > 1)
                      usage(args);
@@ -398,6 +406,7 @@ public class TestUtil {
       String classPath;
       String externalClassPath;
       String srcPath;
+      String outDir;
       String findClassName;
       String[] reparseFiles;
       ArrayList<String> reparseIndexes;
@@ -422,6 +431,22 @@ public class TestUtil {
          }
          return sb.toString();
       }
+
+      public String getOutFile(String pathName) {
+         if (outDir == null)
+            return pathName;
+         String fileName = FileUtil.isAbsolutePath(pathName) ? FileUtil.getFileName(pathName) : pathName;
+         return FileUtil.concat(outDir, fileName);
+      }
+
+      public String getOutDir() {
+         if (outDir == null)
+            return System.getProperty("user.dir");
+         if (FileUtil.isAbsolutePath(outDir))
+            return outDir;
+         else
+            return FileUtil.concat(System.getProperty("user.dir"), outDir);
+      }
    }
 
    static StringBuilder testOutput = new StringBuilder();
@@ -430,7 +455,7 @@ public class TestUtil {
       JavaLanguage.register();
       SCLanguage.register();
 
-      out("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir"));
+      out("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir") + " out dir: " + opts.getOutDir());
 
       ArrayList<String> reparseStats = new ArrayList<String>();
 
@@ -749,10 +774,10 @@ public class TestUtil {
                Object modelObj = getTestResult(node);
 
                if (modelObj instanceof ISemanticNode) {
-                  String serFileName = FileUtil.replaceExtension(fileName, "mbinf");
+                  String serFileName = FileUtil.replaceExtension(opts.getOutFile(fileName), "mbinf");
                   ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName);
 
-                  String parseFileName = FileUtil.replaceExtension(fileName, "pbinf");
+                  String parseFileName = FileUtil.replaceExtension(opts.getOutFile(fileName), "pbinf");
                   ParseUtil.serializeParseNode(node, parseFileName, fileName);
 
                   int rc = 0;
@@ -821,7 +846,7 @@ public class TestUtil {
                lang.debug = false;
 
                // Generate a completely new one
-               String genFileName = FileUtil.replaceExtension(fileName, "result");
+               String genFileName = FileUtil.replaceExtension(opts.getOutFile(fileName), "result");
 
                long generateStartTime = System.currentTimeMillis();
 
@@ -871,8 +896,8 @@ public class TestUtil {
 
       String testName = opts.testBaseName + opts.testArgsId;
       String testId = System.getProperty("user.dir") + "/" + testName;
-      String testOutputFileName = FileUtil.addExtension(testName, "goodOut");
-      String testVerifyFileName = FileUtil.addExtension(testName, "goodVerify");
+      String testOutputFileName = opts.getOutFile(FileUtil.addExtension(testName, "goodOut"));
+      String testVerifyFileName = opts.getOutFile(FileUtil.addExtension(testName, "goodVerify"));
       String newOutputFileName = FileUtil.replaceExtension(testOutputFileName , "newOut");
       String newVerifyFileName = FileUtil.replaceExtension(testOutputFileName , "newVerify");
       File testOutputFile = new File(testOutputFileName);
@@ -944,4 +969,5 @@ public class TestUtil {
       String str = Double.toString((end - start)/1000.0);
       return str.length() > 4 ? str.substring(0,4) : str;
    }
+
 }
