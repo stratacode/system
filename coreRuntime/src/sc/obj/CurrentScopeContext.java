@@ -14,8 +14,9 @@ import java.util.Set;
 
 /**
  * Used to define, save and restore the list of scope contexts used in a given operation.
- * For 'crossScope' data binding expressions, we capture the CurrentScopeContext when the binding is created.
- * If an event occurs, which is queued to a different context, the data-binding operations will temporarily restore the
+ * For 'crossScope' data binding expressions, we capture the CurrentScopeContext when the binding is created, so we
+ * can restore it later to communicate in the context necessary for that binding.
+ * Or more specifically, if an event occurs, which is queued to a different context, the data-binding operations will temporarily restore the
  * CurrentScopeContext before firing the binding so it has access to necessary state and locks required to fire.
  * For example, when an object in session scope receives events from a global object in a context, like a JavaModel changed and
  * we want to update the sessions that are viewing that JavaModel.  That binding is marked with @Bindable(crossScope=true) and
@@ -26,12 +27,20 @@ import java.util.Set;
  * with a 'scopeContextName'.  There are methods here which let the command line interpreter wait for the CurrentScopeContext to be 'ready'
  * which basically means the client is waiting for commands.  At that point, we continue the test-script and use that CurrentScopeContext
  * to override the default scope lookup.
+ *
+ * We can target commands to a specific scope within the CurrentScopeContext using the getScopeContext/ByName methods.  So for a test
+ * script, when we invoke a command we make sure it goes to the intended window in a multi-window test.
  */
 @sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public class CurrentScopeContext {
    private static final int MAX_STATE_LIST_SIZE = 32;
 
    private static final Object scopeContextNamesLock = new Object();
+   /**
+    * Primarily for debugging from the command line, to communicate with a specific browser window (or similar situations)
+    * you can register the CurrentScopeContext used to handle that request with a name.  From the command line, you
+    * can set the cmd.scopeContextName property to target a specific window in those cases where you have more than one.
+    */
    static HashMap<String,CurrentScopeContext> scopeContextNames = null;
 
    // List of ScopeContexts active
@@ -56,10 +65,20 @@ public class CurrentScopeContext {
       this.locks = locks;
    }
 
-   ScopeContext getScopeContext(int scopeId) {
+   public ScopeContext getScopeContext(int scopeId) {
       for (int i = 0; i < scopeContexts.size(); i++) {
          ScopeContext ctx = scopeContexts.get(i);
          if (ctx != null && ctx.getScopeDefinition().scopeId == scopeId)
+            return ctx;
+      }
+      return null;
+   }
+
+   /** Returns a specific ScopeContext from this CurrentScopeContext - perhaps the "window" scope to use for an DynUtil.invokeRemote call.  */
+   public ScopeContext getScopeContextByName(String scopeName) {
+      for (int i = 0; i < scopeContexts.size(); i++) {
+         ScopeContext ctx = scopeContexts.get(i);
+         if (ctx != null && ctx.getScopeDefinition().getExternalName().equals(scopeName))
             return ctx;
       }
       return null;
@@ -143,7 +162,11 @@ public class CurrentScopeContext {
       return null;
    }
 
-
+   /**
+    * Register the CurrentScopeContext - so you can target a specific ScopeContext later via remoteMethod calls (e.g. using
+    * cmd.scopeContextName or to find the ScopeContext param to DynUtil.invokeRemote.   So far, this is only used in debug mode
+    * to make test scripts more flexible in being able to deal with multi-browser window applications.
+    */
    public static void register(String scopeContextName, CurrentScopeContext ctx) {
       ctx.scopeContextName = scopeContextName;
       synchronized (scopeContextNamesLock) {
@@ -336,10 +359,9 @@ public class CurrentScopeContext {
    public Object getSingletonForType(Object typeObj) {
       String scopeName = DynUtil.getScopeNameForType(typeObj);
       if (scopeName != null) {
-         for (ScopeContext ctx:scopeContexts) {
-            if (ctx.getScopeDefinition().getExternalName().equals(scopeName))
-               return ctx.getSingletonForType(typeObj);
-         }
+         ScopeContext sctx = getScopeContextByName(scopeName);
+         if (sctx != null)
+            return sctx.getSingletonForType(typeObj);
          // TODO: including the parent scopes in this search but maybe we should create the CurrentScopeContext with all required scopes?
          // thinking of adding a compile time search for "dependent scopes" that uses the getDependentTypes code.
          for (ScopeContext ctx:scopeContexts) {
