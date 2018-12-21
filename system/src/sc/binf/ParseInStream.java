@@ -67,8 +67,11 @@ public class ParseInStream extends BinfInStream {
             nestedParselet = (NestedParselet) getNextParselet(parser, rctx);
             // Fall through...
          case ParseOutStream.SinglePN:
-            if (nestedParselet == null)
+            if (nestedParselet == null) {
+               if (!(parselet instanceof NestedParselet))
+                  System.out.println("***");
                nestedParselet = (NestedParselet) parselet;
+            }
             // Can't rely on parselet.newParseNode because of a weird case - <statement> an indexedChoice which returns ParentParseNode most of the time but ParseNode for a dangling ";" which has no semantic value presently
             ParseNode spnNode = new ParseNode();
             spnNode.setParselet(nestedParselet);
