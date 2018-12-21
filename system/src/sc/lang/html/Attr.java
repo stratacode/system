@@ -230,6 +230,8 @@ public class Attr extends Node implements ISrcStatement {
                if (exprRes instanceof IParseNode) {
                   if (parseNode != null && parseNode.getStartIndex() != -1)
                      ((IParseNode) exprRes).advanceStartIndex(parseNode.getStartIndex());
+                  else
+                     System.err.println("*** Warning - not updating index for schtml attribute");
                }
             }
          }

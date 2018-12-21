@@ -1090,6 +1090,9 @@ public class OrderedChoice extends NestedParselet  {
    public void saveParseRepeatingChoice(IParseNode pn, ISemanticNode sn, SaveParseCtx sctx) {
       ParseOutStream pOut = sctx.pOut;
 
+      if (toString().equals("<simpleTemplateDeclarations>"))
+         System.out.println("***");
+
       boolean arrElement;
 
       ParentParseNode ppn = (ParentParseNode) pn;
@@ -1138,7 +1141,7 @@ public class OrderedChoice extends NestedParselet  {
          int saveArrIndex = 0;
          if (arrElement) {
             saveArrIndex = sctx.arrIndex;
-            sctx.arrIndex = arrIndex;
+            sctx.arrIndex = 0;
          }
 
          // For the leaf parse nodes, where this no semantic value or a string value, we save the parse node directly

@@ -734,7 +734,7 @@ public abstract class Language extends LayerFileComponent {
       return null;
    }
 
-   /** Hook into the LayeredSystem's build process */
+   /** Used by the LayeredSystem from the IFileProcessor interface to parse the file.  */
    public Object process(SrcEntry file, boolean enablePartialValues) {
       if (file.isZip()) {
          // This is closed inside of the parse method

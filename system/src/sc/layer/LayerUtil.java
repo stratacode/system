@@ -4,6 +4,8 @@
 
 package sc.layer;
 
+import sc.binf.BinfConstants;
+import sc.binf.ParseInStream;
 import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.java.Expression;
@@ -114,6 +116,88 @@ public class LayerUtil implements LayerConstants {
       else {
          System.out.println("   " + appName + " version: java build - no version available");
       }
+   }
+
+   private static String getModelCacheBaseDir(LayeredSystem sys, Layer layer, SrcEntry srcEnt) {
+      return FileUtil.concat(sys.getStrataCodeHomeDir("modelCache"), layer.getUnderscoreName(), srcEnt.getRelDir());
+   }
+
+   public static Object restoreModel(LayeredSystem sys, Language lang, SrcEntry srcEnt, long srcFileModeTime) {
+      Layer layer = srcEnt.layer;
+      if (layer == null)
+         return null;
+      String cacheBaseDir = getModelCacheBaseDir(sys, layer, srcEnt);
+      String baseName = FileUtil.removeExtension(srcEnt.baseFileName);
+      String serFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ModelStreamSuffix));
+
+      File serFile = new File(serFileName);
+      long serLastModified = serFile.lastModified();
+      if (serLastModified == 0) {
+         return null;
+      }
+
+      // TODO: add length and/or a hash verification here for more accuracy?
+      if (serLastModified < srcFileModeTime) {
+         if (sys.options.verboseModelCache)
+            sys.info("Model cache changed: " + serFileName);
+         return null;
+      }
+
+      PerfMon.start("deserializeModel");
+      ISemanticNode deserModel = null;
+      try {
+         deserModel = ParseUtil.deserializeModel(serFileName);
+      }
+      finally {
+         PerfMon.end("deserializeModel");
+      }
+
+      ParseInStream pIn = null;
+      String parseFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ParseStreamSuffix));
+      File parseFile = new File(parseFileName);
+      long parseLastModified = parseFile.lastModified();
+      if (parseLastModified != 0 && parseLastModified > srcFileModeTime) {
+         try {
+            pIn = ParseUtil.openParseNodeStream(parseFileName);
+         }
+         catch (UncheckedIOException exc) {
+            if (sys.options.verbose || sys.options.verboseModelCache)
+               sys.info("Error opening parseNodeStream: " + exc);
+         }
+      }
+
+      PerfMon.start("restoreModel");
+      Object restored = null;
+      try {
+         restored = lang.restore(srcEnt.absFileName, deserModel,  pIn, false);
+      }
+      finally {
+         PerfMon.end("restoreModel");
+      }
+
+      if (restored instanceof ParseError || restored == null) {
+         if (sys.options.verbose || sys.options.verboseModelCache)
+            sys.info("Error restoring model: " + srcEnt + " return: " + restored);
+         return null;
+      }
+      return restored;
+   }
+
+   public static void saveModelCache(LayeredSystem sys, SrcEntry srcEnt, ILanguageModel model) {
+      Layer layer = srcEnt.layer;
+      if (layer == null)
+         return;
+      String cacheBaseDir = getModelCacheBaseDir(sys, layer, srcEnt);
+      String baseName = FileUtil.removeExtension(srcEnt.baseFileName);
+      String serFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ModelStreamSuffix));
+
+      File dir = new File(FileUtil.getParentPath(serFileName));
+      dir.mkdirs();
+
+      ParseUtil.serializeModel((ISemanticNode) model, serFileName, srcEnt.absFileName);
+
+      String parseFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ParseStreamSuffix));
+      ParseUtil.serializeParseNode(model.getParseNode(), parseFileName, srcEnt.absFileName);
    }
 
    public static class LayeredSystemPtr {

@@ -18,4 +18,7 @@ public interface BinfConstants {
    int DoubleId = 10;
    int CharId = 11;
    int NumReservedIds = 12;
+
+   String ModelStreamSuffix = "mplet";
+   String ParseStreamSuffix = "pplet";
 }

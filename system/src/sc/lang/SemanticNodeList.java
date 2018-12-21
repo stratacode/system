@@ -844,8 +844,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       int saveCurrentListId = out.currentListId;
       out.currentListId = parseletId;
       // This is a generic list of different sub-types.  The class of the sub-type is determined in the sub-parselet like normal
-      //if (parseNode != null && !parseNode.getParselet().getSemanticValueIsArray()){
-      if (parseNode != null && parseNode.getParselet().getSemanticValueMultiTypedArray()) {
+      if (parseletId == -1 || (parseNode != null && parseNode.getParselet().getSemanticValueMultiTypedArray())) {
          out.writeUInt(BinfConstants.ListId);
       }
       else {

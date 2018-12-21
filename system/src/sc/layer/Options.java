@@ -43,6 +43,7 @@ public class Options {
    @Constant public boolean verboseLocks = false;
    /** Turns on debug messages specific to the @Exec annotation - see which types are excluded from a given runtime */
    @Constant public boolean verboseExec = false;
+   @Constant public boolean verboseModelCache = false;
    /** Set to true when collecting the logs as a 'verification file' - a signal to not output dates, or other info that will vary from run to run */
    @Constant public boolean testVerifyMode = false;
    /** Set to true when debugging the program - used to disable timeouts  */
@@ -186,6 +187,12 @@ public class Options {
 
    /** For schtml pages, should they use caching by default for runtimes that support it? */
    @Constant public boolean defaultPageCache = true;
+
+   /**
+    * A performance optimization to reduce parsing overhead for files which don't change.  When a src file is changed, it is parsed and the model and parse-stream are serialized.  When that same file
+    * needs to be parsed again, first the model is deserialized.   If and when the parse-node is needed, it is restored from a combination of the original file and the parse-stream.
+    */
+   @Constant public boolean modelCacheEnabled = true;
 
    /**
     * For web applications that use scopes shared across different apps (web pages) like 'global' and 'session' do we
@@ -338,12 +345,16 @@ public class Options {
                      liveDynamicTypes = true;
                   else if (opt.equals("dbg")) // Right now, this option is passed to the 'start' script (e.g. scc) to enable the java debugger options
                      ;
+                  else if (opt.equals("dmc"))
+                     modelCacheEnabled = false;
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
                case 'e':
                   if (opt.equals("ee"))
                      editEditor = true;
+                  else if (opt.equals("emc"))
+                     modelCacheEnabled = true;
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;

@@ -5589,6 +5589,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // in the modify declaration when initializing the instance.
          pendingLayers.put(layerTypeName, layer);
 
+         if (inLayerDir)
+            layerGroup = "";
+
          SrcEntry defSrcEnt = new SrcEntry(layer, layerDefFile, FileUtil.concat(layerGroup, layerBaseName));
 
          // Parse the model, validate it defines an instance of a Layer
@@ -9943,91 +9946,98 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          */
 
          long modTimeStart = srcEnt.getLastModified();
-         try {
-            Object result = processor.process(srcEnt, enablePartialValues);
-            if (result instanceof ParseError) {
-               if (reportErrors) {
-                  error("File: " + srcEnt.absFileName + ": " + ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
+         Object modelObj = options.modelCacheEnabled && processor instanceof Language ? LayerUtil.restoreModel(this, (Language) processor, srcEnt, modTimeStart) : null;
 
-                  if (currentBuildLayer != null && currentBuildLayer.buildState != null) {
-                     BuildState bd = currentBuildLayer.buildState;
-                     anyErrors = true;
-                     bd.addErrorFile(srcEnt);
+         try {
+            if (modelObj == null) {
+               Object result = processor.process(srcEnt, enablePartialValues);
+               if (result instanceof ParseError) {
+                  if (reportErrors) {
+                     error("File: " + srcEnt.absFileName + ": " + ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
+
+                     if (currentBuildLayer != null && currentBuildLayer.buildState != null) {
+                        BuildState bd = currentBuildLayer.buildState;
+                        anyErrors = true;
+                        bd.addErrorFile(srcEnt);
+                     }
+                  }
+                  return result;
+               }
+               else if (result == IFileProcessor.FILE_OVERRIDDEN_SENTINEL) {
+                  return IFileProcessor.FILE_OVERRIDDEN_SENTINEL;
+               }
+               else {
+                  modelObj = ParseUtil.nodeToSemanticValue(result);
+
+                  // TODO: Template file - compile these?
+                  if (!(modelObj instanceof IFileProcessorResult))
+                     return null;
+
+                  IFileProcessorResult res = (IFileProcessorResult) modelObj;
+                  res.addSrcFile(srcEnt);
+                  if (srcEnt.getLastModified() != modTimeStart) {
+                     System.err.println("File: " + srcEnt.absFileName + " changed during parsing");
+                     return new ParseError("File changed during parsing", null, 0, 0);
                   }
                }
-               return result;
             }
-            else if (result == IFileProcessor.FILE_OVERRIDDEN_SENTINEL) {
-               return IFileProcessor.FILE_OVERRIDDEN_SENTINEL;
-            }
-            else {
-               Object modelObj = ParseUtil.nodeToSemanticValue(result);
+            if (modelObj instanceof ILanguageModel && !temporary) {
+               ILanguageModel model = (ILanguageModel) modelObj;
 
-               // TODO: Template file - compile these?
-               if (!(modelObj instanceof IFileProcessorResult))
-                  return null;
-
-               IFileProcessorResult res = (IFileProcessorResult) modelObj;
-               res.addSrcFile(srcEnt);
-               if (srcEnt.getLastModified() != modTimeStart) {
-                  System.err.println("File: " + srcEnt.absFileName + " changed during parsing");
-                  return new ParseError("File changed during parsing", null, 0, 0);
+               if (options.modelCacheEnabled && processor instanceof Language) {
+                  LayerUtil.saveModelCache(this, srcEnt, model);
                }
 
-               if (modelObj instanceof ILanguageModel && !temporary) {
-                  ILanguageModel model = (ILanguageModel) modelObj;
+               markBeingLoadedModel(srcEnt, model);
 
-                  markBeingLoadedModel(srcEnt, model);
+               try {
+                  boolean activatedLayer = srcEnt.layer != null && srcEnt.layer.activated;
 
-                  try {
-                     boolean activatedLayer = srcEnt.layer != null && srcEnt.layer.activated;
+                  ILanguageModel oldModel = activatedLayer ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
+                  if (oldModel instanceof JavaModel && oldModel != model && model instanceof JavaModel) {
+                     ((JavaModel) oldModel).replacedByModel = (JavaModel) model;
+                  }
 
-                     ILanguageModel oldModel = activatedLayer ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
-                     if (oldModel instanceof JavaModel && oldModel != model && model instanceof JavaModel) {
-                        ((JavaModel) oldModel).replacedByModel = (JavaModel) model;
-                     }
+                  ArrayList<JavaModel> clonedModels = null;
 
-                     ArrayList<JavaModel> clonedModels = null;
-
-                     if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers && srcEnt.layer != null) {
-                        for (LayeredSystem peerSys : peerSystems) {
-                           Layer peerLayer = peerSys.getLayerByName(srcEnt.layer.layerUniqueName);
-                           // does this layer exist in the peer runtime
-                           if (peerLayer != null) {
-                              // If the peer layer is not started, we can't clone
-                              if (!peerSys.isModelLoaded(srcEnt.absFileName)) {
-                                 if (peerLayer.started) {
-                                    if (options.verbose)
-                                       verbose("Copying for runtime: " + peerSys.getRuntimeName());
-                                    if (clonedModels == null)
-                                       clonedModels = new ArrayList<JavaModel>();
-                                    PerfMon.start("cloneForRuntime");
-                                    clonedModels.add(peerSys.cloneModel(peerLayer, (JavaModel) model));
-                                    PerfMon.end("cloneForRuntime");
-                                 } else if (options.verbose)
-                                    verbose("Not copying: " + srcEnt.absFileName + " for runtime: " + peerSys.getRuntimeName() + " peer layer not started.");
-                              }
+                  if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers && srcEnt.layer != null) {
+                     for (LayeredSystem peerSys : peerSystems) {
+                        Layer peerLayer = peerSys.getLayerByName(srcEnt.layer.layerUniqueName);
+                        // does this layer exist in the peer runtime
+                        if (peerLayer != null) {
+                           // If the peer layer is not started, we can't clone
+                           if (!peerSys.isModelLoaded(srcEnt.absFileName)) {
+                              if (peerLayer.started) {
+                                 if (options.verbose)
+                                    verbose("Copying for runtime: " + peerSys.getRuntimeName());
+                                 if (clonedModels == null)
+                                    clonedModels = new ArrayList<JavaModel>();
+                                 PerfMon.start("cloneForRuntime");
+                                 clonedModels.add(peerSys.cloneModel(peerLayer, (JavaModel) model));
+                                 PerfMon.end("cloneForRuntime");
+                              } else if (options.verbose)
+                                 verbose("Not copying: " + srcEnt.absFileName + " for runtime: " + peerSys.getRuntimeName() + " peer layer not started.");
                            }
                         }
                      }
-
-                     if (clonedModels != null)
-                        initClonedModels(clonedModels, srcEnt, modTimeStart, true);
-
-                     initModel(srcEnt.layer, modTimeStart, model, isLayer, false);
-
-                     if (clonedModels != null)
-                        initClonedModels(clonedModels, srcEnt, modTimeStart, false);
                   }
-                  finally {
-                     beingLoaded.remove(srcEnt.absFileName);
-                  }
+
+                  if (clonedModels != null)
+                     initClonedModels(clonedModels, srcEnt, modTimeStart, true);
+
+                  initModel(srcEnt.layer, modTimeStart, model, isLayer, false);
+
+                  if (clonedModels != null)
+                     initClonedModels(clonedModels, srcEnt, modTimeStart, false);
                }
-               else if (modelObj instanceof ILanguageModel && temporary) {
-                  initModel(srcEnt.layer, modTimeStart, (ILanguageModel) modelObj, isLayer, false);
+               finally {
+                  beingLoaded.remove(srcEnt.absFileName);
                }
-               return modelObj;
             }
+            else if (modelObj instanceof ILanguageModel && temporary) {
+               initModel(srcEnt.layer, modTimeStart, (ILanguageModel) modelObj, isLayer, false);
+            }
+            return modelObj;
          }
          catch (IllegalArgumentException exc) { // file not found - this happens for unsaved models which get added to the layer index before they have been saved.
             //error("SrcFile no longer exists: " + srcEnt + ": " + exc + "");

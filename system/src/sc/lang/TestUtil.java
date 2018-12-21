@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.binf.BinfConstants;
 import sc.binf.ParseInStream;
 import sc.lang.java.JavaModel;
 import sc.lang.java.TransformUtil;
@@ -774,10 +775,11 @@ public class TestUtil {
                Object modelObj = getTestResult(node);
 
                if (modelObj instanceof ISemanticNode) {
-                  String serFileName = FileUtil.replaceExtension(opts.getOutFile(fileName), "mbinf");
+                  String outFileBase = opts.getOutFile(fileName);
+                  String serFileName = FileUtil.replaceExtension(outFileBase, BinfConstants.ModelStreamSuffix);
                   ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName);
 
-                  String parseFileName = FileUtil.replaceExtension(opts.getOutFile(fileName), "pbinf");
+                  String parseFileName = FileUtil.replaceExtension(outFileBase, BinfConstants.ParseStreamSuffix);
                   ParseUtil.serializeParseNode(node, parseFileName, fileName);
 
                   int rc = 0;

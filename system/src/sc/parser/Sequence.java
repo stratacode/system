@@ -971,6 +971,9 @@ public class Sequence extends NestedParselet  {
       if (repeat)
          return restoreRepeatingSequence(parser, oldNode, rctx, false, null);
 
+      if (toString().equals("<localVariableDeclarationStatement>"))
+         System.out.println("***");
+
       ParentParseNode value = null;
       int startIndex = parser.currentIndex;
 
@@ -1372,6 +1375,9 @@ public class Sequence extends NestedParselet  {
          return;
       }
       ParseOutStream pOut = sctx.pOut;
+
+      if (toString().equals("<templateStatement>TemplateStatement"))
+         System.out.println("***");
 
       if (pn == null)
          System.out.println("*** Null parse node for saveParse");
@@ -2390,6 +2396,9 @@ public class Sequence extends NestedParselet  {
    private void saveParseRepeatingSequence(IParseNode pn, ISemanticNode oldNode, SaveParseCtx sctx) {
       Parselet childParselet = null;
       int numParselets;
+
+      if (toString().equals("<remainingIdentifiers>") && pn.toString().equals(".initType.typeName"))
+         System.out.println("***");
 
       Object sv = pn.getSemanticValue();
       ISemanticNode sn = null;
