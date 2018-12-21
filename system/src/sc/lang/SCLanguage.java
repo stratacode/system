@@ -145,7 +145,7 @@ public class SCLanguage extends JavaLanguage {
       reqPackageDeclaration.optional = false;
       reqImport.repeat = false;
       reqImport.optional = false;
-      reqClassBodyDeclaration.setName("<reqClassBodyDeclarations>([],[],,[],[],[])");
+      reqClassBodyDeclaration.setName("<reqClassBodyDeclarations>(.,.,,.,.,.)");
       //reqClassBodyDeclaration.setName(reqClassBodyDeclaration.getName().replace("<classBodyDeclarations>", "<reqClassBodyDeclaration>"));
       reqClassBodyDeclaration.repeat = false;
       reqClassBodyDeclaration.skipOnErrorParselet = null;
