@@ -4416,8 +4416,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (doGen) {
          File stubFile = new File(newFile);
-         long stubLastModified = stubFile.lastModified();
          if (stubFile.canRead()) {
+            long stubLastModified = stubFile.lastModified();
             if (stubLastModified > getJavaModel().getLastModifiedTime() && (stubLastModified > sys.sysStartTime || !sys.options.buildAllFiles))
                doGen = false;
          }
