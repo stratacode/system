@@ -986,7 +986,7 @@ public class OrderedChoice extends NestedParselet  {
          for (int i = 0; i < numMatches; i++) {
             Parselet matchedParselet = matchingParselets.get(i);
 
-            if (pIn == null && childOldNode != null && !matchedParselet.producesParseletId(childOldNode.getParseletId()))
+            if (pIn == null && childOldNode != null && matchedParselet != null && !matchedParselet.producesParseletId(childOldNode.getParseletId()))
                continue;
 
             int saveArrIndex = 0;
@@ -1089,9 +1089,6 @@ public class OrderedChoice extends NestedParselet  {
 
    public void saveParseRepeatingChoice(IParseNode pn, ISemanticNode sn, SaveParseCtx sctx) {
       ParseOutStream pOut = sctx.pOut;
-
-      if (toString().equals("<simpleTemplateDeclarations>"))
-         System.out.println("***");
 
       boolean arrElement;
 

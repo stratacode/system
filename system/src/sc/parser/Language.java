@@ -342,6 +342,7 @@ public abstract class Language extends LayerFileComponent {
          }
          Parser p = new Parser(this, reader, bufSize);
          p.enablePartialValues = enablePartialValues;
+         p.restore = true;
          Object parseTree = p.restoreStart(start, oldModel, pIn);
          if (parseTree instanceof IParseNode) {
             if (!p.atEOF()) {

@@ -11,4 +11,8 @@ public class SaveParseCtx extends SaveRestoreCtx {
    //int currentIndex;
 
    public ParseOutStream pOut;
+
+   public String toString() {
+      return "saveParse arrIndex: " + arrIndex + (arrElement ? " - arrElement " : "") + (listProp ? " - processing list property " : "") + super.toString();
+   }
 }

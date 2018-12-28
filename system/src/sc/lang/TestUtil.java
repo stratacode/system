@@ -456,7 +456,7 @@ public class TestUtil {
       JavaLanguage.register();
       SCLanguage.register();
 
-      out("Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir") + " out dir: " + opts.getOutDir());
+      out("- Running language test: " + StringUtil.arrayToString(inputFiles) + ": options: " + opts.toString() + " in dir: " + System.getProperty("user.dir") + " out dir: " + opts.getOutDir());
 
       ArrayList<String> reparseStats = new ArrayList<String>();
 
@@ -790,9 +790,11 @@ public class TestUtil {
 
                      out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
 
+                     boolean modelsMatched = false;
                      if (!deserModel.equals(modelObj))
-                        error("Deserialize - results do not match!");
+                        error("*** Error - Deserialize - results do not match!");
                      else {
+                        modelsMatched = true;
                         out("Serialized models match");
                      }
 
@@ -802,17 +804,23 @@ public class TestUtil {
                      long endRestoreTime = System.currentTimeMillis();
                      out("Restored " + (pIn == null ? " with no parse stream" : " with parse stream") + ": " + fileName +  " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
 
+                     if (modelsMatched && !deserModel.equals(modelObj))
+                        error("*** Error - Deserialize - results do not match after restore!");
+                     else {
+                        out("Serialized models match");
+                     }
+
                      if (restored instanceof ParseError || restored == null)
-                        error("Invalid return from restore - should always restore to a valid parse node.");
+                        error("*** Error - Invalid return from restore - should always restore to a valid parse node.");
 
                      if (restored instanceof IParseNode) {
                         if (deserModel.getParseNode() != restored)
                            error("*** Error - model not updated with parse node tree!");
 
                         if (!restored.toString().equals(result.toString()))
-                           error("Restored parse node text does not match");
+                           error("*** Error - Restored parse node text does not match");
                         else if (!restored.equals(result))
-                           error("Restored parse nodes do not match");
+                           error("*** Error - Restored parse nodes do not match");
                         else {
                            // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
                            out("Restored parse node successfully");
@@ -883,11 +891,12 @@ public class TestUtil {
                         mnew.equals(modelObj);
                      }
                      else
-                        out("***** SUCCESS: models match for: " + fileName);
+                        out("Models match for: " + fileName);
                   }
                }
-               out("ln");
             }
+            if (numErrors == 0)
+               out("--- SUCCESS - verified: " + fileName);
          }
 
          if (reparseStats.size() != 0) {

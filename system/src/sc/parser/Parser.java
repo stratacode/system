@@ -72,6 +72,7 @@ public class Parser implements IString {
    // and put it in the error.partialValue property.  This is useful when you use the parser for incremental
    // input, such as for command line completion.
    public boolean enablePartialValues = false;
+   public boolean restore = false;
 
    /** For some small grammars, we may want to populate the parent instance rather than create a new instance from the grammar */
    public Object populateInst = null;

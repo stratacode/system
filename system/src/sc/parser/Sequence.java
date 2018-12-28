@@ -955,7 +955,8 @@ public class Sequence extends NestedParselet  {
                   return null;
                }
                else {
-                  System.err.println("*** Error - unhandled case - return a code to stop parsing here?");
+                  //System.err.println("*** Error - unhandled case - return a code to stop parsing here?");
+                  return null;
                }
             }
             break;
@@ -970,9 +971,6 @@ public class Sequence extends NestedParselet  {
 
       if (repeat)
          return restoreRepeatingSequence(parser, oldNode, rctx, false, null);
-
-      if (toString().equals("<localVariableDeclarationStatement>"))
-         System.out.println("***");
 
       ParentParseNode value = null;
       int startIndex = parser.currentIndex;
@@ -1375,9 +1373,6 @@ public class Sequence extends NestedParselet  {
          return;
       }
       ParseOutStream pOut = sctx.pOut;
-
-      if (toString().equals("<templateStatement>TemplateStatement"))
-         System.out.println("***");
 
       if (pn == null)
          System.out.println("*** Null parse node for saveParse");
@@ -2197,7 +2192,7 @@ public class Sequence extends NestedParselet  {
             ISemanticNode oldChildNode;
             boolean skipRestore = false;
 
-            // Set in getArraySemanticValue if oldChildObj is an element of the list oldModel
+            // Set in getArraySemanticValue if oldChildObj is an element of the list oldModel - TODO: this should be a return value from getArraySemanticCtx to avoid the save/restore here
             arrElement = rctx.arrElement;
             rctx.arrElement = false;
 
@@ -2397,9 +2392,6 @@ public class Sequence extends NestedParselet  {
       Parselet childParselet = null;
       int numParselets;
 
-      if (toString().equals("<remainingIdentifiers>") && pn.toString().equals(".initType.typeName"))
-         System.out.println("***");
-
       Object sv = pn.getSemanticValue();
       ISemanticNode sn = null;
       if (sv instanceof ISemanticNode)
@@ -2427,31 +2419,50 @@ public class Sequence extends NestedParselet  {
 
             Object childObj = ppn.children.get(pnCt++);
 
-            // Set in getArraySemanticValue if oldChildObj is an element of the list oldModel
+            // Set in getArraySemanticValue if oldChildObj is an element of the list oldModel - TODO: this should be a return from getArraySemanticValue
             arrElement = sctx.arrElement;
             sctx.arrElement = false;
 
+            boolean needsParseletSave = false;
+            IParseNode childPN = null;
+            ISemanticNode oldChildNode = null;
+
             if (oldChildObj instanceof ISemanticNode && childObj instanceof IParseNode) {
-               ISemanticNode oldChildNode = (ISemanticNode) oldChildObj;
-               IParseNode childPN = (IParseNode) childObj;
+               oldChildNode = (ISemanticNode) oldChildObj;
+               childPN = (IParseNode) childObj;
                Object childSV = childPN.getSemanticValue();
                if (childSV instanceof ISemanticNode)
                   oldChildNode = (ISemanticNode) childSV;
 
-               // Doing nothing here because we'll have already saved the ISemanticNode in the model index.  We can get right back here in 'restore' and know how to
-               // restore the children parselets from the node value.  It's only when we have no trace of the parse node in the semantic model that we need to write anything to pOut
-               childParselet.saveParse((IParseNode) childPN, oldChildNode, sctx);
+               needsParseletSave = true;
             }
             else {
                pOut.saveChild(childParselet, childObj, sctx, false);
             }
 
             int saveArrIndex = 0;
+            boolean needsArrIndexRestore = false;
             if (arrElement) {
                saveArrIndex = sctx.arrIndex;
+               needsArrIndexRestore = true;
+               if (oldChildNode != sn)
+                  sctx.arrIndex = 0;
+            }
+            else if (oldChildNode != sn) {
+               needsArrIndexRestore = true;
+               saveArrIndex = sctx.arrIndex;
+               sctx.arrIndex = 0;
+            }
+
+            if (needsParseletSave)
+               childParselet.saveParse(childPN, oldChildNode, sctx);
+
+            if (needsArrIndexRestore)
                sctx.arrIndex = saveArrIndex;
+
+            if (arrElement) {
                // Increment the current array index if we just saved an element in the current array value
-               //sctx.arrIndex++;
+               sctx.arrIndex++;
             }
          }
       }

@@ -215,12 +215,12 @@ public class ParentParseNode extends AbstractParseNode {
       // added to its parentNode, it will get removed and the string goes on to represent
       // all of this element's children.
       if (node instanceof StringToken || node == null) {
-         if (p.getDiscard() || p.getLookahead()) {
+         if (p != null && (p.getDiscard() || p.getLookahead())) {
             if (node != null)
                return 0;
             // TODO: else - is this the right code path here?
          }
-         if (p.skip && !(parselet.needsChildren())) {
+         if (p != null && p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
                if (child instanceof StringToken) {
@@ -233,9 +233,9 @@ public class ParentParseNode extends AbstractParseNode {
          }
       }
       else if (node instanceof String) {
-         if (p.getDiscard() || p.getLookahead())
+         if (p != null && (p.getDiscard() || p.getLookahead()))
             return 0;
-         if (p.skip && !(parselet.needsChildren())) {
+         if (p != null && p.skip && !(parselet.needsChildren())) {
             if (children.size() == 1) {
                Object child = children.get(0);
                if (child instanceof String) { // TODO: should this be PString.isString?  See issue#24 where we are not collapsing string tokens into a single parse node

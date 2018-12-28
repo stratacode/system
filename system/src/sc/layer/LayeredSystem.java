@@ -9946,11 +9946,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          */
 
          long modTimeStart = srcEnt.getLastModified();
-         Object modelObj = options.modelCacheEnabled && processor instanceof Language ? LayerUtil.restoreModel(this, (Language) processor, srcEnt, modTimeStart) : null;
+         Object result = options.modelCacheEnabled && processor instanceof Language ? LayerUtil.restoreModel(this, (Language) processor, srcEnt, modTimeStart) : null;
+         boolean restored = true;
+
+         Object modelObj = result == null ? null : ParseUtil.nodeToSemanticValue(result);
 
          try {
-            if (modelObj == null) {
-               Object result = processor.process(srcEnt, enablePartialValues);
+            if (result == null) {
+               restored = false;
+               result = processor.process(srcEnt, enablePartialValues);
                if (result instanceof ParseError) {
                   if (reportErrors) {
                      error("File: " + srcEnt.absFileName + ": " + ((ParseError) result).errorStringWithLineNumbers(new File(srcEnt.absFileName)));
@@ -9966,25 +9970,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                else if (result == IFileProcessor.FILE_OVERRIDDEN_SENTINEL) {
                   return IFileProcessor.FILE_OVERRIDDEN_SENTINEL;
                }
-               else {
-                  modelObj = ParseUtil.nodeToSemanticValue(result);
-
-                  // TODO: Template file - compile these?
-                  if (!(modelObj instanceof IFileProcessorResult))
-                     return null;
-
-                  IFileProcessorResult res = (IFileProcessorResult) modelObj;
-                  res.addSrcFile(srcEnt);
-                  if (srcEnt.getLastModified() != modTimeStart) {
-                     System.err.println("File: " + srcEnt.absFileName + " changed during parsing");
-                     return new ParseError("File changed during parsing", null, 0, 0);
-                  }
-               }
             }
+
+            modelObj = ParseUtil.nodeToSemanticValue(result);
+
+            if (!(modelObj instanceof IFileProcessorResult)) {
+               System.err.println("*** Error - invalid model restored from modelCache");
+               return null;
+            }
+            IFileProcessorResult res = (IFileProcessorResult) modelObj;
+            res.addSrcFile(srcEnt);
+            if (srcEnt.getLastModified() != modTimeStart) {
+               System.err.println("File: " + srcEnt.absFileName + " changed during parsing");
+               return new ParseError("File changed during parsing", null, 0, 0);
+            }
+            
             if (modelObj instanceof ILanguageModel && !temporary) {
                ILanguageModel model = (ILanguageModel) modelObj;
 
-               if (options.modelCacheEnabled && processor instanceof Language) {
+               if (!restored && options.modelCacheEnabled && processor instanceof Language) {
                   LayerUtil.saveModelCache(this, srcEnt, model);
                }
 

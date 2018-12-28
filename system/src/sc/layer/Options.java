@@ -190,7 +190,7 @@ public class Options {
 
    /**
     * A performance optimization to reduce parsing overhead for files which don't change.  When a src file is changed, it is parsed and the model and parse-stream are serialized.  When that same file
-    * needs to be parsed again, first the model is deserialized.   If and when the parse-node is needed, it is restored from a combination of the original file and the parse-stream.
+    * needs to be parsed again, first the model is deserialized.   If and when the parseNode is needed, it is restored from a combination of the original file and the parse-stream.
     */
    @Constant public boolean modelCacheEnabled = true;
 

@@ -131,6 +131,8 @@ public class ModelInStream extends BinfInStream {
                         }
                         try {
                            PTypeUtil.setProperty(resNode, mapper.getField(), propVal);
+                           if (propVal instanceof ISemanticNode)
+                              ((ISemanticNode) propVal).setParentNode(resNode);
                         }
                         catch (IllegalArgumentException exc) {
                            System.err.println("*** Error setting semantic node property on class: " + cl + "." + mapper.getField() + " to: " + propVal);

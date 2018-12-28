@@ -1583,14 +1583,16 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      }
                      else if (sv != null) {
                         SemanticNodeList snl;
-                        if (parent.value == null)
-                           parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
-                        else
-                           snl = (SemanticNodeList) parent.value;
-                        if (childIndex == -1 || snl.size() <= childIndex)
-                           snl.add(sv, true, false);
-                        else
-                           snl.set(childIndex, sv, true, false);
+                        if (!parser.restore) {
+                           if (parent.value == null)
+                              parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                           else
+                              snl = (SemanticNodeList) parent.value;
+                           if (childIndex == -1 || snl.size() <= childIndex)
+                              snl.add(sv, true, false);
+                           else
+                              snl.set(childIndex, sv, true, false);
+                        }
                      }
                      // sv == null has no value so don't increment the svcount
                      else
@@ -1660,7 +1662,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   if (node instanceof ParentParseNode) {
                      ParentParseNode pnode = (ParentParseNode) node;
                      NestedParselet childParselet = pnode.parselet;
-                     processInheritedSlotMappings(parent, childParselet, pnode, childIndex, reparse);
+                     if (!parser.restore)
+                        processInheritedSlotMappings(parent, childParselet, pnode, childIndex, reparse);
                   }
                   else if (node != null && !(node instanceof ErrorParseNode))
                      System.err.println("*** The '*' operator produced a parse node of type: " + node.getClass() + " when it should have produced a ParentParseNode");
@@ -1791,7 +1794,8 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
             // Two reasons to wait: 1) for chained sequences and 2) for propagated values
             // so that we don't try to set the value before the propagated slot has been
             // processed.
-            processSlotMappings(startIx, parent, toProcess, false, childIndex, reparse);
+            if (!parser.restore)
+               processSlotMappings(startIx, parent, toProcess, false, childIndex, reparse);
 
             if (trace && parser.enablePartialValues)
                System.out.println("*** Semantic value of: " + this + FileUtil.LINE_SEPARATOR +
