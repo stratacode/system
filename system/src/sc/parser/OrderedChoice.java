@@ -1133,7 +1133,7 @@ public class OrderedChoice extends NestedParselet  {
          if (childPN instanceof IParseNode) {
             matchedParselet = ((IParseNode) childPN).getParselet();
             childOldObj = ((IParseNode) childPN).getSemanticValue();
-            if (oldList != null && childOldObj != null && !(childOldObj instanceof List) && oldList.get(arrIndex) == childOldObj)
+            if (oldList != null && childOldObj != null && !(childOldObj instanceof List) && arrIndex < oldList.size() && oldList.get(arrIndex) == childOldObj)
                arrElement = true;
             else {
                arrElement = false;
