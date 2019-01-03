@@ -4,6 +4,7 @@
 
 package sc.lang.css;
 
+import sc.lang.html.OutputCtx;
 import sc.lang.html.Style;
 import sc.obj.CompilerSettings;
 import sc.obj.ResultSuffix;
@@ -26,12 +27,15 @@ public class StyleSheet extends Style {
    public void invalidate() {
    }
 
-   public void outputBody(StringBuilder sb) {
+   public void outputBody(StringBuilder sb, OutputCtx ctx) {
+      super.outputBody(sb, ctx);
    }
 
-   public void outputStartTag(StringBuilder sb) {
+   public void outputStartTag(StringBuilder sb, OutputCtx ctx) {
+      super.outputStartTag(sb, ctx);
    }
 
-   public void outputEndTag(StringBuilder sb) {
+   public void outputEndTag(StringBuilder sb, OutputCtx ctx) {
+      super.outputEndTag(sb, ctx);
    }
 }

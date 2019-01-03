@@ -82,7 +82,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
     */
    Object[] chainedPropertyMappings = null;
 
-   enum ParameterType {DEFAULT, ARRAY, STRING, PROPAGATE /* slot has a '.' */, INHERIT /* slot has a '*' */};
+   enum ParameterType {DEFAULT, ARRAY, STRING, PROPAGATE /* slot has a '.' */, INHERIT /* slot has a '*' */}
 
    ParameterType parameterType = ParameterType.DEFAULT;
 
@@ -1542,7 +1542,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         else {
                            if (childIndex == -1) {
                               SemanticNodeList parentNode = (SemanticNodeList) parent.value;
-                              if (parentNode != sv)
+                              if (parentNode != sv && !parser.restore)
                                  parentNode.addAll((List) sv, true, false);
                            }
                            else if (sv != parent.value) {

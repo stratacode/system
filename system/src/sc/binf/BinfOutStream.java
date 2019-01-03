@@ -14,23 +14,18 @@ public abstract class BinfOutStream {
       this.out = out;
    }
 
-   public void initOutStream(String origFileExt) {
+   public void initOutStream(String origFileExt, Language outLang) {
       try {
-         if (lang != null) {
-            if (origFileExt == null)
-               origFileExt = lang.defaultExtension;
-            else {
-               Language extLang = Language.getLanguageByExtension(origFileExt);
-               if (extLang != lang)
-                  System.out.println("*** Warning: mismatching languages in model/parse stream!");
-            }
+         if (outLang != null)
+            lang = outLang;
+         else if (origFileExt != null) {
+            lang = Language.getLanguageByExtension(origFileExt);
          }
+
          if (origFileExt == null)
             throw new IllegalArgumentException("*** Error - no language specified for model/parse stream");
          else if (lang == null) {
-            lang = Language.getLanguageByExtension(origFileExt);
-            if (lang == null)
-               throw new IllegalArgumentException("No language found for extension: " + origFileExt + " serializing model/parse stream");
+            throw new IllegalArgumentException("No language found for extension: " + origFileExt + " serializing model/parse stream");
          }
 
          out.writeUTF(origFileExt);

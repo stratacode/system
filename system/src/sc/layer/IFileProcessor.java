@@ -21,7 +21,7 @@ public interface IFileProcessor {
 
    boolean getInheritFiles();
 
-   enum FileEnabledState { Disabled, NotEnabled, Enabled };
+   enum FileEnabledState { Disabled, NotEnabled, Enabled }
 
    boolean getNeedsCompile();
 

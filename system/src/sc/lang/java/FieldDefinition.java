@@ -808,8 +808,10 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
          int sz = variableDefinitions.size();
          for (int i = 0; i < sz; i++) {
             VariableDefinition varDef = variableDefinitions.get(i);
-            // Add this field for each variable defined
-            addMemberByName(membersByName, varDef.variableName);
+            if (varDef.variableName != null) {
+               // Add this field for each variable defined
+               addMemberByName(membersByName, varDef.variableName);
+            }
          }
       }
    }

@@ -72,6 +72,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                             new Sequence("('','')", qualifiedIdentifier, dotStarTail),
                             semicolonEOL);
 
+   // TODO: eliminate this definition by cloning ImportDeclaration and then setting REPEAT | OPTIONAL flags
    Sequence imports = new Sequence("([])", REPEAT | OPTIONAL, importDeclaration);
 
    KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char", "int", "float", "long", "double", "void");

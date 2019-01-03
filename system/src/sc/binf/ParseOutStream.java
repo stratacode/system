@@ -24,9 +24,9 @@ public class ParseOutStream extends BinfOutStream {
       super(out);
    }
 
-   public void serialize(IParseNode node, ISemanticNode sn, String fileExt) {
+   public void serialize(IParseNode node, ISemanticNode sn, String fileExt, Language lang) {
       Parselet p = node.getParselet();
-      initOutStream(fileExt);
+      initOutStream(fileExt, lang);
       SaveParseCtx sctx = new SaveParseCtx();
       sctx.pOut = this;
       p.saveParse(node, sn, sctx);
@@ -88,6 +88,8 @@ public class ParseOutStream extends BinfOutStream {
             System.err.println("*** Mismatching call to saveChild for ParseNode");
          if (saveType) {
             writeUInt(SinglePNType);
+            // Need to save both parselet and the child so we can restore both the parent and child parselet appropriately
+            saveParseletId(parselet);
             saveParseletId(childParselet);
          }
          else

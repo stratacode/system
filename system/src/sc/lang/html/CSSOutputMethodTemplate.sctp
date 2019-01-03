@@ -1,1 +1,1 @@
-public void outputBody(StringBuilder out) { }
+public void outputBody(StringBuilder out, sc.lang.html.OutputCtx ctx) { }

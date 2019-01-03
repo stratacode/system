@@ -1175,7 +1175,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return FileUtil.concat(dir, dirName);
    }
 
-   /** Use this when your preference is to share the directory among projects */
+   /** Used for storing information shared between projects */
    public String getStrataCodeHomeDir(String dirName) {
       String homeDir = LayerUtil.getDefaultHomeDir();
       if (homeDir != null)
@@ -9937,9 +9937,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
       if (processor != null) {
-         if (options.verbose && !isLayer && !srcEnt.relFileName.equals("sc/layer/BuildInfo.sc") && (processor instanceof Language || options.sysDetails))
-            verbose("Reading: " + srcEnt.absFileName + " for runtime: " + getProcessIdent());
-
          /*
          if (srcEnt.absFileName.contains("coreRuntime") && srcEnt.absFileName.contains("Bind"))
             System.out.println("---");
@@ -9947,13 +9944,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          long modTimeStart = srcEnt.getLastModified();
          Object result = options.modelCacheEnabled && processor instanceof Language ? LayerUtil.restoreModel(this, (Language) processor, srcEnt, modTimeStart) : null;
-         boolean restored = true;
 
-         Object modelObj = result == null ? null : ParseUtil.nodeToSemanticValue(result);
+         Object modelObj;
+
+         boolean restored = result != null;
+
+         if (options.verbose && !isLayer && !srcEnt.relFileName.equals("sc/layer/BuildInfo.sc") && (processor instanceof Language || options.sysDetails))
+            verbose((restored ? "Restored: " : "Reading: ") + srcEnt.absFileName + " for runtime: " + getProcessIdent());
 
          try {
             if (result == null) {
-               restored = false;
                result = processor.process(srcEnt, enablePartialValues);
                if (result instanceof ParseError) {
                   if (reportErrors) {
@@ -9989,7 +9989,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                ILanguageModel model = (ILanguageModel) modelObj;
 
                if (!restored && options.modelCacheEnabled && processor instanceof Language) {
-                  LayerUtil.saveModelCache(this, srcEnt, model);
+                  LayerUtil.saveModelCache(this, srcEnt, model, (Language) processor);
                }
 
                markBeingLoadedModel(srcEnt, model);

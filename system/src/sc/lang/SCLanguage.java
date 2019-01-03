@@ -143,6 +143,7 @@ public class SCLanguage extends JavaLanguage {
    {
       reqClassBodyDeclaration.removeParselet(incompleteStatement);
       reqPackageDeclaration.optional = false;
+      reqImport.setName("(.)");
       reqImport.repeat = false;
       reqImport.optional = false;
       reqClassBodyDeclaration.setName("<reqClassBodyDeclarations>(.,.,,.,.,.)");

@@ -17,13 +17,13 @@ public class ModelOutStream extends BinfOutStream {
       super(out);
    }
 
-   public void serialize(ISemanticNode rootNode, String origFileExt) {
+   public void serialize(ISemanticNode rootNode, String origFileExt, Language lang) {
       this.rootNode = rootNode;
       IParseNode pn = rootNode.getParseNode();
       if (pn != null) {
          lang = pn.getParselet().getLanguage();
       }
-      initOutStream(origFileExt);
+      initOutStream(origFileExt, lang);
       writeValue(rootNode);
    }
 

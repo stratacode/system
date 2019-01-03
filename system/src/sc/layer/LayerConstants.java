@@ -22,7 +22,7 @@ public interface LayerConstants {
    String SC_DIR = ".stratacode";
    String LAYER_PATH_FILE = "layerPath";
    String SC_SOURCE_PATH = "scSourcePath";
-   String LAYER_COMPONENT_PACKAGE = "sys.layerCore";;
-   String LAYER_COMPONENT_TYPE_NAME = "Layer";;
+   String LAYER_COMPONENT_PACKAGE = "sys.layerCore";
+   String LAYER_COMPONENT_TYPE_NAME = "Layer";
    String LAYER_COMPONENT_FULL_TYPE_NAME = CTypeUtil.prefixPath(LAYER_COMPONENT_PACKAGE, LAYER_COMPONENT_TYPE_NAME);
 }

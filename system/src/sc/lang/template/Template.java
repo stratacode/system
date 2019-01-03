@@ -1019,7 +1019,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                Element enclTag;
                // The enclosing tag might be nested inside of a non-object.  In that case, just skip the non-object.
                for (enclTag = origExpr.getEnclosingTag(); enclTag != null && !enclTag.needsObject(); enclTag = enclTag.getEnclosingTag()) {
-                  ;
                }
 
                // Create a new field - for the name, find the location of the expression: enclosing tag.  get it's object name.  Add "body" or "start" and a count if necessary for this field name.

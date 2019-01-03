@@ -208,7 +208,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          pn.resetStartIndex(0, false, false);
          // This is the string version of the statement we are processing - to use for counting newlines for offsets of the generated statements
          params.lineIndex.currentStatement = res;
-         addToFileLineIndex(params.lineIndex, params.getGenLineCount() + extraLines);
+         int genLineCount = params.getGenLineCount();
+         if (genLineCount != -1) {
+             addToFileLineIndex(params.lineIndex, genLineCount + extraLines);
+         }
          params.lineIndex.currentStatement = null;
       }
       //params.addGenLineMapping(this, res, extraLines);
@@ -458,6 +461,9 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
                }
                int startGenLine;
                if (rootStartGenLine == -1) {
+                  // There are two ways to build the line index... incrementally or absolute.  This genFileLineIndex variable is only set when we are using absolute but -1 signals incremental
+                  if (idx == null || idx.genFileLineIndex == null)
+                     throw new IllegalArgumentException("*** Error - genFileLineIndex not initialized but rootStartGenLine is passed as -1");
                   startGenLine = idx.genFileLineIndex.getLineForOffset(startGenOffset);
                }
                else {

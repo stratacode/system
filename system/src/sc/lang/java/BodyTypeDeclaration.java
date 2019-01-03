@@ -1827,14 +1827,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       List<Object> methods = new ArrayList<Object>();
       for (int i = 0; i < body.size(); i++) {
          Definition member = body.get(i);
-         if (member instanceof MethodDefinition && ((MethodDefinition) member).name.equals(methodName) &&
+         if (member instanceof MethodDefinition && StringUtil.equalStrings(((MethodDefinition) member).name, methodName) &&
              (modifier == null || member.hasModifier(modifier)))
             methods.add(member);
       }
       if (hiddenBody != null) {
          for (int i = 0; i < hiddenBody.size(); i++) {
             Definition member = hiddenBody.get(i);
-            if (member instanceof MethodDefinition && ((MethodDefinition) member).name.equals(methodName) &&
+            if (member instanceof MethodDefinition && StringUtil.equalStrings(((MethodDefinition) member).name, methodName) &&
                     (modifier == null || member.hasModifier(modifier)))
                methods.add(member);
          }

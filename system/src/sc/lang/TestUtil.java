@@ -777,15 +777,15 @@ public class TestUtil {
                if (modelObj instanceof ISemanticNode) {
                   String outFileBase = opts.getOutFile(fileName);
                   String serFileName = FileUtil.replaceExtension(outFileBase, BinfConstants.ModelStreamSuffix);
-                  ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName);
+                  ParseUtil.serializeModel((ISemanticNode) modelObj, serFileName, fileName, lang);
 
                   String parseFileName = FileUtil.replaceExtension(outFileBase, BinfConstants.ParseStreamSuffix);
-                  ParseUtil.serializeParseNode(node, parseFileName, fileName);
+                  ParseUtil.serializeParseNode(node, parseFileName, fileName, lang);
 
                   int rc = 0;
                   do {
                      long startDeserTime = System.currentTimeMillis();
-                     ISemanticNode deserModel = ParseUtil.deserializeModel(serFileName);
+                     ISemanticNode deserModel = ParseUtil.deserializeModel(serFileName, lang);
                      long endDeserTime = System.currentTimeMillis();
 
                      out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
@@ -799,10 +799,10 @@ public class TestUtil {
                      }
 
                      long startRestoreTime = System.currentTimeMillis();
-                     ParseInStream pIn = rc % 2 == 0 ? ParseUtil.openParseNodeStream(parseFileName) : null;
+                     ParseInStream pIn = rc % 2 == 0 ? ParseUtil.openParseNodeStream(parseFileName, lang) : null;
                      Object restored = lang.restore(fileName, deserModel,  pIn, false);
                      long endRestoreTime = System.currentTimeMillis();
-                     out("Restored " + (pIn == null ? " with no parse stream" : " with parse stream") + ": " + fileName +  " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
+                     out("Restored " + (pIn == null ? "with no parse stream" : "with parse stream") + ": " + fileName +  " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
 
                      if (modelsMatched && !deserModel.equals(modelObj))
                         error("*** Error - Deserialize - results do not match after restore!");

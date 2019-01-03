@@ -1265,14 +1265,14 @@ public class ParseUtil  {
       return null;
    }
 
-   public static void serializeModel(ISemanticNode node, String serFileName, String origFileName) {
+   public static void serializeModel(ISemanticNode node, String serFileName, String origFileName, Language lang) {
       FileOutputStream fos = null;
       DataOutputStream dos = null;
       try {
          fos = new FileOutputStream(serFileName);
          dos = new DataOutputStream(new BufferedOutputStream(fos));
          ModelOutStream out = new ModelOutStream(dos);
-         out.serialize(node, FileUtil.getExtension(origFileName));
+         out.serialize(node, FileUtil.getExtension(origFileName), lang);
          dos.flush();
       }
       catch (FileNotFoundException fnf) {
@@ -1287,14 +1287,14 @@ public class ParseUtil  {
       }
    }
 
-   public static ISemanticNode deserializeModel(String serFileName) {
+   public static ISemanticNode deserializeModel(String serFileName, Language lang) {
       FileInputStream fis = null;
       DataInputStream dis = null;
       try {
          fis = new FileInputStream(serFileName);
          dis = new DataInputStream(new BufferedInputStream(fis));
          ModelInStream in = new ModelInStream(dis);
-         in.initStream();
+         in.initStream(lang);
          Object rootNode = in.readValue();
          if (rootNode instanceof ISemanticNode)
             return (ISemanticNode) rootNode;
@@ -1309,14 +1309,14 @@ public class ParseUtil  {
       }
    }
 
-   public static void serializeParseNode(IParseNode node, String serFileName, String origFileName) {
+   public static void serializeParseNode(IParseNode node, String serFileName, String origFileName, Language lang) {
       FileOutputStream fos = null;
       DataOutputStream dos = null;
       try {
          fos = new FileOutputStream(serFileName);
          dos = new DataOutputStream(new BufferedOutputStream(fos));
          ParseOutStream out = new ParseOutStream(dos);
-         out.serialize(node, (ISemanticNode) node.getSemanticValue(), FileUtil.getExtension(origFileName));
+         out.serialize(node, (ISemanticNode) node.getSemanticValue(), FileUtil.getExtension(origFileName), lang);
          dos.flush();
       }
       catch (FileNotFoundException fnf) {
@@ -1331,14 +1331,14 @@ public class ParseUtil  {
       }
    }
 
-   public static ParseInStream openParseNodeStream(String serFileName) {
+   public static ParseInStream openParseNodeStream(String serFileName, Language lang) {
       FileInputStream fis = null;
       DataInputStream dis = null;
       try {
          fis = new FileInputStream(serFileName);
          dis = new DataInputStream(new BufferedInputStream(fis));
          ParseInStream in = new ParseInStream(dis);
-         in.initStream();
+         in.initStream(lang);
          return in;
       }
       catch (FileNotFoundException fnf) {

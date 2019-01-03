@@ -19,11 +19,14 @@ public abstract class BinfInStream {
       this.in = in;
    }
 
-   public void initStream() {
+   public void initStream(Language lang) {
       try {
          String ext = in.readUTF();
-         lang = Language.getLanguageByExtension(ext);
          if (lang == null)
+            this.lang = Language.getLanguageByExtension(ext);
+         else
+            this.lang = lang;
+         if (this.lang == null)
             throw new IllegalArgumentException("No language registered for saved model with extension: " + ext);
          // TODO: should we validate the parseletId mappings by storing a hash of some kind - so we can detect when they change and produce a reasonable error?
       }

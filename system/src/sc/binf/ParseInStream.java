@@ -38,6 +38,7 @@ public class ParseInStream extends BinfInStream {
    public Object readChild(Parser parser, Parselet parselet, RestoreCtx rctx) {
       int pnType = readUInt();
       NestedParselet nestedParselet = null;
+      Parselet nextChildParselet = null;
       switch (pnType) {
          case ParseOutStream.NullPN:
             return null;
@@ -65,6 +66,7 @@ public class ParseInStream extends BinfInStream {
             return ppn;
          case ParseOutStream.SinglePNType:
             nestedParselet = (NestedParselet) getNextParselet(parser, rctx);
+            nextChildParselet = getNextParselet(parser, rctx);
             // Fall through...
          case ParseOutStream.SinglePN:
             if (nestedParselet == null) {
@@ -72,11 +74,13 @@ public class ParseInStream extends BinfInStream {
                   System.out.println("*** Not a nested parselet in restore!");
                nestedParselet = (NestedParselet) parselet;
             }
+            if (nextChildParselet == null)
+               nextChildParselet = nestedParselet;
             // Can't rely on parselet.newParseNode because of a weird case - <statement> an indexedChoice which returns ParentParseNode most of the time but ParseNode for a dangling ";" which has no semantic value presently
             ParseNode spnNode = new ParseNode();
             spnNode.setParselet(nestedParselet);
             spnNode.setStartIndex(parser.getCurrentIndex());
-            spnNode.value = readChild(parser, nestedParselet, rctx);
+            spnNode.value = readChild(parser, nextChildParselet, rctx);
             return spnNode;
          case ParseOutStream.StringToken:
             // TODO: is this the best way to create a StringToken?  How will this work with the 'buffer' in Parser... will it ever be incremental?  seems like we should have the file as a byte array and point directly do that here to avoid pulling in extra stuff

@@ -118,8 +118,18 @@ public class LayerUtil implements LayerConstants {
       }
    }
 
+   private final static String modelCacheDirName = "modelCache";
+
+   private static String getDefaultModelCacheDir() {
+      return FileUtil.concat(LayerUtil.getDefaultHomeDir(), modelCacheDirName);
+   }
+
+   private static String getModelCacheDir(LayeredSystem sys) {
+      return sys.getStrataCodeHomeDir(modelCacheDirName);
+   }
+
    private static String getModelCacheBaseDir(LayeredSystem sys, Layer layer, SrcEntry srcEnt) {
-      return FileUtil.concat(sys.getStrataCodeHomeDir("modelCache"), layer.getUnderscoreName(), srcEnt.getRelDir());
+      return FileUtil.concat(getModelCacheDir(sys), layer.getUnderscoreName(), srcEnt.getRelDir());
    }
 
    public static Object restoreModel(LayeredSystem sys, Language lang, SrcEntry srcEnt, long srcFileModeTime) {
@@ -146,7 +156,7 @@ public class LayerUtil implements LayerConstants {
       PerfMon.start("deserializeModel");
       ISemanticNode deserModel = null;
       try {
-         deserModel = ParseUtil.deserializeModel(serFileName);
+         deserModel = ParseUtil.deserializeModel(serFileName, lang);
       }
       finally {
          PerfMon.end("deserializeModel");
@@ -158,7 +168,7 @@ public class LayerUtil implements LayerConstants {
       long parseLastModified = parseFile.lastModified();
       if (parseLastModified != 0 && parseLastModified > srcFileModeTime) {
          try {
-            pIn = ParseUtil.openParseNodeStream(parseFileName);
+            pIn = ParseUtil.openParseNodeStream(parseFileName, lang);
          }
          catch (UncheckedIOException exc) {
             if (sys.options.verbose || sys.options.verboseModelCache)
@@ -183,7 +193,7 @@ public class LayerUtil implements LayerConstants {
       return restored;
    }
 
-   public static void saveModelCache(LayeredSystem sys, SrcEntry srcEnt, ILanguageModel model) {
+   public static void saveModelCache(LayeredSystem sys, SrcEntry srcEnt, ILanguageModel model, Language lang) {
       Layer layer = srcEnt.layer;
       if (layer == null)
          return;
@@ -194,10 +204,14 @@ public class LayerUtil implements LayerConstants {
       File dir = new File(FileUtil.getParentPath(serFileName));
       dir.mkdirs();
 
-      ParseUtil.serializeModel((ISemanticNode) model, serFileName, srcEnt.absFileName);
+      ParseUtil.serializeModel((ISemanticNode) model, serFileName, srcEnt.absFileName, lang);
 
       String parseFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ParseStreamSuffix));
-      ParseUtil.serializeParseNode(model.getParseNode(), parseFileName, srcEnt.absFileName);
+      ParseUtil.serializeParseNode(model.getParseNode(), parseFileName, srcEnt.absFileName, lang);
+   }
+
+   public static void cleanModelCache() {
+      FileUtil.removeDirectory(getDefaultModelCacheDir());
    }
 
    public static class LayeredSystemPtr {

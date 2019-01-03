@@ -741,6 +741,7 @@ public class FileUtil {
       }
    }
 
+   /** Removes the directory and all files in it */
    public static void removeDirectory(String dirName) {
       removeFileOrDirectory(new File(dirName));
    }

@@ -8,7 +8,8 @@ import sc.type.RTypeUtil;
 
 // ++ or -- after the expression
 public class PostfixUnaryExpression extends UnaryExpression {
-   transient Expression chainedExpression;
+   // Need to save/restore this as part of the model's serialized state
+   Expression chainedExpression;
 
    public boolean isPrefix() {
       return false;

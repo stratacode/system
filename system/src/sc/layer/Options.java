@@ -114,9 +114,8 @@ public class Options {
    @Constant /** Additional system diagnostic information in verbose mode */
    public boolean sysDetails = false;
 
-   // TODO: add a "backup option" just in case build files are edited
-   @Constant /** Removes the existing build directories */
-   public boolean clean = false;
+   @Constant /** Removes the existing modelCache directory before running */
+   public boolean cleanModelCache = false;
 
    // Enable editing of the program editor itself
    @Constant public boolean editEditor = false;
@@ -498,8 +497,9 @@ public class Options {
                   else if (opt.equals("cc")) {
                      crossCompile = true;
                   }
-                  else if (opt.equals("clean"))
-                     clean = true;
+                  else if (opt.equals("cmc")) {
+                     LayerUtil.cleanModelCache();
+                  }
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;

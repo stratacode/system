@@ -1905,6 +1905,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public String getTransformedResult() {
       if (transformedModel != null)
          return transformedModel.getTransformedResult();
+
       if (parseNode == null) {
          Parselet compUnit = JavaLanguage.INSTANCE.compilationUnit;
          PerfMon.start("newModelGenerate");

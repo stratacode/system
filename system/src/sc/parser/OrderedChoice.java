@@ -413,7 +413,7 @@ public class OrderedChoice extends NestedParselet  {
             boolean skipSemanticValue = skipSemanticValue(slotIx);
             if (skipSemanticValue)
                oldModel = null; // TODO: do we need this?
-            return restoreResult(parser, oldModel, nestedValue, skipSemanticValue);
+            return restoreResult(parser, oldModel, nestedValue, skipSemanticValue, false);
          }
          else {
             if (parser.semanticContext != null) {
@@ -950,6 +950,8 @@ public class OrderedChoice extends NestedParselet  {
 
       int numValues = pIn == null ? -1 : pIn.readUInt();
 
+      boolean tryNullElement = false;
+
       if (numValues == 0) {
          System.err.println("*** Warning restore repeatingChoice with no values?");
       }
@@ -981,6 +983,10 @@ public class OrderedChoice extends NestedParselet  {
             childOldNode = (ISemanticNode) childOldObj;
 
          List<Parselet> matchingParselets = pIn == null ? getMatchingParselets(parser) : Collections.singletonList(pIn.getNextParselet(parser, rctx));
+         RepeatChildMode childMode = tryNullElement ? RepeatChildMode.NullElement : pIn == null ? null : RepeatChildMode.values()[pIn.readUInt()];
+
+         if (childMode == RepeatChildMode.NullElement)
+            childOldNode = null;
 
          int numMatches = matchingParselets.size();
          for (int i = 0; i < numMatches; i++) {
@@ -1016,7 +1022,7 @@ public class OrderedChoice extends NestedParselet  {
                   value.add(nestedValue, matchedParselet, -1, slotIx, false, parser);
 
                   matched = true;
-                  if (arrElement) {
+                  if (arrElement && childMode != RepeatChildMode.NullElement) {
                      rctx.arrIndex++;
                   }
                   break;
@@ -1042,6 +1048,14 @@ public class OrderedChoice extends NestedParselet  {
             if (numValues == 0)
                break;
          }
+
+         // When there's no parseNodeStream, we might have to parse a 'null element' like the match for a ; without a statement in blockStatements
+         if (!matched && childMode != RepeatChildMode.NullElement && pIn == null) {
+            tryNullElement = true;
+            matched = true;
+         }
+         else
+            tryNullElement = false;
       } while (matched && !emptyMatch);
 
       if (value == null) {
@@ -1057,7 +1071,7 @@ public class OrderedChoice extends NestedParselet  {
 
             // If we are a repeat optional choice with mappings of '' and we match no elements, we should return an empty string, not null.
             if (!lookahead && repeat && isStringParameterMapping() && parser.peekInputChar(0) != '\0') {
-               return restoreResult(parser, oldModel, "", false);
+               return restoreResult(parser, oldModel, "", false, false);
             }
             return null;
          }
@@ -1083,8 +1097,12 @@ public class OrderedChoice extends NestedParselet  {
             parser.changeCurrentIndex(startIndex);
          else
             parser.changeCurrentIndex(lastMatchStart);
-         return restoreResult(parser, oldModel, value, false);
+         return restoreResult(parser, oldModel, value, false, false);
       }
+   }
+
+   enum RepeatChildMode {
+      NullElement, SimpleArrayElement, ParseNodeElement
    }
 
    public void saveParseRepeatingChoice(IParseNode pn, ISemanticNode sn, SaveParseCtx sctx) {
@@ -1105,8 +1123,6 @@ public class OrderedChoice extends NestedParselet  {
       Object childOldObj;
       ISemanticNode childOldNode;
 
-      arrElement = false;
-
       int numValues = ppn.children.size();
       pOut.writeUInt(numValues);
 
@@ -1117,16 +1133,21 @@ public class OrderedChoice extends NestedParselet  {
          if (childPN instanceof IParseNode) {
             matchedParselet = ((IParseNode) childPN).getParselet();
             childOldObj = ((IParseNode) childPN).getSemanticValue();
-            if (oldList != null && childOldObj != null && !(childOldObj instanceof List))
+            if (oldList != null && childOldObj != null && !(childOldObj instanceof List) && oldList.get(arrIndex) == childOldObj)
                arrElement = true;
+            else {
+               arrElement = false;
+            }
          }
          else {
             if (oldList != null) {
-               childOldObj = oldList.get(arrIndex++);
+               childOldObj = oldList.get(arrIndex);
                arrElement = true;
             }
-            else
+            else {
                childOldObj = null;
+               arrElement = false;
+            }
          }
          if (childOldObj instanceof ISemanticNode)
             childOldNode = (ISemanticNode) childOldObj;
@@ -1143,14 +1164,18 @@ public class OrderedChoice extends NestedParselet  {
 
          // For the leaf parse nodes, where this no semantic value or a string value, we save the parse node directly
          if (childOldNode == null || matchedParselet == null || !(childPN instanceof IParseNode)) {
+            pOut.writeUInt(!arrElement ? RepeatChildMode.NullElement.ordinal() : RepeatChildMode.SimpleArrayElement.ordinal());
             pOut.saveChild(matchedParselet, childPN, sctx, true);
          }
          else {
+            pOut.writeUInt(RepeatChildMode.ParseNodeElement.ordinal());
             matchedParselet.saveParse((IParseNode) childPN, childOldNode, sctx);
          }
 
-         if (arrElement)
+         if (arrElement) {
             sctx.arrIndex = saveArrIndex;
+            arrIndex++;
+         }
       }
    }
 
