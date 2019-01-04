@@ -138,6 +138,8 @@ public class LayerUtil implements LayerConstants {
          return null;
       String cacheBaseDir = getModelCacheBaseDir(sys, layer, srcEnt);
       String baseName = FileUtil.removeExtension(srcEnt.baseFileName);
+      String ext = FileUtil.getExtension(srcEnt.baseFileName);
+      baseName = baseName + "_" + ext;
       String serFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ModelStreamSuffix));
 
       File serFile = new File(serFileName);
@@ -199,6 +201,8 @@ public class LayerUtil implements LayerConstants {
          return;
       String cacheBaseDir = getModelCacheBaseDir(sys, layer, srcEnt);
       String baseName = FileUtil.removeExtension(srcEnt.baseFileName);
+      String ext = FileUtil.getExtension(srcEnt.baseFileName);
+      baseName = baseName + "_" + ext;
       String serFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ModelStreamSuffix));
 
       File dir = new File(FileUtil.getParentPath(serFileName));
