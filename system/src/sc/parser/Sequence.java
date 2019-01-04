@@ -892,6 +892,8 @@ public class Sequence extends NestedParselet  {
             break;
 
          case NAMED_SLOT:
+            if (resultClass != null && !resultClass.isInstance(oldNode))
+               return null;
             Object slotValue = rctx.getPropertyValue(oldNode, slotMapping[slotIx]);
             rctx.listProp = slotValue instanceof List;
             return slotValue;
@@ -1291,7 +1293,8 @@ public class Sequence extends NestedParselet  {
             value = newParseNode(startIndex);
 
          // Increment the current array index if we just successfully parsed an index in the current array value
-         if (arrElement)
+         // when pIn is null, we may not parse a child - nestedValue == null and so that should not count as an array index
+         if (arrElement && !skipRestore && (pIn != null || nestedValue != null))
             rctx.arrIndex++;
 
          // After we've completed the parse for a list property, need to clear out the list index so it's not inherited
