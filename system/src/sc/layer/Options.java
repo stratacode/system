@@ -193,6 +193,9 @@ public class Options {
     */
    @Constant public boolean modelCacheEnabled = true;
 
+   /** When modelCacheEnabled=true, if lazyParseNodeCache is true, we do not restore the parse-node tree until it's requested for a given model */
+   @Constant public boolean lazyParseNodeCache = false;
+
    /**
     * For web applications that use scopes shared across different apps (web pages) like 'global' and 'session' do we
     * build a set of type names needed by each web-page, so we don't try to serialize objects which are not referenced in
@@ -498,6 +501,7 @@ public class Options {
                      crossCompile = true;
                   }
                   else if (opt.equals("cmc")) {
+                     System.out.println("Cleaning model cache");
                      LayerUtil.cleanModelCache();
                   }
                   else

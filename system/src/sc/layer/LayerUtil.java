@@ -132,7 +132,7 @@ public class LayerUtil implements LayerConstants {
       return FileUtil.concat(getModelCacheDir(sys), layer.getUnderscoreName(), srcEnt.getRelDir());
    }
 
-   public static Object restoreModel(LayeredSystem sys, Language lang, SrcEntry srcEnt, long srcFileModeTime) {
+   public static Object restoreModel(LayeredSystem sys, Language lang, SrcEntry srcEnt, long srcFileModTime) {
       Layer layer = srcEnt.layer;
       if (layer == null)
          return null;
@@ -148,8 +148,8 @@ public class LayerUtil implements LayerConstants {
          return null;
       }
 
-      // TODO: add length and/or a hash verification here for more accuracy?
-      if (serLastModified < srcFileModeTime) {
+      // TODO: add length and/or a hash verification here for more accuracy?   Need to consider == as changed because of limited timestamp granularity (1 sec in HFS)
+      if (serLastModified <= srcFileModTime) {
          if (sys.options.verboseModelCache)
             sys.info("Model cache changed: " + serFileName);
          return null;
@@ -164,11 +164,24 @@ public class LayerUtil implements LayerConstants {
          PerfMon.end("deserializeModel");
       }
 
+      return deserModel;
+   }
+
+   public static Object restoreParseNodes(LayeredSystem sys, Language lang, SrcEntry srcEnt, long srcFileModTime, ISemanticNode deserModel) {
+      Layer layer = srcEnt.layer;
+      if (layer == null)
+         return null;
+
+      String cacheBaseDir = getModelCacheBaseDir(sys, layer, srcEnt);
+      String baseName = FileUtil.removeExtension(srcEnt.baseFileName);
+      String ext = FileUtil.getExtension(srcEnt.baseFileName);
+      baseName = baseName + "_" + ext;
+
       ParseInStream pIn = null;
       String parseFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ParseStreamSuffix));
       File parseFile = new File(parseFileName);
       long parseLastModified = parseFile.lastModified();
-      if (parseLastModified != 0 && parseLastModified > srcFileModeTime) {
+      if (parseLastModified != 0 && parseLastModified > srcFileModTime) {
          try {
             pIn = ParseUtil.openParseNodeStream(parseFileName, lang);
          }
@@ -193,6 +206,7 @@ public class LayerUtil implements LayerConstants {
          return null;
       }
       return restored;
+
    }
 
    public static void saveModelCache(LayeredSystem sys, SrcEntry srcEnt, ILanguageModel model, Language lang) {

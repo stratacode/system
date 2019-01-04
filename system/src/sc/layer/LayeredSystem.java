@@ -9943,17 +9943,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          */
 
          long modTimeStart = srcEnt.getLastModified();
-         Object result = options.modelCacheEnabled && processor instanceof Language ? LayerUtil.restoreModel(this, (Language) processor, srcEnt, modTimeStart) : null;
+         Object modelObj = options.modelCacheEnabled && processor instanceof Language ? LayerUtil.restoreModel(this, (Language) processor, srcEnt, modTimeStart) : null;
 
-         Object modelObj;
-
-         boolean restored = result != null;
+         boolean restored = modelObj != null;
+         Object result = restored && !options.lazyParseNodeCache ? LayerUtil.restoreParseNodes(this, (Language) processor, srcEnt, modTimeStart, (ISemanticNode) modelObj) : null;
 
          if (options.verbose && !isLayer && !srcEnt.relFileName.equals("sc/layer/BuildInfo.sc") && (processor instanceof Language || options.sysDetails))
             verbose((restored ? "Restored: " : "Reading: ") + srcEnt.absFileName + " for runtime: " + getProcessIdent());
 
          try {
-            if (result == null) {
+            if (modelObj == null) {
                result = processor.process(srcEnt, enablePartialValues);
                if (result instanceof ParseError) {
                   if (reportErrors) {
@@ -9970,9 +9969,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                else if (result == IFileProcessor.FILE_OVERRIDDEN_SENTINEL) {
                   return IFileProcessor.FILE_OVERRIDDEN_SENTINEL;
                }
+               modelObj = ParseUtil.nodeToSemanticValue(result);
             }
-
-            modelObj = ParseUtil.nodeToSemanticValue(result);
 
             if (!(modelObj instanceof IFileProcessorResult)) {
                System.err.println("*** Error - invalid model restored from modelCache");
