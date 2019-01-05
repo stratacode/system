@@ -883,7 +883,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
             copy.parseNodeInvalid = false;
          }
       }
-
+      copy.parseletId = parseletId;
       return copy;
    }
 

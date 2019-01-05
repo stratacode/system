@@ -562,6 +562,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          newList.validated = validated;
          newList.processed = processed;
       }
+      newList.parseletId = parseletId;
       return newList;
    }
 
