@@ -105,4 +105,6 @@ public interface ILanguageModel extends IFileProcessorResult {
    boolean isReplacedModel();
 
    int getNodeCount();
+
+   void restoreParseNode();
 }

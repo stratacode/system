@@ -4842,7 +4842,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                case IsVariable:
                case BoundObjectName:
                   // Don't use 'member' until we've got a member definition that has no errors
-                  if (errorArgs == null && !getParseNode().isErrorNode())
+                  if (errorArgs == null && (getParseNode() == null || !getParseNode().isErrorNode()))
                      styleName = isStaticTarget(i) ? "staticMember" : "member";
                   else
                      styleName = isStaticTarget(i) ? "staticMember" : "member"; // TODO: should we do no style here?

@@ -558,6 +558,9 @@ public abstract class Language extends LayerFileComponent {
          }
       }
       else {
+         IParseNode pn = oldModel.getParseNode();
+         if (pn == null)
+            oldModel.restoreParseNode();
          ParseUtil.initAndStartComponent(oldModel);
          return ParseUtil.styleSemanticValue(oldModel, oldModel.getParseNode(), layerName, fileName);
       }

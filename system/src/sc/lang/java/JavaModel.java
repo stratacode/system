@@ -1361,7 +1361,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (sys.options.clonedTransform) {
             // This returns true for types that either need a transform call made here in Java or do a transform of the model for JS for enumerated types.
             if (needsTransform()) {
-               restoreParseNode();
                // TODO: during rebuild, are there any cases where we need to transform, even if our model did not change?
                /*
                if (transformedModel != null && transformedModel.getTransformed())
@@ -1374,6 +1373,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                if (transformedModel == null || transformedInLayer == null ||
                       (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer, layeredSystem.currentBuildLayer))
                   cloneTransformedModel();
+               if (parseNode == null)
+                  restoreParseNode();
 
                // Already transformed
                if (transformedModel.getTransformed()) {
@@ -1708,6 +1709,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          ParseUtil.initAndStartComponent(this);
          ParseUtil.processComponent(this);
       }
+      restoreParseNode();
       transformedModel = (JavaModel) this.deepCopy(CopyAll | CopyTransformed, null);
       transformedModel.nonTransformedModel = this;
       transformedInLayer = layeredSystem.currentBuildLayer;
