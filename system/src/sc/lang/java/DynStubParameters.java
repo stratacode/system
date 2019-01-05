@@ -1204,6 +1204,8 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       public String getSuperExpression() {
+         String superStr = null;
+         boolean needsSemi = false;
          if (method instanceof ConstructorDefinition) {
             ConstructorDefinition constr = (ConstructorDefinition) method;
             IdentifierExpression superExpr = constr.getSuperExpresssion();
@@ -1211,14 +1213,21 @@ public class DynStubParameters extends AbstractTemplateParameters {
                if (superExpr != null) {
                   IdentifierExpression superCopy = superExpr.deepCopy(ISemanticNode.CopyNormal, null);
                   superCopy.arguments.add(0, IdentifierExpression.create("concreteType"));
-                  return superCopy.toLanguageString();
+                  needsSemi = superExpr.parseNode == null;
+                  superStr = superCopy.toLanguageString();
                }
             }
             if (superExpr == null)
                return null;
-            return superExpr.toLanguageString();
+            needsSemi = superExpr.parseNode == null;
+            superStr = superExpr.toLanguageString();
          }
-         return null;
+         // The toLanguageString() doesn't realize this was an exprStatement when originally parsed so it becomes "super(a, b, c)" if we have not restored
+         // the parse node for this expression;
+         if (needsSemi) {
+            superStr = superStr + ";\n      ";
+         }
+         return superStr;
       }
    }
 
