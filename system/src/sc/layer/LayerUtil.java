@@ -164,6 +164,8 @@ public class LayerUtil implements LayerConstants {
          PerfMon.end("deserializeModel");
       }
 
+      lang.postProcessSemanticValue(deserModel, srcEnt.absFileName);
+
       return deserModel;
    }
 

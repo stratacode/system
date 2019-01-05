@@ -10042,6 +10042,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             return modelObj;
          }
          catch (IllegalArgumentException exc) { // file not found - this happens for unsaved models which get added to the layer index before they have been saved.
+            if (options.verbose) {
+               verbose("*** Exception initializing model: " + exc + ": " + srcEnt);
+               exc.printStackTrace();
+            }
             //error("SrcFile no longer exists: " + srcEnt + ": " + exc + "");
          }
       }

@@ -400,7 +400,7 @@ public class OrderedChoice extends NestedParselet  {
          }
          if (!(nestedValue instanceof ParseError)) {
             // Do any parselet specific processing on the sub-value that would be done in addResultToParent
-            nestedValue = subParselet.propagateResult(nestedValue);
+            nestedValue = nestedValue == null ? null : subParselet.propagateResult(nestedValue);
             if (lookahead) {
                // Reset back to the beginning of the sequence
                parser.changeCurrentIndex(startIndex);
@@ -1626,7 +1626,8 @@ public class OrderedChoice extends NestedParselet  {
             PerfMon.start("updateParseNodes");
             // No need to update the semantic values to point to the parse nodes for the final generation since we never go look at them again.
             if (!ctx.finalGeneration && parselets.get(currentResultIndex).updateParseNodes(currentMatchedValue, (IParseNode) currentResult) != MATCH) {
-               System.out.println("*** failed to update parse nodes in 'final-generation' optimization for choice nodes");
+               if (currentMatchedValue != null)
+                  System.out.println("*** failed to update parse nodes in 'final-generation' optimization for choice nodes");
                // int num = parselets.get(currentResultIndex).updateParseNodes(currentMatchedValue, (IParseNode) currentResult);
             }
             PerfMon.end("updateParseNodes");

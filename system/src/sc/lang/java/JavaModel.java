@@ -1361,6 +1361,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (sys.options.clonedTransform) {
             // This returns true for types that either need a transform call made here in Java or do a transform of the model for JS for enumerated types.
             if (needsTransform()) {
+               restoreParseNode();
                // TODO: during rebuild, are there any cases where we need to transform, even if our model did not change?
                /*
                if (transformedModel != null && transformedModel.getTransformed())
@@ -1907,6 +1908,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          return transformedModel.getTransformedResult();
 
       if (parseNode == null) {
+         // We may not have restored the parse node here - no need to generate it just to return the string
+         if (!needsTransform()) {
+            return FileUtil.getFileAsString(getSrcFile().absFileName);
+         }
          Parselet compUnit = JavaLanguage.INSTANCE.compilationUnit;
          PerfMon.start("newModelGenerate");
          Object res = compUnit.generate(JavaLanguage.INSTANCE.newGenerateContext(compUnit, this), this);
@@ -3396,6 +3401,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                return true;
       }
       return false;
+   }
+
+   public void restoreParseNode() {
+      if (parseNode == null) {
+         LayeredSystem sys = getLayeredSystem();
+         SrcEntry srcEnt = getSrcFile();
+         if (srcEnt == null)
+            return;
+         IFileProcessor processor = sys.getFileProcessorForSrcEnt(srcEnt, null, false);
+            LayerUtil.restoreParseNodes(sys, (Language) processor, srcEnt, getLastModifiedTime(), this);
+      }
+      if (parseNode == null)
+         System.err.println("*** Failed to restore parse node!");
    }
 }
 

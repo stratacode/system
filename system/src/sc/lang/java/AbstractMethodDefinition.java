@@ -875,6 +875,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          ISemanticNode srcRoot = srcStatement.getRootNode();
          if (srcRoot instanceof JavaModel) {
             JavaModel srcModel = (JavaModel) srcRoot;
+            if (srcModel.getParseNode() == null) {
+               srcModel.restoreParseNode();
+            }
             IParseNode genBodyPN = body.getParseNode();
             int startGenOffset = genBodyPN.getStartIndex() + genBodyPN.lastIndexOf("}");
             if (startGenOffset == -1) {

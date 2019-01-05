@@ -790,6 +790,10 @@ public class TestUtil {
 
                      out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
 
+                     ISemanticNode cloneModel = deserModel.deepCopy(ISemanticNode.CopyParseNode, null);
+                     if (!cloneModel.equals(deserModel))
+                        error("*** Error - Cloned models do not match!");
+
                      boolean modelsMatched = false;
                      if (!deserModel.equals(modelObj))
                         error("*** Error - Deserialize - results do not match!");
@@ -826,6 +830,27 @@ public class TestUtil {
                            out("Restored parse node successfully");
                         }
                      }
+
+                     pIn = rc % 2 == 0 ? ParseUtil.openParseNodeStream(parseFileName, lang) : null;
+                     Object cloneRestore = lang.restore(fileName, cloneModel,  pIn, false);
+
+                     if (cloneRestore instanceof ParseError || cloneRestore == null)
+                        error("*** Error - Invalid return from clone restore - should always restore to a valid parse node.");
+
+                     if (cloneRestore instanceof IParseNode) {
+                        if (cloneModel.getParseNode() != cloneRestore)
+                           error("*** Error - clone model not updated with parse node tree!");
+
+                        if (!cloneRestore.toString().equals(result.toString()))
+                           error("*** Error - Restored cloned parse node text does not match");
+                        else if (!cloneRestore.equals(result))
+                           error("*** Error - Restored cloned parse nodes do not match");
+                        else {
+                           // TODO: compare the parse node trees and verify that the semantic node is registered properly onto it
+                           out("Restored cloned parse node successfully");
+                        }
+                     }
+
                      rc++;
                   } while (rc < 2);
                }

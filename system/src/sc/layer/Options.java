@@ -194,7 +194,7 @@ public class Options {
    @Constant public boolean modelCacheEnabled = true;
 
    /** When modelCacheEnabled=true, if lazyParseNodeCache is true, we do not restore the parse-node tree until it's requested for a given model */
-   @Constant public boolean lazyParseNodeCache = false;
+   @Constant public boolean lazyParseNodeCache = true;
 
    /**
     * For web applications that use scopes shared across different apps (web pages) like 'global' and 'session' do we

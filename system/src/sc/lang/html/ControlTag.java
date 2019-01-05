@@ -11,6 +11,8 @@ public class ControlTag extends SemanticNode {
    public String docTypeValue; // Usually the value html
 
    public String toString() {
+      if (parseNode == null)
+         return "<!" + docTypeName + " " + docTypeValue + ">";
       return toLanguageString();
    }
 }
