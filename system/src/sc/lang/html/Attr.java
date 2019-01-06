@@ -432,4 +432,11 @@ public class Attr extends Node implements ISrcStatement {
          initQuoteType(); // Do this so we save quoteType on the original parse
       super.serialize(out);
    }
+
+   public boolean deepEquals(Object other) {
+      // To avoid errors when we are comparing a model we have serialized versus one we have not - this all could be avoided with a 'preInit' operation that is run before the model is saved.
+      if (parseNode != null && quoteType == 0)
+         initQuoteType();
+      return super.deepEquals(other);
+   }
 }

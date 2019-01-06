@@ -131,7 +131,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
       Object annot = null;
       TypeDeclaration enclType = getEnclosingType();
-      if (enclType != null) {
+      if (enclType != null && variableName != null) {
          Object getMethod = enclType.declaresMember(variableName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
          if (getMethod != null) {
             annot = ModelUtil.getBindableAnnotation(getMethod);

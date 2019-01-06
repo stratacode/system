@@ -106,5 +106,10 @@ public interface ILanguageModel extends IFileProcessorResult {
 
    int getNodeCount();
 
+   /**
+    * Models can be parsed once and then serialized and de-serialized much faster.  When a model is deserialized, we can restore the parse nodes
+    * using this operation.  When the model is cached, we can either cache the parse-node tree as well or not.   Either way, it's faster to restore
+    * the parse-node tree with the existing model than to parse it again from scratch.
+    */
    void restoreParseNode();
 }

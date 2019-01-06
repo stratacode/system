@@ -179,5 +179,9 @@ public interface ISemanticNode {
    /** Returns number of nodes in this tree for helping to diagnose memory use */
    public int getNodeCount();
 
+   /**
+    * Saves all of the properties of this model as parsed.  If you need to save additional state with the semantic model that's not set directly from the grammar,
+    * you can override this method, set additional fields and just make sure they are not marked 'transient'
+    */
    public void serialize(ModelOutStream out);
 }

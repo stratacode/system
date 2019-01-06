@@ -3412,7 +3412,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (srcEnt == null)
             return;
          IFileProcessor processor = sys.getFileProcessorForSrcEnt(srcEnt, null, false);
-            LayerUtil.restoreParseNodes(sys, (Language) processor, srcEnt, getLastModifiedTime(), this);
+         LayerUtil.restoreParseNodes(sys, (Language) processor, srcEnt, getLastModifiedTime(), this);
+         if (sys.options.verbose)
+            sys.verbose("Restoring parse node for: " + this);
       }
       if (parseNode == null)
          System.err.println("*** Failed to restore parse node!");

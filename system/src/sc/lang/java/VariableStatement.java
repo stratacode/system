@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
+import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -41,7 +42,7 @@ public class VariableStatement extends TypedDefinition implements IClassBodyStat
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
       if (definitions != null && mtype.contains(MemberType.Variable) && !inactive) {
          for (VariableDefinition v : definitions)
-            if (v.variableName.equals(name))
+            if (StringUtil.equalStrings(v.variableName, name))
                return v;
       }
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
