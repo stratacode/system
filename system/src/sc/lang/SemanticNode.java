@@ -718,14 +718,22 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
    private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
       IParseNode pp = parseNode;
-      if (pp == null)
+      if (pp == null) {
+         ISemanticNode rootNode = getRootNode();
+         if (rootNode instanceof ILanguageModel) {
+            ILanguageModel rootModel = (ILanguageModel) rootNode;
+            rootModel.restoreParseNode();
+         }
+      }
+      if (pp == null) {
          pp = getAnyChildParseNode();
+      }
 
       int startIx = getStartIndex();
 
       if (startIx != -1) {
          ISemanticNode rootNode = getRootNode();
-         if (rootNode != null && rootNode instanceof ILanguageModel) {
+         if (rootNode instanceof ILanguageModel) {
             ILanguageModel rootModel = (ILanguageModel) rootNode;
             List<SrcEntry> srcEnts = rootModel.getSrcFiles();
             if (srcEnts != null && srcEnts.size() > 0) {
