@@ -4,6 +4,7 @@
 
 package sc.lang.html;
 
+import sc.binf.ModelOutStream;
 import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.template.Template;
@@ -30,11 +31,10 @@ public class Attr extends Node implements ISrcStatement {
    // Is this an href or other URL reference
    public transient boolean link = false;
 
-   enum QuoteType {
-      Single, Double, Unknown
-   }
+   public final static int QuoteUnknown = 0, QuoteSingle = 1, QuoteDouble = 2;
 
-   public transient QuoteType quoteType;
+   // Not transient because we want this info to be serialized as part of the model
+   public int quoteType;
 
    // The Element tag which defined this attribute
    public transient Element declaringTag;
@@ -127,15 +127,7 @@ public class Attr extends Node implements ISrcStatement {
       Object attValue = value;
       Expression init = null;
       String op = "=";
-      HTMLLanguage htmlLang = HTMLLanguage.getHTMLLanguage();
-      Parselet p = getValueParselet();
-
-      if (p == htmlLang.attributeValueSQLiteral)
-         quoteType = QuoteType.Single;
-      else if (p == htmlLang.attributeValueLiteral)
-         quoteType = QuoteType.Double;
-      else
-         quoteType = QuoteType.Unknown;
+      initQuoteType();
       if (PString.isString(attValue)) {
          String attStr = attValue.toString();
          String opStr = getOperationFromExpression(attStr);
@@ -253,6 +245,17 @@ public class Attr extends Node implements ISrcStatement {
          valueExpr = init;
          this.op = op;
       }
+   }
+
+   private void initQuoteType() {
+      HTMLLanguage htmlLang = HTMLLanguage.getHTMLLanguage();
+      Parselet p = getValueParselet();
+
+      if (p == htmlLang.attributeValueSQLiteral)
+         quoteType = QuoteSingle;
+      else if (p == htmlLang.attributeValueLiteral)
+         quoteType = QuoteDouble;
+      // if (p == null) we may not have a parse node so don't set anything in this case
    }
 
    private Parselet getValueParselet() {
@@ -422,5 +425,11 @@ public class Attr extends Node implements ISrcStatement {
       valueProp = null;
       unknown = false;
       declaringTag = null;
+   }
+
+   public void serialize(ModelOutStream out) {
+      if (parseNode != null)
+         initQuoteType(); // Do this so we save quoteType on the original parse
+      super.serialize(out);
    }
 }

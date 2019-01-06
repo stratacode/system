@@ -1095,10 +1095,10 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public void serialize(ModelOutStream out) {
       if (parseletId == -1) {
          if (out.currentListId == -1)
-            System.err.println("** Unable to serialize semantic node without parseletId");
+            System.err.println("*** Unable to serialize semantic node without parseletId");
          else {
             if (((NestedParselet) out.lang.getParseletById(out.currentListId)).getSemanticValueComponentClass() != getClass())
-               System.err.println("*** Mismatching parslet list slot class!");
+               System.err.println("*** Mismatching parselet list slot class!");
             out.writeUInt(BinfConstants.ListElementId);
          }
       }
@@ -1124,5 +1124,4 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          out.writeValue(val);
       }
    }
-
 }

@@ -1201,7 +1201,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         continue; // draw nothing for =: bindings that happen to be on HTML attributes
                      Expression outputExpr = att.getOutputExpr();
                      boolean isConstant = outputExpr == null || outputExpr instanceof StringLiteral;
-                     char quoteChar = att.quoteType == Attr.QuoteType.Single ? '\'' : '"';
+                     char quoteChar = att.quoteType == Attr.QuoteSingle ? '\'' : '"';
                      if (!inactive && (!staticContentOnly || isConstant)) {
                         if (isBooleanAttribute(att.name) && outputExpr != null && !(outputExpr instanceof StringLiteral)) {
                            if (str.length() > 0) {
@@ -1256,7 +1256,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                               if (exprType != null && ModelUtil.isString(exprType)) {
                                  SemanticNodeList<Expression> escArgs = new SemanticNodeList<Expression>();
                                  escArgs.add(outputExprCopy);
-                                 escArgs.add(BooleanLiteral.create(att.quoteType == Attr.QuoteType.Single));
+                                 escArgs.add(BooleanLiteral.create(att.quoteType == Attr.QuoteSingle));
                                  Expression escExpr = IdentifierExpression.createMethodCall(escArgs, "sc.lang.html.Element.escAtt");
                                  escExpr.fromStatement = att;
                                  strExprs.add(escExpr);
