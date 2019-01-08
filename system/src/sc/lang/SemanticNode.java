@@ -716,15 +716,19 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return -1;
    }
 
-   private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
-      IParseNode pp = parseNode;
-      if (pp == null) {
+   public void restoreParseNode() {
+      if (parseNode == null) {
          ISemanticNode rootNode = getRootNode();
          if (rootNode instanceof ILanguageModel) {
             ILanguageModel rootModel = (ILanguageModel) rootNode;
             rootModel.restoreParseNode();
          }
       }
+   }
+
+   private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
+      restoreParseNode();
+      IParseNode pp = parseNode;
       if (pp == null) {
          pp = getAnyChildParseNode();
       }
@@ -786,6 +790,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    public String computeNearString(int indent) {
+      restoreParseNode();
       IParseNode pp = parseNode;
       if (pp == null) {
          pp = getAnyChildParseNode();

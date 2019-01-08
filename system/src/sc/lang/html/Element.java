@@ -169,6 +169,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public final static boolean nestedTagsInStatements = false;
    private static final boolean oldExecTag = false;
 
+   // During code-generation, one element may be generated from another, e.g. for templates we clone statements that are children of a template declaration.  This
+   // stores that references so we can find the original source Statement.
+   public transient Element fromElement;
+
    public Element() {
    }
    public Element(sc.lang.java.TypeDeclaration concreteType)  {
@@ -4742,6 +4746,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       //if ((options & ISemanticNode.CopyInitLevels) != 0) {
          // Not copying tagObject here - it needs to be cloned at the root and then tagObjects assigned as a second pass
       //}
+      res.fromElement = this;
       return res;
    }
 
@@ -4998,6 +5003,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          return false;
       }
       return cache == CacheMode.Enabled;
+   }
+
+   public void displayError(String...args) {
+      if (fromElement != null)
+         fromElement.displayError(args);
+      else
+         super.displayError(args);
    }
 
 }

@@ -93,7 +93,7 @@ public interface ISemanticNode {
 
    /**
     * Copy just some of the state in the semantic nodes.  Used to speed things up and make code more robust during
-    * transform so expressiona don't get re-resolved mid-stream.  This mode does not copy the parse node but
+    * transform so expressions don't get re-resolved mid-stream.  This mode does not copy the parse node but
     * does create a new parse node which points to the parselet so we can re-generate this child.  No initialized, started, etc. flags are copied.
     */
    public static final int CopyNormal = CopyState;
