@@ -12,7 +12,7 @@ import sc.parser.Parselet;
 import sc.parser.SymbolChoice;
 import sc.util.URLUtil;
 
-/** A language designed for parsing values from URLs using the pattern property of the @URL annotation */
+/** A small language that's not parsed itself but supplies parselets used for parsing values from URLs using the pattern property of the @URL annotation */
 public class URLPatternLanguage extends SCLanguage {
    public URLPatternLanguage() {
       this(null);

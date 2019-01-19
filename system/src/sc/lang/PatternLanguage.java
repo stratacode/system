@@ -8,15 +8,15 @@ import sc.layer.Layer;
 import sc.parser.*;
 
 /**
- * A language which lets you define a simple pattern that will get matched to a string, to populate properties of an
- * instance of a particular type.  First a "Pattern" object is parsed from the string.  You then initialize it with
- * a class - so we can resolve any properties referenced in the pattern.  If successful, you are returned a Parselet
- * that represents this 'pattern to type' mapping.  You can use Language.parseIntoInstance with that parselet to
- * parse a given string, and if successful set the properties on the instance.
+ * A language which lets you define a simple pattern that will get matched to a string, and optionally to populate properties of an
+ * instance of a particular type.  First a Pattern instance is parsed from the string.  You then initialize it with
+ * a class - which defines the type produced when parsing the instance.  This class must define the properties referenced in the pattern.  This produces
+ * a generated Parselet which can parse that pattern and if needed, set properties in an instance.
+ * Use Language.parseIntoInstance with that parselet to parse a given string and set properties on the instance.
  * <p>
  * This approach is an alternative to regular expressions for matching strings and extracting values from string formats, such as parameterized URLs.
- * Given a String in the form: "somestring{propName=parseletName}somestring{parseletName}[optionalString/{propName=parseletName}]"  where the 'somestring' can be any character except { and }, [ and ]
- * To include those characters in the string, use the normal backslash escape character before them.
+ * Given a String in the form: "abc{propName=parseletName}def{parseletName}[optionalString/{propName=parseletName}]"
+ * To include the {}[]= characters in the string, use the normal backslash escape character before them.
  * This language generates a Pattern object which you can use to generate a Sequence that can parse strings that match the
  * pattern.  From this Sequence, you can:
  *    1) Match a string to the pattern.
@@ -24,8 +24,9 @@ import sc.parser.*;
  *    3) Go in the opposite direction and generate a string from an object instance (i.e. by replacing the prop=token with those found in the properties of the instance).
  * The types of tokens you can use are defined by parselets, named by parseletName.
  * <p>
- * This moves the pattern logic into Java code, instead of being part of each pattern that helps to keep
- * the pattern readable and secure.  Unlike regular expressions, we can go in both directions and convert this into a data binding expression
+ * This provides a high-level, but constrained way to translate user-supplied URLs to program expected information that has
+ * passed a level of validation and transformation.
+ * Unlike regular expressions, patterns work in both directions and so are 'reactive', translatable into data binding expressions
  * so the client can be responsive to changes in those properties and re-generate the string when they change (e.g. generate a parameterized
  * URL when a property changes for history management)
  * <p>

@@ -6945,7 +6945,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (Map.Entry<String, ILanguageModel> cacheEnt: inactiveModelIndex.entrySet()) {
             ILanguageModel model = cacheEnt.getValue();
 
-            if (model.getLastAccessTime() - cleanTime > INACTIVE_MODEL_CACHE_EXPIRE_TIME_MILLIS) {
+            if (cleanTime - model.getLastAccessTime() > INACTIVE_MODEL_CACHE_EXPIRE_TIME_MILLIS) {
                if (externalModelIndex == null || !externalModelIndex.isInUse(model)) {
                   toCullList.add(cacheEnt.getKey());
                }
