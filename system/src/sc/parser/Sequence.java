@@ -1387,6 +1387,8 @@ public class Sequence extends NestedParselet  {
       else if (sv == null)
          sn = oldNode;
 
+      if (pn instanceof ErrorParseNode)
+         System.out.println("*** Error parse node during save parse!");
       ParentParseNode ppn = (ParentParseNode) pn;
 
       boolean arrElement;

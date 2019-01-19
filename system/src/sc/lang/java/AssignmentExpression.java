@@ -445,6 +445,14 @@ public class AssignmentExpression extends TwoOperatorExpression {
       return sb.toString();
    }
 
+   public boolean isLeafStatement() {
+      if (!super.isLeafStatement())
+         return false;
+      if (rhs != null && rhs.isLeafStatement())
+         return true;
+      return false;
+   }
+
    public ISrcStatement findFromStatement (ISrcStatement st) {
       if (fromDefinition instanceof ISrcStatement && ((ISrcStatement) fromDefinition).findFromStatement(st) != null)
          return this;

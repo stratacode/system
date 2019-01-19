@@ -197,7 +197,8 @@ public abstract class BaseLambdaExpression extends Expression {
       newMeth.setProperty("parameters", parameters = params);
       // resolve was true but it could lead to us binding to java.lang.Object too soon in some cases
       Object lambdaMethodReturnType = ModelUtil.getParameterizedReturnType(ifaceMeth, null, false);
-      newMeth.setProperty("type", JavaType.createFromParamType(sys, lambdaMethodReturnType, typeCtx, enclType));
+      if (lambdaMethodReturnType != null)
+         newMeth.setProperty("type", JavaType.createFromParamType(sys, lambdaMethodReturnType, typeCtx, enclType));
       lambdaMethod = newMeth;
 
       // Doing this after we have defined the parameters here so we can resolve the references
@@ -285,7 +286,8 @@ public abstract class BaseLambdaExpression extends Expression {
       }
       else if (paramReturnType instanceof ExtendsType.LowerBoundsTypeDeclaration)
          paramReturnType = ((ExtendsType.LowerBoundsTypeDeclaration) paramReturnType).getBaseType();
-      newMeth.setProperty("type", JavaType.createFromParamType(sys, paramReturnType, typeCtx, enclType));
+      if (paramReturnType != null)
+         newMeth.setProperty("type", JavaType.createFromParamType(sys, paramReturnType, typeCtx, enclType));
       if (ModelUtil.hasTypeParameters(inferredType)) {
          SemanticNodeList<JavaType> typeParams = new SemanticNodeList<JavaType>();
          int numParams = ModelUtil.getNumTypeParameters(inferredType);

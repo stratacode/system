@@ -112,8 +112,12 @@ public class ParseOutStream extends BinfOutStream {
             throw new UncheckedIOException(exc);
          }
       }
-      else
-         System.err.println("*** Unknown parser node object");
+      else {
+         // TODO: currently we are not trying to save/restore parse node trees with parse-errors.  Ordinarily a ParseError
+         // is returned from the parse operation and we won't even try to save it.  But when partialValues is set, we might
+         // return a parseNode with errors.
+         throw new IllegalArgumentException("Parse error found");
+      }
    }
 
    public void saveParseletId(Parselet p) {

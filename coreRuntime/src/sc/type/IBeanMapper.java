@@ -15,7 +15,7 @@ import sc.js.JSSettings;
  * <p>You can globally turn off the use of bean mappers for data bindings and they are turned off in the JS runtime.</p>
  */
 @JSSettings(replaceWith="jv_Object")
-public interface IBeanMapper extends IBinding {
+public interface IBeanMapper extends IBinding, Comparable<IBeanMapper> {
    /** Properties defined on an interface need to do a dynamic lookup to retrieve the position.  This is the sentinel value for those properties */
    public final static int DYNAMIC_LOOKUP_POSITION = -2;
 

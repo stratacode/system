@@ -8,6 +8,7 @@ import sc.dyn.DynUtil;
 import sc.util.CoalescedHashMap;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Map;
 
 public class DynType {
@@ -153,6 +154,9 @@ public class DynType {
             }
          }
       }
+      // Sorting this here because otherwise changes in the hash of the CoalescedHashMap can affect the order, even when you are not changing
+      // a property in the semantic list.
+      Collections.sort(l);
       semanticProps = l.toArray(new IBeanMapper[l.size()]);
       return semanticProps;
    }

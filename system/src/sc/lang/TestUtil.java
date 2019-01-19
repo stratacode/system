@@ -506,6 +506,7 @@ public class TestUtil {
 
          String ext = FileUtil.getExtension(file.getPath());
 
+         boolean parseErrors = false;
          long startTime = System.currentTimeMillis();
          int ct = opts.repeatCount;
          do {
@@ -526,6 +527,8 @@ public class TestUtil {
                //HTMLLanguage.getHTMLLanguage().templateBlockStatements.trace = true;
 
                result = lang.parse(fileName, new StringReader(input), lang.getStartParselet(), opts.enablePartialValues);
+               if (result instanceof ParseError)
+                  parseErrors = true;
             }
             else {
                LayeredSystem sys = ParseUtil.createSimpleParser(opts.classPath, opts.externalClassPath, opts.srcPath, null);
@@ -551,15 +554,17 @@ public class TestUtil {
                         System.err.println("*** Parse result not a JavaModel: " + result);
                      }
                   }
-                  else // ParseError - handled below...
+                  else { // ParseError - handled below...
                      result = modelResult;
+                     parseErrors = true;
+                  }
                }
             }
          } while (--ct > 0);
 
          long parseResultTime = System.currentTimeMillis();
 
-         out("Parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime));
+         out("Parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime) + (parseErrors ? " - with parse error: " + result.toString() : ""));
 
          if (opts.reparseIndexes != null) {
             opts.reparseFiles = new String[opts.reparseIndexes.size()];

@@ -127,7 +127,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
       if (mtype.contains(MemberType.Field)) {
          for (VariableDefinition v:variableDefinitions) {
-            if (v.variableName.equals(name) && (refType == null || ModelUtil.checkAccess(refType, this))) {
+            if (StringUtil.equalStrings(v.variableName, name) && (refType == null || ModelUtil.checkAccess(refType, this))) {
                if ((!mtype.contains(MemberType.Initializer) || v.initializer != null))
                   return v;
             }

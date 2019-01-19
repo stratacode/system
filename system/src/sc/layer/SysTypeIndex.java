@@ -222,7 +222,7 @@ public class SysTypeIndex {
    }
 
    public void refreshLayerOrder(LayeredSystem sys) {
-      if (inactiveTypeIndex != null) {
+      if (inactiveTypeIndex != null && inactiveTypeIndex.orderIndex != null) {
          if (inactiveTypeIndex.orderIndex.refreshAll(sys, false))
             needsSave = true;
       }

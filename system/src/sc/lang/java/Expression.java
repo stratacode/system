@@ -982,6 +982,9 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
    }
 
    public String toSafeLanguageString() {
+      if (parseNode == null) {
+         restoreParseNode();
+      }
       if (parseNode == null || parseNodeInvalid)
          return toGenerateString();
       return toLanguageString();

@@ -210,8 +210,11 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       isStarting = true;
 
+      if (typeName == null)
+         System.out.println("***");
+
       // Are we an "a.b" modify?
-      compoundName = typeName.indexOf(".") != -1;
+      compoundName = typeName != null && typeName.indexOf(".") != -1;
 
       JavaModel thisModel = getJavaModel();
       if (thisModel == null) {

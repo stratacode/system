@@ -188,6 +188,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
+      if (propertyName == null)
+         return null;
       if (mtype.contains(MemberType.Assignment))
          if (propertyName.equals(name) && (!mtype.contains(MemberType.Initializer) || initializer != null))
             return this;

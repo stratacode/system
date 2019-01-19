@@ -4747,6 +4747,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // Not copying tagObject here - it needs to be cloned at the root and then tagObjects assigned as a second pass
       //}
       res.fromElement = this;
+      // This is important to avoid some extra computation
+      res.cachedObjectName = cachedObjectName;
       return res;
    }
 

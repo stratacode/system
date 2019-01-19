@@ -64,6 +64,10 @@ public interface ILanguageModel extends IFileProcessorResult {
 
    void setLastModifiedTime(long time);
 
+   void setLastAccessTime(long time);
+
+   long getLastAccessTime();
+
    ILanguageModel getModifiedModel();
 
    ILanguageModel resolveModel();

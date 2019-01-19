@@ -1325,6 +1325,10 @@ public class ParseUtil  {
       catch (IOException exc) {
          throw new IllegalArgumentException("IOException: " + serFileName + ": " + exc);
       }
+      // Happens when there are errors in the parse node tree, usually for a partial parse
+      catch (IllegalArgumentException exc) {
+         new File(serFileName).delete();
+      }
       finally {
          FileUtil.safeClose(dos);
          FileUtil.safeClose(fos);

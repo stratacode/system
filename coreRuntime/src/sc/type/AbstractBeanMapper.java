@@ -10,7 +10,6 @@ import sc.bind.IBinding;
 import sc.bind.IListener;
 
 public abstract class AbstractBeanMapper implements IBeanMapper, IBinding, Cloneable {
-
    public int hashCode() {
       return getPropertyName().hashCode();
    }
@@ -103,5 +102,11 @@ public abstract class AbstractBeanMapper implements IBeanMapper, IBinding, Clone
 
    public boolean isReversible() {
       return !isConstant();
+   }
+
+   public int compareTo(IBeanMapper other) {
+      if (other == this)
+         return 0;
+      return getPropertyName().compareTo(other.getPropertyName());
    }
 }

@@ -6042,7 +6042,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (useBuildDir != null && includeBuildDir)
          sb.append(useBuildDir); // Our build dir overrides all other directories
       if (startLayer == coreBuildLayer) {
+         // Need this for the IDE because the sc.jar files are not in the rootClasspath in that environment because we want to debug those.  They are when running scc though.
+         if (strataCodeInstallDir != null) {
+            LayerUtil.addQuotedPath(sb, getStrataCodeRuntimePath(false, false));
+         }
          addOrigBuild = startLayer.appendClassPath(sb, includeBuildDir, useBuildDir, addOrigBuild);
+
       }
       else {
          for (int i = startLayer.layerPosition; i >= 0; i--) {
@@ -6930,20 +6935,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
+   private final static int INACTIVE_MODEL_CACHE_EXPIRE_TIME_MILLIS = 30000;
+
    public void cleanInactiveCache() {
       try {
+         long cleanTime = System.currentTimeMillis();
          acquireDynLock(false);
          ArrayList<String> toCullList = new ArrayList<String>();
          for (Map.Entry<String, ILanguageModel> cacheEnt: inactiveModelIndex.entrySet()) {
             ILanguageModel model = cacheEnt.getValue();
 
-            if (externalModelIndex == null || !externalModelIndex.isInUse(model)) {
-               toCullList.add(cacheEnt.getKey());
+            if (model.getLastAccessTime() - cleanTime > INACTIVE_MODEL_CACHE_EXPIRE_TIME_MILLIS) {
+               if (externalModelIndex == null || !externalModelIndex.isInUse(model)) {
+                  toCullList.add(cacheEnt.getKey());
+               }
+            }
+            else {
+               if (options.verbose)
+                  verbose("Not removing inactive model: " + model + " (accessed " + (model.getLastAccessTime() - cleanTime) + "millis ago)");
             }
          }
          for (String toCull:toCullList) {
             ILanguageModel removed = inactiveModelIndex.remove(toCull);
             if (removed != null) {
+               if (options.verbose)
+                  verbose("Removing inactive model: " + toCull + " (accessed " + (removed.getLastAccessTime() - cleanTime) + " millis ago)");
                Layer layer = removed.getLayer();
                if (layer != null) {
                   layer.layerModels.remove(new IdentityWrapper(removed));
@@ -10187,6 +10203,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          model.setLayer(srcEntLayer);
       model.setLastModifiedTime(modTimeStart);
+      model.setLastAccessTime(modTimeStart);
 
       if (isLayer && model instanceof JavaModel)
          ((JavaModel) model).isLayerModel = true;
@@ -12352,6 +12369,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             error("Parsing type: " + srcEnt + ": returned null");
       }
+      else {
+         model.setLastAccessTime(System.currentTimeMillis());
+      }
       if (model instanceof JavaModel)
          return ((JavaModel) model).getModelTypeDeclaration();
       return null;
@@ -13197,7 +13217,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          model.addTypeDeclaration(modelType);
          if (model.isInitialized())
             ParseUtil.initComponent(modelType);
-         String err = "No layer definition in file: " + defFile + " exepcted file to contain: " + expectedName + " {  }";
+         String err = "No layer definition in file: " + defFile + " expected file to contain definition for type: " + expectedName + " {  }";
          if (lpi.activate)
             throw new IllegalArgumentException(err);
          modelType.displayError(err);

@@ -117,8 +117,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Set so we can keep do incremental refreshes */
    public transient long lastModifiedTime = 0;
 
-   /** Set to the timestamp of the time the model was last started */
+   /** Set to the timestamp of the time the model was last started - TODO: remove this?  We used to use it to avoid restarting the model unnecessarily */
    public transient long lastStartedTime = -1;
+
+   /** Set to the timestamp of the time the model was last used - to determine when to flush it from the cache for the IDE */
+   public transient long lastAccessTime = -1;
 
    /** Set to true during the build process if this model needs to stopped when it's reinitialized */
    public transient boolean needsRestart = false;
@@ -2375,6 +2378,14 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public void setLastModifiedTime(long t) {
       lastModifiedTime = t;
+   }
+
+   public long getLastAccessTime() {
+      return lastAccessTime;
+   }
+
+   public void setLastAccessTime(long t) {
+      lastAccessTime = t;
    }
 
    /** Used to create unique names for methods/properties on inner classes. */

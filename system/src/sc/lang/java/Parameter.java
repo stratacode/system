@@ -22,8 +22,10 @@ public class Parameter extends AbstractVariable implements IVariable {
       int i = 0;
       for (Object type:types) {
          Parameter next = new Parameter();
-         JavaType methType = JavaType.createFromParamType(sys, type, ctx, definedInType);
-         next.setProperty("type", methType);
+         if (type != null) {
+            JavaType methType = JavaType.createFromParamType(sys, type, ctx, definedInType);
+            next.setProperty("type", methType);
+         }
          next.variableName = names[i++];
          if (curr == null)
             first = curr = next;

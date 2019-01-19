@@ -205,7 +205,7 @@ public class LambdaExpression extends BaseLambdaExpression implements IStatement
    }
 
    public boolean isLeafStatement() {
-      return lambdaBody != null && !lambdaBody.isLeafStatement();
+      return lambdaBody != null && lambdaBody.isLeafStatement();
    }
 
    public Statement getWrappedStatement() {

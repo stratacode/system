@@ -253,6 +253,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", "\n", EOF));
    {
       escapedString.styleName = escapedSingleQuoteString.styleName = "string";
+      escapedSingleQuoteString.setLanguage(this);
    }
 
    public Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
@@ -468,11 +469,16 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
            new OrderedChoice("<elementValue>", expression, annotation, elementValueArrayInitializer);
 
    Sequence inferredParameters = new Sequence("(,[],)", openParen, new Sequence("([],[])", OPTIONAL, identifier, new Sequence("(,[])", OPTIONAL | REPEAT, comma, identifier)), closeParenSkipOnError);
+   {
+      // Don't want to match this as incomplete since formalParameters is a better match for partial values and this will override a valid formalParameters
+     inferredParameters.skipOnErrorSlot = 3;
+   }
 
    // Forward reference
    Sequence formalParameters = new Sequence("<parameters>(,.,)");
 
-   public OrderedChoice lambdaParameters = new OrderedChoice(identifier, formalParameters, inferredParameters);
+   // Need inferredParameters ahead of formalParameters for the partialValues parsing case - otherwise, formalParameters matches (a) where a is the type and there's an error node
+   public OrderedChoice lambdaParameters = new OrderedChoice(identifier, inferredParameters, formalParameters);
    public OrderedChoice lambdaBody = new OrderedChoice(expression, block);
 
    {
@@ -807,7 +813,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
                    new Sequence(OPTIONAL, comma),
                    new Sequence("([],[])", OPTIONAL, new Sequence("EmptyStatement()", semicolon), classBodyDeclarations));
    Sequence enumBody = new Sequence("(,[],)", openBraceEOL, enumBodyDeclaration, closeBraceEOL);
-   Sequence enumDeclaration = new Sequence("EnumDeclaration(,typeName,implementsTypes,body)",
+   public Sequence enumDeclaration = new Sequence("EnumDeclaration(,typeName,implementsTypes,body)",
                                            new KeywordSpace("enum"), identifier, implementsTypes, enumBody);
    {
       classDeclarationWithoutModifiers.set(normalClassDeclaration, enumDeclaration);
@@ -885,6 +891,7 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    Sequence modelList = new Sequence("([])", OPTIONAL | REPEAT, languageModel);
    public Sequence modelStream = new Sequence("ModelStream(,modelList,)", spacing, modelList, new Symbol(EOF));
    {
+      modelList.setLanguage(this);
       modelStream.setLanguage(this);
    }
 

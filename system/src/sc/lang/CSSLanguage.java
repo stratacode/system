@@ -8,8 +8,9 @@ import sc.layer.Layer;
 import sc.parser.*;
 
 /** TODO: For now, the sccss format is just the template language generating a string.  This is the hook for
-    extending the template grammar so it can also parse CSS.  Maybe add nice expressions and simpler syntax. 
-    Use that also to incrementally update the css on the client.   For now, the template language will work
+    extending the template grammar so it can also parse CSS.  It might be nice to add syntax to embed expressions into the CSS so we'd manage
+    the structure of the CSS as part of the language implementation.
+    It could also be used to incrementally update the css on the client.   For now, the template language will work
     by itself and where we refresh page-by-page.  Since CSS is layered by design - rules override previous rules
     we can still do a ton this way, just more awkward syntax.
 
@@ -31,20 +32,20 @@ public class CSSLanguage extends TemplateLanguage {
     }
 
     public CSSLanguage(Layer layer) {
-        super(layer);
-        if (enableCSSParser) {
-            templateBodyDeclarations.setName("([],[],[],[],[],[])");
-            templateBodyDeclarations.addDefault(cssStyleSheet);
-            setStartParselet(template);
-            addToSemanticValueClassPath("sc.lang.css");
-        }
-        languageName = "SCCss";
-        defaultExtension = "sccss";
+       super(layer);
+       if (enableCSSParser) {
+          templateBodyDeclarations.setName("([],[],[],[],[],[])");
+          templateBodyDeclarations.addDefault(cssStyleSheet);
+          setStartParselet(template);
+       }
+       addToSemanticValueClassPath("sc.lang.css");
+       languageName = "SCCss";
+       defaultExtension = "sccss";
     }
 
     public static CSSLanguage getCSSLanguage() {
-        INSTANCE.initialize();
-        return INSTANCE;
+       INSTANCE.initialize();
+       return INSTANCE;
     }
 
 
@@ -301,13 +302,11 @@ public class CSSLanguage extends TemplateLanguage {
     // Note: Not using asterix since it seems to be slightly different.
     OrderedChoice elementName = new OrderedChoice(OPTIONAL, ident, new Symbol("*"));
 
-    // STATUS: DONE
     Sequence clazz = new Sequence ("('','')", new Symbol("."), ident);
 
     Sequence simpleSelector = new Sequence ("SimpleSelector(elementName, additional,)", elementName,
             new OrderedChoice("([],[],[],[])", OPTIONAL | REPEAT, hashName, clazz, attrib, pseudo), spacing);
 
-    // STATUS: DONE?
     Sequence cssSelector = new Sequence ("CSSSelector(simpleSelector, additionalSelectorTerms)", simpleSelector,
             new Sequence("([],[])", OPTIONAL | REPEAT,
                     new OrderedChoice(OPTIONAL,
@@ -315,44 +314,34 @@ public class CSSLanguage extends TemplateLanguage {
                             new Sequence("(.,)", new Symbol(">"), spacing)),
                     simpleSelector));
 
-    // STATUS: DONE?
     Sequence selectors = new Sequence("<otherSelectors>(,,[])", OPTIONAL | REPEAT, comma, spacing, cssSelector);
 
-    // STATUS: READY
     Sequence ruleset = new Sequence("RuleSet(cssSelector, otherSelectors, declarations)",
             cssSelector, selectors, declarations);
 
-    // STATUS: DONE
     Sequence ruleSets = new Sequence("<rulesets>([])", OPTIONAL | REPEAT, ruleset);
 
-    // STATUS: DONE
     Sequence pseudoPage = new Sequence("<pseudoPage>('','')", OPTIONAL, new Symbol(":"), ident);
 
-    // STATUS: GOOD
     Sequence medium = new Sequence ("<medium>(.,)", ident, spacing);
     Sequence mediums = new Sequence ("<otherMediums>(,,[])",
             OPTIONAL | REPEAT, comma, spacing, medium);
 
-    // STATUS: READY
     Sequence fontFaceAtRule = new Sequence("FontFaceAtRule(,,,declarations,)",
             at, new CaseInsensitiveSequence("font-face"),
             spacing, declarations, spacing);
 
-    // STATUS: TESTED
     Sequence pageAtRule = new Sequence("PageAtRule(,,,ident,pseudoPage,,declarations)",
             at, new CaseInsensitiveSequence("page"), spacing, new Sequence("(.)", OPTIONAL, ident), pseudoPage, spacing,
             declarations);
 
-    // STATUS: TESTED
     Sequence mediaAtRule = new Sequence ("MediaAtRule(,,,medium,otherMediums,,ruleSets,,)",
             at, new CaseInsensitiveSequence("media"), spacing, medium, mediums, openBraceEOL, ruleSets, closeBrace, spacingEOL);
 
-    // STATUS: PARSES
     Sequence namespaceAtRules = new Sequence("NamespaceAtRule(,,,identifier,value,,)", OPTIONAL | REPEAT,
             at, new CaseInsensitiveSequence("namespace"), spacing,
             new Sequence ("(.,)", OPTIONAL, ident, spacing), new OrderedChoice (cssURI, cssString), spacing, semicolonEOL);
 
-    // STATUS: PARSES
     Sequence importAtRules = new Sequence("ImportAtRule(,,,importAt,,medium,otherMediums,)", OPTIONAL | REPEAT,
             at, new CaseInsensitiveSequence("import"), spacing,
             new OrderedChoice (cssURI, cssString), spacing,
@@ -360,7 +349,6 @@ public class CSSLanguage extends TemplateLanguage {
             mediums,
             semicolonEOL);
 
-    // STATUS: PARSES
     // ENHANCEMENT: Use the family-names defined at http://www.iana.org/assignments/character-sets?
     Sequence charsetAtRule = new Sequence("CharSetAtRule(,,,charsetFamily,,)", OPTIONAL,
             at, new CaseInsensitiveSequence("charset"), spacing, cssString, spacing, semicolonEOL);
@@ -368,7 +356,6 @@ public class CSSLanguage extends TemplateLanguage {
     OrderedChoice styleStatements =
             new OrderedChoice("([],[],[],[])", OPTIONAL | REPEAT, ruleset, mediaAtRule, pageAtRule, fontFaceAtRule);
 
-    // STATUS: **TESTING**
     public Sequence cssStyleSheet = new Sequence ("CSSStyleSheet(, charsetRule, importAtRules, namespaceAtRules, styleStatements)",
             spacing,
             charsetAtRule,
