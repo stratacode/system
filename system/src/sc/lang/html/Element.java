@@ -148,9 +148,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Element[] invisTags = null;
 
-   // This property is set for the client version of the tag objects on tags whose content is defined on the server, not dynamically by running the Javascript code on the client.
+   // This property is set to true for the client version of the tag objects on tags whose content is defined on the server, not dynamically by running the Javascript code on the client.
    // This property is not the same as setting exec="server" which indicates that the tag object itself should not be included in the client version at all.
-   // It makes sense to set serverContent=true when you want that content to be included in the static HTML file for the client-only version.
+   // With serverContent=true, a stub tag object is included in the client (i.e. no children).  Instead, the client
+   // side serverContent=true tag knows to just grab the innerHTML of it's tag and re-insert it if the parent node
+   // is trying to refresh.
+   // You need to use serverContent=true when you want that content to be included in the static HTML file for the client-only version.
    // For example, you'd set serverContent on tags which generate the script tags to include javascript.
    public transient boolean serverContent = false;
 
@@ -2743,7 +2746,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
 
       if (extTypeDecl != null && !ModelUtil.isAssignableFrom(HTMLElement.class, extTypeDecl)) {
-         if (javaModel.getLayer().activated)
+         Layer l = javaModel.getLayer();
+         if (l != null && l.activated)
             displayTypeError("extends type for tag must extend HTMLElement or come from an schtml template: ");
       }
 

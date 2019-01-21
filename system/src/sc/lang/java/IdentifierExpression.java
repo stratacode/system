@@ -1147,7 +1147,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
 
             if (!(nextType instanceof TypeDeclaration)) {
-               if (!(sys = fromExpr.getLayeredSystem()).useRuntimeReflection) {
+               sys = fromExpr.getLayeredSystem();
+               if (sys != null && !sys.useRuntimeReflection) {
                   sys.buildInfo.addExternalDynProp(nextType, propertyName, fromExpr.getJavaModel(), referenceOnly);
                }
             }
@@ -5509,6 +5510,10 @@ public class IdentifierExpression extends ArgumentsExpression {
    public void setIdentifier(int ix, String identifier, IdentifierType idType, Object boundType) {
       List<IString> idents = getAllIdentifiers();
       idents.set(ix, new NonKeywordString(identifier));
+      if (idTypes == null) {
+         idTypes = new IdentifierType[idents.size()];
+         boundTypes = new Object[idents.size()];
+      }
       idTypes[ix] = idType;
       boundTypes[ix] = boundType;
    }

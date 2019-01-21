@@ -6952,14 +6952,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else {
                if (options.verbose)
-                  verbose("Not removing inactive model: " + model + " (accessed " + (model.getLastAccessTime() - cleanTime) + "millis ago)");
+                  verbose("Not removing inactive model: " + model + " (accessed " + (cleanTime - model.getLastAccessTime()) + "millis ago)");
             }
          }
          for (String toCull:toCullList) {
             ILanguageModel removed = inactiveModelIndex.remove(toCull);
             if (removed != null) {
                if (options.verbose)
-                  verbose("Removing inactive model: " + toCull + " (accessed " + (removed.getLastAccessTime() - cleanTime) + " millis ago)");
+                  verbose("Removing inactive model: " + toCull + " (accessed " + (cleanTime - removed.getLastAccessTime()) + " millis ago)");
                Layer layer = removed.getLayer();
                if (layer != null) {
                   layer.layerModels.remove(new IdentityWrapper(removed));
@@ -13435,8 +13435,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          Layer bl = activated ? findLayerByName(relPath, baseLayerName) : findInactiveLayerByName(relPath, baseLayerName.replace('/', '.'), openLayers);
          if (bl != null) {
             baseLayers.add(bl);
-            if (bl.layeredSystem != this)
-               System.out.println("*** find layer returned mismatching runtime");
          }
          else {
             if (options.sysDetails)

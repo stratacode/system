@@ -25,7 +25,21 @@ public class Pattern extends SemanticNode {
    private transient Language language = null;
 
    /**
-    * Initializes a pattern string written in the PatternLanguage.  Returns either a Pattern object or a ParseError if the pattern does not match.
+    * Initializes a pattern string written in the PatternLanguage.  Returns either a Pattern object or a ParseError if the pattern string is not valid
+    * This variant uses the URLPatternLanguage to provide a known set of data types.
+    */
+   public static Pattern initURLPattern(Object pageType, String pattern) {
+      Object res = initPattern(URLPatternLanguage.getURLPatternLanguage(), pageType, pattern);
+      if (res instanceof ParseError) {
+         throw new IllegalArgumentException("*** Failed to parse URL pattern: " + pattern + " in: " + pageType);
+      }
+      Pattern pat = (Pattern) res;
+      pat.init();
+      return pat;
+   }
+
+   /**
+    * Initializes a pattern string written in the PatternLanguage.  Returns either a Pattern object or a ParseError if the pattern string is not valid
     * The supplied pattern can use parselets from a second language to parse a chunk in the pattern (e.g. {integerLiteral}, or {identifier} if you supply the JavaLanguage)
     * or the pattern can be matched to properties of the pageType (e.g. {blogId=integerLiteral}).
     */

@@ -144,7 +144,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object modType = methodType.getDerivedTypeDeclaration();
       if (extendsType == null)
          extendsType = Object.class;
-      Object overridden = ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
+      Object overridden = name == null ? null : ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       superMethod = overridden;
 
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
@@ -180,7 +180,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             Object implMeth;
             LayeredSystem sys = getLayeredSystem();
             for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
+               implMeth = name == null ? null : ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
                if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
                   methodType.setNeedsDynamicStub(true);
                   overridesCompiled = true;
@@ -208,7 +208,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
       }
       // TODO: shouldn't this be moved to the start method?
-      if (modType != extendsType) {
+      if (modType != extendsType && name != null) {
          overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
          if (overridden instanceof MethodDefinition) {
             MethodDefinition overMeth = (MethodDefinition) overridden;

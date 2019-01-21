@@ -211,7 +211,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       isStarting = true;
 
       if (typeName == null)
-         System.out.println("***");
+         System.out.println("*** Error - null typeName for modify type");
 
       // Are we an "a.b" modify?
       compoundName = typeName != null && typeName.indexOf(".") != -1;

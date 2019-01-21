@@ -14,12 +14,14 @@ import java.net.URLConnection;
 import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Arrays;
+import java.util.List;
 
 public class URLUtil {
    public static Character[] URL_SPECIAL_CHARS = new Character[] {'$','-', '_', '.', '+', '!', '*', '\'', '(', ')', ',' };
+   public static List<Character> URL_SPECIAL_CHARS_LIST = Arrays.asList(URL_SPECIAL_CHARS);
 
    public static boolean isURLCharacter(char c) {
-      return Character.isAlphabetic(c) || Character.isDigit(c) || Arrays.asList(URL_SPECIAL_CHARS).contains(c);
+      return Character.isAlphabetic(c) || Character.isDigit(c) || URL_SPECIAL_CHARS_LIST.contains(c);
    }
 
    /** Given a/b/c.x returns a/b */

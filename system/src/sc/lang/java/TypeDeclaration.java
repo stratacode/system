@@ -344,6 +344,9 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (res != null)
          return res;
       if (typeParameters != null) {
+         for (Object p:typeParameters)
+            if (!(p instanceof TypeParameter))
+               System.err.println("*** Invalid typeParmeter in type!");
          for (TypeParameter param:typeParameters)
             if (name.equals(param.name))
                return param;
