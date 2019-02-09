@@ -58,7 +58,7 @@ public class Window {
    }
 
    // TODO: Just a placeholder for now.  Should populate the URL, determine the window size from the device meta-data, etc.
-   public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI, String pathInfo) {
+   public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI, String pathInfo, String queryStr) {
       Window win = new Window();
       win.location = new Location();
       Location loc = win.location;
@@ -71,8 +71,9 @@ public class Window {
          loc.port = String.valueOf(serverPort);
       }
       loc.hostname = serverName;
-      loc.href = requestURL;
-      loc.pathname = requestURI;
+      loc.setHref(requestURL);
+      loc.setPathname(requestURI);
+      loc.setSearch(queryStr);
       int hashIx = requestURL.lastIndexOf("#");
       if (hashIx != -1)
          loc.hash = requestURL.substring(hashIx+1);

@@ -4428,7 +4428,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Window window = Window.getWindow();
       if (window == null)
          return srcRelPath;
-      String curRelPath = window.location.pathname;
+      String curRelPath = window.location.getPathname();
       if (curRelPath != null) {
          // TODO: remove this bogus code - if we have /articles/ the relPath should be /articles
          //if (curRelPath.endsWith("/") && curRelPath.length() > 1)
@@ -4777,8 +4777,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (listeners != null) {
          stag = addServerTagProps(listeners, stag, HTMLElement.domAttributes);
          // TODO: Do we need to add these to indicate the need for immediate versus non-immediate?
+         // These properties are listened to on the client so no need to add them to the explicit
+         // server tag props.
          //stag = addServerTagProps(listeners, stag, getCustomServerTagProps());
-
       }
       if (stag != null) {
          serverTagInfo = stag;

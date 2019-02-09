@@ -6298,7 +6298,7 @@ public class ModelUtil {
             continue;
          if (byName) {
             String name = ModelUtil.getPropertyName(cprop);
-            if (name.equals(ModelUtil.getPropertyName(prop)))
+            if (StringUtil.equalStrings(name, ModelUtil.getPropertyName(prop)))
                return i;
          }
          else {
@@ -8508,7 +8508,7 @@ public class ModelUtil {
       if (type instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration td = ((BodyTypeDeclaration) type);
          JavaModel model = td.getJavaModel();
-         if (model.isStarted() && !td.isStarted()) {
+         if (!model.isStarted() && !td.isStarted()) {
             if (validate)
                ParseUtil.initAndStartComponent(model);
             else

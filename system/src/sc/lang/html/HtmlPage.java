@@ -54,7 +54,7 @@ public class HtmlPage extends Html {
       if (pageURL == null) {
          Window w = Window.getWindow();
          if (w != null)
-            pageURL = w.location.href;
+            pageURL = w.location.getHref();
       }
       return pageURL;
    }

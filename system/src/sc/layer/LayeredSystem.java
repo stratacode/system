@@ -12877,7 +12877,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public Object resolveRuntimeName(String name, boolean create, boolean returnTypes) {
-      if (systemCompiled) {
+      if (systemCompiled && returnTypes) {
          Object c = getClassWithPathName(name);
          if (c != null) {
             if (create && c instanceof Class) {

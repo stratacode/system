@@ -601,6 +601,7 @@ public class Sequence extends NestedParselet  {
                               pendingError = new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{childParselet}, errorStart, parser.currentIndex), errorRes.toString());
                               pendingErrorIx = resumeIx;
                               value.addForReparse(pendingError, parselets.get(resumeIx), -1, resumeIx, resumeIx, true, parser, errorChildParseNode, dctx, false, false);
+                              resumeIx++;
                            }
                            else {
                               if (resumeSlotVal instanceof PreErrorParseNode)
@@ -805,6 +806,9 @@ public class Sequence extends NestedParselet  {
                         pendingError.errorText += nestedValue.toString();
                   }
                }
+               else
+                  value.addForReparse(null, childParselet, -1, newChildCount, newChildCount, false, parser, oldChildParseNode, dctx, false, false);
+
                newChildCount++;
             }
             else
@@ -1181,6 +1185,7 @@ public class Sequence extends NestedParselet  {
                               pendingError = new ErrorParseNode(new ParseError(skipOnErrorParselet, "Expected {0}", new Object[]{this}, errorStart, parser.currentIndex), errorRes.toString());
                               pendingErrorIx = resumeIx;
                               value.addOrSet(pendingError, parselets.get(resumeIx), -1, resumeIx, true, parser);
+                              resumeIx++;
                            }
                            else {
                               if (resumeSlotVal instanceof PreErrorParseNode)
@@ -1334,6 +1339,8 @@ public class Sequence extends NestedParselet  {
                         pendingError.errorText += nestedValue.toString();
                   }
                }
+               else
+                  value.addOrSet(null, childParselet, -1, i, false, parser);
             }
             else
                value.add(nestedValue, childParselet, -1, i, false, parser);

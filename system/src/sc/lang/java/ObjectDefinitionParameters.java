@@ -45,6 +45,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public boolean typeIsComponentClass = false; // True if the type we are creating itself is a component class (call newX instead of new X)
    public boolean typeIsCompiledComponent = false; // True if the type we is a component class and not a dynamic one
    public boolean isAbstract = false;    // True if the class being generated is abstract
+   public boolean isAbstractElement = false;// True if this is a tag object with the abstract='true' attribute
    public String childTypeName;          // If known, specifies the type name of the objects in the childrenNames list
    public String rootName;               // Variable name that refers to the root object in the type tree
    public String parentName;             // Variable name that refers to the enclosing type's instance
@@ -83,6 +84,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
    public void init() {
       isAbstract = objType.hasModifier("abstract");
+      isAbstractElement = objType.element != null && objType.element.isAbstract();
       fieldModifiers = TransformUtil.removeClassOnlyModifiers(constrModifiers);
       getModifiers = TransformUtil.removeModifiers(fieldModifiers, TransformUtil.fieldOnlyModifiers);
       typeBaseName = CTypeUtil.getClassName(typeName);

@@ -258,18 +258,18 @@ public class Pattern extends SemanticNode {
       return false;
    }
 
-   public boolean isPatternValidWithInst(Object inst, Map<String,Object> otherProps) {
-      return evalPatternWithInst(inst, otherProps) != null;
+   public boolean isPatternValidWithInst(Map<String,Object> otherProps, Object inst) {
+      return evalPatternWithInst(otherProps, inst) != null;
    }
 
-   public String evalPatternWithInst(Object inst, Map<String,Object> otherProps) {
+   public String evalPatternWithInst(Map<String,Object> otherProps, Object inst) {
       StringBuilder sb = new StringBuilder();
       for (Object elem:elements) {
-         if (elem instanceof String)
-            sb.append((String) elem);
+         if (PString.isString(elem))
+            sb.append(elem);
          else if (elem instanceof OptionalPattern) {
             OptionalPattern pat = (OptionalPattern) elem;
-            String optStr = pat.evalPatternWithInst(inst, otherProps);
+            String optStr = pat.evalPatternWithInst(otherProps, inst);
             if (optStr != null)
                sb.append(optStr);
          }
@@ -277,12 +277,14 @@ public class Pattern extends SemanticNode {
             PatternVariable patVar = (PatternVariable) elem;
             String propName = patVar.propertyName;
             try {
-               // The pattern is not defined because some property is not defined
+               // The pattern is not defined because some property is not defined or we do not have an instance
                Object propVal = otherProps == null ? null : otherProps.get(propName);
-               propVal = propVal == null ? DynUtil.getProperty(inst, propName) : propVal;
+               propVal = propVal == null && inst != null ? DynUtil.getProperty(inst, propName) : propVal;
                if (propVal == null)
                   return null;
                // TODO: are there any cases where we need to do something other than toString here?
+               sb.append(propName);
+               sb.append('=');
                sb.append(propVal.toString());
             }
             catch (IllegalArgumentException exc) {
