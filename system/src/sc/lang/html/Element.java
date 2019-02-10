@@ -4367,34 +4367,36 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                }
                return res;
             }
-            return null;
          }
-
       }
-      else {
-         if (serverTag) {
-            Object type = getTagType();
-            if (type != null) {
-               String jsFiles = (String) DynUtil.getInheritedAnnotationValue(type, "sc.obj.ServerTagSettings", "jsFiles");
-               if (jsFiles == null)
-                  return null;
-               String[] jsFilesArr = jsFiles.split(",");
-               ArrayList<String> res = new ArrayList<String>(jsFilesArr.length);
-               for (int i = 0; i < jsFilesArr.length; i++) {
-                  String jsFilePath = jsFilesArr[i];
-                  // TODO: code copied from above - move to a separate method
-                  if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
-                     if (!sys.postBuildProcessing)
-                        jsFilePath = "/" + jsFilePath;
-                     else {
-                        jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
-                     }
-                  }
-                  res.add(jsFilePath);
+      if (serverTag) {
+         return getServerTagJSFiles();
+      }
+      return null;
+   }
+
+   private List<String> getServerTagJSFiles() {
+      LayeredSystem sys = getLayeredSystem();
+      Object type = getTagType();
+      if (type != null) {
+         String jsFiles = (String) DynUtil.getInheritedAnnotationValue(type, "sc.obj.ServerTagSettings", "jsFiles");
+         if (jsFiles == null)
+            return null;
+         String[] jsFilesArr = jsFiles.split(",");
+         ArrayList<String> res = new ArrayList<String>(jsFilesArr.length);
+         for (int i = 0; i < jsFilesArr.length; i++) {
+            String jsFilePath = jsFilesArr[i];
+            // TODO: code copied from above - move to a separate method
+            if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
+               if (!sys.postBuildProcessing)
+                  jsFilePath = "/" + jsFilePath;
+               else {
+                  jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
                }
-               return res;
             }
+            res.add(jsFilePath);
          }
+         return res;
       }
       return null;
    }

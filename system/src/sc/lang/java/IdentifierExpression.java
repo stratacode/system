@@ -4735,7 +4735,10 @@ public class IdentifierExpression extends ArgumentsExpression {
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
 
-      styleExpression((ParentParseNode) parseNode, adapter);
+      if (parseNode instanceof ParentParseNode)
+         styleExpression((ParentParseNode) parseNode, adapter);
+      else
+         System.err.println("*** Identifier expression has wrong type of parse node");
    }
 
    private void styleExpression(ParentParseNode parseNode, IStyleAdapter adapter) {

@@ -283,8 +283,8 @@ public class Pattern extends SemanticNode {
                if (propVal == null)
                   return null;
                // TODO: are there any cases where we need to do something other than toString here?
-               sb.append(propName);
-               sb.append('=');
+               //sb.append(propName);
+               //sb.append('=');
                sb.append(propVal.toString());
             }
             catch (IllegalArgumentException exc) {
