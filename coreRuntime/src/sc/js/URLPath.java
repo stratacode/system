@@ -18,10 +18,13 @@ public class URLPath implements Comparable {
    public String name;
    @Constant
    public String keyName;
+   @Constant
+   public Object pageType;
 
-   public URLPath(String templatePathName) {
+   public URLPath(String templatePathName, Object pageType) {
       keyName = templatePathName;
       name = templatePathName;
+      this.pageType = pageType;
 
       // Turn /path/foo.html into path/foo as a display name
       if (name.startsWith("/"))

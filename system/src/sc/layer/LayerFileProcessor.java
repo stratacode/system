@@ -36,9 +36,6 @@ public class LayerFileProcessor extends LayerFileComponent {
    /** If true extended layers see this processor.  If false, only files in this layer will use it */
    public boolean exportProcessing = true;
 
-   /** If true, this processor disables processing of this file type (i.e. if this type has conflicts with a higher up layer) */
-   public boolean disableProcessing = false;
-
    public boolean compiledLayersOnly = false;
 
    private boolean producesTypes = false;
@@ -142,6 +139,9 @@ public class LayerFileProcessor extends LayerFileComponent {
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
+      FileEnabledState superState = super.enabledForPath(pathName, fileLayer, abs, generatedFile);
+      if (superState != null && superState == FileEnabledState.Disabled)
+         return superState;
       // Currently we have one data structure to store all file processors - both activated and inactivated.  We filter them out here.
       // This is not accurate if we do not have a layer but almost all cases now do supply a layer so we should be fine.
       if (definedInLayer != null && fileLayer != null && definedInLayer.activated != fileLayer.activated)

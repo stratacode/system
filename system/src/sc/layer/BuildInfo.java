@@ -690,7 +690,7 @@ public class BuildInfo {
                // Skip mainInit types which also have URL since we'll process them below
                if (memb.hasAnnotation("sc.html.URL"))
                   continue;
-               URLPath path = new URLPath(memb.templatePathName);
+               URLPath path = new URLPath(memb.templatePathName, memb.getType());
                if (!system.serverEnabled) {
                   path.convertToRelativePath();
                }
@@ -711,7 +711,7 @@ public class BuildInfo {
                // Skip types which may not be loaded yet
                if (memb.getType() == null)
                   continue;
-               URLPath path = new URLPath(memb.templatePathName);
+               URLPath path = new URLPath(memb.templatePathName, memb.getType());
                // TODO: when the pattern is in the pattern language, we can init the pattern, find the variables and build
                // a form for testing the URL?
                String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");

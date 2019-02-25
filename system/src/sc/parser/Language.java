@@ -81,7 +81,6 @@ public abstract class Language extends LayerFileComponent {
     */
    public String[] srcPathTypes;
 
-   public boolean disableProcessing = false;
    public boolean exportProcessing = true;  // You can add a language private to a specific layer by setting this to false
 
    public BuildPhase buildPhase = BuildPhase.Process;
@@ -795,6 +794,9 @@ public abstract class Language extends LayerFileComponent {
    }
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
+      FileEnabledState superState = super.enabledForPath(pathName, fileLayer, abs, generatedFile);
+      if (superState != null && superState == FileEnabledState.Disabled)
+         return superState;
       // for generatedFile we just ignore the src path type since that applies to files in the src dir and this
       // with generatedFile=true, the files are in the destination with a different path structure
       if (generatedFile)

@@ -1694,7 +1694,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             continue;
          String ext = FileUtil.getExtension(fn);
          String srcPath = FileUtil.concat(prefix, fn);
-         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, f.getPath(), true, this, null, false);
+         IFileProcessor proc = ext == null ? null : layeredSystem.getFileProcessorForExtension(ext, f.getPath(), true, this, null, false, false);
 
          // This isParsed test is also used for properly setting langExtensions for the type index
          if (proc != null && proc.isParsed()) {

@@ -3,6 +3,7 @@ package sc.layer;
 import sc.util.FileUtil;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,9 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
    /** Should the resulting file be executable - TODO: this is supported for layer files only right now but could also be supported for processed languages if needed */
    public boolean makeExecutable = false;
 
+   /** If true, this processor disables processing of this file type (i.e. if this type has conflicts with a higher up layer) */
+   public boolean disableProcessing = false;
+
    /**
     * Set this to true so that result files are copied to the build dir for for all build layers (e.g. web files).  Other assets like resources only need to be built in the first
     * build layer where they are included because they are picked up in the classpath.
@@ -41,6 +45,8 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
    /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
    public boolean inheritFiles = false;
 
+   public List<String> excludeRuntimes = null;
+   public List<String> includeRuntimes = null;
 
    // Stores a mapping from file path to the most specific result file - used by LayerFileProcessor and the test script language to determine
    // which file is the most specific.  Since it's not used by languages which are processed, it's initialized only when it's needed by a subclass.
@@ -140,4 +146,30 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
       return inheritFiles;
    }
 
+   public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
+      if (disableProcessing)
+         return FileEnabledState.Disabled;
+      if (definedInLayer != null) {
+         String runtimeName = definedInLayer.layeredSystem.getRuntimeName();
+         if (includeRuntimes != null) {
+            if (includeRuntimes.contains(runtimeName))
+               return FileEnabledState.Enabled;
+            else
+               return FileEnabledState.Disabled;
+         }
+         if (excludeRuntimes != null) {
+            if (excludeRuntimes.contains(runtimeName))
+               return FileEnabledState.Disabled;
+            else
+               return FileEnabledState.Enabled;
+         }
+      }
+      return null;
+   }
+
+   public void excludeRuntime(String rtName) {
+      if (excludeRuntimes == null)
+         excludeRuntimes = new ArrayList<String>();
+      excludeRuntimes.add(rtName);
+   }
 }

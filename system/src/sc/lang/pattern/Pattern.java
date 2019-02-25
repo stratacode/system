@@ -262,6 +262,15 @@ public class Pattern extends SemanticNode {
       return evalPatternWithInst(otherProps, inst) != null;
    }
 
+   /**
+    * Returns a string for this pattern.  If inst is not null, it's used as a source for
+    * any PatternVariables which map onto properties of the instance. If otherProps is not
+    * null, that map is consulted before the instance is checked (so you can create a new URL
+    * from the existing instance but replace one or more properties in the new URL)
+    *
+    * If a required PatternVariable does not have a value, null is returned - which means
+    * this URL is not valid in this context.
+    */
    public String evalPatternWithInst(Map<String,Object> otherProps, Object inst) {
       StringBuilder sb = new StringBuilder();
       for (Object elem:elements) {

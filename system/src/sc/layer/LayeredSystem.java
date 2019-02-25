@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
+import sc.js.URLPath;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.SCModel;
@@ -38,9 +39,9 @@ import java.net.URL;
 import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import java.util.regex.Pattern;
 
 import static sc.type.RTypeUtil.systemClasses;
 
@@ -2184,20 +2185,34 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return main.getServerURL();
    }
 
-   public String getURLForPath(String path) {
+   public String getURLForPath(URLPath urlPath) {
+      sc.lang.pattern.Pattern pattern = sc.lang.pattern.Pattern.initURLPattern(urlPath.pageType, urlPath.url);
+      String url = pattern.evalPatternWithInst(null, null);
+      if (url == null)
+         return null;
+
+      String res = url;
+      if (res.equals("") && serverEnabled)
+         res = "index.html";
+      if (res.startsWith("/"))
+         res = res.substring(1);
       if (serverEnabled)
-         return FileUtil.concatNormalized(getServerURL(), path);
+         return FileUtil.concatNormalized(getServerURL(), res);
       else {
          for (int lix = layers.size() - 1; lix >= 0; lix--) {
             Layer curLayer = layers.get(lix);
             if (curLayer.isBuildLayer() && curLayer.buildDir != null) {
-               String filePath = FileUtil.concatNormalized(curLayer.buildDir, "web", path);
+               String filePath = FileUtil.concatNormalized(curLayer.buildDir, "web", res);
                if (new File(filePath).canRead()) {
                   return "file://" + filePath;
                }
             }
          }
-         System.err.println("*** Unable to find URL for path: " + path + " in web directory of the buildDirs");
+         // The file might be in the "modelsToPostBuild" which has not yet been built.
+         // TODO: is there logic we could add to make sure the file will be built here?
+         if (buildLayer != null)
+            return "file://" + FileUtil.concatNormalized(buildLayer.buildDir, "web", res);
+         System.err.println("*** Unable to find URL for path: " + res + " in web directory of the buildDirs");
          return null;
       }
    }
@@ -8617,11 +8632,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // extendsLayer here for all except the final build layer?
             if (!dep.processForBuildLayer(genLayer))
                continue;
-            IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, genLayer, null);
+            IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, null, genLayer, null, false, true);
             if (depProc == null) {
                System.err.println("*** No file processor registered for type group dependency: " + dep.relFileName + " for group: " + dep.typeGroupName);
             }
-            else {
+            else if (depProc.enabledForPath(dep.relFileName, genLayer, false, false) != IFileProcessor.FileEnabledState.Disabled) {
                SrcEntry depFile = getSrcFileFromTypeName(dep.typeName, true, genLayer.getNextLayer(), depProc.getPrependLayerPackage(), null);
                if (depFile == null)
                   System.err.println("Warning: file: " + dep.relFileName + " not found in layer path but referenced via a typeGroup dependency on group: " + dep.typeGroupName);
@@ -8853,11 +8868,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             for (TypeGroupDep dep:typeGroupDeps) {
                if (!dep.processForBuildLayer(genLayer))
                   continue;
-               IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, genLayer, null);
+               IFileProcessor depProc = getFileProcessorForFileName(dep.relFileName, null, genLayer, null, false, true);
                if (depProc == null) {
                   System.err.println("*** No file processor registered for type group dependency: " + dep.relFileName + " for group: " + dep.typeGroupName);
                }
-               else {
+               else if (depProc.enabledForPath(dep.relFileName, genLayer, false, false) != IFileProcessor.FileEnabledState.Disabled) {
                   SrcEntry depFile = getSrcFileFromTypeName(dep.typeName, true, genLayer.getNextLayer(), depProc.getPrependLayerPackage(), null);
                   if (depFile == null)
                       System.err.println("Warning: file: " + dep.relFileName + " not found in layer path but referenced via a typeGroup dependency on group: " + dep.typeGroupName);
@@ -9609,7 +9624,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String fileName = fileNames[f];
          if (layer.excludedFile(fileName, srcPath))
             continue;
-         IFileProcessor proc = getFileProcessorForFileName(FileUtil.concat(srcPath, fileName), FileUtil.concat(srcDirName, fileName), layer, phase, false);
+         IFileProcessor proc = getFileProcessorForFileName(FileUtil.concat(srcPath, fileName), FileUtil.concat(srcDirName, fileName), layer, phase, false, false);
          if (proc != null && !fileName.equals(layer.layerBaseName)) {
             SrcEntry prevEnt;
             SrcEntry newSrcEnt = new SrcEntry(layer, srcDirName, srcPath,  fileName, proc.getPrependLayerPackage());
@@ -9739,15 +9754,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public IFileProcessor getFileProcessorForExtension(String ext) {
-      return getFileProcessorForExtension(ext, null, false, null, null, false);
+      return getFileProcessorForExtension(ext, null, false, null, null, false, false);
    }
 
-   public IFileProcessor getFileProcessorForExtension(String ext, String fileName, boolean abs, Layer srcLayer, BuildPhase phase, boolean generatedFile) {
+   public IFileProcessor getFileProcessorForExtension(String ext, String fileName, boolean abs, Layer srcLayer, BuildPhase phase, boolean generatedFile, boolean includeDisabled) {
       IFileProcessor[] procs = fileProcessors.get(ext);
       if (procs != null) {
          for (IFileProcessor proc:procs) {
             if (phase == null || phase == proc.getBuildPhase()) {
                if (fileName != null) {
+                  if (includeDisabled)
+                     return proc;
                   switch (proc.enabledForPath(fileName, srcLayer, abs, generatedFile)) {
                      case Enabled:
                         return proc;
@@ -9757,6 +9774,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         continue;
                   }
                }
+               if (includeDisabled)
+                  return proc;
                switch (proc.enabledFor(srcLayer)) {
                   case Enabled:
                      return proc;
@@ -9769,20 +9788,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       // The standard languages are processed during the process phase by default
-      if (phase == null || phase == BuildPhase.Process)
-         return Language.getLanguageByExtension(ext);
+      if (phase == null || phase == BuildPhase.Process) {
+         IFileProcessor proc = Language.getLanguageByExtension(ext);
+         if (proc == null || (!includeDisabled && proc.enabledForPath(fileName, srcLayer, abs, generatedFile) == IFileProcessor.FileEnabledState.Disabled))
+            return null;
+         return proc;
+      }
       return null;
    }
 
    public IFileProcessor getFileProcessorForSrcEnt(SrcEntry srcEnt, BuildPhase phase, boolean generatedFile) {
-      return getFileProcessorForFileName(srcEnt.relFileName, srcEnt.absFileName, srcEnt.layer, phase, generatedFile);
+      return getFileProcessorForFileName(srcEnt.relFileName, srcEnt.absFileName, srcEnt.layer, phase, generatedFile, false);
    }
 
    public IFileProcessor getFileProcessorForFileName(String fileName, Layer fromLayer, BuildPhase phase) {
-      return getFileProcessorForFileName(fileName, null, fromLayer, phase, false);
+      return getFileProcessorForFileName(fileName, null, fromLayer, phase, false, false);
    }
 
-   public IFileProcessor getFileProcessorForFileName(String fileName, String absFileName, Layer fromLayer, BuildPhase phase, boolean generatedFile) {
+   public IFileProcessor getFileProcessorForFileName(String fileName, String absFileName, Layer fromLayer, BuildPhase phase, boolean generatedFile, boolean includeDisabled) {
       IFileProcessor res;
       if (filePatterns.size() > 0) {
          for (Map.Entry<Pattern,IFileProcessor> ent:filePatterns.entrySet()) {
@@ -9797,9 +9820,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       String ext = FileUtil.getExtension(fileName);
       if (absFileName != null)
-         return getFileProcessorForExtension(ext, absFileName, true, fromLayer, phase, generatedFile);
+         return getFileProcessorForExtension(ext, absFileName, true, fromLayer, phase, generatedFile, includeDisabled);
       else
-         return getFileProcessorForExtension(ext, fileName, false, fromLayer, phase, generatedFile);
+         return getFileProcessorForExtension(ext, fileName, false, fromLayer, phase, generatedFile, includeDisabled);
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean reportErrors) {
