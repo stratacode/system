@@ -142,6 +142,12 @@ public class ClassType extends JavaType {
       errorArgs = null;
    }
 
+   public void clearStarted() {
+      super.clearStarted();
+      type = null;
+      errorArgs = null;
+   }
+
    /** Returns the complete type name including the import */
    public String getFullBaseTypeName() {
       if (chainedTypes == null)

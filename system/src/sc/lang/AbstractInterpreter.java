@@ -1871,18 +1871,29 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void execLaterJobs() {
+      execLaterJobs(IScheduler.NO_MIN, IScheduler.NO_MAX);
+   }
+
+   public void execLaterJobs(int minPriority, int maxPriority) {
       boolean pushed = false;
       if (CurrentScopeContext.getThreadScopeContext() == null)
          pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
       try {
          int runCt = 0;
+         ArrayList<ScheduledJob> toRestore = null;
          do {
             runCt++;
             ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
             toRunLater.clear();
             for (int i = 0; i < toRunNow.size(); i++) {
                ScheduledJob toRun = toRunNow.get(i);
-               toRun.run();
+               if (toRun.priority >= minPriority && toRun.priority < maxPriority)
+                  toRun.run();
+               else {
+                  if (toRestore == null)
+                     toRestore = new ArrayList<ScheduledJob>();
+                  toRestore.add(toRun);
+               }
             }
             if (runCt > 16) {
                System.err.println("*** execLaterJobs - exceeded indirection count!");
@@ -1890,6 +1901,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             }
          }
          while (toRunLater.size() > 0); // Make sure we run any jobs found when running these jobs
+
+         if (toRestore != null)
+            toRunLater.addAll(toRestore);
       }
       finally {
          if (pushed)

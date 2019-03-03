@@ -3645,6 +3645,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
+   public void clearStarted() {
+      super.clearStarted();
+      boundTypes = null;
+      idTypes = null;
+   }
+
    public void setBindingInfo(BindingDirection dir, Statement dest, boolean nested) {
       super.setBindingInfo(dir, dest, nested);
       if (arguments != null) {

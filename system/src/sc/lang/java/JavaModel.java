@@ -126,6 +126,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** Set to true during the build process if this model needs to stopped when it's reinitialized */
    public transient boolean needsRestart = false;
 
+   /** Set to true if we fail to edit this model at some point - used by the IDE to mark models which failed to reparse properly */
+   public transient boolean needsReparse = false;
+
    public transient JavaModel modifiedModel = null;
 
    /** If you want to parse and start a model but insert your own name resolver which runs before the normal system's type look, set this property. */

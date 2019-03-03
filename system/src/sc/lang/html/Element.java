@@ -10,6 +10,7 @@ import sc.bind.BindingListener;
 import sc.bind.IListener;
 import sc.dyn.DynUtil;
 import sc.dyn.IObjChildren;
+import sc.dyn.IScheduler;
 import sc.js.ServerTag;
 import sc.js.URLPath;
 import sc.lang.*;
@@ -3782,7 +3783,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
 
       // Even events which fired during the tag initialization or since we last were rendered must be flushed so our content is accurate.
-      DynUtil.execLaterJobs();
+      // Do not run any 'refreshTag' jobs we might have queued here.
+      DynUtil.execLaterJobs(REFRESH_TAG_PRIORITY + 1, IScheduler.NO_MAX);
 
       Object repeatVal = getCurrentRepeatVal();
       boolean isRepeatTag = isRepeatTag();
@@ -4925,6 +4927,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
    */
 
+   // Run this after default (priority 0) 'doLater' operations.
+   public final static int REFRESH_TAG_PRIORITY = -5;
+
    public void scheduleRefreshTags() {
       if (refreshTagsScheduled)
          return;
@@ -4934,7 +4939,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             refreshTagsScheduled = false;
             refreshTags(false);
          }
-      }, 5);
+      }, REFRESH_TAG_PRIORITY);
    }
 
    public void refreshTags(boolean parentBodyChanged) {

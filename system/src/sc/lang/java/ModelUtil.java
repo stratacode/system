@@ -6880,7 +6880,7 @@ public class ModelUtil {
                for (int i = 0; i < meths.length; i++) {
                   Object meth = meths[i];
                   String mname = ModelUtil.getMethodName(meth);
-                  if (mname.startsWith(prefix)) {
+                  if (mname != null && mname.startsWith(prefix)) {
                      if (!addCompletionCandidate(candidates, mname + ModelUtil.getParameterString(meth), max))
                         return false;
                   }

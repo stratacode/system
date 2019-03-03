@@ -1410,6 +1410,10 @@ public class DynUtil {
       threadScheduler.set(sched);
    }
 
+   /**
+    * Runs at the next opportunity as determined by the ThreadScheduler or the framework scheduler.
+    * Higher priority jobs run before lower priority ones
+    */
    public static void invokeLater(Runnable r, int priority) {
       IScheduler sched = threadScheduler.get();
       if (sched != null) {
@@ -1422,14 +1426,18 @@ public class DynUtil {
    }
 
    public static void execLaterJobs() {
+      execLaterJobs(IScheduler.NO_MIN, IScheduler.NO_MAX);
+   }
+
+   public static void execLaterJobs(int minPriority, int maxPriority) {
       IScheduler sched = threadScheduler.get();
       if (sched != null) {
-         sched.execLaterJobs();
+         sched.execLaterJobs(minPriority, maxPriority);
          return;
       }
       if (frameworkScheduler == null)
          return;
-      frameworkScheduler.execLaterJobs();
+      frameworkScheduler.execLaterJobs(minPriority, maxPriority);
    }
 
    public static boolean hasPendingJobs() {

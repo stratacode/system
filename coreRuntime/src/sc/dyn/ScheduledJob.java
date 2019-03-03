@@ -7,6 +7,7 @@ import java.util.List;
 
 public class ScheduledJob {
    public Runnable toInvoke;
+   /** higher priority jobs run first */
    public int priority;
    public CurrentScopeContext curScopeCtx;
 

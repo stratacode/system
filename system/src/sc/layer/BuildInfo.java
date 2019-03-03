@@ -727,6 +727,19 @@ public class BuildInfo {
                }
                if (!res.contains(path))
                   res.add(path);
+               String[] testURLs = (String[]) memb.getAnnotationValue("sc.html.URL", "testURLs");
+               // TODO: also need a hook so we can serve up the test URLs which match against a pattern
+               if (testURLs != null && system.serverEnabled && annotURL != null) {
+                  int testIx = 0;
+                  for (String testURL:testURLs) {
+                     URLPath testURLPath = new URLPath(memb.templatePathName + "/test" + testIx,
+                                                        memb.getType());
+                     testURLPath.url = testURL;
+                     if (!res.contains(testURLPath))
+                        res.add(testURLPath);
+                     testIx++;
+                  }
+               }
             }
          }
       }

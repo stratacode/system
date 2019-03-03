@@ -156,7 +156,7 @@ public class VariableSelector extends Selector {
       SelectorExpression selEx = getSelectorExpression();
       int ix = getSelectorIndex();
       boolean handled = false;
-      if (selEx != null && ix != -1 && selEx.idTypes != null && ix < selEx.idTypes.length) {
+      if (selEx != null && ix != -1 && selEx.idTypes != null && ix < selEx.idTypes.length && selEx.idTypes[ix] != null) {
          Object boundType = selEx.boundTypes == null ? null : selEx.boundTypes[ix];
          switch (selEx.idTypes[ix]) {
             case SetVariable:
