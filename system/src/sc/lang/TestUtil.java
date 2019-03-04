@@ -292,6 +292,11 @@ public class TestUtil {
                      }
                   }
                   break;
+               case 't':
+                  if (opt.equals("tv")) {
+                     opts.testVerifyMode = true;
+                     break;
+                  }
                default:
                   System.err.println("*** Unrecognized option: " + opt);
                   usage(args);
@@ -414,6 +419,7 @@ public class TestUtil {
 
       String testBaseName;
       String testArgsId = "";
+      boolean testVerifyMode = false;
 
       public String toString() {
          StringBuilder sb = new StringBuilder();
@@ -564,7 +570,7 @@ public class TestUtil {
 
          long parseResultTime = System.currentTimeMillis();
 
-         out("Parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startTime, parseResultTime) + (parseErrors ? " - with parse error: " + result.toString() : ""));
+         out("Parsed: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + (opts.testVerifyMode ? "" : " in: " + rangeToSecs(startTime, parseResultTime)) + (parseErrors ? " - with parse error: " + result.toString() : ""));
 
          if (opts.reparseIndexes != null) {
             opts.reparseFiles = new String[opts.reparseIndexes.size()];
@@ -793,7 +799,7 @@ public class TestUtil {
                      ISemanticNode deserModel = ParseUtil.deserializeModel(serFileName, lang);
                      long endDeserTime = System.currentTimeMillis();
 
-                     out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + " in: " + rangeToSecs(startDeserTime, endDeserTime));
+                     out("Deserialized: " + fileName + " " + opts.repeatCount + (opts.repeatCount == 1 ? " time" : " times") + (opts.testVerifyMode ? "" : " in: " + rangeToSecs(startDeserTime, endDeserTime)));
 
                      ISemanticNode cloneModel = deserModel.deepCopy(ISemanticNode.CopyParseNode, null);
                      if (!cloneModel.equals(deserModel))
@@ -811,7 +817,7 @@ public class TestUtil {
                      ParseInStream pIn = rc % 2 == 0 ? ParseUtil.openParseNodeStream(parseFileName, lang) : null;
                      Object restored = lang.restore(fileName, deserModel,  pIn, false);
                      long endRestoreTime = System.currentTimeMillis();
-                     out("Restored " + (pIn == null ? "with no parse stream" : "with parse stream") + ": " + fileName +  " in: " + rangeToSecs(startRestoreTime, endRestoreTime));
+                     out("Restored " + (pIn == null ? "with no parse stream" : "with parse stream") + ": " + fileName +  (opts.testVerifyMode ? "" : " in: " + rangeToSecs(startRestoreTime, endRestoreTime)));
 
                      if (modelsMatched && !deserModel.equals(modelObj))
                         error("*** Error - Deserialize - results do not match after restore!");
@@ -904,7 +910,7 @@ public class TestUtil {
                   FileUtil.saveStringAsFile(genFileName, sb.toString(), true);
 
                   out("*** processed: " + fileName + " bytes: " + sb.length() +
-                          " generate: " + rangeToSecs(generateStartTime, generateResultTime));
+                          (opts.testVerifyMode ? "" : " generate: " + rangeToSecs(generateStartTime, generateResultTime)));
 
                   Object reparsedResult = lang.parse(new StringReader(genResult));
                   if (reparsedResult instanceof ParseError)

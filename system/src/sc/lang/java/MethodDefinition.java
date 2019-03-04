@@ -29,7 +29,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
   
    public transient String propertyName = null;
    public transient PropertyMethodType propertyMethodType;
-   public transient Object superMethod; // A reference to the method we override if any
+   public transient Object superMethod; // A reference to the method we override if any from the extends class of this method's type
+   public transient Object ifaceMethod; // A reference to the method we override from any interface implemented by this type
    public transient boolean isMain;
    public transient boolean dynamicType;
    public transient boolean overridesCompiled;
@@ -147,11 +148,14 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       Object overridden = name == null ? null : ModelUtil.definesMethod(extendsType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
       superMethod = overridden;
 
+      boolean inDynamicType = false;
+
       /* Dynamic methods need to find any overridden method and make sure calls to that one are also made dynamic.
        * This is here in the validate because the isDynamic method on our parents is not valid until we've propagated
-       * the dyanmicType flag through the type hierarchy.
+       * the dynamicType flag through the type hierarchy.
        */
       if (isDynamicType()) {
+         inDynamicType = true;
          if (overridden != null) {
             if (ModelUtil.isCompiledMethod(overridden)) {
                // If we inherit this method through a dynamic stub, that type will have already made a stub for this method.
@@ -173,21 +177,6 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                }
             }
          }
-
-         // We can't modify an interface method but if we override a method in a compile interface we
-         // need that interface in the dynamic stub of the enclosing type.
-         if (overridden == null && methodType.implementsBoundTypes != null) {
-            Object implMeth;
-            LayeredSystem sys = getLayeredSystem();
-            for (Object impl:methodType.implementsBoundTypes) {
-               implMeth = name == null ? null : ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
-               if (implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
-                  methodType.setNeedsDynamicStub(true);
-                  overridesCompiled = true;
-               }
-            }
-         }
-
       }
       else {
          boolean makeBindable = false;
@@ -207,6 +196,22 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                enclType.addPropertyToMakeBindable(propertyName, this, null, false, this);
          }
       }
+
+      // We can't modify an interface method but if we override a method in a compile interface we
+      // need that interface in the dynamic stub of the enclosing type.
+      if (methodType.implementsBoundTypes != null) {
+         Object implMeth;
+         LayeredSystem sys = getLayeredSystem();
+         for (Object impl:methodType.implementsBoundTypes) {
+            implMeth = name == null ? null : ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
+            ifaceMethod = implMeth;
+            if (inDynamicType && overridden == null && implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
+               methodType.setNeedsDynamicStub(true);
+               overridesCompiled = true;
+            }
+         }
+      }
+
       // TODO: shouldn't this be moved to the start method?
       if (modType != extendsType && name != null) {
          overridden = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());

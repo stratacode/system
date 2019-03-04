@@ -200,6 +200,7 @@ public class CurrentScopeContext {
       }
       long now = System.currentTimeMillis();
       long startTime = now;
+      boolean waited = false;
       do {
          synchronized (scopeContextNamesLock) {
             CurrentScopeContext ctx = scopeContextNames.get(scopeContextName);
@@ -208,18 +209,25 @@ public class CurrentScopeContext {
                   break;
                }
                try {
+                  if (ScopeDefinition.verbose || PTypeUtil.testMode)
+                     System.out.println("--- Waiting for client: " + scopeContextName);
+
+                  waited = true;
                   scopeContextNamesLock.wait(timeout);
                }
                catch (InterruptedException exc) {}
             }
-            else
+            else {
+               if (waited && (ScopeDefinition.verbose || PTypeUtil.testMode))
+                  System.out.println("- Client connected: " + scopeContextName + (PTypeUtil.testVerifyMode ? "" : " in: " + (now - startTime) + " millis"));
                return ctx;
+            }
          }
          now = System.currentTimeMillis();
       } while (true);
 
-      if (ScopeDefinition.verbose)
-         System.out.println("waitForCreate(" + scopeContextName + ", " + timeout + ") - timed out in " + (now - startTime) + " millis");
+      if (ScopeDefinition.verbose || PTypeUtil.testMode)
+         System.out.println("* Wait for client: " + scopeContextName + " timed out in: " + (now - startTime) + " millis");
       return null;
    }
 

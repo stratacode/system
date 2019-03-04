@@ -746,6 +746,8 @@ public class Options {
          if (!headlessSet)
             headless = true;
       }
+      if (testVerifyMode)
+         PTypeUtil.testVerifyMode = true;
       if (verbose)
          PTypeUtil.verbose = true;
 
