@@ -168,7 +168,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
             if (defaultMethod == null) {
                superMethod = type.declaresConstructor(null, null);
             }
-            else if (!defaultMethod.callsSuper()) {
+            else if (!defaultMethod.callsSuper(true)) {
                superMethod = ModelUtil.getSuperMethod(defaultMethod);
             }
 
@@ -214,7 +214,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
          LayeredSystem sys = type.getLayeredSystem();
          if (constructor) {
             String defaultSuper = getDefaultSuperConstr();
-            if (((defaultSuper == null && defaultMethod == null) || methods == null || (methods.length == 1 && !methods[0].callsSuper()) && !methods[0].callsThis())) {
+            if (((defaultSuper == null && defaultMethod == null) || methods == null || (methods.length == 1 && !methods[0].callsSuper(true)) && !methods[0].callsThis())) {
                // Even if there's no constructor, we still need to insert a call to the base class to run any initializers
                Object extType = type.getDerivedTypeDeclaration();
                if (extType != null) {
@@ -250,7 +250,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
                   superAppended = true;
                }
             }
-            else if (methods != null && methods.length == 1 && (methods[0].callsSuper() || methods[0].callsThis()))
+            else if (methods != null && methods.length == 1 && (methods[0].callsSuper(true) || methods[0].callsThis()))
                superCalled = true;
             if (defaultSuper != null && !superCalled) {
                sb.append(replaceIndent(indent, defaultSuper));
@@ -359,7 +359,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
                }
                */
                sb.append(nextStatement);
-               if (constructorInit != null && st.callsSuper()) {
+               if (constructorInit != null && st.callsSuper(true)) {
                   sb.append(constructorInit);
                   constructorInit = null;
                }

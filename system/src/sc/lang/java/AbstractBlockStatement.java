@@ -223,12 +223,12 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return statements == null ? 0 : statements.size();
    }
 
-   public boolean callsSuper() {
+   public boolean callsSuper(boolean checkModSuper) {
       if (statements == null)
          return false;
 
       for (Statement st:statements)
-         if (st.callsSuper())
+         if (st.callsSuper(checkModSuper))
             return true;
 
       return false;
@@ -243,6 +243,13 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
             return true;
 
       return false;
+   }
+
+   public void markFixedSuper() {
+      if (statements != null) {
+         for (Statement st:statements)
+            st.markFixedSuper();
+      }
    }
 
    public void refreshBoundTypes(int flags) {

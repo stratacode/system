@@ -76,6 +76,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    transient Object inferredType; // Set to the known type of the expected result of this expression when there is one
    transient boolean inferredFinal = true; // When there is an expected result, set to false when inferredType represents a possibly incomplete type because it's based on an expression where the inferred type has not yet been set.
+   transient boolean fixedSuper = false; // Set for a super(xx) expression that is moved into a modified constructor - one that needs to remain a super(..) and not get rewritten as _super_...()
 
    public static IdentifierExpression create(IString... args) {
       IdentifierExpression ie = new IdentifierExpression();
@@ -2763,11 +2764,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                   //
                   // Note - there is some question as to whether we should map super to 'this' or '_super_xxx" when you are in a method which is not modifying another method.
                   // we used to do this (see multiComponentTest/sub/BaseClass.sc for an example) so that you could call the method in a base-layer even if you were not overriding that
-                  // method.  I think that for constructors in particular, there is some abiguity where that had to change and so we had to modify those tests to use 'this' instead.  That means
+                  // method.  I think that for constructors in particular, there is some ambiguity where that had to change and so we had to modify those tests to use 'this' instead.  That means
                   // you can only call the modified method from within an overriding method.
                   //
                   // A third alternative is to just use "modify" as an explicit keyword.  Maybe we use it as a replacement to class and also in the super/this case as an identifier.  That will make everything explicit.
-                  if (enclMethod != null && enclMethod.modified) {
+                  if (!fixedSuper && enclMethod != null && enclMethod.modified) {
                      // Get the enclosing type again - we really don't want the class's type here which is what
                      // we bound to in the init method.
                      ITypeDeclaration itype = getEnclosingIType();
@@ -4892,14 +4893,14 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
 
-   public boolean callsSuper() {
+   public boolean callsSuper(boolean checkModSuper) {
       // We now convert the JS super(x) into a MethodInvocation in JS so it's return value should reflect the fromStatement.
-      if (fromStatement instanceof Statement && ((Statement)fromStatement).callsSuper())
+      if (fromStatement instanceof Statement && ((Statement)fromStatement).callsSuper(checkModSuper))
          return true;
       // Need to catch both the normal case: super(x) and the JS case: typeName.call(...)
       if (idTypes != null && (idTypes[0] == IdentifierType.SuperExpression || (idTypes.length == 2 && idTypes[1] == IdentifierType.SuperExpression && idTypes[0] == IdentifierType.BoundTypeName)) && arguments != null) {
          AbstractMethodDefinition method = getEnclosingMethod();
-         if (method instanceof ConstructorDefinition) {
+         if (checkModSuper && method instanceof ConstructorDefinition) {
             ConstructorDefinition constr = (ConstructorDefinition) method;
             return !constr.isModifySuper(); // Eliminate the case where super is really going to a modified constructor.  This method is for real super's in the constructor that go to a base class for the purposes of maintaining the dynamic/compiled type constract.
          }
@@ -4914,8 +4915,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       return idTypes != null && idTypes[0] == IdentifierType.ThisExpression && arguments != null && idents.size() == 1;
    }
 
+   public void markFixedSuper() {
+      fixedSuper = true;
+   }
+
    public Expression[] getConstrArgs() {
-      return callsSuper() ? arguments.toArray(new Expression[arguments.size()]) : null;
+      return callsSuper(true) ? arguments.toArray(new Expression[arguments.size()]) : null;
    }
 
    public void refreshBoundTypes(int flags) {

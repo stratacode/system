@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.lang.java.TypeDeclaration;
 import sc.type.IBeanMapper;
 
 import java.util.Map;
@@ -28,6 +29,14 @@ public class A extends HTMLElement {
    }
    public A(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
+   }
+   public A(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
+      super(concreteType);
+      setRepeatVar(repeatVar);
+      setRepeatIndex(repeatIx);
+   }
+   public A(Object repeatVar, int repeatIx) {
+      super(repeatVar, repeatIx);
    }
    {
       tagName = "a";

@@ -601,7 +601,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       initExtendsTypes();
 
       int lix;
-      if ((lix = typeName.lastIndexOf(".")) != -1 && !skipRoots && thisModel != null && !(thisModel instanceof CmdScriptModel)) {
+      if (typeName != null && (lix = typeName.lastIndexOf(".")) != -1 && !skipRoots && thisModel != null && !(thisModel instanceof CmdScriptModel)) {
          List<Object> rootTypes = new ArrayList<Object>();
 
          String rootName = typeName.substring(0,lix);
@@ -723,7 +723,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    private JavaType getInternalExtendsType(boolean declared) {
       if (isLayerType) {
-         // layers use multiple extendsTypes. Generally this method should be called for layer
+         // layers use multiple extendsTypes. Generally this method should not be called with a layer type
          return null;
       }
       if (!extendsInvalid && extendsTypes != null && extendsTypes.size() == 1)
@@ -2602,8 +2602,12 @@ public class ModifyDeclaration extends TypeDeclaration {
     * modified class like the extends class (at least when analyzing the generated code)
     */
    public Object getCompiledExtendsTypeDeclaration() {
-      if (modifyInherited)
-         return modifyTypeDecl;
+      if (modifyInherited) {
+         if (modifyTypeDecl != null)
+            return modifyTypeDecl;
+         if (modifyClass != null)
+            return modifyClass;
+      }
 
       return super.getExtendsTypeDeclaration();
    }

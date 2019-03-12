@@ -274,6 +274,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    public static Object create(boolean doInit, TypeDeclaration dynType, Object outerObj, String constructorSig, Object...args) {
       Class rtClass = dynType.getCompiledClass();
       Object dynObj;
+      boolean dynInnerArgs = false;
       if (rtClass == null) {
          dynType.displayError("No compiled class for creating: " + dynType.getFullTypeName() + ": ");
       }
@@ -336,12 +337,17 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             }
             else {
                Object[] newerArgs = newArgs;
-               if (outerObj != null && ModelUtil.getEnclosingType(rtClass) != null) {
-                  newerArgs = new Object[newArgs.length + 1];
-                  System.arraycopy(newArgs, 0, newerArgs, 1, newArgs.length);
-                  newerArgs[0] = outerObj;
-                  args = newerArgs;
+               if (outerObj != null) {
+                  if (ModelUtil.getEnclosingType(rtClass) != null) {
+                     newerArgs = new Object[newArgs.length + 1];
+                     System.arraycopy(newArgs, 0, newerArgs, 1, newArgs.length);
+                     newerArgs[0] = outerObj;
+                     args = newerArgs;
+                  }
+                  else
+                     dynInnerArgs = true;
                }
+
                dynObj = PTypeUtil.createInstance(rtClass, constructorSig, newerArgs);
             }
          }
@@ -405,6 +411,15 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          }
          // Any native constructors will be called indirectly by the stub
          if (constr instanceof ConstructorDefinition) {
+            // A dynamic type where the compiled class is not an innerObject but the actual dynType is an inner instance type.
+            // The constructor expects to be called with the outerObj as the first argument but we did not add it above.
+            if (dynInnerArgs) {
+               Object[] innerArgs = new Object[args == null ? 1 : args.length+1];
+               if (args != null)
+                  System.arraycopy(args, 0, innerArgs, 1, args.length);
+               innerArgs[0] = outerObj;
+               args = innerArgs;
+            }
             ModelUtil.invokeMethod(null, constr, args, ctx);
          }
 

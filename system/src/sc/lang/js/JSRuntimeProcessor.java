@@ -157,10 +157,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
            "   console.error('error initializing objects: ' + e);\n" +
            "   e.printStackTrace();\n" +
            "}\nfinally {" +
-           "   sc_SyncManager_c.endSync();\n   if (sc_refresh !== undefined) sc_refresh();\n" +
+           "   sc_SyncManager_c.endSync();\n   if (typeof sc_refresh !== \"undefined\") sc_refresh();\n" +
            "}";
 
-   public final static String NoSyncCode =  "   if (sc_refresh !== undefined) sc_refresh();\n";
+   public final static String NoSyncCode =  "   if (typeof sc_refresh !== \"undefined\") sc_refresh();\n";
 
 
    public JSRuntimeProcessor() {
@@ -1087,8 +1087,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                ent.needsInit = true;
                ent.isDefault = jsFile == null && getJSModuleFile(type, true, true) == null;
                jsBuildInfo.addJSGenFile(ent.jsFile, type);
-               if (!jsBuildInfo.jsFiles.contains(ent.jsFile))
-                  jsBuildInfo.jsFiles.add(ent.jsFile);
+               addJSFile(ent.jsFile);
                entryPointAdded = true;
             }
          }
@@ -1119,8 +1118,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      ent.isMain = true;
                      ent.isDefault = jsModuleFile == null;
                      jsBuildInfo.addJSGenFile(ent.jsFile, type);
-                     if (!jsBuildInfo.jsFiles.contains(ent.jsFile))
-                        jsBuildInfo.jsFiles.add(ent.jsFile);
+                     addJSFile(ent.jsFile);
                   }
                   entryPointAdded = true;
                }
@@ -1146,8 +1144,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                ent.isDefault = false;
             }
             jsBuildInfo.addJSGenFile(ent.jsFile, type);
-            if (!jsBuildInfo.jsFiles.contains(ent.jsFile))
-               jsBuildInfo.jsFiles.add(ent.jsFile);
+            addJSFile(ent.jsFile);
          }
          addJSLibFiles(type, true, null, null, null);
 
@@ -1550,7 +1547,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       if (!jsBuildInfo.jsLibFiles.contains(jsCoreLib)) {
          jsBuildInfo.jsLibFiles.add(jsCoreLib);
-         jsBuildInfo.jsFiles.add(jsCoreLib);
+         addJSFile(jsCoreLib);
       }
 
       if (libFile == null) {
@@ -1608,6 +1605,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return getJSSettingsStringValue(type, "dependentTypes", false, false);
       }
       return null;
+   }
+
+   void addJSFile(String jsFile) {
+      if (!jsBuildInfo.jsFiles.contains(jsFile))
+         jsBuildInfo.jsFiles.add(jsFile);
    }
 
    String getJSLibFiles(Object type) {

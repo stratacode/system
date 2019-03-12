@@ -58,7 +58,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public Object getExtendsTypeDeclaration() {
-      return getDerivedTypeDeclaration();
+      return ModelUtil.getExtendsClass(baseType);
    }
 
    public Object getExtendsType() {

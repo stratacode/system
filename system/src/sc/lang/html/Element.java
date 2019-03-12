@@ -177,10 +177,23 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // stores that references so we can find the original source Statement.
    public transient Element fromElement;
 
+   static String[] repeatConstrNames = {"_repeatVar", "_repeatIx"};
+   static List<?> repeatConstrParams = Arrays.asList(new Object[] {Object.class, Integer.TYPE});
+
    public Element() {
    }
-   public Element(sc.lang.java.TypeDeclaration concreteType)  {
+   public Element(TypeDeclaration concreteType)  {
       super(concreteType);
+   }
+
+   public Element(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
+      super(concreteType);
+      setRepeatVar((RE) repeatVar);
+      setRepeatIndex(repeatIx);
+   }
+   public Element(Object repeatVar, int repeatIx) {
+      setRepeatVar((RE) repeatVar);
+      setRepeatIndex(repeatIx);
    }
 
    @Bindable(manual=true)
@@ -1376,17 +1389,47 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return template.getDefaultOutputArgs();
    }
 
-   public JavaType getExtendsType() {
+   public JavaType getExtendsType(String parentPrefix, String rootTypeName) {
       Object tagType = getExtendsTypeDeclaration();
       if (tagType == null)
          return null;
-      return convertExtendsTypeToJavaType(tagType, true);
+      return convertExtendsTypeToJavaType(tagType, true, parentPrefix, rootTypeName);
    }
 
-   public JavaType convertExtendsTypeToJavaType(Object tagType, boolean addTypeVar) {
+   public JavaType convertExtendsTypeToJavaType(Object tagType, boolean addTypeVar, String parentPrefix, String rootTypeName) {
       List<?> tps = ModelUtil.getTypeParameters(tagType);
 
-      ClassType ct = (ClassType) ClassType.create(ModelUtil.getTypeName(tagType));
+      String extTypeName = ModelUtil.getTypeName(tagType);
+      // Workaround a weird thing with Java. If we use the full path to an inner type it says it's a 'raw' type and won't let us pass the
+      // type parameters. But if we use the local name, it works.
+      if (parentPrefix != null) {
+         String extTypePrefix = CTypeUtil.getPackageName(extTypeName);
+         if (StringUtil.equalStrings(extTypePrefix, parentPrefix) || StringUtil.equalStrings(parentPrefix, extTypeName))
+            extTypeName = CTypeUtil.getClassName(extTypeName);
+         else {
+            if (extTypeName.equals(rootTypeName))
+               extTypeName = CTypeUtil.getClassName(extTypeName);
+            else if (extTypeName.startsWith(rootTypeName) && extTypeName.length() > rootTypeName.length() + 1 && extTypeName.charAt(rootTypeName.length()) == '.') {
+               extTypeName = extTypeName.substring(rootTypeName.length()+1);
+               String relParentPrefix = parentPrefix.substring(rootTypeName.length() + 1);
+               do {
+                  int rix = relParentPrefix.indexOf('.');
+                  int eix = extTypeName.indexOf('.');
+                  if (rix == -1 || eix == -1)
+                     break;
+                  String nextRName = relParentPrefix.substring(0, rix);
+                  String nextEName = extTypeName.substring(0, eix);
+                  if (!nextRName.equals(nextEName))
+                     break;
+
+                  extTypeName = extTypeName.substring(eix+1);
+                  relParentPrefix = relParentPrefix.substring(rix+1);
+               } while(true);
+            }
+         }
+      }
+
+      ClassType ct = (ClassType) ClassType.create(extTypeName);
 
       // We will optionally supply a parameter type to the extends type we create.  Only if the
       // base class has one.
@@ -2349,7 +2392,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // TODO: the addTypeVar param here might not be necessary... I think we add it typically for all classes in case they eventually are used as
          // a base class for a repeat tag which uses it for the element type.  Saw an error where the type param could not be resolved: RE_typeName so I
          // think maybe when the ClassType tries to resolve itself, it is not looking at the stub?
-         ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType, false));
+         ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType, false, tagObject.getFullTypeName(), tagObject.getRootType().getFullTypeName()));
          decl.addModifier("public");
          decl.parentNode = parentNode;
          addSetServerAtt(decl, 0, "serverContent");
@@ -2576,6 +2619,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       boolean isRepeatWrap = false;
       boolean isDefaultWrap = false;
       Object repeatWrapperType = null;
+      Object repeatElementType = isRepeatElement ? getRepeatElementType() : null;
       boolean needsWrapperInterface = true;
       if (isRepeatElement && !remoteContent) {
          String repeatWrapperName = getFixedAttribute("repeatWrapper");
@@ -2619,13 +2663,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
          if (needsWrapperInterface) {
             // TODO: cache this to avoid reparsing it each time?
+            if (repeatElementType == null)
+               repeatElementType = Object.class;
             SemanticNodeList<Statement> repeatMethList = (SemanticNodeList<Statement>) TransformUtil.parseCodeTemplate(Object.class,
                     "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
                             "      if (oldTag != null)\n" +
                             "         return oldTag;\n " +
-                            "      sc.lang.html.Element elem = new " + objName + "();\n" +
-                            "      elem.repeatVar = val;\n" +
-                            "      elem.repeatIndex = ix;\n" +
+                            "      sc.lang.html.Element elem = new " + objName + "((" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
                             "      return elem;\n" +
                             "   }",
                     SCLanguage.INSTANCE.classBodySnippet, false);
@@ -2708,7 +2752,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (!canInherit)
             extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
          else {
-            extendsType = getExtendsType();
+            String parentPrefix = parentType == null ? null : parentType.getFullTypeName();
+            TypeDeclaration rootType = parentType == null ? null : parentType.getRootType();
+            String rootTypeName = null;
+            if (rootType == null)
+               rootType = parentType;
+            if (rootType != null)
+               rootTypeName = rootType.getFullTypeName();
+
+            extendsType = getExtendsType(parentPrefix, rootTypeName);
             // If we are modifying a type need to be sure this type is compatible with that type (and that one is a tag type)
             if (modifyType != null) {
                Object declaredExtends = getDeclaredExtendsTypeDeclaration();
@@ -2883,6 +2935,69 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
 
+      // Using the compiledExtTypeDecl here to catch the case where we use a modify inherited type... that creates a real class
+      // in the type hierarchy (e.g. ElementView in the test.editor2). Because we are not propagating the constructors, the modified
+      // type will not have the constructor for (repeatVal,repeatIx) so we need to just create a new one here instead of trying to
+      // inherit it.
+      Object compiledExtTypeDecl = ModelUtil.getCompiledExtendsTypeDeclaration(tagType);
+      if (compiledExtTypeDecl == null) {
+         System.err.println("*** Null compiled extends type for tagType!");
+         compiledExtTypeDecl = ModelUtil.getCompiledExtendsTypeDeclaration(tagType);
+      }
+
+      LayeredSystem sys = getLayeredSystem();
+
+      // TODO: definesConstructor and declaresConstructor really are the same thing - we used to only partially implement inheritance of
+      // constructors with this method. Perhaps instead, we should have an @Repeatable annotation we put on the type which we can set to false
+      // for body, html, head, etc. which are singleton tags. The goal here is to reduce the number of constructors that will never be used
+      // - each repeatable tag, needs at least 2 - the default and for the repeat. So if it's a repeatable tag, we could handle either the
+      // case where the direct extends class provides the repeatVar/ix constructor, or we could just add it using setRepeatVar/ix so at least
+      // we start out at this type with a consistent repeatable tag where repeatVar/ and ix won't be null.
+      //
+      // Ideally we'd only include the repeat constructors for tags we knew were used in a repeat but it's hard to tell that because of
+      // inheritance and modifiability.
+      if (compiledExtTypeDecl != null && ModelUtil.definesConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
+         if (repeatElementType == null)
+            repeatElementType = Object.class;
+         Layer refLayer = getJavaModel().getLayer();
+         boolean hasDefaultConstructor = ModelUtil.hasDefaultConstructor(sys, compiledExtTypeDecl, null, this, refLayer);
+         Object propConstr = ModelUtil.getPropagatedConstructor(sys, compiledExtTypeDecl, this, refLayer);
+         Object[] repeatConstrTypes = new Object[2];
+         repeatConstrTypes[0] = repeatElementType;
+         repeatConstrTypes[1] = Integer.TYPE;
+         ConstructorDefinition repeatConst = ConstructorDefinition.create(tagType, repeatConstrTypes, repeatConstrNames);
+         repeatConst.addModifier("public");
+         boolean needsConstructor = false;
+         // If we create constructors, it overrides the behavior of the propagateConstructor - stopping the propagation
+         if (propConstr == null) {
+            if (ModelUtil.declaresConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
+               SemanticNodeList<Expression> sargs = new SemanticNodeList<Expression>();
+               sargs.add(IdentifierExpression.create(repeatConstrNames[0]));
+               sargs.add(IdentifierExpression.create(repeatConstrNames[1]));
+               IdentifierExpression constSuperExpr = IdentifierExpression.createMethodCall(sargs, "super");
+               repeatConst.addBodyStatementAt(0, constSuperExpr);
+               needsConstructor = true;
+            }
+            else if (hasDefaultConstructor) {
+               SemanticNodeList<Expression> srvArgs = new SemanticNodeList<Expression>();
+               srvArgs.add(IdentifierExpression.create(repeatConstrNames[0]));
+               repeatConst.addBodyStatementAt(0, IdentifierExpression.createMethodCall(srvArgs, "setRepeatVar"));
+               SemanticNodeList<Expression> ixArgs = new SemanticNodeList<Expression>();
+               ixArgs.add(IdentifierExpression.create(repeatConstrNames[1]));
+               repeatConst.addBodyStatementAt(1, IdentifierExpression.createMethodCall(ixArgs, "setRepeatIndex"));
+               needsConstructor = true;
+            }
+         }
+         if (needsConstructor) {
+            addTagTypeBodyStatement(tagType, repeatConst);
+
+            ConstructorDefinition emptyConst = ConstructorDefinition.create(tagType, null, null);
+            emptyConst.addModifier("public");
+            emptyConst.initBody();
+            addTagTypeBodyStatement(tagType, emptyConst);
+         }
+      }
+
       /* done below as part of the normal attribute to code process
       if (getBooleanAttribute("refreshBindings")) {
          tagType.addBodyStatement(PropertyAssignment.create("refreshBindings", BooleanLiteral.create(true), "="));
@@ -2965,7 +3080,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (!staticContentOnly && !remoteContent) {
          String repeatVarName = getRepeatVarName();
          if (repeatVarName != null && !repeatVarName.equals("repeatVar")) {
-            Object repeatElementType = getRepeatElementType();
             Expression repeatExpr = IdentifierExpression.create("repeatVar");
             if (repeatElementType == null)
                repeatElementType = Object.class;

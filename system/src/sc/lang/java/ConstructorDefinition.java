@@ -7,11 +7,19 @@ package sc.lang.java;
 import sc.lang.sc.ModifyDeclaration;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class ConstructorDefinition extends AbstractMethodDefinition {
 
    private transient boolean objectConstructor;
+
+   public static ConstructorDefinition create(TypeDeclaration type, Object[] paramTypes, String[] paramNames) {
+      ConstructorDefinition cdef = new ConstructorDefinition();
+      cdef.name = type.typeName;
+      cdef.setProperty("parameters", Parameter.create(type.getLayeredSystem(), paramTypes, paramNames, null, type));
+      return cdef;
+   }
 
    public void start() {
       TypeDeclaration td = getEnclosingType();
@@ -108,6 +116,8 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       MethodDefinition methDef = new MethodDefinition();
       PrimitiveType voidType = new PrimitiveType();
       voidType.typeName = "void";
+      methDef.fromStatement = this;
+      methDef.origName = name;
       methDef.type = voidType;
       methDef.name = methName;
       methDef.arrayDimensions = arrayDimensions;
@@ -119,6 +129,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       methDef.setProperty("parameters", parameters);
       methDef.setProperty("body", body);
       methDef.modifiers = modifiers;
+      replacedByMethod = methDef;
       parentNode.replaceChild(this, methDef);
       return methDef;
    }
@@ -130,7 +141,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       // We have a case where there was a dynamic class created with a super in the top level method so we set the pending
       // constructor.  But that super tag called another constructor which has no super.  In this case, we'll just create it
       // here using the default constructor of the parent type.  There must be one right?
-      if (pendingConst != null && !callsSuper()) {
+      if (pendingConst != null && !callsSuper(true)) {
          ctx.setPendingConstructor(null);
 
          Object inst = pendingConst.constructInstFromArgs(null, ctx, false);
@@ -141,8 +152,13 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       }
       TypeDeclaration td = getEnclosingType();
       if (td.getEnclosingInstType() != null) {
-         // Strip off the hidden this param - no name for that value in the ExecutionContext.
-         paramValues = paramValues.subList(1, paramValues.size());
+         if (paramValues.size() > 0) {
+            // Strip off the hidden this param - no name for that value in the ExecutionContext.
+            paramValues = paramValues.subList(1, paramValues.size());
+         }
+         else {
+            System.err.println("*** Missing enclosing type in constructor params!");
+         }
       }
       try {
         return super.invoke(ctx, paramValues);
@@ -185,8 +201,14 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       // Don't count a constructor that is modifying a previous constructor.
       if (getEnclosingType() instanceof ModifyDeclaration) {
          ModifyDeclaration modType = (ModifyDeclaration) getEnclosingType();
+         Object[] paramTypes = getParameterTypes(false);
+         List<?> paramTypesList;
+         if (paramTypes == null)
+            paramTypesList = Collections.emptyList();
+         else
+            paramTypesList = Arrays.asList(paramTypes);
          // We are modifying the super constructor so it's not a real extends super
-         if (modType.declaresConstructor(Arrays.asList(getParameterTypes(false)), null) != null)
+         if (modType.declaresConstructor(paramTypesList, null) != null)
             return true;
       }
       return false;
@@ -201,7 +223,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       if (isModifySuper())
          return null;
       for (Statement st:bd.statements)
-         if (st.callsSuper() && st instanceof IdentifierExpression)
+         if (st.callsSuper(true) && st instanceof IdentifierExpression)
             return (IdentifierExpression) st;
       return null;
    }

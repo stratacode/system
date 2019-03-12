@@ -4015,7 +4015,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       else { // We have a dynamic constructor
          ConstructorDefinition superConDef = (ConstructorDefinition) superCon;
          // If there's a chained super call, delegate the construction till that
-         if (superConDef.callsSuper()) {
+         if (superConDef.callsSuper(true)) {
             Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, null);
             if (superType instanceof BodyTypeDeclaration)
                ctx.setPendingConstructor((BodyTypeDeclaration) superType);
@@ -6903,7 +6903,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // If there is a constructor and a base class but no super
                // call - using the implied zero arg constructor.  In that case, we do the init here.
 
-               if (con == null || !con.callsSuper() || isDynStub) {
+               if (con == null || !con.callsSuper(true) || isDynStub) {
                   // Was emptyObjectArray for the args
                   constructInstance(ctx, outerObj == null ? ModelUtil.getOuterObject(this, ctx) : outerObj, argValues, false);
                }
@@ -7356,7 +7356,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (constrs == null || constrs.length == 0)
          return true;
       for (Object constr:constrs) {
-         if (constr instanceof ConstructorDefinition && !((ConstructorDefinition) constr).callsSuper())
+         if (constr instanceof ConstructorDefinition && !((ConstructorDefinition) constr).callsSuper(true))
             return true;
       }
       return false;
@@ -7876,12 +7876,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       // Need to do this after we start the @Exec annotation
       if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
-         if (sys.options.verbose || sys.options.verboseExec)
-            sys.info("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
+         if (!excluded) {
+            if (sys.options.verbose || sys.options.verboseExec)
+               sys.info("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
 
-         TypeDeclaration enclType = getEnclosingType();
+            TypeDeclaration enclType = getEnclosingType();
 
-         markExcluded(enclType == null || !enclType.excluded);
+            markExcluded(enclType == null || !enclType.excluded);
+         }
       }
 
       if (!excluded) {

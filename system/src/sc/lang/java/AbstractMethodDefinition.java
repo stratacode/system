@@ -22,10 +22,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public BlockStatement body;
    public List<TypeParameter> typeParameters;
 
+   /** True when this method modifies another method: TODO: rename this to "modifyingMethod"? It's hard to tell which side it reflects now */
    public transient boolean modified = false;
    public transient boolean needsDynInvoke = false;
 
-   /** When overriding a method in a layer, the name of the method this method has modified */
+   /** When this method overrides a method in a downstream layer, the generated name of the method this method has modified so we can remap super calls to this method (_super_x()) */
    public transient String overriddenMethodName = null;
    public transient String overriddenLayer = null;
    public transient Object[] parameterTypes;
@@ -49,7 +50,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public void init() {
       if (initialized) return;
       super.init();
-      origName = name;
+      if (origName == null)
+         origName = name;
       templateBody = body != null && body.statements != null && body.statements.size() == 1 &&
                      body.statements.get(0) instanceof GlueStatement;
    }
@@ -262,7 +264,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (!modified && overridden != null) {
          overriddenLayer = baseLayer.getLayerUniqueName();
 
-         // Marks that this method was modified in this operation.  This means that any super definition in this
+         // Marks that this method is modifying a base method in the same class in this operation.  This means that any super definition in this
          // method needs to be remapped.  We simulate super because the modify operation does not actually create
          // a new Java class.  This is set to true even if we do not override a method since our "super" references
          // need to get rewritten due to the elimination of that class.
@@ -274,9 +276,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       if (!isOverrideMethod) {
          if (overridden != null) {
             boolean overriddenIsAbstract = overridden.hasModifier("abstract");
-            TypeDeclaration enclType = overridden.getEnclosingType();
+            TypeDeclaration overEnclType = overridden.getEnclosingType();
             if (overriddenIsAbstract) {
-               enclType.removeStatement(overridden);
+               overEnclType.removeStatement(overridden);
             }
             else {
                boolean overriddenIsStatic = overridden.hasModifier("static");
@@ -287,17 +289,56 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
                   else
                      displayError("Cannot make an instance method static in a derived layer: ");
                }
-               // Needs to be unique per layer, per-type  TODO: is there a shorter way to make this unique?
-               overriddenMethodName = "_super_" + enclType.getLayer().getLayerUniqueName().replace('.', '_') + "_" + enclType.getInnerTypeName().replace('.', '_') + '_' + origName;
 
-               overrides = overridden;
+               boolean doOverride = true;
 
-               /* Constructors need to be void so we need to change them to a method definition */
                if (overridden instanceof ConstructorDefinition) {
-                  ((ConstructorDefinition) overridden).convertToMethod(overriddenMethodName);
+                  ConstructorDefinition overConst = (ConstructorDefinition) overridden;
+                  if (overConst.body != null) {
+                     BlockStatement constrBody = overConst.body;
+                     SemanticNodeList<Statement> sts = constrBody.statements;
+                     if (sts != null && sts.size() > 0) {
+                        Statement st = sts.get(0);
+                        // First check for any super that's alone in the method
+                        if (st.callsSuper(false)) {
+                           if (sts.size() == 1) {
+                              // If it's only super(x) then this method can just be removed
+                              overConst.parentNode.removeChild(overConst);
+                              doOverride = false;
+                              modified = false; // We are no longer modifying another method - so clear this flag
+                           }
+                           // Only if it will turn into a real super() in the code do we move it though...
+                           else if (st.callsSuper(true)) {
+                              sts.remove(0);
+                              TypeDeclaration enclType = getEnclosingType();
+                              AbstractMethodDefinition lastModMeth;
+                              if (enclType == null)
+                                 lastModMeth = this;
+                              else
+                                 lastModMeth = enclType.declaresMethodDef(origName, getParameterList());
+
+                              // TODO: need to change the names of the parameters if they are different
+                              lastModMeth.body.addStatementAt(0, st);
+                              st.markFixedSuper();
+                           }
+                        }
+                     }
+                  }
                }
-               else
-                  overridden.setProperty("name", overriddenMethodName);
+
+               if (doOverride) {
+                  // Needs to be unique per layer, per-type  TODO: is there a shorter way to make this unique?
+                  overriddenMethodName = "_super_" + overEnclType.getLayer().getLayerUniqueName().replace('.', '_') + "_" + overEnclType.getInnerTypeName().replace('.', '_') + '_' + origName;
+
+                  overrides = overridden;
+
+                  /* Constructors need to be void so we need to change them to a method definition */
+                  if (overridden instanceof ConstructorDefinition) {
+                     ((ConstructorDefinition) overridden).convertToMethod(overriddenMethodName);
+                  }
+                  else
+                     overridden.setProperty("name", overriddenMethodName);
+               }
             }
          }
 
@@ -601,12 +642,12 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return toDeclarationString();
    }
 
-   public boolean callsSuper() {
+   public boolean callsSuper(boolean checkModSuper) {
       BlockStatement bd = body;
       if (bd == null || bd.statements == null)
          return false;
       for (Statement st:bd.statements)
-         if (st.callsSuper())
+         if (st.callsSuper(checkModSuper))
             return true;
       return false;
    }
@@ -619,6 +660,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          if (st.callsThis())
             return true;
       return false;
+   }
+
+   public void markFixedSuper() {
+      BlockStatement bd = body;
+      if (bd == null || bd.statements == null)
+         return;
+      for (Statement st:bd.statements)
+         st.markFixedSuper();
    }
 
    public Expression[] getConstrArgs() {

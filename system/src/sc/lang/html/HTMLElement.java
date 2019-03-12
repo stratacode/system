@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.lang.java.TypeDeclaration;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 import sc.type.CTypeUtil;
@@ -34,7 +35,7 @@ import java.util.HashSet;
 //@Sync(syncMode= SyncMode.Automatic) // Turn back on sync mode for subclasses with this enabled.  Turned out to not be a good idea to sync both the UI and the model
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentJSFiles="js/javasys.js")
 @Sync(syncMode=SyncMode.Disabled, includeSuper=true)
-public class HTMLElement<E> extends Element<E> {
+public class HTMLElement<RE> extends Element<RE> {
    public final static sc.type.IBeanMapper _clickEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "clickEvent");
    public final static sc.type.IBeanMapper _dblClickEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "dblClickEvent");
    public final static sc.type.IBeanMapper _mouseDownEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "mouseDownEvent");
@@ -67,6 +68,14 @@ public class HTMLElement<E> extends Element<E> {
    }
    public HTMLElement(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
+   }
+   public HTMLElement(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
+      super(concreteType);
+      setRepeatVar((RE) repeatVar);
+      setRepeatIndex(repeatIx);
+   }
+   public HTMLElement(Object repeatVar, int repeatIx) {
+      super(repeatVar, repeatIx);
    }
 
    static HashSet<String> domEventNames = new HashSet<String>();

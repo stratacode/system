@@ -4,6 +4,8 @@
 
 package sc.lang.html;
 
+import sc.lang.java.TypeDeclaration;
+
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Span extends HTMLElement {
    {
@@ -13,6 +15,14 @@ public class Span extends HTMLElement {
    }
    public Span(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
+   }
+   public Span(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
+      super(concreteType);
+      setRepeatVar(repeatVar);
+      setRepeatIndex(repeatIx);
+   }
+   public Span(Object repeatVar, int repeatIx) {
+      super(repeatVar, repeatIx);
    }
 }
   

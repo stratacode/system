@@ -40,7 +40,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public String childObjNames;          // String object names only of the children in parallel array to the above
    public boolean overrideField = false; // True if this is overriding a property of the same name
    public boolean overrideGet = false;   // True if this is overriding a property of the same name
-   public boolean needsMemberCast = false;// True if overriding a property and the overriden type is a sub-class of the type we are overriding.  Needs the cast to return the member variable.
+   public boolean needsMemberCast = false;// True if overriding a property and the overridden type is a sub-class of the type we are overriding.  Needs the cast to return the member variable.
    public boolean typeIsComponent = false; // True if the type we are creating is a component in any way
    public boolean typeIsComponentClass = false; // True if the type we are creating itself is a component class (call newX instead of new X)
    public boolean typeIsCompiledComponent = false; // True if the type we is a component class and not a dynamic one

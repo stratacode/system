@@ -648,12 +648,17 @@ public class BinaryExpression extends Expression {
       info.visitList(operands, ctx);
    }
 
-   public boolean callsSuper() {
-      return lhs.callsSuper() || getRhsExpr().callsSuper();
+   public boolean callsSuper(boolean checkModSuper) {
+      return lhs.callsSuper(checkModSuper) || getRhsExpr().callsSuper(checkModSuper);
    }
 
    public boolean callsThis() {
       return lhs.callsThis() || getRhsExpr().callsThis();
+   }
+
+   public void markFixedSuper() {
+      lhs.markFixedSuper();
+      getRhsExpr().markFixedSuper();
    }
 
    public void refreshBoundTypes(int flags) {

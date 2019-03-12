@@ -626,12 +626,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    public boolean isGetMethod() {
-      return propertyName != null && ((name.startsWith("get") || name.startsWith("is")) || (origName != null && (origName.startsWith("get") || origName.startsWith("is"))));
+      return propertyName != null && name != null && ((name.startsWith("get") || name.startsWith("is")) || (origName != null && (origName.startsWith("get") || origName.startsWith("is"))));
    }
 
    public boolean isSetMethod() {
       // Make sure to include the orig name in case we do the _bind_set transformation
-      return propertyName != null && (name.startsWith("set") || (origName != null && origName.startsWith("set")));
+      return propertyName != null && name != null && (name.startsWith("set") || (origName != null && origName.startsWith("set")));
    }
 
    public boolean isGetIndexMethod() {

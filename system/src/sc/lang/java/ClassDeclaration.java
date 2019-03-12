@@ -884,7 +884,7 @@ public class ClassDeclaration extends TypeDeclaration {
          insertInitMethodCall(onInitMethodName);
       }
 
-      // Do not propagate the construct if we are not generating a type for it.  Or should this flag force needsOwnClass=true
+      // Do not propagate the constructor if we are not generating a type for it.  Or should this flag force needsOwnClass=true
       // if it is set?   Should work either way but adding these methods will cause "needsOwnClass" to subsequently return true which messes up
       // getCompiledClassName for this class.
       if (propagateConstructorArgs != null && needsOwnClass) {

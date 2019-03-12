@@ -33,6 +33,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
    Layer layer;
    public List<TypeParameter> typeParameters;
 
+   Object[] constructors;
    CoalescedHashMap<String,Object[]> methodsByName;  // This does include super-type methods
    CoalescedHashMap<String,CFField> fieldsByName;    // This does not include the super type fields
 
@@ -395,6 +396,8 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       for (int i = 0; i < keys.length; i++) {
          String key = (String) keys[i];
          if (key != null) {
+            if (key.equals("<init>")) // don't merge super types constructors since these are not inherited
+               continue;
             Object[] superMethods = (Object[]) values[i];
             Object[] thisMethods = methodsByName.get(key);
             if (thisMethods == null) {

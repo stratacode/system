@@ -3155,6 +3155,25 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   public static boolean hasDefaultConstructor(LayeredSystem sys, Object td, Object refType, JavaSemanticNode refNode, Layer refLayer) {
+      Object[] constrs = getConstructors(td, refType);
+      if (constrs == null || constrs.length == 0) {
+         Object propConstr = getPropagatedConstructor(sys, td, refNode, refLayer);
+         if (propConstr == null)
+            return true;
+         Object[] paramTypes = ModelUtil.getParameterTypes(propConstr);
+         if (paramTypes == null || paramTypes.length == 0)
+            return true;
+         return false;
+      }
+      for (Object constr:constrs) {
+         Object[] paramTypes = ModelUtil.getParameterTypes(constr);
+         if (paramTypes == null || paramTypes.length == 0)
+            return true;
+      }
+      return false;
+   }
+
    public static boolean transformNewExpression(LayeredSystem sys, Object boundType) {
       // For types which have the component interface, if it is either an object or has a new template
       // we need to transform new Foo into a call to the newFoo method that was generated.
@@ -4961,7 +4980,8 @@ public class ModelUtil {
          if (res == null)
             res = new ArrayList<Object>();
 
-         Object next = ModelUtil.getSuperclass(resultType);
+         // Object next = ModelUtil.getSuperclass(resultType);
+         Object next = ModelUtil.getExtendsClass(resultType);
          if (next != null && ModelUtil.isAssignableFrom(srcType, next)) {
             res.add(ModelUtil.getExtendsJavaType(resultType));
          }
@@ -8396,7 +8416,9 @@ public class ModelUtil {
 
    public static void makeBindable(TypeDeclaration type, String propName, boolean needsBindable) {
       Object member = type.definesMember(propName, JavaSemanticNode.MemberType.FieldSet, null, null);
-      if (member != null && member instanceof VariableDefinition) {
+      if (member instanceof ParamTypedMember)
+         member = ((ParamTypedMember) member).member;
+      if (member instanceof VariableDefinition) {
          // Someone could have added the manual annotation after the fact
          if (!ModelUtil.isManualBindable(member))
             ((VariableDefinition) member).makeBindable(!needsBindable);

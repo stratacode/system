@@ -169,8 +169,11 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    /** Does this method call "super(xxx)" for a constructor definition */
-   public boolean callsSuper() {
+   public boolean callsSuper(boolean checkModSuper) {
       return false;
+   }
+
+   public void markFixedSuper() {
    }
 
    public boolean callsThis() {

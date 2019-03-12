@@ -12,12 +12,17 @@ public abstract class ExpressionStatement extends Statement {
    public String operator;
    public Expression expression;
 
-   public boolean callsSuper() {
-      return expression != null && expression.callsSuper();
+   public boolean callsSuper(boolean checkModSuper) {
+      return expression != null && expression.callsSuper(checkModSuper);
    }
 
    public boolean callsThis() {
       return expression != null && expression.callsThis();
+   }
+
+   public void markFixedSuper() {
+      if (expression != null)
+         expression.markFixedSuper();
    }
 
    public Expression[] getConstrArgs() {
