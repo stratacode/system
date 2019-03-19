@@ -215,12 +215,12 @@ public class PTypeUtil {
       }
    }
 
-   public static Object getProperty(Object parent, Object mapping) {
+   public static Object getProperty(Object parent, Object mapping, boolean getField) {
       if (mapping instanceof IBeanMapper)
-         return ((IBeanMapper) mapping).getPropertyValue(parent);
+         return ((IBeanMapper) mapping).getPropertyValue(parent, getField);
       else if (parent instanceof IDynObject) {
          if (mapping instanceof String)
-            return ((IDynObject) parent).getProperty((String) mapping);
+            return ((IDynObject) parent).getProperty((String) mapping, getField);
       }
       throw new UnsupportedOperationException();
    }

@@ -80,9 +80,9 @@ public abstract class JavaSemanticNode extends SemanticNode {
    }
 
    public enum DepTypeMode {
-      All,
-      SyncTypes,
-      RemoteMethodTypes
+      All, // Return all dependent types for this type
+      SyncTypes, // Return only the synchronized types this type depends on
+      RemoteMethodTypes // Return only the remoteMethod types this type depends on
    }
 
    /** Mode parameter for addDependentTypes family of methods */

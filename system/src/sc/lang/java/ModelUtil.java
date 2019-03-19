@@ -1814,6 +1814,8 @@ public class ModelUtil {
    }
 
    public static Object[] getAllImplementsTypeDeclarations(Object c1) {
+      while (ModelUtil.hasTypeParameters(c1))
+         c1 = ModelUtil.getParamTypeBaseType(c1);
       if (c1 instanceof Class) {
          Class class1 = (Class) c1;
          Object[] ifaces = class1.getInterfaces();

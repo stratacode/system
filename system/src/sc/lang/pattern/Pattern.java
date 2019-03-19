@@ -124,8 +124,9 @@ public class Pattern extends SemanticNode {
                Parselet optSubPattern = ((OptionalPattern) elem).getParselet(language, pageType);
                optSubPattern.optional = true;
                parselets.add(optSubPattern);
-               // If there are any variables in the optSubPattern, this will cause them to be applied on the same instance.
-               descriptor.append("*");
+               // If we are given a page type and there are any variables in the optSubPattern, this will cause them to be applied on the same instance.
+               if (pageType != null)
+                  descriptor.append("*");
             }
             else {
                System.err.println("*** Unexpected element type in Pattern elements: " + elem);

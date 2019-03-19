@@ -22,7 +22,7 @@ public class UnaryBinding extends AbstractMethodBinding {
    }
 
    protected Object invokeMethod(Object obj) {
-      Object val = boundParams[0].getPropertyValue(obj);
+      Object val = boundParams[0].getPropertyValue(obj, false);
       if (val == UNSET_VALUE_SENTINEL || val == null)
           return UNSET_VALUE_SENTINEL;
       if (val == PENDING_VALUE_SENTINEL)
@@ -41,7 +41,7 @@ public class UnaryBinding extends AbstractMethodBinding {
          return value;
       if (operator.equals("++") || operator.equals("--")) {
          IBinding param = boundParams[0];
-         Object val = param.getPropertyValue(obj);
+         Object val = param.getPropertyValue(obj, false);
          int ival = (Integer) val;
          if (operator.charAt(0) == '+')
             ival++;

@@ -459,22 +459,22 @@ public class DynUtil {
    }
 
    public static int intPropertyValue(IDynObject p, String propName) {
-      Object o = p.getProperty(propName);
+      Object o = p.getProperty(propName, false);
       return o == null ? 0 : ((Number) o).intValue();
    }
 
    public static float floatPropertyValue(IDynObject p, String propName) {
-      Object o = p.getProperty(propName);
+      Object o = p.getProperty(propName, false);
       return o == null ? 0 : ((Number) o).floatValue();
    }
 
    public static double doublePropertyValue(IDynObject p, String propName) {
-      Object o = p.getProperty(propName);
+      Object o = p.getProperty(propName, false);
       return o == null ? 0 : ((Number) o).doubleValue();
    }
 
    public static long longPropertyValue(IDynObject p, String propName) {
-      Object o = p.getProperty(propName);
+      Object o = p.getProperty(propName, false);
       return o == null ? 0 : ((Number) o).longValue();
    }
    public static IBeanMapper[] getProperties(Object typeObj) {
@@ -535,17 +535,24 @@ public class DynUtil {
 
    public static Object getPropertyValue(Object object, String propertyName) {
       if (object instanceof IDynObject)
-         return ((IDynObject) object).getProperty(propertyName);
+         return ((IDynObject) object).getProperty(propertyName, false);
       else if (object instanceof Map)
          return ((Map) object).get(propertyName);
       else
          return TypeUtil.getPropertyValue(object, propertyName);
    }
 
-   /** This variant works for static properties as well but breaks if the TypeDeclaration object is used as an arg */
    public static Object getProperty(Object object, String propertyName) {
+      return getProperty(object, propertyName, false);
+   }
+
+   /**
+    * Like getPropertyValue this works for static properties, but breaks if the TypeDeclaration object is used as an object instance.
+    * That case is where the type declaration represents the class for a static property.
+    */
+   public static Object getProperty(Object object, String propertyName, boolean getField) {
       if (object instanceof IDynObject)
-         return ((IDynObject) object).getProperty(propertyName);
+         return ((IDynObject) object).getProperty(propertyName, getField);
       else if (dynamicSystem != null && dynamicSystem.isTypeObject(object))
          return dynamicSystem.getStaticProperty(object, propertyName);
       else if (object instanceof Map)

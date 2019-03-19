@@ -35,16 +35,16 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
       return dynObj != null;
    }
 
-   public Object getProperty(String propName) {
+   public Object getProperty(String propName, boolean getField) {
       if (dynObj == null) {
-         return TypeUtil.getPropertyValueFromName(this, propName);
+         return TypeUtil.getPropertyValueFromName(this, propName, getField);
       }
-      return dynObj.getPropertyFromWrapper(this, propName);
+      return dynObj.getPropertyFromWrapper(this, propName, getField);
    }
-   public Object getProperty(int propIndex) {
+   public Object getProperty(int propIndex, boolean getField) {
       if (dynObj == null)
          return null;
-      return dynObj.getPropertyFromWrapper(this, propIndex);
+      return dynObj.getPropertyFromWrapper(this, propIndex, getField);
    }
 
    // TODO: fix this name conflict.  Probably the setProperty and getProperty in semanticNode and/or the dynObject should change to be something else.  Both of them are mixins to other object name spaces so should be named to avoid conflicts?
@@ -87,7 +87,7 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
    public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
       if (dynObj == null)
          return null;
-      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName);
+      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName, false);
    }
    public void addProperty(Object propType, String propName, Object initValue) {
       dynObj.addProperty(propType, propName, initValue);

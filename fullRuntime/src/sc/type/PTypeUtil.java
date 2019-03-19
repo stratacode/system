@@ -74,8 +74,8 @@ public class PTypeUtil {
          /* If this is an array we perform the array to value mapping */
          if (valueClass.isArray()) {
             return new BeanMapper(mapper) {
-               public Object getPropertyValue(Object parent) {
-                  List<?> lval = (List<?>) TypeUtil.getPropertyValue(parent, getSelector);
+               public Object getPropertyValue(Object parent, boolean getField) {
+                  List<?> lval = (List<?>) TypeUtil.getPropertyValue(parent, getSelector, getField);
                   return lval.toArray((Object[]) Array.newInstance(mapper.getComponentType(), lval.size()));
                }
                public void setPropertyValue(Object parent, Object value) {
@@ -94,11 +94,11 @@ public class PTypeUtil {
          else {
             /* Allow a list of length 1 to be treated as a scalar */
             return new BeanMapper(mapper) {
-               public Object getPropertyValue(Object parent) {
+               public Object getPropertyValue(Object parent, boolean getField) {
                   // Undo the conversion here.  If we use a slot mapping to wrap a list on the way in
                   // we need to undo it on the way out so that we get the right data type for generation
                   // purposes.
-                  Object pval = TypeUtil.getPropertyValue(parent, getSelector);
+                  Object pval = TypeUtil.getPropertyValue(parent, getSelector, getField);
                   if (pval instanceof List) {
                      List lval = (List) pval;
                      if (lval.size() == 1)
@@ -126,8 +126,8 @@ public class PTypeUtil {
          /* If this is an array we perform the array to value mapping */
          if (valueClass.isArray()) {
             return new BeanMapper(mapper) {
-               public Object getPropertyValue(Object parent) {
-                  Set<?> lval = (Set<?>) TypeUtil.getPropertyValue(parent, getSelector);
+               public Object getPropertyValue(Object parent, boolean getField) {
+                  Set<?> lval = (Set<?>) TypeUtil.getPropertyValue(parent, getSelector, getField);
                   return lval.toArray((Object[])Array.newInstance(mapper.getComponentType(), lval.size()));
                }
                public void setPropertyValue(Object parent, Object value) {
@@ -181,8 +181,8 @@ public class PTypeUtil {
       if (IValueConverter.class.isAssignableFrom(valueClass)) {
          return new BeanMapper() {
             BeanMapper superMapper = mapper;
-            public Object getPropertyValue(Object parent) {
-               Object propVal = superMapper.getPropertyValue(parent);
+            public Object getPropertyValue(Object parent, boolean getField) {
+               Object propVal = superMapper.getPropertyValue(parent, getField);
                // TODO: create an AbstractLiteral here somehow from the value.
                return propVal;
             }
@@ -292,7 +292,7 @@ public class PTypeUtil {
       if (meth instanceof Method) {
          // Handle Java8 dependency using reflection so we can run on Java6 as well
          if (methodDefaultMapper != null) {
-            return (Boolean) methodDefaultMapper.getPropertyValue(meth);
+            return (Boolean) methodDefaultMapper.getPropertyValue(meth, false);
          }
          return false;
       }
@@ -318,7 +318,7 @@ public class PTypeUtil {
       }
    }
 
-   public static Object getProperty(Object parent, Object mapping) {
+   public static Object getProperty(Object parent, Object mapping, boolean getField) {
       try {
          if (mapping instanceof Field) {
             Field f = (Field) mapping;
@@ -515,6 +515,13 @@ public class PTypeUtil {
       catch (IndexOutOfBoundsException exc) {
          System.err.println("*** Index out of bounds invoking constructor: " + ctor + " params: " + Arrays.asList(params) + ": " + exc);
       }
+      // TODO: not sure this is the right thing but good for debugging
+      /*
+      catch (NullPointerException exc) {
+         System.err.println("***");
+         System.err.println("*** NullPointerException invoking constructor: " + ctor + " params: " + Arrays.asList(params) + ": " + exc);
+      }
+      */
       return null;
    }
 

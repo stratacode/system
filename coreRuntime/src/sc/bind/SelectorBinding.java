@@ -412,7 +412,7 @@ public class SelectorBinding extends DestinationListener {
 
    private ISet<Object> dstPropSet() {
       if (dstProp instanceof IBinding)
-         return new SingleElementSet<Object>(((IBinding)dstProp).getPropertyValue(dstObj));
+         return new SingleElementSet<Object>(((IBinding)dstProp).getPropertyValue(dstObj, false));
       return null;
    }
 
@@ -460,7 +460,7 @@ public class SelectorBinding extends DestinationListener {
       }
    }
 
-   public Object getPropertyValue(Object obj) {
+   public Object getPropertyValue(Object obj, boolean getField) {
       if (!valid)
          validateBinding(obj);
       return getBoundValue();

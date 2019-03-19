@@ -582,7 +582,7 @@ public class VariableBinding extends DestinationListener {
       Object bProp = getBoundProperty();
 
       valid = true;
-      Object newValue = dstProp instanceof IBinding ? ((IBinding)dstProp).getPropertyValue(dstObj) : PBindUtil.getPropertyValue(dstObj, dstProp);
+      Object newValue = dstProp instanceof IBinding ? ((IBinding)dstProp).getPropertyValue(dstObj, false) : PBindUtil.getPropertyValue(dstObj, dstProp);
 
       // For reverse only bindings, we do not want to eval the binding at all... that's what we do when
       // we decide to execute it anyway!
@@ -667,7 +667,7 @@ public class VariableBinding extends DestinationListener {
 
    private ISet<Object> dstPropSet() {
       if (dstProp instanceof IBinding)
-         return new SingleElementSet<Object>(((IBinding)dstProp).getPropertyValue(dstObj));
+         return new SingleElementSet<Object>(((IBinding)dstProp).getPropertyValue(dstObj, false));
       return null;
    }
 
@@ -703,7 +703,7 @@ public class VariableBinding extends DestinationListener {
       }
    }
 
-   public Object getPropertyValue(Object obj) {
+   public Object getPropertyValue(Object obj, boolean getField) {
       if (!valid)
          validateBinding();
       return getBoundValue();

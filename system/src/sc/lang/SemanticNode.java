@@ -74,7 +74,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ILifecycle)
             ((ILifecycle) val).init();
       }
@@ -91,7 +91,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       try {
          for (int i = 0; i < semanticProps.length; i++) {
             IBeanMapper mapper = semanticProps[i];
-            Object val = PTypeUtil.getProperty(this, mapper.getField());
+            Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
             if (val instanceof ILifecycle)
                ((ILifecycle) val).start();
          }
@@ -112,7 +112,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ILifecycle)
             ((ILifecycle) val).validate();
       }
@@ -140,7 +140,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
          for (int i = 0; i < semanticProps.length; i++) {
             IBeanMapper mapper = semanticProps[i];
-            Object val = PTypeUtil.getProperty(this, mapper.getField());
+            Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
             if (val instanceof ISemanticNode)
                ((ISemanticNode) val).validateParseNode(finalGen);
          }
@@ -157,7 +157,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ISemanticNode)
             ((ISemanticNode) val).process();
       }
@@ -174,7 +174,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ILifecycle) {
             if (val == this) {
                System.err.println("*** Recursive element tree - child: " + mapper.getPropertyName() + " refers to parent in stop method");
@@ -203,7 +203,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ISemanticNode) {
             ISemanticNode nodeVal = (ISemanticNode) val;
             if (!nodeVal.getTransformed() && nodeVal.transform(runtime))
@@ -220,7 +220,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ISemanticNode) {
             ISemanticNode nodeVal = (ISemanticNode) val;
             if (nodeVal.needsTransform())
@@ -302,7 +302,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       for (int i = 0; i < fields.length; i++) {
          String name = fields[i].getName();
          if (name.equals("parseNode") || name.equals("parentNode")) {
-            Object val = PTypeUtil.getProperty(this, fields[i]);
+            Object val = PTypeUtil.getProperty(this, fields[i], false);
             if (val == null)
                 sb.append("Warning - NULL for: " + name + FileUtil.LINE_SEPARATOR);
             continue;
@@ -314,7 +314,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          sb.append(indentStr(indent));
          sb.append(name);
          sb.append(" = ");
-         sb.append(getStringValue(PTypeUtil.getProperty(this, fields[i]), visited, indent));
+         sb.append(getStringValue(PTypeUtil.getProperty(this, fields[i], false), visited, indent));
          sb.append(FileUtil.LINE_SEPARATOR);
       }
       indent--;
@@ -362,7 +362,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
          String name = field.getName();
 
-         Object obj = PTypeUtil.getProperty(this, field);
+         Object obj = PTypeUtil.getProperty(this, field, false);
          if (obj != null && !(obj instanceof ISemanticNode) && !(obj instanceof List))
          {
             if (!first)
@@ -464,7 +464,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < props.length; i++) {
          IBeanMapper prop = props[i];
-         Object thisProp = PTypeUtil.getProperty(this, prop.getField());
+         Object thisProp = PTypeUtil.getProperty(this, prop.getField(), false);
          if (thisProp == toReplace)
             return true;
       }
@@ -482,7 +482,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper prop = semanticProps[i];
          // Not sure why this one is using the property, not the field
-         Object thisProp = PTypeUtil.getProperty(this, prop.getField());
+         Object thisProp = PTypeUtil.getProperty(this, prop.getField(), false);
          if (thisProp == toReplace) {
             setProperty(prop, other);
             return i;
@@ -497,7 +497,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       for (int i = 0; i < props.length; i++) {
          IBeanMapper prop = props[i];
          Object field = prop.getField();
-         Object thisProp = PTypeUtil.getProperty(this, field);
+         Object thisProp = PTypeUtil.getProperty(this, field, false);
          if (thisProp == toRemove) {
             setProperty(field, null);
             return i;
@@ -524,8 +524,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       IBeanMapper[] props = type.getSemanticPropertyList();
       for (int i = 0; i < props.length; i++) {
          Field field = (Field) props[i].getField();
-         Object thisProp = PTypeUtil.getProperty(this, field);
-         Object otherProp = PTypeUtil.getProperty(other, field);
+         Object thisProp = PTypeUtil.getProperty(this, field, false);
+         Object otherProp = PTypeUtil.getProperty(other, field, false);
          // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
          if (thisProp != otherProp &&
                 (thisProp == null || otherProp == null ||
@@ -566,8 +566,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       IBeanMapper[] props = type.getSemanticPropertyList();
       for (int i = 0; i < props.length; i++) {
          Field field = (Field) props[i].getField();
-         Object thisProp = PTypeUtil.getProperty(this, field);
-         Object otherProp = PTypeUtil.getProperty(other, field);
+         Object thisProp = PTypeUtil.getProperty(this, field, false);
+         Object otherProp = PTypeUtil.getProperty(other, field, false);
          // If both are null it is ok.  If thisProp is not null it has to equal other prop to go on.
          if (thisProp != otherProp) {
             if (thisProp instanceof ISemanticNode && otherProp != null) {
@@ -601,7 +601,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       IBeanMapper[] props = type.getSemanticPropertyList();
       for (int i = 0; i < props.length; i++) {
          IBeanMapper mapper = props[i];
-         Object thisProp = PTypeUtil.getProperty(this, mapper.getField());
+         Object thisProp = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (thisProp == this) {
             System.out.println("*** Ack!");
             continue;
@@ -841,7 +841,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       for (int i = 0; i < props.length; i++) {
          IBeanMapper mapper = props[i];
          Field field = (Field) mapper.getField();
-         Object oldVal = PTypeUtil.getProperty(this, field);
+         Object oldVal = PTypeUtil.getProperty(this, field, false);
          Object val;
          if (oldVal instanceof ISemanticNode) {
             // This clones both the semantic node and if CopyParseNode is set, it also copies the parsed representation of that node.
@@ -1003,7 +1003,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
 
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ISemanticNode)
             ((ISemanticNode) val).changeLanguage(l);
       }
@@ -1090,7 +1090,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       IBeanMapper[] semanticProps = type.getSemanticPropertyList();
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          if (val instanceof ISemanticNode)
             ct += ((ISemanticNode) val).getNodeCount();
       }
@@ -1125,7 +1125,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       IBeanMapper[] semanticProps = type.getSemanticPropertyList();
       for (int i = 0; i < semanticProps.length; i++) {
          IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField());
+         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
          out.writeValue(val);
       }
    }

@@ -9763,6 +9763,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (IFileProcessor proc:procs) {
             if (phase == null || phase == proc.getBuildPhase()) {
                if (fileName != null) {
+                  Layer procLayer = proc.getDefinedInLayer();
+                  // Never return processors from excluded layers since they are not active in this runtime
+                  if (procLayer != null && procLayer.excluded)
+                     continue;
                   if (includeDisabled)
                      return proc;
                   switch (proc.enabledForPath(fileName, srcLayer, abs, generatedFile)) {
@@ -9813,8 +9817,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // If either just the file name part or the entire directory matches use this pattern
             if (patt.matcher(fileName).matches() || patt.matcher(FileUtil.getFileName(fileName)).matches()) {
                res = ent.getValue();
-               if (phase == null || res.getBuildPhase() == phase)
-                  return res;
+               Layer resLayer = res.getDefinedInLayer();
+               if (resLayer == null || !resLayer.excluded) {
+                  if (phase == null || res.getBuildPhase() == phase)
+                     return res;
+               }
             }
          }
       }
@@ -13058,7 +13065,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (mapper != null) {
                      // Can't evaluate an instance property anyway
                      if (mapper.getStaticPropertyPosition() != -1)
-                        nextObj = mapper.getPropertyValue(null);
+                        nextObj = mapper.getPropertyValue(null, false);
                      else
                         return null;
                   }

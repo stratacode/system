@@ -130,7 +130,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       else if (direction.doReverse()) {
          Object newValue;
          if (dstProp instanceof IBinding)
-             newValue = ((IBinding) dstProp).getPropertyValue(dstObj);
+             newValue = ((IBinding) dstProp).getPropertyValue(dstObj, false);
           else
              newValue = PBindUtil.getPropertyValue(dstObj, dstProp);
 
@@ -152,7 +152,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       return direction.doReverse() && !direction.doForward() && dstObj != dstProp;
    }
 
-   public Object getPropertyValue(Object object) {
+   public Object getPropertyValue(Object object, boolean getField) {
       // Do not cache results when it's a reverse only binding.  We're not listening on our parameters in
       // that case so we can't rely on being notified.
       if (!valid || !direction.doForward()) {

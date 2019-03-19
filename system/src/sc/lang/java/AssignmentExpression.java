@@ -242,7 +242,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
          if (bindingDirection != null) {
             super.transform(runtime);
             // In some cases, the super transform process will remove this statement entirely, for example when you have
-            // an =: assignmnet expression.  In those cases, just skip these last steps as we are done.
+            // an =: assignment expression.  In those cases, just skip these last steps as we are done.
             if (parentNode.containsChild(this)) {
                convertAssignmentToSetMethod();
             }

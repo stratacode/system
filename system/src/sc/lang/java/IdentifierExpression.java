@@ -1874,10 +1874,10 @@ public class IdentifierExpression extends ArgumentsExpression {
             value = ((MethodDefinition) boundType).callVirtual(thisObj);
          }
          else if (isDynGetVariableDef(i)) {
-            value = ((IDynObject) thisObj).getProperty(((VariableDefinition) boundType).variableName);
+            value = ((IDynObject) thisObj).getProperty(((VariableDefinition) boundType).variableName, false);
          }
          else
-            value = ((IDynObject) thisObj).getProperty(varName);
+            value = ((IDynObject) thisObj).getProperty(varName, false);
       }
       else
          value = TypeUtil.getPropertyValue(checkNullThis(thisObj, varName), varName);
@@ -2713,7 +2713,8 @@ public class IdentifierExpression extends ArgumentsExpression {
 
             case MethodInvocation:
                if (ModelUtil.isDynamicType(boundTypes[i]) && !inSuperExpr) {
-                  convertToDynamicMethod(identifier, i, sz, incr);
+                  if (parentNode.containsChild(this)) // This identifierExpression might have been replaced but using some of our arguments so if we continue on, we mess up their 'parent pointers' to point to nodes in this now unused tree.
+                     convertToDynamicMethod(identifier, i, sz, incr);
                }
                break;
 
@@ -3619,14 +3620,15 @@ public class IdentifierExpression extends ArgumentsExpression {
       // If we have not been officially started but our type reference has been assigned, we need to clear it here anyway
       //if (boundTypes == null && idTypes == null) return;
 
-      // Need to complete the full stop() on this node and our base type checks 'started'
-      if (!started)
-         started = true;
-
       if (arguments != null && arguments.identityIndexOf(this) != -1) {
          System.err.println("*** ERROR - invalid model - recursive identifier expression!");
          return;
       }
+
+      // Need to complete the full stop() on this node and our base type checks 'started'
+      if (!started)
+         started = true;
+
       super.stop();
       
       boundTypes = null;

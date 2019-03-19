@@ -42,7 +42,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    transient ThreadLocal<Integer> setNestCount = new ThreadLocal<Integer>();
    */
 
-   public Object getPropertyFromWrapper(IDynObject origObj, String propName) {
+   public Object getPropertyFromWrapper(IDynObject origObj, String propName, boolean getField) {
       int index = type.getDynInstPropertyIndex(propName);
       if (index == -1) {
          index = type.getDynStaticFieldIndex(propName);
@@ -55,7 +55,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                throw new IllegalArgumentException("No property: " + propName + " for get value on type: " + type.typeName);
             }
 
-            return TypeUtil.getPropertyValue(origObj, mapper);
+            return TypeUtil.getPropertyValue(origObj, mapper, getField);
             /*
             Integer nestCt = nestCount.get();
             if (nestCt == null)
@@ -79,23 +79,26 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          else
             return type.getDynStaticProperty(index);
       }
-      return getPropertyFromWrapper(origObj, index);
+      return getPropertyFromWrapper(origObj, index, getField);
    }
 
-   public Object getProperty(String propName) {
-      return getPropertyFromWrapper(this, propName);
+   public Object getProperty(String propName, boolean getField) {
+      return getPropertyFromWrapper(this, propName, getField);
    }
 
-   public Object getProperty(int propIndex) {
-      return getPropertyFromWrapper(this, propIndex);
+   public Object getProperty(int propIndex, boolean getField) {
+      return getPropertyFromWrapper(this, propIndex, getField);
    }
 
-   public Object getPropertyFromWrapper(IDynObject origObj, int propIndex) {
+   public Object getPropertyFromWrapper(IDynObject origObj, int propIndex, boolean getField) {
       if (propIndex >= properties.length || propIndex < 0)
          throw new IllegalArgumentException("No property with index: " + propIndex + " in type: " + type.typeName);
       Object val = properties[propIndex];
-      if (val == lazyInitSentinel)
+      if (val == lazyInitSentinel) {
+         if (getField) // This is basically the way we see if object has been initialized yet - so don't init it here if getField is true
+            return null;
          val = properties[propIndex] = type.initLazyDynProperty(origObj, propIndex, true);
+      }
       return val;
    }
 
@@ -104,7 +107,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
    }
 
    public <T> T getTypedProperty(String propName, Class<T> propType) {
-      return (T) getProperty(propName);
+      return (T) getProperty(propName, false);
    }
 
    public void setPropertyFromWrapper(Object origObj, String propName, Object value, boolean setField) {
@@ -277,7 +280,9 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       boolean dynInnerArgs = false;
       if (rtClass == null) {
          dynType.displayError("No compiled class for creating: " + dynType.getFullTypeName() + ": ");
+         rtClass = dynType.getCompiledClass();
       }
+
       if (rtClass == null || rtClass == IDynObject.class)
          dynObj = new DynObject(dynType);
       else {
@@ -552,7 +557,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       // For non-static inner instances, we store the outer object as the first slot
       // If we were not created with a src type declaration though, the dynamic type does not define our parent.
       if (srcObj instanceof IDynObject && ((IDynObject) srcObj).hasDynObject())
-         return ((IDynObject) srcObj).getProperty(OUTER_INSTANCE_SLOT);
+         return ((IDynObject) srcObj).getProperty(OUTER_INSTANCE_SLOT, false);
       else {
          int ix = 0;
          Class cl = srcObj.getClass();

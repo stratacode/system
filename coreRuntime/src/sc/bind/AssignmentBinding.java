@@ -54,8 +54,8 @@ public class AssignmentBinding extends DestinationListener {
       return ((DestinationListener) rhsBinding).isValid();
    }
 
-   public Object getPropertyValue(Object parent) {
-      return rhsBinding.getPropertyValue(parent);
+   public Object getPropertyValue(Object parent, boolean getField) {
+      return rhsBinding.getPropertyValue(parent, getField);
    }
 
    public void addBindingListener(Object eventObject, IListener listener, int event) {
@@ -170,7 +170,7 @@ public class AssignmentBinding extends DestinationListener {
       if (direction.doForward())
          return boundValue;
       else // reverse bindings are not cached - no listeners so we eval them each time
-         return rhsBinding.getPropertyValue(srcObj);
+         return rhsBinding.getPropertyValue(srcObj, false);
    }
 
    protected void initBinding() {
@@ -178,7 +178,7 @@ public class AssignmentBinding extends DestinationListener {
       lhsBinding.setBindingParent(this, direction);
       rhsBinding.setBindingParent(this, direction);
       if (direction.doForward()) {
-         boundValue = rhsBinding.getPropertyValue(srcObj);
+         boundValue = rhsBinding.getPropertyValue(srcObj, false);
          doAssignment();
       }
       else if (direction.doReverse() && dstProp != dstObj) {
@@ -194,7 +194,7 @@ public class AssignmentBinding extends DestinationListener {
          Object bindingParent = srcObj;
 
          if (isValidObject(bindingParent)) {
-            boundValue = rhsBinding.getPropertyValue(bindingParent);
+            boundValue = rhsBinding.getPropertyValue(bindingParent, false);
             doAssignment();
          }
       }
@@ -299,7 +299,7 @@ public class AssignmentBinding extends DestinationListener {
             return true;
          }
 
-         Object newValue = rhsBinding.getPropertyValue(srcObj);
+         Object newValue = rhsBinding.getPropertyValue(srcObj, false);
          if (!DynUtil.equalObjects(newValue, boundValue)) {
             changed = true;
             if (apply)
@@ -336,7 +336,7 @@ public class AssignmentBinding extends DestinationListener {
             return true;
          }
 
-         Object newValue = rhsBinding.getPropertyValue(srcObj);
+         Object newValue = rhsBinding.getPropertyValue(srcObj, false);
          if (!DynUtil.equalObjects(newValue, boundValue))
             bindingInvalidated(apply);
       }

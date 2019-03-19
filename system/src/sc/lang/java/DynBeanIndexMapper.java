@@ -40,7 +40,7 @@ public class DynBeanIndexMapper extends DynBeanMapper implements IBeanIndexMappe
 
    public void setIndexPropertyValue(Object parent, int index, Object value) {
       if (setIndexMethod == null)
-         DynUtil.setArrayElement(getPropertyValue(parent), index, value);
+         DynUtil.setArrayElement(getPropertyValue(parent, false), index, value);
       else {
          try {
             ModelUtil.callMethod(parent, setIndexMethod, index, value);
@@ -56,7 +56,7 @@ public class DynBeanIndexMapper extends DynBeanMapper implements IBeanIndexMappe
 
    public Object getIndexPropertyValue(Object parent, int index) {
       if (getIndexMethod == null)
-         return DynUtil.getArrayElement(getPropertyValue(parent), index);
+         return DynUtil.getArrayElement(getPropertyValue(parent, false), index);
       try {
          return ModelUtil.callMethod(parent, getIndexMethod, index);
       }

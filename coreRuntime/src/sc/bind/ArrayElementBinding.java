@@ -84,7 +84,7 @@ public class ArrayElementBinding extends VariableBinding {
    private boolean validateDims() {
       for (int i = 0; i < arrayBindings.length; i++) {
          IBinding arrayBinding = arrayBindings[i];
-         Object value = arrayBinding.getPropertyValue(null);
+         Object value = arrayBinding.getPropertyValue(null, false);
          if (!isValidObject(value))
             return false;
 

@@ -45,8 +45,9 @@ import java.util.*;
  *    - the getProcessedFiles method is called by the build system.  It generates the javascript code for each Java class - (these files are stored in the web/js/types directory of the build dir for debugging).
  *    Each of these js type files is a direct conversion of the Java code for that class only.  It does not contain any dependency info and is not intended to be loaded directly.  Instead those files are
  *    rolled up in the postProcess method into the files to be loaded by the browser.
- *    - the postProcess method is called after all types have been processed.  It generates the jsGenFiles by rolling up the individual .js files in the proper order..  For each changed gen file, it iterates over all of the entrypoints
- *    that are defined to be in that file.  Each entry point first makes sure all of the extends classes which are in the same file get added to the file first.   A base class must be defined before the sub-class is defined.
+ *    - the postProcess method is called after all types have been processed.  It generates the jsGenFiles by rolling up the individual .js files in the proper order..
+ *    For each changed gen file, it iterates over all of the entry points that are defined to be in that file.  Each entry point first makes sure all of the extends classes which are in the same
+ *    file get added to the file first.   A base class must be defined before the sub-class is defined.
  *    After the dependent types have been loaded, the entryPoint type is itself added to the file.
  */
 public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
@@ -887,6 +888,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
+   /** Called after all components have been started. We should not have any more entryPoints added after this point */
    public void postStart(LayeredSystem sys, Layer genLayer) {
       sortJSFiles();
 
@@ -1418,7 +1420,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                addModuleEntryPoint(type, jsModuleStr);
 
                // Record the top-level type-name to module name mappings.  We use these to compute at runtime the JSFiles property without having to load the src
-               jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
+               addJsModuleName(typeName, jsModuleStr);
             }
             return jsModuleStr;
          }
@@ -1427,7 +1429,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (enclType != null) {
             jsModuleStr = getJSModuleFile(enclType, resolveSrc, create);
             if (jsModuleStr != null) {
-               jsBuildInfo.jsModuleNames.put(typeName, jsModuleStr);
+               addJsModuleName(typeName, jsModuleStr);
                return jsModuleStr;
             }
          }
@@ -1444,7 +1446,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             if (ModelUtil.getEnclosingType(type) == null) {
                addModuleEntryPoint(type, layerModule);
             }
-            jsBuildInfo.jsModuleNames.put(typeName, layerModule);
+            addJsModuleName(typeName, layerModule);
             return layerModule;
          }
 
@@ -1457,13 +1459,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                if (type instanceof TypeDeclaration && (elem = ((TypeDeclaration) type).element) != null && elem.isAbstract())
                   return null;
 
+               // This is really an abstract class we kept around so we can create instances for the dynamic runtime - ignore it because we won't create a JS file for it due to the above logic for the source runtime
+               Boolean dynAbs = (Boolean) ModelUtil.getAnnotationValue(type, "sc.obj.TypeSettings", "dynAbstract");
+               if (dynAbs != null && dynAbs)
+                  return null;
+
                // Need to do this here because it might impact the type name used in the file - and we may not have hit this type due to the weird way we start from bottom up
                registerPrefixAlias(type);
 
                Object typeParams = new ObjectTypeParameters(system, type);
                String jsModuleRes = TransformUtil.evalTemplate(typeParams, jsModuleStr, true); // TODO: preparse these strings for speed
                addModuleEntryPoint(type, jsModuleRes);
-               jsBuildInfo.jsModuleNames.put(typeName, jsModuleRes);
+               addJsModuleName(typeName, jsModuleRes);
                return jsModuleRes;
             }
          }
@@ -1472,7 +1479,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             // I'm not sure why we are getting this again since we tried getting it above, but just in case adding the null sentinel processing here
             res = jsBuildInfo.jsModuleNames.get(typeName);
             if (res == null) {
-               jsBuildInfo.jsModuleNames.put(typeName, NULL_JS_MODULE_NAMES_SENTINEL);
+               addJsModuleName(typeName, NULL_JS_MODULE_NAMES_SENTINEL);
             }
             else if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
                res = null;
@@ -1494,6 +1501,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          PerfMon.end("getJSModuleFile");
       }
       return null;
+   }
+
+   private void addJsModuleName(String typeName, String name) {
+      jsBuildInfo.jsModuleNames.put(typeName, name);
    }
 
    public void process(BodyTypeDeclaration td) {
@@ -1836,6 +1847,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (currentType == null) {
             System.err.println("*** Unable to find type for JS update");
             return;
+         }
+
+         if (currentType.excluded) {
+            if (currentType.excludedStub == null)
+               return;
+            currentType = currentType.excludedStub;
          }
 
          // Get these from the pre-transformed type
@@ -2193,7 +2210,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   }
                   */
                   List<BodyTypeDeclaration> addLaterTypes = new ArrayList<BodyTypeDeclaration>();
-                  addTypeToFile(e.getResolvedType(sys), typesInFile, jsFile, genLayer, null, addLaterTypes);
+                  BodyTypeDeclaration btd = e.getResolvedType(sys);
+                  addTypeToFile(btd, typesInFile, jsFile, genLayer, null, addLaterTypes);
                   while (addLaterTypes.size() > 0) {
                      List<BodyTypeDeclaration> addNowTypes = addLaterTypes;
                      addLaterTypes = new ArrayList<BodyTypeDeclaration>();
@@ -2724,7 +2742,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       jsEnt.fullTypeName = fullTypeName;
       Boolean state = typesInFile.get(jsEnt);
       // Already initializing this type
-      if (state != null) {
+      if (state != null) { // TODO performance: move this earlier in the function?
          if (!notInParentFile && typesInSameFile != null) {
             typesInSameFile.add(type.getFullTypeName());
          }

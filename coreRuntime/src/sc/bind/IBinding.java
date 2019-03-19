@@ -9,7 +9,8 @@ import sc.js.JSSettings;
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
 public interface IBinding {
    /** Retrieves the current value of the binding given the current object. */
-   Object getPropertyValue(Object parent);
+
+   Object getPropertyValue(Object parent, boolean getField);
 
    void addBindingListener(Object eventObject, IListener listener, int event);
 

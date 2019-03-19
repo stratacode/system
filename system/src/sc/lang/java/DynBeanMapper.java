@@ -115,16 +115,16 @@ public class DynBeanMapper extends AbstractBeanMapper {
       }
    }
 
-   public Object getPropertyValue(Object parent) {
+   public Object getPropertyValue(Object parent, boolean getField) {
       try {
          if ((attMask & IS_STATIC) == 0) {
             if ((attMask & GET_IS_FIELD) != 0) {
                // TODO: should cache the offset someplace to avoid the proeprty name/lookup
-               if ((attMask & GET_IS_DYN) != 0) {
+               if ((attMask & GET_IS_DYN) != 0 && !getField) {
                   if (!(parent instanceof IDynObject))
                      System.out.println("*** not a dynamic object");
                   IDynObject dynObj = (IDynObject) parent;
-                  return dynObj.getProperty(getPropertyName());
+                  return dynObj.getProperty(getPropertyName(), false);
                }
                else {
                   return ((Field) getSelector).get(parent);
@@ -145,6 +145,8 @@ public class DynBeanMapper extends AbstractBeanMapper {
                   return ((BodyTypeDeclaration)ownerType).getDynStaticField(getPropertyName());
                }
                else {
+                  if (getField && field instanceof Field)
+                     return ((Field) field).get(null);
                   if (!(getSelector instanceof Field))
                      throw new IllegalArgumentException("No property: " + getSelector + " on: " + parent);
                   return ((Field) getSelector).get(null);

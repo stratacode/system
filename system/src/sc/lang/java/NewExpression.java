@@ -961,13 +961,19 @@ public class NewExpression extends IdentifierExpression {
          expr.boundTypeName = boundTypeName;
          expr.boundType = boundType;
          expr.anonTypeTransformed = anonTypeTransformed;
+         expr.classPropertyName = classPropertyName;
       }
 
       if ((options & CopyInitLevels) != 0) {
          expr.constructor = constructor;
          expr.classPropertyName = classPropertyName;
          expr.isStaticContext = isStaticContext;
-
+         expr.boundType = boundType;
+         expr.boundTypeName = boundTypeName;
+         expr.anonTypeTransformed = anonTypeTransformed;
+         expr.anonType = anonType;
+         expr.anonTypeInited = anonTypeInited;
+         expr.anonId = anonId;
       }
       return expr;
    }

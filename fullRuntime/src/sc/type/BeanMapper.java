@@ -49,10 +49,13 @@ public class BeanMapper extends AbstractBeanMapper {
    }
 
 
-   public Object getPropertyValue(Object parent) {
+   public Object getPropertyValue(Object parent, boolean getField) {
       if (parent == null && staticPosition == -1)
          throw new IllegalArgumentException("Attempt to get instance property: " + this + " without object");
       try {
+         if (getField && field != null)
+            return field.get(parent);
+
          if (getIsField)
             return ((Field) getSelector).get(parent);
          else

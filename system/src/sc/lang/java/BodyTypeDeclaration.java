@@ -135,9 +135,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient String fullTypeName;
 
    /**
-    * When we extend an inner class from a dynamic type, we need to generate inner types in the dynamic stub.  this preserves the outer/inner
+    * When we extend a compiled inner class from a dynamic type, we need to generate inner stub types in the dynamic stub of the parent type.  this preserves the outer/inner
     * relationship in the dynamic type.  We cannot extend an inner type from a top level type.  java requires that the inner type be extended from
-    * within the type hierarchy.  But if we use the inner/outer relationship all of the time, it means regenerating a new outer class every time
+    * within the type hierarchy (for instance types).  But if we use the inner/outer relationship all of the time, it means regenerating a new outer class every time
     * we add a new inner object.  So we only use inner types in the stub when we extend a compiled outer/inner combo.  This flag gets set to true
     * on the inner class if a type which extends some compiled inner type.
     */
@@ -1685,6 +1685,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return typeName;
 
       ISemanticNode pnode = parentNode instanceof BodyTypeDeclaration || parentNode instanceof JavaModel ? parentNode : parentNode.getParentNode(); // Skip the list, not there for command completion
+      if (pnode instanceof Element) // Not sure why this case happened but in this case, we want the tagObject's typeName.
+         pnode = ((Element) pnode).tagObject;
       if (pnode instanceof JavaModel) {
          return typeName;
       }
@@ -2904,7 +2906,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public Object getStaticProperty(String propName) {
       IBeanMapper mapper = getPropertyMapping(propName);
       if (mapper != null)
-         return mapper.getPropertyValue(this);
+         return mapper.getPropertyValue(this, false);
       else
          throw new IllegalArgumentException("No static property: " + propName + " for type: " + this);
    }
@@ -3504,22 +3506,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object[] children = new Object[childNames.length];
       int i = 0;
       for (String childName:childNames) {
-         // TODO: should be passing "false" to the "doInit" flag we need to add.  Maybe add it to the
          // getProperty(int) version so we don't have so many methods.
-         children[i] = DynUtil.getProperty(inst, childName);
+         // Passing getField as true here so we just return an existing instance. If it's null, we need to check if the inner type
+         // is a dynamic type. If we were to call the compiled getX, it would skip a type we override with a "modify inherited" scheme
+         // or just outright replaced in the dynamic world. This also lets us do the proper component initialization sequence even if it's a compiled type
+         // first it will call getX(false) to create the object, then we can set all of the properties and do the preInit, then init, etc for all referenced types
+         // rather than doing them all one at a time.
+         children[i] = DynUtil.getProperty(inst, childName, true);
          // If we call the super.get method and it returns null, this must be an object def which overrides a compiled
          // property.  In this case, we should have a TypeDeclaration and can then set it.
          if (children[i] == null) {
             Object type = getInnerType(childName, null);
             if (type instanceof BodyTypeDeclaration) {
                BodyTypeDeclaration td = (BodyTypeDeclaration) type;
-               children[i] = td.initLazyInnerObject(inst, (BodyTypeDeclaration) type, -1, true);
-               IBeanMapper mapper = getPropertyMapping(childName);
-               // TODO: is there something we need to set here on the dyn object?
-               // When we have compiled an inner type which is an independent stub, there's no property to set for the outer object
-               if (mapper != null && mapper.isWritable())
-                  DynUtil.setProperty(inst, childName, children[i]);
+               if (!td.isDynamicType()) {
+                  children[i] = DynUtil.getProperty(inst, childName, false); // Now call the 'getX' method to create the object because we don't have it defined as a dynamic type
+               }
+               if (children[i] == null) {
+                  children[i] = td.initLazyInnerObject(inst, (BodyTypeDeclaration) type, -1, true);
+                  IBeanMapper mapper = getPropertyMapping(childName);
+                  // TODO: is there something we need to set here on the dyn object?
+                  // When we have compiled an inner type which is an independent stub, there's no property to set for the outer object
+                  if (mapper != null && mapper.isWritable())
+                     DynUtil.setProperty(inst, childName, children[i]);
+               }
             }
+            else
+               children[i] = DynUtil.getProperty(inst, childName, false); // Now call the 'getX' method to create the object because we don't have it defined as a dynamic type
          }
          i++;
       }
@@ -4837,11 +4850,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "   }\n" +
            "<% } } %>" +
            "<% if (!extendsDynamicStub) { %>" +
-           "   public Object getProperty(String propName) {\n" +
-           "      return dynObj.getPropertyFromWrapper(this, propName);\n" +
+           "   public Object getProperty(String propName, boolean getField) {\n" +
+           "      return dynObj.getPropertyFromWrapper(this, propName, getField);\n" +
            "   }\n" +
-           "   public Object getProperty(int propIndex) {\n" +
-           "      return dynObj.getPropertyFromWrapper(this, propIndex);\n" +
+           "   public Object getProperty(int propIndex, boolean getField) {\n" +
+           "      return dynObj.getPropertyFromWrapper(this, propIndex, getField);\n" +
            "   }\n" +
            "   public void setProperty(String propName, Object value, boolean setField) {\n" +
            "      dynObj.setPropertyFromWrapper(this, propName, value, setField);\n" +
@@ -4862,7 +4875,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      dynObj.setTypeFromWrapper(this, typeObj);\n" +
            "   }\n" +
            "   public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {\n" +
-           "      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName);\n" +
+           "      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName, false);\n" +
            "   }\n" +
            "   public void addProperty(Object propType, String propName, Object initValue) {\n" +
            "      dynObj.addProperty(propType, propName, initValue);\n" +
@@ -4898,7 +4911,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            //
            "<% for (sc.lang.java.PropertyDefinitionParameters prop:dynCompiledProperties) {%>" +
            "   <%=prop.getModifiers%> <%=prop.propertyTypeName%><%=prop.arrayDimensions%> <%=prop.getOrIs%><%=prop.upperPropertyName%>() {\n" +
-           "      return <%=prop.preReturn%> getProperty(\"<%=prop.lowerPropertyName%>\")<%=prop.postReturn%>;\n" +
+           "      return <%=prop.preReturn%> getProperty(\"<%=prop.lowerPropertyName%>\", false)<%=prop.postReturn%>;\n" +
            "   }\n" +
            "   <%=prop.setModifiers%> void set<%=prop.upperPropertyName%>(<%=prop.setTypeName%><%=prop.arrayDimensions%> _<%=prop.lowerPropertyName%>) {\n" +
            "     setProperty(\"<%=prop.lowerPropertyName%>\", _<%=prop.lowerPropertyName%>, false);\n" +
@@ -6668,7 +6681,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (innerType.isDynObj(false) && currentObj instanceof IDynObject) {
                   mgr = getDynChildManager();
                   if (mgr != null)
-                     mgr.addChild(currentObj, ((IDynObject)currentObj).getProperty(ix));
+                     mgr.addChild(currentObj, ((IDynObject)currentObj).getProperty(ix, false));
                }
                else {
                   JavaModel model = getJavaModel();
@@ -6678,7 +6691,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             case Remove:
                if (innerType.isDynObj(false) && currentObj instanceof IDynObject) {
                   mgr = getDynChildManager();
-                  Object toRemove = ((IDynObject)currentObj).getProperty(ix);
+                  Object toRemove = ((IDynObject)currentObj).getProperty(ix, false);
                   if (toRemove != null) {
                      if (mgr != null)
                         mgr.removeChild(currentObj, toRemove);
@@ -7004,7 +7017,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // Need to add the outer instance - this is a compiled class that's an inner class.  There's probably a dynamic slot for this property as well
                // but we need to bypass it because that slot may not have the lazy init sentinel.
                if (outerObj != null && ModelUtil.getEnclosingInstType(cl) != null) {
-                  inst = TypeUtil.getPropertyValueFromName(outerObj, typeName);
+                  inst = TypeUtil.getPropertyValueFromName(outerObj, typeName, false);
                }
                else {
                   if (argValues == null)
@@ -7255,7 +7268,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public static boolean isExtendsDynamicType(Object extendsType) {
-      // Make sure it's a dynamic type implements the IDynObject interface and has the appropriate constructor.  If we insert a regular compiled type inbetween a dyn stub
+      // Make sure it's a dynamic type implements the IDynObject interface and has the appropriate constructor.  If we insert a regular compiled type in between a dyn stub
       // and another dynamic type, we need to create a new dynamic stub for the sub-type.
       /* ??? Not sure why we used to include this test below
       boolean oldTest = ModelUtil.getParamTypeBaseType(extendsType) instanceof Class;
@@ -7918,7 +7931,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (needsDynamicStubForExtends()) {
          if (!dynamicNew) {
-            needsDynamicStub = true;
+            markNeedsDynamicStub(true);
             propagateDynamicStub();
          }
       }
@@ -8127,10 +8140,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void setNeedsDynamicStub(boolean val) {
       if (!needsDynamicStub && val) {
+         /** TODO: performance - this test broke in a case where the super class was a dynamic stub but where we needed a new
+          * dynamic stub because there was at least one child dynInnerStub. This test assumes that we can always inject the dynamic
+          * behavior into the first dynamic stub, but we sometimes need to create an extended dynamic stub because that class needs
+          * to exist to support new dynInner stubs. We could reduce the # of dynamic stubs that this creates by figuring out that
+          * case - i.e. where there are no children which need dyn inner stub.
          if (getSuperIsDynamicStub()) {
             return;
          }
-         needsDynamicStub = true;
+         */
+         markNeedsDynamicStub(true);
          if (getNeedsDynInnerStub()) {
             BodyTypeDeclaration enclType = getEnclosingType();
             if (enclType != null)
@@ -8143,7 +8162,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void propagateDynamicStub() {
       BodyTypeDeclaration modifiedType = getPureModifiedType();
       if (modifiedType != null) {
-         modifiedType.needsDynamicStub = true;
+         modifiedType.markNeedsDynamicStub(true);
          modifiedType.propagateDynamicStub();
       }
    }
@@ -9829,5 +9848,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean getNeedsDynInnerStub() {
       return needsDynInnerStub;
+   }
+
+   public final void markNeedsDynamicStub(boolean val) {
+      needsDynamicStub = val;
    }
 }

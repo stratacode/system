@@ -273,9 +273,9 @@ public class TypeUtil  {
       }
 
       if (mapping instanceof IBeanMapper)
-         return ((IBeanMapper) mapping).getPropertyValue(null);
+         return ((IBeanMapper) mapping).getPropertyValue(null, false);
       else
-         return PTypeUtil.getProperty(null, mapping);
+         return PTypeUtil.getProperty(null, mapping, false);
    }
 
    public static void setStaticValue(Class parent, Object mapping, Object value) {
@@ -296,25 +296,29 @@ public class TypeUtil  {
       return PTypeUtil.evalInstanceOfExpression(lhsVal, theClass);
    }
 
-   public static Object getPropertyValueFromName(Object parent, String propName) {
+   public static Object getPropertyValueFromName(Object parent, String propName, boolean getField) {
       Object newMapping = getPropertyMapping(parent.getClass(), propName, null, null);
       // No mapping
       if (newMapping == null) {
          throw new IllegalArgumentException("No property: " + propName + " in class: " + parent.getClass() + " for instance: " + DynUtil.getInstanceName(parent));
       }
-      return getPropertyValue(parent, newMapping);
+      return getPropertyValue(parent, newMapping, getField);
    }
 
    public static Object getPropertyValue(Object parent, Object mapping) {
+      return getPropertyValue(parent, mapping, false);
+   }
+
+   public static Object getPropertyValue(Object parent, Object mapping, boolean getField) {
       if (mapping instanceof IBeanMapper)
-         return ((IBeanMapper) mapping).getPropertyValue(parent);
+         return ((IBeanMapper) mapping).getPropertyValue(parent, getField);
       else if (parent instanceof IDynObject && mapping instanceof String)
-         return ((IDynObject) parent).getProperty((String) mapping);
+         return ((IDynObject) parent).getProperty((String) mapping, getField);
       else if (mapping instanceof String) {
-         return getPropertyValueFromName(parent, (String) mapping);
+         return getPropertyValueFromName(parent, (String) mapping, getField);
       }
       else
-         return PTypeUtil.getProperty(parent, mapping);
+         return PTypeUtil.getProperty(parent, mapping, getField);
    }
 
    public static IBeanMapper resolveObjectPropertyMapping(Object dstObj, String dstPropName) {

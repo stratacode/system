@@ -11,7 +11,7 @@ import sc.type.IBeanMapper;
 public class PBindUtil {
    public static Object getPropertyValue(Object obj, Object prop) {
       if (prop instanceof IBinding)
-         return ((IBinding) prop).getPropertyValue(obj);
+         return ((IBinding) prop).getPropertyValue(obj, false);
       return DynUtil.getProperty(obj, (String) prop);
    }
 

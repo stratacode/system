@@ -31,14 +31,14 @@ public class ArithmeticBinding extends AbstractMethodBinding {
    }
 
    protected Object invokeMethod(Object obj) {
-      Object lhsVal = boundParams[0].getPropertyValue(obj);
+      Object lhsVal = boundParams[0].getPropertyValue(obj, false);
       paramValues[0] = lhsVal;
       boolean isString = lhsVal instanceof String;
       for (int i = 1; i < boundParams.length; i++) {
          Object nextVal;
          // TODO: do we need to add some form of typing to the binding interface?  Arithmetic expressions would
          // propagate their type.  The top-level guy would get the type from the dst property mapper.
-         paramValues[i] = nextVal = boundParams[i].getPropertyValue(obj);
+         paramValues[i] = nextVal = boundParams[i].getPropertyValue(obj, false);
          isString = isString || nextVal instanceof String;
          if (nextVal == PENDING_VALUE_SENTINEL || lhsVal == PENDING_VALUE_SENTINEL) {
             return PENDING_VALUE_SENTINEL;
@@ -74,20 +74,20 @@ public class ArithmeticBinding extends AbstractMethodBinding {
 
       if (!boundParams[0].isConstant()) {
          lhsVal = evalInverseExpr(inverseOp.inverseOpA, value,
-                                  boundParams[1].getPropertyValue(obj), inverseOp.swapArgsA);
+                                  boundParams[1].getPropertyValue(obj, false), inverseOp.swapArgsA);
          propagated = true;
          startParam = 2;
          boundParams[0].applyReverseBinding(obj, lhsVal, this);
       }
       else
-         lhsVal = boundParams[0].getPropertyValue(obj);
+         lhsVal = boundParams[0].getPropertyValue(obj, false);
       for (int i = startParam; i < boundParams.length; i++) {
          if (!propagated && !boundParams[i].isConstant()) {
             lhsVal = evalInverseExpr(inverseOp.inverseOpB, lhsVal, value, inverseOp.swapArgsB);
             boundParams[i].applyReverseBinding(obj, lhsVal, this);
          }
          else {
-            lhsVal = DynUtil.evalArithmeticExpression(operator, null, lhsVal, boundParams[i].getPropertyValue(obj));
+            lhsVal = DynUtil.evalArithmeticExpression(operator, null, lhsVal, boundParams[i].getPropertyValue(obj, false));
          }
       }
       return lhsVal;

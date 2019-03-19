@@ -393,7 +393,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
          // If our modified type needs a dynamic stub we do too.   the propagateDynamicStub method only goes down the modify tree
          if (modifyTypeDecl.needsDynamicStub && !modifyInherited)
-            needsDynamicStub = true;
+            modifyTypeDecl.markNeedsDynamicStub(true);
       }
 
       if (modifyInherited && isDynamicType() && !ModelUtil.isDynamicType(modifyTypeDecl)) {
@@ -532,7 +532,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                TypeDeclaration enclType = getEnclosingType();
                // If this is the top-level type in the layer, resolve it as a layer
                if (thisModel.isLayerModel && enclType == null) {
-                  Object obj = thisModel.resolveName(fullTypeName, false, true);
+                  Object obj = fullTypeName == null ? null : thisModel.resolveName(fullTypeName, false, true);
                   // Originally the layer is initially registered under its type name - it gets renamed once after init
                   if (obj == null)
                      obj = thisModel.resolveName(typeName, false, true);
@@ -2560,7 +2560,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
                      // TODO: is this an error? conflicting compiled class names but maybe it's interfaces?
                      System.err.println("*** Dyn stub with conflicting base classes from modified and extends types");
-                     needsDynamicStub = true;
+                     markNeedsDynamicStub(true);
                      propagateDynamicStub();
                   }
                }

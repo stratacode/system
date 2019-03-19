@@ -2041,14 +2041,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    // ---- Begin the DynObject redirection boilerplate
-   public Object getProperty(String propName) {
-      return dynObj.getPropertyFromWrapper(this, propName);
+   public Object getProperty(String propName, boolean getField) {
+      return dynObj.getPropertyFromWrapper(this, propName, getField);
    }
-   public Object getProperty(int propIndex) {
-      return dynObj.getPropertyFromWrapper(this, propIndex);
+   public Object getProperty(int propIndex, boolean getField) {
+      return dynObj.getPropertyFromWrapper(this, propIndex, getField);
    }
    public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
-      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName);
+      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName, false);
    }
    public void setProperty(String propName, Object value, boolean setField) {
       dynObj.setPropertyFromWrapper(this, propName, value, setField);

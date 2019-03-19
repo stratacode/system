@@ -910,34 +910,34 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    @Override
-   public Object getProperty(String propName) {
+   public Object getProperty(String propName, boolean getField) {
       initDynObj();
       if (dynObj != null) {
          if (definesProperty(propName)) {
-            return dynObj.getPropertyFromWrapper(this, propName);
+            return dynObj.getPropertyFromWrapper(this, propName, getField);
          }
          if (baseLayers != null) {
             for (Layer base:baseLayers) {
                if (base.hasProperty(propName))
-                  return base.getProperty(propName);
+                  return base.getProperty(propName, getField);
             }
          }
       }
-      return TypeUtil.getPropertyValueFromName(this, propName);
+      return TypeUtil.getPropertyValueFromName(this, propName, getField);
    }
 
-   public Object getProperty(int propIndex) {
+   public Object getProperty(int propIndex, boolean getField) {
       initDynObj();
       if (dynObj == null)
          return null;
-      return dynObj.getPropertyFromWrapper(this, propIndex);
+      return dynObj.getPropertyFromWrapper(this, propIndex, getField);
    }
 
    public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
       initDynObj();
       if (dynObj == null)
          return null;
-      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName);
+      return (_TPROP) dynObj.getPropertyFromWrapper(this, propName, false);
    }
    public void addProperty(Object propType, String propName, Object initValue) {
       initDynObj();

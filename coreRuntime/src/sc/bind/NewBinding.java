@@ -24,7 +24,7 @@ public class NewBinding extends AbstractMethodBinding {
    protected Object invokeMethod(Object obj) {
       boolean valid = true;
       for (int i = 0; i < paramValues.length; i++) {
-         paramValues[i] = boundParams[i].getPropertyValue(obj);
+         paramValues[i] = boundParams[i].getPropertyValue(obj, false);
          if (paramValues[i] == PENDING_VALUE_SENTINEL)
             return PENDING_VALUE_SENTINEL;
          if (paramValues[i] == UNSET_VALUE_SENTINEL)

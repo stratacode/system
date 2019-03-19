@@ -2815,17 +2815,55 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       else {
          tagType = ClassDeclaration.create(isAbstract() || isRepeatElement ? "class" : "object", getObjectName(), extendsType);
-         if (tagLayer != null && tagLayer.defaultModifier != null)
-            tagType.addModifier(tagLayer.defaultModifier);
-         // If we make these classes abstract, it makes it simpler to identify them and omit from type groups, but it means we can't
-         // instantiate these classes as base type.  This means more classes in the code.  So instead the type groups stuff needs
-         // to check Element.isAbstract.
-         if (isAbstract() && tagTypeNeedsAbstract())
-            tagType.addModifier("abstract");
       }
 
-      processScope(tagType, scopeName);
-      processExecAttr(tagType);
+      SemanticNodeList<Object> tagModifiers = null;
+      // Start with any modifiers specified in the template declaration for this object. We build these up as a list before
+      // we set them due to the fact that we are not yet initialized, and parselets only tracks changes
+      // on initialized objects.
+      // TODO: when adding to this list, we really need to be merging in annotations - especially TypeSettings
+      if (templateModifiers != null) {
+         tagModifiers = (SemanticNodeList<Object>) templateModifiers.deepCopy(ISemanticNode.CopyNormal, null);
+      }
+
+      // If we make these classes abstract, it makes it simpler to identify them and omit from type groups, but it means we can't
+      // instantiate these classes as base type.  This means more classes in the code.  So instead the type groups stuff needs
+      // to check Element.isAbstract.
+      if (!isModify) {
+         if (tagLayer != null && tagLayer.defaultModifier != null) {
+            if (tagModifiers == null)
+               tagModifiers = new SemanticNodeList<Object>();
+            tagModifiers.add(tagLayer.defaultModifier);
+         }
+         if (isAbstract()) {
+            if (tagModifiers == null)
+               tagModifiers = new SemanticNodeList<Object>();
+            if (tagTypeNeedsAbstract()) {
+               tagModifiers.add("abstract");
+            }
+            else {
+               // Need to mark the compiled class as abstract even if we don't mark it that way for Java for the dynamic type system.
+               // This is ultimately an optimization because otherwise we generate new classes for each tag instantiation of a base class.
+               // If we can't detect abstract tag objects at runtime though, we will not apply JSSettings like jsModuleFile subTypeOnly correctly
+               // which ignore abstract classes.
+               tagModifiers.add(Annotation.create("sc.obj.TypeSettings", "dynAbstract", Boolean.TRUE));
+            }
+         }
+      }
+
+      if (tagModifiers == null)
+         tagModifiers = new SemanticNodeList<Object>();
+
+      processScope(tagType, scopeName, tagModifiers);
+      processExecAttr(tagType, tagModifiers);
+
+      String componentStr = getFixedAttribute("component");
+      if (componentStr != null && componentStr.equalsIgnoreCase("true")) {
+         tagModifiers.add(Annotation.create("sc.obj.Component"));
+      }
+
+      if (tagModifiers != null && tagModifiers.size() > 0)
+         tagType.setProperty("modifiers", tagModifiers);
 
       // Leave a trail for finding where this statement was generated from for debugging purposes
       tagType.fromStatement = this;
@@ -2839,19 +2877,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
 
-      String componentStr = getFixedAttribute("component");
-      if (componentStr != null && componentStr.equalsIgnoreCase("true")) {
-         tagType.addModifier(Annotation.create("sc.obj.Component"));
-      }
-
       if (template.temporary)
          tagType.markAsTemporary();
 
       tagObject = tagType;
       tagType.element = this;
       tagType.layer = tagLayer;
-      if (templateModifiers != null)
-         tagType.setProperty("modifiers", templateModifiers);
 
       if (!isModify && ModelUtil.hasModifier(extTypeDecl, "public") && !tagType.hasModifier("public"))
          tagType.addModifier("public");
@@ -3302,12 +3333,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       st.fromStatement = this;
    }
 
-   private void processScope(TypeDeclaration tagType, String scopeName) {
+   private void processScope(TypeDeclaration tagType, String scopeName, SemanticNodeList<Object> tagModifiers) {
       if (scopeName != null) {
          if (ScopeModifier.isValidScope(getJavaModel(), scopeName)) {
             ScopeModifier scopeMod = new ScopeModifier();
             scopeMod.scopeName = scopeName;
-            tagType.addModifier(scopeMod);
+            tagModifiers.add(scopeMod);
          }
          else {
             Attr attr = getAttribute("scope");
@@ -3317,7 +3348,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   private void processExecAttr(TypeDeclaration tagType) {
+   private void processExecAttr(TypeDeclaration tagType, SemanticNodeList<Object> tagModifiers) {
       if (oldExecTag)
          return;
       String execStr = getFixedAttribute("exec");
@@ -3330,7 +3361,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if ((flags & ExecClient) != 0 && ((flags & ExecServer) == 0))
             annot.addAnnotationValues(AnnotationValue.create("clientOnly", true));
 
-         tagType.addModifier(annot);
+         tagModifiers.add(annot);
       }
    }
 
@@ -3441,6 +3472,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("fieldset", "element", emptyArgs, null);
       addTagAttributes("legend", "element", emptyArgs, null);
       addTagAttributes("label", "element", new String[] {"for", "form"}, null);
+      addTagAttributes("abbr", "element", new String[] {"title"}, null);
       // One per document so no worrying about merging or allocating unique ids for them
       singletonTagNames.add("head");
       singletonTagNames.add("body");
@@ -3994,7 +4026,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       else {
          return ModelUtil.isAssignableFrom(IRepeatWrapper.class, dynObj.getDynType()) ?
-                                              dynObj.getPropertyFromWrapper(this, "repeat") : null;
+                                              dynObj.getPropertyFromWrapper(this, "repeat", false) : null;
       }
    }
 

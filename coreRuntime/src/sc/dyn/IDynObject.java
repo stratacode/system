@@ -11,8 +11,8 @@ public interface IDynObject {
 
    public final static String SET_PROPERTY_NAME = "setProperty";
 
-   Object getProperty(String propName);
-   Object getProperty(int propIndex); // Faster way to get properties
+   Object getProperty(String propName, boolean getField);
+   Object getProperty(int propIndex, boolean getField); // Faster way to get properties
    <T> T getTypedProperty(String propName, Class<T> propType); // Get properties without casting at the access site
 
    void setProperty(String propName, Object value, boolean setField);

@@ -39,7 +39,7 @@ public class BeanIndexMapper extends BeanMapper implements IBeanIndexMapper {
 
    public void setIndexPropertyValue(Object parent, int index, Object value) {
       if (setIndexMethod == null)
-         DynUtil.setArrayElement(getPropertyValue(parent), index, value);
+         DynUtil.setArrayElement(getPropertyValue(parent, false), index, value);
       try {
          setIndexMethod.invoke(parent, index, value);
       }
@@ -58,7 +58,7 @@ public class BeanIndexMapper extends BeanMapper implements IBeanIndexMapper {
 
    public Object getIndexPropertyValue(Object parent, int index) {
       if (getIndexMethod == null)
-         return DynUtil.getArrayElement(getPropertyValue(parent), index);
+         return DynUtil.getArrayElement(getPropertyValue(parent, false), index);
       try {
          return getIndexMethod.invoke(parent, index);
       }
