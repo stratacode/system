@@ -74,6 +74,12 @@ VALID_DIR="$VALID_RESULTS/$TEST_NAME"
 VALID_FILE="$VALID_DIR/out"
 VALID_STATUS_FILE="$VALID_DIR/status"
 VALID_PAGES="$VALID_DIR/pages"
+LOG_FILTER_OPTS=""
+LOG_FILTER_OPTS_MSG=""
+if [ -f ${VALID_DIR}/logFilterOpts ] ; then
+  LOG_FILTER_OPTS=`cat ${VALID_DIR}/logFilterOpts`
+  LOG_FILTER_OPTS_MSG=" with options: $LOG_FILTER_OPTS"
+fi
 
 CMD=${ARGS[*]}
 if [ ! -d "$TEST_DIR" ] ; then
@@ -117,8 +123,8 @@ fi
 echo "$STATUS" > "$STATUS_FILE"
 
 if [ -f "$OUTP_FILE" ] ; then
-   scc -q -ni sctest.logFilter < "$OUTP_FILE" > "$OUT_FILE"
-   echo "Filtered: `diff "$OUTP_FILE" "$OUT_FILE" | wc -l` output lines"
+   scc -q -ni sctest.logFilter -ra $LOG_FILTER_OPTS < "$OUTP_FILE" > "$OUT_FILE"
+   echo "Filtered$LOG_FILTER_OPTS_MSG: `diff "$OUTP_FILE" "$OUT_FILE" | wc -l` output lines"
 fi
 
 if [ -d "$PAGESP" ] ; then
@@ -129,8 +135,8 @@ if [ -d "$PAGESP" ] ; then
       PAGEP_FILE="${PAGESP}/${PAGE_FILE}"
       PAGE_FILE="${PAGES}/${PAGE_FILE}"
       mkdir -p `dirname "$PAGE_FILE"`
-      scc -q -ni sctest.logFilter < "$PAGEP_FILE" > "$PAGE_FILE"
-      echo "Filtered: `diff "$PAGEP_FILE" "$PAGE_FILE" | wc -l` page: $PAGE_FILE lines"
+      scc -q -ni sctest.logFilter -ra $LOG_FILTER_OPTS < "$PAGEP_FILE" > "$PAGE_FILE"
+      echo "Filtered$LOG_FILTER_OPTS_MSG: `diff "$PAGEP_FILE" "$PAGE_FILE" | wc -l` lines for page: $PAGE_FILE"
    done
 fi
 
@@ -141,23 +147,53 @@ else
 fi
 
 SUCCESS=0
+ALT_PAGES_IX=
+ALT_OUT_IX=
 if [ -f "$VALID_FILE" ] ; then 
    pagesChanged=1
    outputChanged=1
    statusChanged=1
    if [[ ! -d "$VALID_PAGES" ]] || diff -r "$VALID_PAGES" "$PAGES" > /dev/null ; then 
       pagesChanged=0
+   else 
+      NEXT_PAGES_IX=1
+      while [[ "$pagesChanged" = "1" ]] && [[ -d "${VALID_PAGES}_alt${NEXT_PAGES_IX}" ]] ; 
+      do
+         if diff -r "${VALID_PAGES}_alt${NEXT_PAGES_IX}" "$PAGES" > /dev/null ; then
+            pagesChanged=0
+            ALT_PAGES_IX=${NEXT_PAGES_IX}
+         fi
+         let NEXT_PAGES_IX=${NEXT_PAGES_IX}+1
+      done
    fi
    if diff "$VALID_FILE" "$OUT_FILE" > /dev/null ; then 
       outputChanged=0
+   else
+      NEXT_OUT_IX=1
+      while [[ "$outputChanged" = "1" ]] && [[ -d "${VALID_FILE}_alt${NEXT_OUT_IX}" ]] ; 
+      do
+         if diff "${VALID_FILE}_alt${NEXT_OUT_IX}" "$OUT_FILE" > /dev/null ; then
+            outputChanged=0
+            ALT_OUT_IX=${NEXT_OUT_IX}
+         fi
+         let NEXT_OUT_IX=${NEXT_OUT_IX}+1
+      done
    fi
    if diff "$VALID_STATUS_FILE" "$STATUS_FILE" > /dev/null ; then 
       statusChanged=0
    fi
    
    testFailed=0
+
+   altMsg=""
+   if [[ "$ALT_PAGES_IX" != "" ]] ; then
+     altMsg=" - pages matched alt: $ALT_PAGES_IX"
+   fi
+   if [[ "$VALID_OUT_IX" != "" ]] ; then
+     altMsg=" - output matched alt: $ALT_OUT_IX${altMsg}"
+   fi
    if [[ "$outputChanged" = "0" ]] && [[ "$statusChanged" = "0" ]] && [[ "$pagesChanged" = "0" ]] ; then 
-      echo "- Success: $TEST_NAME"
+      echo "- Success: ${TEST_NAME}${altMsg}"
       SUCCESS=1
       echo "$TEST_NAME" >> "${RUN_DIR}/passed"
    else
@@ -216,14 +252,14 @@ fi
 
 if [[ "$SUCCESS" = 0 && "$INTERACTIVE" = 1 ]] ; then
    acceptYN=""
-   while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+   while [[ "$acceptYN" != "a" && "$acceptYN" != "r" && "$acceptYN" != "t" ]] ; 
    do
-      read -p "Accept new output? [yn] " acceptYN
-      if [[ ! "$acceptYN" =~ [yn] ]] ; then
-          echo "Invalid: $acceptYN - enter y or n"
+      read -p "Accept new, reject or accept alt output? [art] " acceptYN
+      if [[ ! "$acceptYN" =~ [arA] ]] ; then
+          echo "Invalid: $acceptYN - enter 'a' for 'accept', 'r' for 'reject' or 't' for accept as an alternate"
       fi
    done
-   if [ "$acceptYN" = "y" ] ; then
+   if [ "$acceptYN" = "a" ] ; then
       cp "$OUT_FILE" "$VALID_FILE"
       cp "$STATUS_FILE" "$VALID_STATUS_FILE"
       cp "$CMD_FILE" "$VALID_CMD_FILE"
@@ -231,11 +267,22 @@ if [[ "$SUCCESS" = 0 && "$INTERACTIVE" = 1 ]] ; then
       if [ -d "$PAGES" ] ; then
          if [ -d "$VALID_PAGES" ] ; then
             rm -rf "$VALID_PAGES" 
+            rm -rf "${VALID_PAGES}_alt*" 
          fi
          cp -r "$PAGES" "$VALID_PAGES"
          echo "Updated valid pages dir $VALID_PAGES"
       fi
+   elif [ "$acceptYN" = "t" ] ; then
+      echo "Accepting alternative content: out=${NEXT_OUT_IX} pages=${NEXT_PAGES_IX}"
+      if [ "$outputChanged" = "1" ] ; then
+         cp "$OUT_FILE" "${VALID_FILE}_alt${NEXT_OUT_IX}"
+         echo "Updated alternate output in: ${VALID_FILE}alt_${NEXT_OUT_IX}"
+      fi
+      if [ "$pagesChanged" = "1" ] ; then
+         cp -r "$PAGES" "${VALID_PAGES}_alt${NEXT_PAGES_IX}"
+         echo "Updated alternate pages in: ${VALID_PAGES}_alt${NEXT_PAGES_IX}"
+      fi
    else
-      echo "Did not accept $OUT_FILE - valid file remains: $VALID_FILE"
+      echo "Rejecting $OUT_FILE - valid file unchanged: $VALID_FILE"
    fi
 fi

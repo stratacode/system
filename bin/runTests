@@ -89,7 +89,7 @@ if [ -d "$RUN_DIR" ] ; then
       testAns=""
       while [[ ! $testAns =~ [qQ] ]] ; 
       do
-         read -p "Enter: [h] for help or [qalovdn][<i>]: " testAns
+         read -p "Enter: [h] for help or [qatlovdnA][<i>]: " testAns
          if [[ $testAns =~ [lL] ]] ; then
             newTestArray=($(cat ${RUN_DIR}/failed))
             echo "Failed tests:"
@@ -102,8 +102,8 @@ if [ -d "$RUN_DIR" ] ; then
                 echo "${failIdx}: ${testName}"
                 let failIdx=${failIdx}+1
             done
-         elif [[ $testAns =~ [oOadDvV][0-9]* ]] ; then
-            if [[ $testAns =~ [oOadDvV][0-9]+ ]] ; then
+         elif [[ $testAns =~ [oOaAdDvV][0-9]* ]] ; then
+            if [[ $testAns =~ [oOaAdDvV][0-9]+ ]] ; then
                testIndex=${testAns:1}
                currentIndex=$testIndex
             else
@@ -136,7 +136,7 @@ if [ -d "$RUN_DIR" ] ; then
                   fi
                   if ! diff "$VALID_DIR/out" "$TEST_DIR/outf" > /dev/null ; then 
                       echo "---- output changed < valid > new:"
-                      diff "$VALID_DIR/out" "$TEST_DIR/outf"|| true
+                      diff "$VALID_DIR/out" "$TEST_DIR/outf" || true
                   fi
                   if [[ -d "$TEST_DIR/pages" ]] || [[ -d "$VALID_DIR/pages" ]] ; then
                      if ! diff -r "$VALID_DIR/pages" "$TEST_DIR/pagesf" > /dev/null ; then 
@@ -159,6 +159,47 @@ if [ -d "$RUN_DIR" ] ; then
                   elif [ -d "$VALID_DIR/pages" ] ; then
                      rm -rf "$VALID_DIR/pages" 
                      echo "Warning: removed old valid pages dir $VALID_DIR/pages"
+                  fi
+                  sed "s/^${testName}\$/+${testName}/" < ${RUN_DIR}/failed > ${RUN_DIR}/new-failed
+                  mv ${RUN_DIR}/new-failed ${RUN_DIR}/failed
+                  if [[ ${testIndex} -eq ${currentIndex} ]] ; then
+                      let currentIndex=${currentIndex}+1; 
+                      if [[ ${currentIndex} -ge ${#testArray[@]} ]] ; then
+                          echo "End of tests" 
+                      else
+                          echo "Next test: ${currentIndex}: ${testArray[${currentIndex}]}"
+                      fi
+                  fi
+               elif [[ $testAns =~ [t][0-9]* ]] ; then
+                  NEXT_OUT_IX=1
+                  while [[ -d "${VALID_FILE}_alt${NEXT_OUT_IX}" ]] ; 
+                  do
+                     let NEXT_OUT_IX=${NEXT_OUT_IX}+1
+                  done
+                  ALT_VALID_DIR="${VALID_DIR}/alt_${NEXT_OUT_IX}"
+                  mkdir "${ALT_VALID_DIR}"
+
+                  if diff "$TEST_DIR/outf" "$VALID_DIR/out" > /dev/null ; then
+                      echo "Output matches current valid result - not updating alternate output"
+                  else
+                     echo "Accepting alternate output for $testName in: ${ALT_VALID_DIR}/out"
+                     cp "$TEST_DIR/outf" "${ALT_VALID_DIR}/out"
+                  fi
+                  if [ -d "$TEST_DIR/pages" ] ; then
+                     if [ -d "$VALID_DIR/pages" ] ; then
+                        if diff -r "$TEST_DIR/pagesf" "${VALID_DIR}/pages" ; then
+                           echo "Pages match current valid result - not updating pages"
+                        else
+                           cp -r "$TEST_DIR/pagesf" "$ALT_VALID_DIR/pages"
+                           echo "Updated alternate pages dir $ALT_VALID_DIR/pages"
+                        fi
+                     else
+                        cp -r "$TEST_DIR/pagesf" "$VALID_DIR/pages"
+                        echo "Creating new valid pages: $VALID_DIR/pages"
+                     fi
+                  elif [ -d "$VALID_DIR/pages" ] ; then
+                     rm -rf "$VALID_DIR/pages" 
+                     echo "Warning: no pages for test but valid dir had pages which have been removed $VALID_DIR/pages"
                   fi
                   sed "s/^${testName}\$/+${testName}/" < ${RUN_DIR}/failed > ${RUN_DIR}/new-failed
                   mv ${RUN_DIR}/new-failed ${RUN_DIR}/failed
@@ -195,7 +236,7 @@ if [ -d "$RUN_DIR" ] ; then
                fi
             done
          elif [[ $testAns =~ [nN] ]] ; then
-            let currentIndex=${currentIndex}+1; 
+            let currentIndex=${currentIndex}+1
             if [[ ${currentIndex} -ge ${#testArray[@]} ]] ; then
                 echo "End of tests" 
             else
@@ -206,6 +247,8 @@ if [ -d "$RUN_DIR" ] ; then
             echo "       [l] - list, [o]<i> - show test output"
             echo "       [v]<i> - show valid output, [d]<i> - show diffs"
             echo "       [d], [o], [v] - show current diffs/output/valid, [a] accept current + next, [n] next"
+            echo "       [A] - accept all"
+            echo "       [t] - accept output as an alternate valid result"
          elif [[ ! $testAns =~ [qQ] ]] ; then
              echo "Invalid: ${testAns} - enter [aqlsdn][<testIndex>]"
          fi
@@ -215,7 +258,7 @@ if [ -d "$RUN_DIR" ] ; then
    fi
    if [ -f "$RUN_DIR/ignored" ] ; then
        echo "Ignored these tests from: ${RUN_DIR}/ignored"
-       cat $RUN_DIR/ignored
+       cat "$RUN_DIR/ignored"
    fi
 else
    echo "Something went wrong - no test run directory: $RUN_DIR"

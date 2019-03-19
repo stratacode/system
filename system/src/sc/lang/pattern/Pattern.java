@@ -50,6 +50,9 @@ public class Pattern extends SemanticNode {
       res = ParseUtil.nodeToSemanticValue(res);
       if (!(res instanceof Pattern))
          return res;
+      Pattern patternRes = (Pattern) res;
+      // ignoring the result - just because this initializes the parslet and language
+      patternRes.getParselet(language, pageType);
       // Need to set the system class loader so we can find the user defined model class in the pattern in case there are properties to set
       if (pageType instanceof BodyTypeDeclaration)
          language.classLoader = ((BodyTypeDeclaration) pageType).getLayeredSystem().getSysClassLoader();
@@ -148,8 +151,8 @@ public class Pattern extends SemanticNode {
       int len = 0;
       String matchStr = fromStr;
       for (Object elem:elements) {
-         if (elem instanceof String) {
-            String elemStr = (String) elem;
+         if (PString.isString(elem)) {
+            String elemStr = elem.toString();
             if (matchStr.startsWith(elemStr)) {
                int strLen = elemStr.length();
                matchStr = matchStr.substring(strLen);
@@ -179,7 +182,7 @@ public class Pattern extends SemanticNode {
             Object propVal = null;
             int matchLen = matchStr.length();
             try {
-               if (typeName.equals("integer") || typeName.equals("integerLiteral")) {
+               if (typeName.equals("integer") || typeName.equals("integerLiteral") || typeName.equals("digits")) {
                   int intLen;
                   for (intLen = 0; intLen < matchLen && Character.isDigit(matchStr.charAt(intLen)); intLen++) {
                   }
@@ -198,6 +201,7 @@ public class Pattern extends SemanticNode {
                   catch (NumberFormatException exc) {
                      return null;
                   }
+                  matchStr = matchStr.substring(intLen);
                }
                else if (typeName.equals("urlString") || typeName.equals("identifier")) {
                   int strLen = 0;
@@ -228,6 +232,18 @@ public class Pattern extends SemanticNode {
                   }
                   matchStr = matchStr.substring(strLen);
                }
+               else if (typeName.equals("whiteSpace")) {
+                  int strLen = 0;
+                  while (strLen < matchLen) {
+                     char c = matchStr.charAt(strLen);
+                     if (!Character.isWhitespace(c))
+                        break;
+                     strLen++;
+                  }
+                  if (strLen > 0) {
+                     matchStr = matchStr.substring(strLen);
+                  }
+               }
                else {
                   System.err.println("*** Unrecognized pattern name: " + typeName);
                }
@@ -248,6 +264,14 @@ public class Pattern extends SemanticNode {
       String matchStr = match(fromStr, null);
       // Should be a match with nothing left over
       return matchStr != null && matchStr.length() == fromStr.length();
+   }
+
+   // TODO: this does the match via the parselet which can use any parselet defined in the language. For the URLs we moved to
+   // specific parselets so we could implement a simple parsing version in Javascript, rather than using the Pattern object - not sure if it's different or not.
+   public boolean matchSimpleString(String fromStr) {
+      if (language == null)
+         language = parselet.getLanguage();
+      return language.matchString(fromStr, parselet);
    }
 
    public boolean updateInstance(String fromStr, Object inst) {
@@ -307,5 +331,133 @@ public class Pattern extends SemanticNode {
 
    public boolean isSimplePattern() {
       return elements.size() == 1 && elements.get(0) instanceof String;
+   }
+
+   /**
+    * Similar to match above but if there's a match, we'll return a string which replaces any named
+    * pattern variables with the variable name. This is used by the TestLogFilter, which can take a line in the
+    * log file and replace matched values with the data type name matched - when those values are not consistent
+    * from one run to the other.
+    */
+   public String replaceString(String fromStr) {
+      int len = 0;
+      String matchStr = fromStr;
+      StringBuilder res = new StringBuilder();
+      for (Object elem:elements) {
+         if (PString.isString(elem)) {
+            String elemStr = elem.toString();
+            if (matchStr.startsWith(elemStr)) {
+               res.append(elemStr);
+               int strLen = elemStr.length();
+               matchStr = matchStr.substring(strLen);
+               len += strLen;
+            }
+            else {
+               return null;
+            }
+         }
+         else if (elem instanceof Pattern) {
+            Pattern pattern = (Pattern) elem;
+            String subMatch = pattern.replaceString(matchStr);
+            if (subMatch == null)
+               return null;
+            else {
+               int subLen = subMatch.length();
+               if (subLen != 0) {
+                  matchStr = matchStr.substring(subLen);
+                  len += subLen;
+               }
+               res.append(subMatch);
+            }
+         }
+         else if (elem instanceof PatternVariable) {
+            PatternVariable patVar = (PatternVariable) elem;
+            String typeName = patVar.parseletName;
+            String propName = patVar.propertyName;
+            Object propVal = null;
+            int matchLen = matchStr.length();
+            try {
+               if (typeName.equals("integer") || typeName.equals("integerLiteral") || typeName.equals("digits")) {
+                  int intLen;
+                  for (intLen = 0; intLen < matchLen && Character.isDigit(matchStr.charAt(intLen)); intLen++) {
+                  }
+                  if (intLen == 0)
+                     return null;
+                  String intStr = matchStr.substring(0, intLen);
+                  try {
+                     int intVal = Integer.parseInt(intStr); // validate that this string is an integer
+                     // TODO: should we add an option to return the values?
+                  }
+                  catch (NumberFormatException exc) {
+                     return null;
+                  }
+                  if (propName == null)
+                     res.append(intStr);
+                  else {
+                     appendSubstitute(res, propName);
+                  }
+                  matchStr = matchStr.substring(intLen);
+               }
+               else if (typeName.equals("urlString") || typeName.equals("identifier")) {
+                  int strLen = 0;
+                  while (strLen < matchLen) {
+                     char c = matchStr.charAt(strLen);
+                     boolean isFirst = strLen == 0;
+
+                     if (typeName.equals("urlString")) {
+                        if (!URLUtil.isURLCharacter(c))
+                           break;
+                     }
+                     else if (typeName.equals("identifier")) {
+                        if (isFirst) {
+                           if (!Character.isJavaIdentifierStart(c))
+                              break;
+                        }
+                        else if (!Character.isJavaIdentifierPart(c))
+                           break;
+                     }
+                     strLen++;
+                  }
+                  if (strLen == 0)
+                     return null;
+                  String strVal = matchStr.substring(0, strLen);
+                  propVal = strVal;
+                  if (propName == null)
+                     res.append(strVal);
+                  else {
+                     appendSubstitute(res, propName);
+                  }
+                  matchStr = matchStr.substring(strLen);
+               }
+               else if (typeName.equals("whiteSpace")) {
+                  int strLen = 0;
+                  while (strLen < matchLen) {
+                     char c = matchStr.charAt(strLen);
+                     if (!Character.isWhitespace(c))
+                        break;
+                     strLen++;
+                  }
+                  if (strLen > 0) {
+                     res.append(matchStr.substring(0, strLen));
+                     matchStr = matchStr.substring(strLen);
+                  }
+               }
+               else {
+                  System.err.println("*** Unrecognized pattern name: " + typeName);
+               }
+            }
+            catch (IllegalArgumentException exc) {
+               System.err.println("*** Failed to replace pattern property: " + propName + " = " + propVal);
+               return null;
+            }
+         }
+      }
+      return res.toString();
+   }
+
+   private void appendSubstitute(StringBuilder res, String propName) {
+      res.append("{");
+      res.append(propName);
+      res.append("}");
    }
 }
