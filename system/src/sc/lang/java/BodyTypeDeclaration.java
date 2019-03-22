@@ -6445,6 +6445,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = model.layeredSystem;
       Iterator insts = sys.getInstancesOfTypeAndSubTypes(getRuntimeFullTypeName());
 
+      /** Make sure we are started */
+      ModelUtil.ensureStarted(this, true);
+
       if (overriddenAssign.isStatic()) {
          if (sys.options.verbose) {
             System.out.println("Updating static property change: " + overriddenAssign.toSafeLanguageString());

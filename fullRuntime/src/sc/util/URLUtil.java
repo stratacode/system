@@ -60,6 +60,16 @@ public class URLUtil {
       String result = null;
       for (String param:params) {
          if (param != null && param.length() > 0) {
+            // Here we are processing any URLs that start with "../". We're only looking at the first
+            // part of the path and then will remove the last directory in the current result as well as the "../"
+            while (param.startsWith("../") && result != null) {
+               int lastIx = result.lastIndexOf("/");
+               param = param.substring(3);
+               if (lastIx == -1)
+                  result = "/";
+               else
+                  result = result.substring(0, lastIx);
+            }
             if (result == null)
                result = param;
             else if (result.endsWith("/"))

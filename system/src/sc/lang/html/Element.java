@@ -129,6 +129,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Object repeat;
 
+   // TODO: we probably should support wrap for normal tags - i.e. when it's set to false, we render just the body, without the start/end tag.
    /**
     * For repeat tags, with wrap=true we use the tagName as a wrapper around the content - so there's no wrapping tag around the body as it's repeated.
     * (i.e. <thisTag>bodyTag0...bodyTagN</thisTag>)
@@ -4587,8 +4588,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             curRelPath = curRelPath.substring(1);
          curRelPath = URLUtil.getParentPath(curRelPath);
       }
-      if (curRelPath == null || curRelPath.equals(srcRelPath))
+      if (curRelPath == null)
          return srcRelPath;
+      // The current URL is pointed to the same directory as the URL in the link so we return no directory prefix.
+      if (curRelPath.equals(srcRelPath))
+         return null;
+
       // We need to return a prefix for a relative url reference which will resolve to srcRelPath but in the context of curRelPath.
       String[] curRelDirs = curRelPath.split("/");
       String[] srcRelDirs = srcRelPath.length() == 0 ?  StringUtil.EMPTY_STRING_ARRAY : srcRelPath.split("/");
@@ -5018,7 +5023,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          else {
             // No id is normal for the 'repeat wrapper' class
             if (!(this instanceof IRepeatWrapper))
-               System.out.println("*** null id for repeat tag");
+               System.out.println("*** null id for server tag");
             // else - TODO: is this a case we want to handle?
          }
          defaultServerTag = true;

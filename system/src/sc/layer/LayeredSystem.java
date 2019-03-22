@@ -505,7 +505,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    List<String> activatedLayerNames = null;
    List<String> activatedDynLayerNames = null;
 
-   public void clearActiveLayers() {
+   public void clearActiveLayers(boolean clearPeers) {
       activatedLayerNames = null;
       activatedDynLayerNames = null;
 
@@ -588,9 +588,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (runtimeProcessor != null)
          runtimeProcessor.clearRuntime();
 
-      if (!peerMode && peerSystems != null) {
+      if (clearPeers && !peerMode && peerSystems != null) {
          for (LayeredSystem peerSys : peerSystems)
-            peerSys.clearActiveLayers();
+            peerSys.clearActiveLayers(false);
       }
 
       resetBuild(false);
@@ -614,14 +614,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // TODO: if any of the layer names in the run configuration have changed, throw it all away and restart from scratch.
       // this is the simple approach.  It would not be too hard to figure out the differences, and peel-away unused layers, and
       // add in used ones.  That would make the builds a lot faster I think in some cases since you can save the compiled state of
-      // the previous layers.  But maybe a good incremental compile will be fast enough?
+      // the previous layers.  But maybe a good incremental compile will be fast enough?  And now that we are doing external builds, this is not
+      // going to be helpful since these layers are not being built.
       if (activatedLayerNames == null || !activatedLayerNames.equals(allLayerNames) || !DynUtil.equalObjects(dynLayers, activatedDynLayerNames)) {
          if (activatedLayerNames != null) {
-            clearActiveLayers();
+            clearActiveLayers(true);
          }
 
          activatedLayerNames = new ArrayList<String>(allLayerNames);
          activatedDynLayerNames = dynLayers == null ? null : new ArrayList<String>(dynLayers);
+         // This will create layers for all referenced dependent layers. We use this layered system to store that list while
+         // we figure out which runtimes and processes we want to include. After that, we mark the ones we will exclude then
+         // initialize the runtimes. We also must accumulate the list of processes and runtimes that are actually defined. There
+         // might be some layers which are included in a runtime or process, but that runtime or process is not referenced in this
+         // set of layers. We remove those layers at the end from all layered systems.
          initLayersWithNames(allLayerNames, false, false, dynLayers, true, false);
          // First mark all layers that will be excluded
          removeExcludedLayers(true);
@@ -629,8 +635,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // Init the runtimes, using the excluded layers as a guide
          initRuntimes(dynLayers, true, false, true);
 
-         // Now actually remove the excluded layers.
-         removeExcludedLayers(false);
+         ArrayList<IProcessDefinition> procs = new ArrayList<IProcessDefinition>();
+         ArrayList<IRuntimeProcessor> runtimes = new ArrayList<IRuntimeProcessor>();
+         for (int i = 0; i < layers.size(); i++) {
+            Layer l = layers.get(i);
+            if (l.hasDefinedProcess)
+               procs.add(l.definedProcess);
+            if (l.hasDefinedRuntime)
+               runtimes.add(l.definedRuntime);
+         }
+
+         if (!procs.contains(processDefinition) && (processDefinition.getProcessName() != null || !runtimes.contains(runtimeProcessor))) {
+            clearActiveLayers(false);
+         }
+         else {
+            // Now actually remove the excluded layers.
+            removeExcludedLayers(false);
+         }
+
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+            if (!procs.contains(peerSys.processDefinition) && (peerSys.processDefinition.getProcessName() != null || !runtimes.contains(peerSys.runtimeProcessor)))
+               peerSys.clearActiveLayers(false);
+         }
 
          // Finally initialize the build system from scratch and we are ready to go.
          initBuildSystem(true, true);
@@ -825,7 +852,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             disabledLayers = new ArrayList<Layer>();
          if (!disabledLayers.contains(layer)) {
             disabledLayers.add(layer);
-            disabledLayersIndex.put(layer.getLayerName(), layer);
+            Layer oldLayer = disabledLayersIndex.put(layer.getLayerName(), layer);
+            if (layer.layeredSystem != this && oldLayer.layeredSystem == this) {
+               // If we've already disabled this layer in this system, put back our system as it's preferred that they match
+               disabledLayersIndex.put(layer.getLayerName(), oldLayer);
+            }
+
             if (inactiveLayers.remove(layer)) {
                inactiveLayerIndex.remove(layer.getLayerName());
                renumberInactiveLayers(0);
@@ -1583,7 +1615,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
          }
-
       }
       // We've added some layers to the this layered system through activate.  Now we need to go through the
       // other systems and include the layers in them if they are needed.
@@ -1822,7 +1853,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private void destroySystemInternal() {
-      clearActiveLayers();
+      clearActiveLayers(true);
 
       if (runtimes != null) {
          for (int i = 0; i < runtimes.size(); i++) {
@@ -10913,6 +10944,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       model.setAdded(true);
       SrcEntry srcEnt = model.getSrcFile();
       Layer srcEntLayer = srcEnt.layer;
+      if (ctx == null && model instanceof JavaModel) {
+         // TODO: if we set the ctx here, it messes things up when initializing layers
+         //ctx = new ExecutionContext((JavaModel) model);
+      }
       boolean active = false;
       if (srcEntLayer != null) {
          if (!isLayer && srcEntLayer.activated) {
@@ -10929,7 +10964,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       updateModelIndex(srcEnt, model, ctx, updateInfo);
 
-      if (updateInfo != null)
+      if (updateInfo != null && ctx != null)
          updateInfo.updateInstances(ctx);
    }
 
@@ -12460,6 +12495,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       // TODO: I believe we should only be including layers explicitly extended by refLayer in this search
       List<Layer> layerList = fromLayer == null ? refLayer == null ? layers : refLayer.getLayersList() : fromLayer.getLayersList();
+      if (layerList == null) {
+         System.err.println("*** No layers list!");
+         return null;
+      }
       int startIx = fromLayer == null ? layerList.size() - 1 : fromLayer.getLayerPosition();
       if (startIx >= layerList.size())
          startIx = layerList.size() - 1;
@@ -14375,7 +14414,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (disabledLayersIndex != null) {
          inactiveLayer = disabledLayersIndex.get(layerName);
-         if (inactiveLayer != null)
+         // Be careful not to return a disabled layer in another system since it may be disabled in android but enabled here
+         if (inactiveLayer != null && inactiveLayer.layeredSystem == this)
             return inactiveLayer;
       }
 

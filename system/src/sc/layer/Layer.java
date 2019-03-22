@@ -2990,6 +2990,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** Returns the layer after this one in the list, i.e. the one that overrides this layer */
    public Layer getNextLayer() {
+      if (disabled) // The layers list is not really ordered for disabled layers so just return null.
+         return null;
       List<Layer> layersList = getLayersList();
       if (layersList == null)
          return null;

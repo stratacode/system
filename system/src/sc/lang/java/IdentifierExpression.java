@@ -3675,6 +3675,10 @@ public class IdentifierExpression extends ArgumentsExpression {
    }
 
    public String getBindingTypeName() {
+      if (idTypes == null) {
+         System.err.println("*** Identifier expression not started!");
+         return null;
+      }
       IdentifierType idType = idTypes[0];
       List<IString> idents = getAllIdentifiers();
 

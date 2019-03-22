@@ -1586,7 +1586,7 @@ public class DynUtil {
 
    public static IDynChildManager getDynChildManager(Object type) {
       String className = (String) getInheritedAnnotationValue(type, "sc.obj.CompilerSettings", "dynChildManager");
-      if (className == null)
+      if (className == null || className.length() == 0)
          return null;
       Object mgrType = findType(className);
       if (mgrType == null) {

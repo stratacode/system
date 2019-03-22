@@ -1021,14 +1021,15 @@ public class PTypeUtil {
       Annotation annotation = null;
       do {
          annotation = cl.getAnnotation(annotClass);
-         if (annotation != null)
-            break;
+         if (annotation != null) {
+            Object res = getValueFromAnnotation(annotation, annotValue);
+            if (res != null)
+               return res;
+         }
          cl = cl.getSuperclass();
       } while (cl != null);
 
-      if (annotation == null)
-         return null;
-      return getValueFromAnnotation(annotation, annotValue);
+      return null;
    }
 
    // Takes a def - either a Class, Method, Field and the annotNameOrType - either the String type name of the annot class itself.

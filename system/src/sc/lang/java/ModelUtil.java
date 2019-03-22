@@ -5538,10 +5538,18 @@ public class ModelUtil {
    }
 
    public static Object getInheritedAnnotationValue(LayeredSystem system, Object type, String annotName, String attributeName) {
-      Object annot = getInheritedAnnotation(system, type, annotName);
-      if (annot == null)
-         return null;
-      return ModelUtil.getAnnotationValue(annot, attributeName);
+      // Search the class hierarchy for all TypeSettings annotations and if any of them declare this property bindable at the type level
+      // we treat it as bindable.
+      ArrayList<Object> allAnnots = ModelUtil.getAllInheritedAnnotations(system, type, annotName, false, null, false);
+      if (allAnnots != null) {
+         for (Object annot:allAnnots) {
+            Object annotVal = ModelUtil.getAnnotationValue(annot, attributeName);
+            if (annotVal != null) {
+               return annotVal;
+            }
+         }
+      }
+      return null;
    }
 
    public static Object getInheritedAnnotation(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled) {
