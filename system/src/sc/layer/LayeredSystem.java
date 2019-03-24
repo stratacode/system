@@ -853,7 +853,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!disabledLayers.contains(layer)) {
             disabledLayers.add(layer);
             Layer oldLayer = disabledLayersIndex.put(layer.getLayerName(), layer);
-            if (layer.layeredSystem != this && oldLayer.layeredSystem == this) {
+            if (layer.layeredSystem != this && oldLayer != null && oldLayer.layeredSystem == this) {
                // If we've already disabled this layer in this system, put back our system as it's preferred that they match
                disabledLayersIndex.put(layer.getLayerName(), oldLayer);
             }

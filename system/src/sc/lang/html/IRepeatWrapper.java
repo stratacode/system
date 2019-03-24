@@ -5,13 +5,29 @@
 package sc.lang.html;
 
 /**
- * Implement this interface to add hooks to how array values are synchronized with the repeat tag - i.e. one tag
- * per value in the list.
- * You can create a new element, or decide whether or not to reuse an element, and be notified when you need to renumber
- * elements in the list because an element was removed.
+ * Used to gain more control over the construction of tag objects that
+ * correspond to elements of the 'repeat' attribute's value.
+ * Implement this interface with your own class and set the repeatWrapper attribute
+ * on the same tag that has repeat.
  */
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public interface IRepeatWrapper {
+   /*
+    * The createElement method will be called with the current repeatVar element as
+    * the value parameter. It returns the Element instance to associate with that
+    * value. This method should also set repeatVar and repeatIndex in the Element
+    * returned if it can't use the Element(repeatVar, repeatIx) constructor
+    * Its best to set the constructor so that repeatVar is never null for any of
+    * the bindings that might depend on it in the page.
+    * <p>
+    * The oldTag parameter can be used for more efficient rendering.
+    * The first time that a repeat tag is rendered, the oldTag parameter will
+    * always be null. The second time, after the list has changed, when the
+    * syncRepeatTags method needs to replace the value for an existing tag in
+    * a given slot, it provides oldTag set to the tag in that slot.  You can either
+    * ignore oldTag and just construct a new instance or set the repeatVar and repeatIndex
+    * in oldTag and return it.
+    */
    Element createElement(Object value, int ix, Element oldTag);
    void updateElementIndexes(int fromIx);
 }

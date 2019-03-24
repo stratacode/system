@@ -18,7 +18,7 @@ import java.util.Set;
  * <p>
  * For the replace tagMerge mode, this tag replaces the matching tag in the previous document.  So if you replace one document with a copy of itself, the result would be unchanged.
  * <p>
- * For the append tagMerge mode, the matched dynamic tag is itself not changed.  The new tag creates a new object with a new name that is appended to the body of the previous tag's body.
+ * For the append tagMerge mode, the matched tag is itself not changed.  The new tag creates a new object with a new name that is appended to the body of the previous tag's body.
  * (? Question: should this append to the parent's body after the last matched tag?  Same with prepend)
  * </p>
  * For the prepend tagMerge mode, the matched dynamic tag is also not changed.  The new tag creates a new object with a new name that is prepended to the body of the previous tag's body.
