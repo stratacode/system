@@ -753,8 +753,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getTypeIndexDir(getTypeIndexIdent());
    }
 
+   public String getTypeIndexBaseDir() {
+      return getStrataCodeDir("idx");
+   }
+
    public String getTypeIndexDir(String typeIndexIdent) {
-      return FileUtil.concat(getStrataCodeDir("idx"), TYPE_INDEX_DIR_PREFIX + typeIndexIdent);
+      return FileUtil.concat(getTypeIndexBaseDir(), TYPE_INDEX_DIR_PREFIX + typeIndexIdent);
    }
 
    public String getProcessIdent() {
@@ -6812,6 +6816,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (LayerTypeIndex startIndex:refreshCtx.toStartLaterIndexes) {
             for (BodyTypeDeclaration toStartLater:startIndex.toStartLaterTypes) {
                JavaModel toStartModel = toStartLater.getJavaModel();
+               Layer toStartLayer = toStartModel.getLayer();
+               if (toStartLayer.closed)
+                  toStartLayer.markClosed(false, false);
                ParseUtil.initAndStartComponent(toStartModel);
             }
          }
@@ -7141,6 +7148,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (Layer layer:rebuildLayers) {
             layer.layeredSystem.leafLayerNames.add(layer.getLayerName());
          }
+         // Note: we are doing this here but then later starting types. For now, we are re-opening the layer right before
+         // we start the type so that it can properly resolve all dependencies.  It might make sense to wait to close them till
+         // after we do the start to re-validate the type index.
          markClosedLayers(true);
          // Remove any layers which are extended by other layers
          for (Layer layer:rebuildLayers) {
@@ -15330,6 +15340,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Returns the complete set of inactive layers - returns the more complete inactiveLayer entry or the one from the type index if the inactive layer is not loaded yet */
    public List<Layer> getInactiveIndexLayers() {
       return typeIndex.inactiveTypeIndex.getIndexLayers(this);
+   }
+
+   public void clearCaches() {
+      String baseIndexDir = getTypeIndexBaseDir();
+      File f = new File(baseIndexDir);
+      if (f.isDirectory()) {
+         FileUtil.removeFileOrDirectory(f);
+      }
    }
 }
 

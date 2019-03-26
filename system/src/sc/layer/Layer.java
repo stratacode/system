@@ -1081,8 +1081,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (includeProcesses != null) {
          if (includeProcesses.contains(procName))
             return LayerEnabledState.Enabled;
-         else
+         else {
+            // If we have includeRuntime("js") and includeProcess("Server") it should still allow any default layered system to match at the
+            // runtime level and return Enabled, not Disabled here.
+            if (StringUtil.equalStrings(procName, IProcessDefinition.DEFAULT_PROCESS_NAME) && includeRuntimes != null && checkRuntime && proc != null) {
+               if (includeRuntimes.contains(proc.getRuntimeName()))
+                  return LayerEnabledState.Enabled;
+            }
             return LayerEnabledState.Disabled;
+         }
       }
       LayerEnabledState baseState = LayerEnabledState.NotSet;
       boolean runtimeBaseState = false;

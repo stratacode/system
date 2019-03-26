@@ -2861,6 +2861,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if ((options & CopyInitLevels) != 0) {
          // For transform at least, these are data structures that should be immutable so we are copying by reference.
          copy.externalReferences = externalReferences;
+         copy.globalTypes = globalTypes;
 
          // Register just the imports before the transform  During transform, importsByName gets updated to include imports in merged types.
          // so we need to make a copy.
