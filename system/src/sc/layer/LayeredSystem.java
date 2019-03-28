@@ -1406,7 +1406,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          initTypeIndexRuntimes();
       }
 
-      boolean reusingDefaultRuntime = !javaIsAlwaysDefaultRuntime && runtimes != null && runtimes.size() == 1;
+      //boolean reusingDefaultRuntime = !javaIsAlwaysDefaultRuntime && runtimes != null && runtimes.size() == 1 && (processes == null || processes.size() == 0);
+      boolean reusingDefaultRuntime = true;
       if (useProcessDefinition == null) {
          if (!reusingDefaultRuntime)
             removeExcludedLayers(true);
@@ -1532,6 +1533,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (runtimes == null && layers.size() != 0)
          addRuntime(null, null);
 
+      boolean removeExcludedLayers = false;
+
       // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
       // Then purge any layers from this LayeredSystem which should not be here.
       if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size() - 1)) {
@@ -1551,6 +1554,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // make the main layered system point to this process.
                if (processDefinition == null && proc != null)
                   updateProcessDefinition(proc);
+               removeExcludedLayers(true);
+               removeExcludedLayers = true;
                continue;
             }
 
@@ -1619,6 +1624,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
          }
+
+         if (removeExcludedLayers)
+            removeExcludedLayers(false);
       }
       // We've added some layers to the this layered system through activate.  Now we need to go through the
       // other systems and include the layers in them if they are needed.
@@ -13487,6 +13495,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return layer;
       }
       catch (RuntimeException exc) {
+         if (externalModelIndex != null && externalModelIndex.isCancelledException(exc)) {
+            System.err.println("*** Rethrowing ProcessCanceledException - caught during loadLayerObject");
+            throw exc;
+         }
          if (!lpi.activate) {
             System.err.println("*** Failed to initialize inactive layer due to error initializing the layer: " + exc);
             if (options.verbose) exc.printStackTrace();

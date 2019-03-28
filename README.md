@@ -6,10 +6,10 @@ Defines three layers used to build the coreRuntime and StrataCode distributions.
 
 * system depends on fullRuntime and contains the LayeredSystem, parsing and language framework.
 
-* To build StrataCode, from this directory run bin/makeSC
+* To build StrataCode with Stratacode, make sure 'scc' is in your path and from this directory run bin/makeSC
 
 * To build the Javadoc run bin/makeJavaDoc
 
-* To build the Documentation run bin/makeDoc
+* To build the Documentation, make sure 'scc' is in your path and run bin/makeDoc
 
-StrataCode is written in java so you can also build it without itself.  See http://www.stratacode.com/ideConfig.html
+StrataCode is written in java so you can also build it without itself.  See http://www.stratacode.com/ide/config.html

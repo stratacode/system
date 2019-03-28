@@ -1573,8 +1573,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public Object getExtendsTypeDeclaration() {
-      if (extendsTypeDecl != null)
+      if (extendsTypeDecl != null) {
+         // We might define this early in this initialization as part of getDefinedExecFlags from needsObject() called to determine if we
+         // will create a tag object for this object. Later our actual extends type is modified... for convertToObject we need to resolve
+         // to get the right type.
+         if (extendsTypeDecl instanceof BodyTypeDeclaration)
+            return ((BodyTypeDeclaration) extendsTypeDecl).resolve(true);
          return extendsTypeDecl;
+      }
       Object specType = getSpecifiedExtendsTypeDeclaration();
       if (specType != null)
          return extendsTypeDecl = specType;
@@ -2040,7 +2046,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                else {
                   // This element may not be derived in the type hierarchy if it's 'replace=true' so getDerivedElement will not work.  Still that should not count as a unique child since we are replacing a previous object
                   Element childElement = (Element) child;
-                  int childElementIx = findChildInList(derivedChildren, childElement.getRawObjectName());
+                  int childElementIx = -1;
+                  // TODO: this is the logic which determines whether we by default 'merge' a child tag with the previous version or append it.  For simple content tags, we should
+                  // not ever merge because content tags just get appended. Thinking we might have some logic which says we only merge singleton tags (body, and head) or tags with
+                  // an explicit id.
+                  if (childElement.needsObject())
+                     childElementIx = findChildInList(derivedChildren, childElement.getRawObjectName());
                   // If this is a new piece of static content, non dynamic element, or an element which did not match for whatever reason it's derived element.
                   if (childElementIx == -1) {
                      if (res == null) {

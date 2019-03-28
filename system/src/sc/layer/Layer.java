@@ -636,12 +636,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public boolean excludeForProcess(IProcessDefinition proc) {
       IRuntimeProcessor rtProc = proc == null ? null : proc.getRuntimeProcessor();
-      if (excludeForRuntime(rtProc))
-         return true;
+
       LayerEnabledState layerState = isExplicitlyEnabledForProcess(proc, true, true);
       if (layerState == LayerEnabledState.Disabled) {
          return true;
       }
+      if (layerState == LayerEnabledState.Enabled)
+         return false;
+      if (excludeForRuntime(rtProc))
+         return true;
       // If we are not prohibited from the process we are not considered excluded.
       return false;
    }
@@ -4825,10 +4828,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (runtime) {
          if (excludeRuntimes != null)
             first = opAppend(sb, " excludes: " + excludeRuntimes, first);
+         if (includeRuntimes != null)
+            first = opAppend(sb, " includes: " + includeRuntimes, first);
          if (hasDefinedRuntime)
             first = opAppend(sb, " only: " + (definedRuntime == null ? "java" : definedRuntime), first);
          if (excludeProcesses != null)
             first = opAppend(sb, " excludes: " + excludeProcesses, first);
+         if (includeProcesses != null)
+            first = opAppend(sb, " includes: " + includeProcesses, first);
          if (hasDefinedProcess)
             first = opAppend(sb, " only: " + (definedProcess == null ? "<default>" : definedProcess), first);
       }

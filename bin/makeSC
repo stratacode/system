@@ -2,6 +2,9 @@
 
 # Run with an argument to specify the target build dir.  If no argument is supplied a default is chosen in /tmp
 
+# Builds StrataCode using StrataCode. This is the preferred way to build a distribution for tagging and packaging but it's
+# easy to build StrataCode from Java as well to bootstrap the process since there's no StrataCode used in building StrataCode.
+
 set -e
 
 STAGEDIR=/tmp/

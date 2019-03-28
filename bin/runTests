@@ -102,8 +102,8 @@ if [ -d "$RUN_DIR" ] ; then
                 echo "${failIdx}: ${testName}"
                 let failIdx=${failIdx}+1
             done
-         elif [[ $testAns =~ [oOaAdDvV][0-9]* ]] ; then
-            if [[ $testAns =~ [oOaAdDvV][0-9]+ ]] ; then
+         elif [[ $testAns =~ [oOatdDvV][0-9]* ]] ; then
+            if [[ $testAns =~ [oOatdDvV][0-9]+ ]] ; then
                testIndex=${testAns:1}
                currentIndex=$testIndex
             else
@@ -216,7 +216,6 @@ if [ -d "$RUN_DIR" ] ; then
                echo "Test index outside of the range 0-${#testArray[@]}"
             fi
          elif [[ $testAns =~ [A] ]] ; then
-
             for testName in "${testArray[@]}"
             do
                echo "Updating valid file for $testName"
@@ -250,7 +249,7 @@ if [ -d "$RUN_DIR" ] ; then
             echo "       [A] - accept all"
             echo "       [t] - accept output as an alternate valid result"
          elif [[ ! $testAns =~ [qQ] ]] ; then
-             echo "Invalid: ${testAns} - enter [aqlsdn][<testIndex>]"
+             echo "Invalid: ${testAns} - enter [aqlsdnt][<testIndex>]"
          fi
       done
    elif [ -f "$RUN_DIR/passed" ] ; then 

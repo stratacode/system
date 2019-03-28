@@ -37,4 +37,7 @@ public interface IExternalModelIndex {
    public void modelChanged(ILanguageModel model, boolean modelChanged, Layer layer);
 
    public ITypeDeclaration getTypeDeclaration(String typeName);
+
+   /** Returns true for when the IDE aborts a type lookup - the layered system needs to treat these exceptions differently than those that occur from running dynamic code */
+   public boolean isCancelledException(RuntimeException exc);
 }
