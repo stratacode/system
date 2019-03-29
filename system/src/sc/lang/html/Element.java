@@ -587,6 +587,23 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return (((genFlags & getComputedExecFlags()) == 0 && !childNeedsObject()) && genFlags == ExecServer);
    }
 
+   public boolean needsObjectDef() {
+      if (tagObject != null)
+         return true;
+
+      Template template = getEnclosingTemplate();
+      if (template == null || tagName == null)
+         return false;
+
+      // Annotation layers do not generate types - they can be used in extends though
+      Layer templLayer = template.getLayer();
+      if (templLayer != null && templLayer.annotationLayer)
+         return false;
+
+      return getElementId() != null || getAttribute("extends") != null || getAttribute("tagMerge") != null || getDynamicAttribute() != null || isRepeatElement() || getAttribute("cache") != null ||
+              getAttribute("visible") != null || getFixedAttribute("extends") != null;
+   }
+
    /** Returns true if this tag needs an object definition */
    public boolean needsObject() {
       if (tagObject != null)
@@ -606,7 +623,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (templLayer != null && templLayer.annotationLayer)
          return false;
 
-      boolean needsObject = getElementId() != null || getAttribute("extends") != null || getAttribute("tagMerge") != null || getDynamicAttribute() != null || isRepeatElement() || getAttribute("cache") != null;
+      boolean needsObject = needsObjectDef();
 
       // When not part of a top-level tag, we currently can't define the object structure.  We'll have to treat this case as elements having no state - just do normal string processing on the templates and print an error
       // if any features are used that are not compatible with that behavior.  To support normal tag objects here, we could use inner types which are created, output and then destroyed
@@ -621,8 +638,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
 
-      // TODO: should visible be here?  We also can handle it if there's no object right?
-      boolean res = needsObject || getAttribute("visible") != null || getSpecifiedExtendsTypeDeclaration() != null;
+      boolean res = needsObject || getSpecifiedExtendsTypeDeclaration() != null;
       /*
        TODO: should <p/> render as <p> or with the self-close.  Right now, needsBody=true by default which means we ignore the self-close if it's there when rendering
        for tags like iframe, the browser ignores that self-close anyway because it's "illegal" that just confuses things when debugging.  Maybe we should flag it as an error if you add
@@ -2050,7 +2066,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   // TODO: this is the logic which determines whether we by default 'merge' a child tag with the previous version or append it.  For simple content tags, we should
                   // not ever merge because content tags just get appended. Thinking we might have some logic which says we only merge singleton tags (body, and head) or tags with
                   // an explicit id.
-                  if (childElement.needsObject())
+                  // Using needsObjectDef here, not needsObject because otherwise we initialize the extends type too soon as part of execOmitObject() which calls getDefinedExecFlags.
+                  if (childElement.needsObjectDef() || childElement.isSingletonTag())
                      childElementIx = findChildInList(derivedChildren, childElement.getRawObjectName());
                   // If this is a new piece of static content, non dynamic element, or an element which did not match for whatever reason it's derived element.
                   if (childElementIx == -1) {
