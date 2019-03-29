@@ -201,7 +201,7 @@ if [ -d "$RUN_DIR" ] ; then
                      rm -rf "$VALID_DIR/pages" 
                      echo "Warning: no pages for test but valid dir had pages which have been removed $VALID_DIR/pages"
                   fi
-                  sed "s/^${testName}\$/+${testName}/" < ${RUN_DIR}/failed > ${RUN_DIR}/new-failed
+                  sed "s/^${testName}\$/++${testName}/" < ${RUN_DIR}/failed > ${RUN_DIR}/new-failed
                   mv ${RUN_DIR}/new-failed ${RUN_DIR}/failed
                   if [[ ${testIndex} -eq ${currentIndex} ]] ; then
                       let currentIndex=${currentIndex}+1; 
