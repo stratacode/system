@@ -115,10 +115,14 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
          new File(rootParent).mkdirs();
       long installedTime = -1;
       if (rootDirExists && tagFile != null && tagFile.canRead()) {
-         if (pkg.definedInLayer != null)
-            pkg.definedInLayer.layeredSystem.layerResolveContext = true;
+         if (pkg.definedInLayer != null) {
+            if (pkg.definedInLayer.layeredSystem == null)
+               System.out.println("*** Package from removed layer still present!");
+            else
+               pkg.definedInLayer.layeredSystem.layerResolveContext = true;
+         }
          RepositoryPackage oldPkg = RepositoryPackage.readFromFile(tagFile, this);
-         if (pkg.definedInLayer != null)
+         if (pkg.definedInLayer != null && pkg.definedInLayer.layeredSystem != null)
             pkg.definedInLayer.layeredSystem.layerResolveContext = false;
 
          /* TODO: is it possible to restore a package which was not installed and then think it is installed?

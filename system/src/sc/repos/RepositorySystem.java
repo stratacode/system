@@ -123,6 +123,9 @@ public class RepositorySystem {
 
    public RepositoryPackage addRepositoryPackage(RepositoryPackage pkg) {
       RepositoryPackage existingPkg = store.packages.get(pkg.packageName);
+      // If we are replacing a package defined in a layer that has been removed, might as well replace it.
+      if (existingPkg != null && existingPkg.definedInLayer != null && (existingPkg.definedInLayer.excluded || existingPkg.definedInLayer.layeredSystem == null))
+         existingPkg = null;
       if (existingPkg != null) {
          pkg.installedRoot = existingPkg.installedRoot;
          if (existingPkg.currentSource != null)
