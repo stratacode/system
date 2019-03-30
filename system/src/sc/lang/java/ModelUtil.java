@@ -3904,7 +3904,12 @@ public class ModelUtil {
       else if (method instanceof AbstractMethodDefinition) {
          AbstractMethodDefinition rtmeth = (AbstractMethodDefinition) method;
 
-         return rtmeth.invoke(ctx, argValues == null ? Collections.EMPTY_LIST : Arrays.asList(argValues));
+         if (rtmeth.isDynMethod())
+            return rtmeth.invoke(ctx, argValues == null ? Collections.EMPTY_LIST : Arrays.asList(argValues));
+         else {
+            Object invMeth = rtmeth.getRuntimeMethod();
+            return ModelUtil.invokeMethod(thisObject, invMeth, argValues, ctx);
+         }
       }
       else if (method instanceof CFMethod) {
          Method rtMeth = ((CFMethod) method).getRuntimeMethod();

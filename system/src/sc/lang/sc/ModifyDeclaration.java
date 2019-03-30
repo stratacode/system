@@ -2924,4 +2924,11 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
       return null;
    }
+
+   public String getNodeName() {
+      // For layers, if we have example.todo.data - because references in local layer files can be just 'data' we need to return 'data' as the NodeName.
+      if (isLayerType && typeName != null)
+         return CTypeUtil.getClassName(typeName);
+      return typeName;
+   }
 }

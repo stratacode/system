@@ -506,8 +506,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    List<String> activatedDynLayerNames = null;
 
    public void clearActiveLayers(boolean clearPeers) {
-      activatedLayerNames = null;
-      activatedDynLayerNames = null;
+      if (clearPeers) {
+         activatedLayerNames = null;
+         activatedDynLayerNames = null;
+      }
 
       if (layers != null) {
          for (Layer layer : layers) {
@@ -7005,6 +7007,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ArrayList<String> toCullList = new ArrayList<String>();
          for (Map.Entry<String, ILanguageModel> cacheEnt: inactiveModelIndex.entrySet()) {
             ILanguageModel model = cacheEnt.getValue();
+
+            // Don't cull layer models since they are needed more often and tend to be small
+            if (model instanceof JavaModel && ((JavaModel) model).isLayerModel)
+               continue;
 
             if (cleanTime - model.getLastAccessTime() > INACTIVE_MODEL_CACHE_EXPIRE_TIME_MILLIS) {
                if (externalModelIndex == null || !externalModelIndex.isInUse(model)) {
