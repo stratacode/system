@@ -58,7 +58,7 @@ public abstract class ScopeContext {
    // Used for receiving cross-scope binding events
    public IScopeEventListener eventListener = null;
 
-   public void scopeDestroyed() {
+   public void scopeDestroyed(ScopeContext fromParent) {
       if (destroyed) {
          return;
       }
@@ -67,17 +67,15 @@ public abstract class ScopeContext {
          destroyListener.scopeDestroyed(this);
       if (parentContexts != null) {
          for (ScopeContext par:parentContexts) {
-            if (!par.removeChildContext(this))
+            if (fromParent != par && !par.removeChildContext(this))
                System.err.println("*** Failed to remove child context");
          }
       }
       if (childContexts != null && childContexts.size() > 0) {
          ArrayList<ScopeContext> childrenToRemove = new ArrayList<ScopeContext>(childContexts);
          childContexts = null;
-         // NOTE: because the child removes itself from the parent we end up double-destroying here but the 'destroyed' flag in the ScopeContext
-         // keeps us from doing the work twice.
          for (ScopeContext child:childrenToRemove) {
-            child.scopeDestroyed();
+            child.scopeDestroyed(this);
          }
       }
    }

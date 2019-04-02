@@ -32,7 +32,7 @@ public abstract class BaseScopeContext extends ScopeContext {
       return valueTable;
    }
 
-   public void scopeDestroyed() {
+   public void scopeDestroyed(ScopeContext fromParent) {
       if (valueTable != null) {
          ArrayList<String> keysToDestroy = new ArrayList<String>(valueTable.size());
          for (String key:valueTable.keySet()) {
@@ -51,7 +51,7 @@ public abstract class BaseScopeContext extends ScopeContext {
          valueTable = null;
       }
       // Destroy the sync context after we dispose of any items directly in the attributes list so they are not disposed of twice.
-      super.scopeDestroyed();
+      super.scopeDestroyed(fromParent);
    }
 
 
