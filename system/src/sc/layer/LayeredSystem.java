@@ -5654,20 +5654,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          SrcEntry defSrcEnt = new SrcEntry(layer, layerDefFile, FileUtil.concat(layerGroup, layerBaseName));
 
-         // Parse the model, validate it defines an instance of a Layer
-         Layer newLayer = (Layer) loadLayerObject(defSrcEnt, Layer.class, layerTypeName, layerPrefix, relDir, layerPathPrefix, inLayerDir, markDynamic, layerPathName, lpi);
-         // No matter what, get it out since the name name have changed or maybe we did not look it up.
-         pendingLayers.remove(layerTypeName);
+         try {
+            // Parse the model, validate it defines an instance of a Layer
+            Layer newLayer = (Layer) loadLayerObject(defSrcEnt, Layer.class, layerTypeName, layerPrefix, relDir, layerPathPrefix, inLayerDir, markDynamic, layerPathName, lpi);
 
-         if (newLayer != null) {
-            layer = newLayer;
-            /*
-            if (layerNamePrefix != null && !layerNamePrefix.equals(layer.packagePrefix))
-               System.err.println("*** Error: layer name prefix does not match package prefix in the layer definition file: " + layerNamePrefix + " != " + layer.packagePrefix);
-            */
+            if (newLayer != null) {
+               layer = newLayer;
+               /*
+               if (layerNamePrefix != null && !layerNamePrefix.equals(layer.packagePrefix))
+                  System.err.println("*** Error: layer name prefix does not match package prefix in the layer definition file: " + layerNamePrefix + " != " + layer.packagePrefix);
+               */
+            }
+            else
+               return null;
          }
-         else
-            return null;
+         finally {
+            // No matter what, get it out since the name name have changed or maybe we did not look it up.
+            pendingLayers.remove(layerTypeName);
+         }
       }
       else {
          return null;
