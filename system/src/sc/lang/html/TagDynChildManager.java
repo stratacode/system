@@ -28,6 +28,10 @@ public class TagDynChildManager implements sc.dyn.IDynChildManager {
 
    public void addChild(int ix, Object parentObj, Object childObj) {
       Element parent = (Element) parentObj;
+      if (parent.children == null) {
+         parent.children = new SemanticNodeList();
+         parent.children.setParentNode(parent);
+      }
       if (ix == -1)
          parent.children.add(childObj);
       else
