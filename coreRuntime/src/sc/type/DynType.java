@@ -162,7 +162,7 @@ public class DynType {
    }
 
    protected boolean excludedProperty(String name) {
-      return name.charAt(0) == 'p' && (name.equals("parseNode") || name.equals("parentNode") || name.startsWith("this$"));
+      return (name.charAt(0) == 'p' && (name.equals("parseNode") || name.equals("parentNode"))) || name.startsWith("this$");
    }
 
    /** Returns just the instance properties for the type */
