@@ -3978,6 +3978,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // explicitly through the apis.
    public void initSync() {
       // We don't pick these types up reliably because the compiled types are used for incremental compiles so just add them all to the global filter whenever the sync system is initialized.
+      if (SyncManager.globalSyncTypeNames == null)
+         SyncManager.globalSyncTypeNames = new HashSet<String>();
       SyncManager.globalSyncTypeNames.addAll(globalSyncTypeNames);
 
       syncInited = true;
@@ -14503,7 +14505,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
            // Need to also load this layer and any dependent layers as an inactive layers into the other runtimes if they are needed there.
             if (layer.includeForProcess(peerSys.processDefinition)) {
-               Layer peerRes = peerSys.getInactiveLayer(layer.getLayerName(), openLayer, false, !layer.disabled, false);
+               // Note: used to pass layer.disabled here for 'enabled' but that could lead to dependent layers of the disabled layer being
+               // also disabled.
+               Layer peerRes = peerSys.getInactiveLayer(layer.getLayerName(), openLayer, false, true, false);
                if (peerRes != null)
                   foundInPeer = true;
             }
