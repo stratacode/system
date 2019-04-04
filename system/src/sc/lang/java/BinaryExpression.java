@@ -103,7 +103,7 @@ public class BinaryExpression extends Expression {
          for (int i = 1; i < operands.size(); i++) {
             op = operands.get(i);
             Expression newExpr;
-            if (TypeUtil.operatorPrecedes(op.operator, operator)) {
+            if (op.operator == null || operator == null || TypeUtil.operatorPrecedes(op.operator, operator)) {
                // TODO: Is there a case where an instanceof operator could be used here?
                BinaryExpression lastParent = this;
                // Seems wrong as we'd be using a type as the "lhs" of some other expression.
