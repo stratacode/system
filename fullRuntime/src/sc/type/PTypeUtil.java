@@ -672,7 +672,7 @@ public class PTypeUtil {
             field.setAccessible(true);
 
             String name = field.getName();
-            // Keep this$0 etc because we use them for finding the outer object.  But other properties with $ get ommitted.
+            // Keep this$0 etc because we use them for finding the outer object.  But other properties with $ get omitted.
             if (name.contains("$") && !name.startsWith("this"))
                continue;
             boolean isStatic = Modifier.isStatic(field.getModifiers());
@@ -711,7 +711,7 @@ public class PTypeUtil {
             switch (c) {
                case 's':
                   ptypes = method.getParameterTypes();
-                  if (!name.startsWith("set"))
+                  if (!name.startsWith("set") || Modifier.isPrivate(method.getModifiers()))
                      continue;
                   if (ptypes.length == 1)
                      type = PropertyMethodType.Set;
@@ -723,7 +723,7 @@ public class PTypeUtil {
                   break;
                case 'g':
                   ptypes = method.getParameterTypes();
-                  if (!name.startsWith("get"))
+                  if (!name.startsWith("get") || Modifier.isPrivate(method.getModifiers()))
                      continue;
                   if (ptypes.length == 0)
                      type = PropertyMethodType.Get;
@@ -736,7 +736,7 @@ public class PTypeUtil {
                   break;
                case 'i':
                   ptypes = method.getParameterTypes();
-                  if (!name.startsWith("is") || ptypes.length != 0)
+                  if (!name.startsWith("is") || ptypes.length != 0 || Modifier.isPrivate(method.getModifiers()))
                      continue;
                   propName = CTypeUtil.decapitalizePropertyName(name.substring(2));
                   type = PropertyMethodType.Is;
@@ -811,7 +811,8 @@ public class PTypeUtil {
                               String getName = "get" + CTypeUtil.capitalizePropertyName(propName);
                               for (int j = i; j < methods.length; j++) {
                                  Method theMethod = methods[j];
-                                 if (theMethod.getName().equals(getName) && theMethod.getParameterTypes().length == 0) {
+                                 if (theMethod.getName().equals(getName) && theMethod.getParameterTypes().length == 0 &&
+                                     !Modifier.isPrivate(theMethod.getModifiers())) {
                                     getSelector = theMethod;
                                     break;
                                  }
