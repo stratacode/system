@@ -229,15 +229,19 @@ public class ClassDeclaration extends TypeDeclaration {
       return Object.class;
    }
 
+   private boolean sameTypes(Object typeA, Object typeB) {
+      return typeA == typeB || (typeA != null && typeB != null && ModelUtil.sameTypes(typeA, typeB));
+   }
+
    protected void updateBoundExtendsType(Object newType, Object oldType) {
-      Object curType = null;
-      if (extendsType != null && ((curType = extendsType.getTypeDeclaration()) == oldType || curType == newType)) {
+      Object curType;
+      if (extendsType != null && ((curType = extendsType.getTypeDeclaration()) == oldType || sameTypes(curType, newType) || sameTypes(curType, oldType))) {
          extendsType.setTypeDeclaration(newType);
          return;
       }
       if (implementsTypes != null) {
          for (JavaType implType:implementsTypes) {
-            if ((curType = implType.getTypeDeclaration()) == oldType || curType == newType) {
+            if ((curType = implType.getTypeDeclaration()) == oldType || sameTypes(curType, oldType) || sameTypes(curType, newType)) {
                implType.setTypeDeclaration(newType);
                return;
             }
