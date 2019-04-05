@@ -48,6 +48,8 @@ public class HTMLElement<RE> extends Element<RE> {
    public final static sc.type.IBeanMapper _keyUpEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "keyUpEvent");
    public final static sc.type.IBeanMapper _focusEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "focusEvent");
    public final static sc.type.IBeanMapper _blurEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "blurEvent");
+   public final static sc.type.IBeanMapper _innerWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "innerWidth");
+   public final static sc.type.IBeanMapper _innerHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "innerHeight");
 
    static HashMap<String,IBeanMapper> domAttributes = new HashMap<String,IBeanMapper>();
    {
@@ -61,6 +63,8 @@ public class HTMLElement<RE> extends Element<RE> {
       domAttributes.put("keyUpEvent", HTMLElement._keyUpEventProp);
       domAttributes.put("focusEvent", HTMLElement._focusEventProp);
       domAttributes.put("blurEvent", HTMLElement._blurEventProp);
+      domAttributes.put("innerWidth", HTMLElement._innerWidthProp);
+      domAttributes.put("innerHeight", HTMLElement._innerHeightProp);
    }
 
 

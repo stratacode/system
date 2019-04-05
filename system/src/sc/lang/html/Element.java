@@ -4730,7 +4730,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res;
    }
 
-   // Available on the client only where we have a real DOM element.
+   // TODO: do we need to add these to the serverTags api?  Make them real fields and add them to the list we check
+   // for listeners on.
    @Bindable(manual=true)
    public int getOffsetWidth() {
       return -1;
@@ -4748,14 +4749,26 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return -1;
    }
 
+   private int innerWidth = -1;
    @Bindable(manual=true)
    public int getInnerWidth() {
-      return -1;
+      return innerWidth;
+   }
+   @Bindable(manual=true)
+   public void setInnerWidth(int iw) {
+      this.innerWidth = iw;
+      Bind.sendChange(this, "innerWidth", iw);
    }
 
+   private int innerHeight = -1;
    @Bindable(manual=true)
    public int getInnerHeight() {
-      return -1;
+      return innerHeight;
+   }
+   @Bindable(manual=true)
+   public void setInnerHeight(int ih) {
+      this.innerHeight = ih;
+      Bind.sendChange(this, "innerHeight", ih);
    }
 
    // TODO: implement these.  right now only used on the client.
@@ -5181,11 +5194,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // Specific DOM type subclasses (e.g. input) have custom attributes that are sync'd for server tags we
       SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{
             "startTagTxt", "innerHTML", "style", "class", "clickEvent", "dblClickEvent", "mouseDownEvent", "mouseOutEvent",
-            "mouseUpEvent", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent"}, 0));
+            "mouseUpEvent", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "innerWidth", "innerHeight"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));
       SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));
+      SyncManager.addSyncType(Window.class, new SyncProperties(null, null, new Object[]{"innerWidth", "innerHeight"}, null, 0));
    }
 
    public boolean isCacheEnabled() {
