@@ -617,11 +617,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
             Statement st = getDefinition();
             if (st instanceof TypedDefinition && frozenTypeDecl != null) {
                ArrayInitializer arrInit = (ArrayInitializer) initializer;
-               if (frozenTypeDecl instanceof ArrayTypeDeclaration) {
-                  ArrayTypeDeclaration arrType = (ArrayTypeDeclaration) frozenTypeDecl;
-                  int numDims = arrType.getNumDims();
+               if (ModelUtil.isArray(frozenTypeDecl)) {
+                  int numDims = ModelUtil.getArrayNumDims(frozenTypeDecl);
                   SemanticNodeList args = new SemanticNodeList<Expression>();
-                  String prefix =  getLayeredSystem().runtimeProcessor.getStaticPrefix(arrType.getArrayComponentType(), this);
+                  String prefix =  getLayeredSystem().runtimeProcessor.getStaticPrefix(ModelUtil.getArrayComponentType(frozenTypeDecl), this);
                   args.add(IdentifierExpression.create(prefix));
                   args.add(IntegerLiteral.create(numDims));
                   args.add(arrInit);

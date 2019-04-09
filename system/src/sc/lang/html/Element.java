@@ -2715,7 +2715,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                     "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
                             "      if (oldTag != null)\n" +
                             "         return oldTag;\n " +
-                            "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)parentNode, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
+                            "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)enclosingTag, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
                             "      return elem;\n" +
                             "   }",
                     SCLanguage.INSTANCE.classBodySnippet, false);

@@ -2161,6 +2161,9 @@ public class ModelUtil {
 
          return arrayClass.getComponentType();
       }
+      else if (arrayType instanceof GenericArrayType) {
+         return ((GenericArrayType) arrayType).getGenericComponentType();
+      }
       else if (arrayType instanceof IArrayTypeDeclaration) {
          return ((IArrayTypeDeclaration) arrayType).getComponentType();
       }
@@ -8394,6 +8397,15 @@ public class ModelUtil {
       }
       else if (type instanceof JavaType) {
          return ((JavaType) type).getNdims();
+      }
+      else if (type instanceof GenericArrayType) {
+         int ndim = 0;
+         Object compType = type;
+         do {
+            compType = ModelUtil.getArrayComponentType(compType);
+            ndim++;
+         } while (compType != null && ModelUtil.isArray(compType));
+         return ndim;
       }
       else if (type instanceof ArrayTypeDeclaration) {
          return ((ArrayTypeDeclaration) type).getNumDims();
