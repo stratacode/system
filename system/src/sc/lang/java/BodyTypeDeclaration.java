@@ -3541,7 +3541,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    private void initServerTag(Object inst) {
       // This is for the dynamic type equivalent of the addMixinProperties which are now done during the transform phase.
-      // TODO: this is like the mixinTemplate functionality
       if (inst instanceof Element && isServerTagType())
          ((Element) inst).serverTag = true;
    }

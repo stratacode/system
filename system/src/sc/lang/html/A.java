@@ -30,13 +30,11 @@ public class A extends HTMLElement {
    public A(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public A(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
-      super(concreteType);
-      setRepeatVar(repeatVar);
-      setRepeatIndex(repeatIx);
+   public A(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, repeatVar, repeatIx);
    }
-   public A(Object repeatVar, int repeatIx) {
-      super(repeatVar, repeatIx);
+   public A(Element parent, Object repeatVar, int repeatIx) {
+      super(parent, repeatVar, repeatIx);
    }
    {
       tagName = "a";

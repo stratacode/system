@@ -651,12 +651,17 @@ public class SyncLayer {
       Object[] newArgs = null;
       String changedObjFullName = null;
 
+      String changedObjPkg;
+
       if (changedObj != null) {
+         changedObjPkg = syncHandler.getPackageName();
          String changedObjName = syncHandler.getObjectBaseName(null, this);
          changedObjFullName = syncHandler.getObjectName();
 
          // isNew should not be set for property changes when the current object is set or already serialized.
-         isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) && !currentObjNames.contains(changedObjName) && createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
+         isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) &&
+                  (!currentObjNames.contains(changedObjName) || !equalStrings(changedObjPkg, changeCtx.lastPackageName)) &&
+                  createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
          newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).args : isNew ? parentContext.getNewArgs(changedObj) : null;
          Object changedObjType = syncHandler.getObjectType(changedObj);
          objTypeName = DynUtil.getTypeName(changedObjType, false);
@@ -755,6 +760,7 @@ public class SyncLayer {
          objTypeName = change.getStaticTypeName();
          useObjNameForPackage = false;
          newObjName = objName = CTypeUtil.getClassName(objTypeName);
+         changedObjPkg = null;
       }
 
       // First we compute the new obj name and new obj names for this change.  They are not getting applied yet though so we keep them as a copy.
@@ -764,7 +770,7 @@ public class SyncLayer {
       int switchObjNum = -1;
       int switchObjStart = -1;
 
-      String newPackageName = useObjNameForPackage ? syncHandler.getPackageName() : CTypeUtil.getPackageName(objTypeName);
+      String newPackageName = useObjNameForPackage ? changedObjPkg : CTypeUtil.getPackageName(objTypeName);
       boolean packagesMatch = !(changeCtx.lastPackageName != newPackageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(newPackageName)));
 
       boolean pushName = true;
@@ -1006,6 +1012,10 @@ public class SyncLayer {
    }
 
    public final static String GLOBAL_TYPE_NAME = "_GLOBAL_";
+
+   static boolean equalStrings(String s1, String s2) {
+      return s1 == s2 || (s1 != null && s1.equals(s2));
+   }
 
    static void pushCurrentObjNames(SyncSerializer ser, ArrayList<String> currentObjNames, int num) {
       String parentName = null;

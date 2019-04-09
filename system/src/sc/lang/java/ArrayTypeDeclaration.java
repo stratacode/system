@@ -72,7 +72,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public static ArrayTypeDeclaration create(LayeredSystem sys, Object compType, int ndim, Object dit) {
       while (compType instanceof ArrayTypeDeclaration) {
          ArrayTypeDeclaration arrCompType = (ArrayTypeDeclaration) compType;
-         ndim += arrCompType.getNdim();
+         ndim += arrCompType.getNumDims();
          compType = arrCompType.getComponentType();
       }
       return new ArrayTypeDeclaration(sys, dit, compType, JavaType.getDimsStr(ndim));
@@ -145,9 +145,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       if (componentClass instanceof Class) {
          Class cclass = (Class) componentClass;
          if (cclass.isPrimitive())
-            return Type.get(cclass).getPrimitiveArrayClass(getNdim());
+            return Type.get(cclass).getPrimitiveArrayClass(getNumDims());
          else
-            return Type.get(cclass).getArrayClass(cclass, getNdim());
+            return Type.get(cclass).getArrayClass(cclass, getNumDims());
       }
       return null;
    }
@@ -172,9 +172,6 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return ModelUtil.isDynamicStub(componentType, includeExtends);
    }
 
-   public int getNdim() {
-      return arrayDimensions.length() >> 1;
-   }
 
    public Object definesMethod(String name, List<? extends Object> parametersOrExpressions, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
       Object res = ModelUtil.definesMethod(OBJECT_ARRAY_CLASS, name, parametersOrExpressions, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, getLayeredSystem());

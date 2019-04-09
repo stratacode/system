@@ -4572,8 +4572,10 @@ public class ModelUtil {
          return null;
 
       Object[] types = new Object[list.size()];
-      for (int i = 0; i < types.length; i++)
-         types[i] = ((ITypedObject)list.get(i)).getTypeDeclaration();
+      for (int i = 0; i < types.length; i++) {
+         ITypedObject type = (ITypedObject)list.get(i);
+         types[i] = type.getTypeDeclaration();
+      }
       return types;
    }
 
@@ -8374,7 +8376,9 @@ public class ModelUtil {
       return ct;
    }
 
-   public static int getNdims(Object type) {
+   public static int getArrayNumDims(Object type) {
+      if (type instanceof ParamTypeDeclaration)
+         type = ((ParamTypeDeclaration) type).baseType;
       if (type instanceof Class) {
          Class cl = (Class) type;
          if (cl.isArray()) {
@@ -8390,6 +8394,9 @@ public class ModelUtil {
       }
       else if (type instanceof JavaType) {
          return ((JavaType) type).getNdims();
+      }
+      else if (type instanceof ArrayTypeDeclaration) {
+         return ((ArrayTypeDeclaration) type).getNumDims();
       }
       else
          throw new UnsupportedOperationException();

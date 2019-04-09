@@ -38,6 +38,8 @@ public class HtmlPage extends Html {
       super(concreteType);
    }
 
+   public IPageDispatcher pageDispatcher;
+
    private QueryParamProperty[] queryParamProperties;
 
    /** List of associations between URL query parameters and properties of the page object */
@@ -79,6 +81,7 @@ public class HtmlPage extends Html {
       pageVisitCount = ct;
       Bind.sendEvent(IListener.VALUE_CHANGED, this, _pageVisitProp);
    }
+
 
    // TODO: this only works for the most rudimentary cases and should do escaping etc.
    /*

@@ -101,9 +101,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public transient boolean startTagValid = false, bodyValid = false;
 
    /**
-    * Like bodyValid but applies only to changes made to the static text chunks.  When a child tag's bodyTxt changes,
+    * Like bodyValid but applies only to changes made this tag's body, not including child tag bodies.  When a child tag's bodyTxt changes,
     * we set both this and bodyValid = false.  For the parent nodes, we only make bodyValid = false.  This way, we can
-    * walk down the tree to find any child nodes which have actually changed.
+    * walk down the tree looking for bodyValid=false nodes, to ultimately find child nodes which have actually changed where bodyTxtValid = false
+    * for an incremental update.
     */
    public transient boolean bodyTxtValid = false;
 
@@ -129,11 +130,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Object repeat;
 
-   // TODO: we probably should support wrap for normal tags - i.e. when it's set to false, we render just the body, without the start/end tag.
+   // TODO: we probably should support wrap or probably bodyOnly for normal tags - i.e. when it's set to false, we render just the body, without the start/end tag.
    /**
-    * For repeat tags, with wrap=true we use the tagName as a wrapper around the content - so there's no wrapping tag around the body as it's repeated.
-    * (i.e. <thisTag>bodyTag0...bodyTagN</thisTag>)
-    * For wrap=false, this tag's name is the enclosing tag <thisTag0>body with repeat[0]</thisTag0>...<thisTagN>body with repeat[n]</thisTagN>
+    * For repeat tags, with wrap=true, the body repeats without a wrapper tag.  Instead a wrapper tag based using this element's tag name wraps all of the repeated content without
+    * a separate tag wrapping each element.
+    * (e.g. if this is a div tag: <div>body for repeat[0]...body for repeat[n]</div>)
+    * With wrap=false, there is no outer wrapper tag. Just the body tags are rendered using this tag's name: <div>body for repeat[0]</div>...<div>body with repeat[n]</div>
     */
    public transient boolean wrap;
 
@@ -180,8 +182,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // stores that references so we can find the original source Statement.
    public transient Element fromElement;
 
-   static String[] repeatConstrNames = {"_repeatVar", "_repeatIx"};
-   static List<?> repeatConstrParams = Arrays.asList(new Object[] {Object.class, Integer.TYPE});
+   static String[] repeatConstrNames = {"_parent", "_repeatVar", "_repeatIx"};
+   static List<?> repeatConstrParams = Arrays.asList(new Object[] {Element.class, Object.class, Integer.TYPE});
 
    public Element() {
    }
@@ -189,12 +191,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       super(concreteType);
    }
 
-   public Element(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
+   public Element(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
       super(concreteType);
+      parentNode = parent;
       setRepeatVar((RE) repeatVar);
       setRepeatIndex(repeatIx);
    }
-   public Element(Object repeatVar, int repeatIx) {
+   public Element(Element parent, Object repeatVar, int repeatIx) {
+      parentNode = parent;
       setRepeatVar((RE) repeatVar);
       setRepeatIndex(repeatIx);
    }
@@ -304,7 +308,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          res = wrapper.createElement(val, ix, oldTag);
       }
       else if (dynObj != null) {
-         res = (Element) dynObj.invokeFromWrapper(this, "createElement","Ljava/lang/Object;ILsc/lang/html/Element;", val, ix, oldTag);
+         res = (Element) dynObj.invokeFromWrapper(this, "createElement","Lsc/lang/html/Element;Ljava/lang/Object;ILsc/lang/html/Element;", val, ix, oldTag);
       }
       // If this Element instance was created by parsing an schtml file, we can implement the repeat using the parsed semantic node tree.
       else {
@@ -317,7 +321,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          res = repeatElem;
       }
       if (res != null) {
-         res.parentNode = this;
+         res.setParentNode(this);
+         //res.initUniqueId();
          registerSyncInstAndChildren(res);
          if (wrap)
             res.bodyOnly = true;
@@ -352,6 +357,16 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public String allocUniqueId(String name) {
       return allocUniqueId(name, false);
+   }
+
+   /**
+    * Should be called after the parentNode is set on tags that are created in code (e.g. repeat tags)
+    * that become part of the page so that we can be sure to add a suffix for ids that are not unique in the page.
+    */
+   public void initUniqueId() {
+      if (parentNode == null)
+         throw new IllegalArgumentException("initUniqueId called with no parent node");
+      setId(allocUniqueId(getRawObjectName()));
    }
 
    /** If this only runs on one side or the other, it's a client/server specific node and gets named differently */
@@ -2332,9 +2347,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return sb.toString();
    }
 
-   // TODO: this method is probably not 100% yet - it mirrors the logic in convertToObject in reverse - so we can clone
-   // the Template and template's rootType, then reassign the Elements.  It's probably faster this way?  We could also just
-   // reinit the rootType from the cloned template when the init flags are set.
+   // This class mirrors the logic in convertToObject in reverse - cloning
+   // the Template and template's rootType, then reassign the Elements rather than just calling convertToObject again.
+   // It's probably faster this way?  We could also just reinit the rootType from the cloned template when the init flags are set.
    public void assignChildTagObjects(TypeDeclaration parentType, Element oldElem) {
       if (oldElem.tagObject != null) {
          tagObject = parentType;
@@ -2700,7 +2715,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                     "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
                             "      if (oldTag != null)\n" +
                             "         return oldTag;\n " +
-                            "      sc.lang.html.Element elem = new " + objName + "((" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
+                            "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)parentNode, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
                             "      return elem;\n" +
                             "   }",
                     SCLanguage.INSTANCE.classBodySnippet, false);
@@ -3024,9 +3039,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          Layer refLayer = getJavaModel().getLayer();
          boolean hasDefaultConstructor = ModelUtil.hasDefaultConstructor(sys, compiledExtTypeDecl, null, this, refLayer);
          Object propConstr = ModelUtil.getPropagatedConstructor(sys, compiledExtTypeDecl, this, refLayer);
-         Object[] repeatConstrTypes = new Object[2];
-         repeatConstrTypes[0] = repeatElementType;
-         repeatConstrTypes[1] = Integer.TYPE;
+         Object[] repeatConstrTypes = new Object[3];
+         repeatConstrTypes[0] = Element.class;
+         repeatConstrTypes[1] = repeatElementType;
+         repeatConstrTypes[2] = Integer.TYPE;
          ConstructorDefinition repeatConst = ConstructorDefinition.create(tagType, repeatConstrTypes, repeatConstrNames);
          repeatConst.addModifier("public");
          boolean needsConstructor = false;
@@ -3034,19 +3050,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (propConstr == null) {
             if (ModelUtil.declaresConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
                SemanticNodeList<Expression> sargs = new SemanticNodeList<Expression>();
-               sargs.add(IdentifierExpression.create(repeatConstrNames[0]));
-               sargs.add(IdentifierExpression.create(repeatConstrNames[1]));
+               for (int p = 0; p < repeatConstrNames.length; p++)
+                  sargs.add(IdentifierExpression.create(repeatConstrNames[p]));
                IdentifierExpression constSuperExpr = IdentifierExpression.createMethodCall(sargs, "super");
                repeatConst.addBodyStatementAt(0, constSuperExpr);
                needsConstructor = true;
             }
             else if (hasDefaultConstructor) {
+               SemanticNodeList<Expression> parArgs = new SemanticNodeList<Expression>();
+               parArgs.add(IdentifierExpression.create(repeatConstrNames[0]));
+               repeatConst.addBodyStatementAt(0, IdentifierExpression.createMethodCall(parArgs, "setParentNode"));
                SemanticNodeList<Expression> srvArgs = new SemanticNodeList<Expression>();
-               srvArgs.add(IdentifierExpression.create(repeatConstrNames[0]));
-               repeatConst.addBodyStatementAt(0, IdentifierExpression.createMethodCall(srvArgs, "setRepeatVar"));
+               srvArgs.add(IdentifierExpression.create(repeatConstrNames[1]));
+               repeatConst.addBodyStatementAt(1, IdentifierExpression.createMethodCall(srvArgs, "setRepeatVar"));
                SemanticNodeList<Expression> ixArgs = new SemanticNodeList<Expression>();
-               ixArgs.add(IdentifierExpression.create(repeatConstrNames[1]));
-               repeatConst.addBodyStatementAt(1, IdentifierExpression.createMethodCall(ixArgs, "setRepeatIndex"));
+               ixArgs.add(IdentifierExpression.create(repeatConstrNames[2]));
+               repeatConst.addBodyStatementAt(2, IdentifierExpression.createMethodCall(ixArgs, "setRepeatIndex"));
                needsConstructor = true;
             }
          }
@@ -3245,6 +3264,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
             addTagTypeBodyStatement(tagType, outputBodyMethod);
          }
+
+         if (tagName.equals("head")) {
+            addStyleSheetPaths();
+         }
       }
 
       /*
@@ -3273,6 +3296,64 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return tagType;
    }
 
+   private void addStyleSheetPathsForChildren(ArrayList<String> styleSheetPaths) {
+      if (children != null) {
+         for (int i = 0; i < children.size(); i++) {
+            Object child = children.get(i);
+            if (child instanceof Element) {
+               Element childElem = (Element) child;
+               if (childElem.tagName != null && childElem.tagName.equals("link")) {
+                  Attr rel = childElem.getAttribute("rel");
+                  if (PString.isString(rel.value) && rel.value.toString().equalsIgnoreCase("stylesheet")) {
+                     Attr hrefObj = childElem.getAttribute("href");
+                     if (hrefObj != null && PString.isString(hrefObj.value)) {
+                        String href = hrefObj.value.toString();
+                        if (!styleSheetPaths.contains(href))
+                           styleSheetPaths.add(href);
+                     }
+                  }
+               }
+            }
+         }
+      }
+      boolean handled = false;
+      Object ext = getExtendsTypeDeclaration();
+      if (ext instanceof TypeDeclaration) {
+         TypeDeclaration extType = (TypeDeclaration) ext;
+         if (extType.element != null) {
+            extType.element.addStyleSheetPathsForChildren(styleSheetPaths);
+            handled = true;
+         }
+      }
+      Object modExt = getTagObjectExtends();
+      if (modExt instanceof TypeDeclaration && modExt != ext) {
+         TypeDeclaration modType = (TypeDeclaration) modExt;
+         if (modType.element != null) {
+            modType.element.addStyleSheetPathsForChildren(styleSheetPaths);
+            handled = true;
+         }
+      }
+      Object next = ext;
+      while (!handled && next != null) {
+         next = ModelUtil.getExtendsClass(next);
+         if (next instanceof TypeDeclaration) {
+            TypeDeclaration nextType = (TypeDeclaration) next;
+            if (nextType.element != null) {
+               nextType.element.addStyleSheetPathsForChildren(styleSheetPaths);
+               handled = true;
+            }
+         }
+      }
+   }
+
+   private void addStyleSheetPaths() {
+      ArrayList<String> styleSheetPaths = new ArrayList<String>();
+      addStyleSheetPathsForChildren(styleSheetPaths);
+      if (styleSheetPaths.size() > 0) {
+         PropertyAssignment propAssign = PropertyAssignment.create("styleSheetPaths", ArrayInitializer.create(styleSheetPaths.toArray()), "=");
+         addTagTypeBodyStatement(tagObject, propAssign);
+      }
+   }
 
    private Expression createIdInitExpr(Expression attExpr, String attStr, boolean idSpecified) {
       if (idSpecified && attStr.equals(ALT_ID))
@@ -4594,10 +4675,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return decl;
    }
 
-   /** For now, this just handles converting relative URL paths so a path relative to a template in one directory can be
-    * extended, or included into a template in a different directory.
+   /**
+    * This converts relative URL paths in the context of this element. The goal is that a path relative to a template in one directory can be
+    * extended, or included into a template in a different directory. You call it with the relative path to the current source file (which is the
+    * context URLs in that file will be evaluated in, along with the relative URL to be translated. It looks at the Window.location.pathname to determine
+    * the current URL from the browser's perspective and returns a path to this supplied urlPath in the context of the browser's URL.
     * TODO: should we have a mode where we specify a mapping from urls specified as path names to some other abstract name.  If so, we can use that table here to figure out which
-    * external URL corresponds to a given internal path. */
+    * external URL corresponds to a given internal path.
+    */
    public static String getRelURL(String srcRelPath, String urlPath) {
       return URLUtil.concat(getRelPrefix(srcRelPath), urlPath);
    }
@@ -5221,4 +5306,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          super.displayError(args);
    }
 
+   public void setParentNode(ISemanticNode parentNode) {
+      if (parentNode == this.parentNode)
+         return;
+      super.setParentNode(parentNode);
+      // If we have already called allocUniqueId on children, if this idSpaces is not the
+      // same inherited idSpaces map, we need to reinitialize this id.
+      // TODO: are there children ids in idSpaces we also have to reinit?
+      if (idSpaces != null) {
+         if (parentNode instanceof Element) {
+            Element par = (Element) parentNode;
+            if (par.idSpaces != idSpaces) {
+               idSpaces = null;
+               if (id != null)
+                  initUniqueId();
+            }
+         }
+      }
+   }
 }

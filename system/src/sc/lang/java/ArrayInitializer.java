@@ -356,4 +356,9 @@ public class ArrayInitializer extends Expression {
          }
       }
    }
+
+   public int getNumDims() {
+      Object type = getTypeDeclaration();
+      return type == null ? 1 : ModelUtil.getArrayNumDims(type);
+   }
 }

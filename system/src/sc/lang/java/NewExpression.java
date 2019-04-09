@@ -868,9 +868,20 @@ public class NewExpression extends IdentifierExpression {
       setProperty("typeArguments", null);
 
       if (arrayInitializer != null) {
-         arrayInitializer.transformToJS();
-         parentNode.replaceChild(this, arrayInitializer);
-         return arrayInitializer;
+         for (Expression ad:arrayDimensions) {
+            if (ad != null)
+               ad.transformToJS();
+         }
+         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+         String prefix =  getLayeredSystem().runtimeProcessor.getStaticPrefix(boundType, this);
+         args.add(IdentifierExpression.create(prefix));
+         int ndim = arrayInitializer.getNumDims();
+         args.add(IntegerLiteral.create(ndim));
+         Expression arrayInit = (Expression) arrayInitializer.transformToJS();
+         args.add(arrayInit);
+         IdentifierExpression initExpr = IdentifierExpression.createMethodCall(args, "sc_initArray");
+         parentNode.replaceChild(this, initExpr);
+         return initExpr;
       }
       else if (arrayDimensions != null) {
          for (Expression ad:arrayDimensions) {

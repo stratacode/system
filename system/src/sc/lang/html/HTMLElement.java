@@ -73,13 +73,11 @@ public class HTMLElement<RE> extends Element<RE> {
    public HTMLElement(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public HTMLElement(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
-      super(concreteType);
-      setRepeatVar((RE) repeatVar);
-      setRepeatIndex(repeatIx);
+   public HTMLElement(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, repeatVar, repeatIx);
    }
-   public HTMLElement(Object repeatVar, int repeatIx) {
-      super(repeatVar, repeatIx);
+   public HTMLElement(Element parent, Object repeatVar, int repeatIx) {
+      super(parent, repeatVar, repeatIx);
    }
 
    static HashSet<String> domEventNames = new HashSet<String>();

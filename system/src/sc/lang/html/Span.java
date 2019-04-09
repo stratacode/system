@@ -16,13 +16,11 @@ public class Span extends HTMLElement {
    public Span(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public Span(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
-      super(concreteType);
-      setRepeatVar(repeatVar);
-      setRepeatIndex(repeatIx);
+   public Span(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, repeatVar, repeatIx);
    }
-   public Span(Object repeatVar, int repeatIx) {
-      super(repeatVar, repeatIx);
+   public Span(Element parent, Object repeatVar, int repeatIx) {
+      super(parent, repeatVar, repeatIx);
    }
 }
   

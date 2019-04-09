@@ -610,8 +610,30 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public void transformToJS() {
       if (arrayDimensions != null)
          setProperty("arrayDimensions", null);
-      if (initializer != null)
+      if (initializer != null) {
          initializer.transformToJS();
+
+         if (initializer instanceof ArrayInitializer) {
+            Statement st = getDefinition();
+            if (st instanceof TypedDefinition && frozenTypeDecl != null) {
+               ArrayInitializer arrInit = (ArrayInitializer) initializer;
+               if (frozenTypeDecl instanceof ArrayTypeDeclaration) {
+                  ArrayTypeDeclaration arrType = (ArrayTypeDeclaration) frozenTypeDecl;
+                  int numDims = arrType.getNumDims();
+                  SemanticNodeList args = new SemanticNodeList<Expression>();
+                  String prefix =  getLayeredSystem().runtimeProcessor.getStaticPrefix(arrType.getArrayComponentType(), this);
+                  args.add(IdentifierExpression.create(prefix));
+                  args.add(IntegerLiteral.create(numDims));
+                  args.add(arrInit);
+                  // TODO: add extra dims as args here
+                  IdentifierExpression initExpr = IdentifierExpression.createMethodCall(args, "sc_initArray");
+                  replaceChild(initializer, initExpr);
+               }
+               else
+                  System.err.println("*** TODO: handle non arrays initialized by arrays?");
+            }
+         }
+      }
    }
 
    public boolean needsDataBinding() {

@@ -16,6 +16,7 @@ import sc.obj.SyncMode;
 @CompilerSettings(outputMethodTemplate="sc.lang.html.CSSOutputMethodTemplate")
 @ResultSuffix("css")
 public class StyleSheet extends Style {
+
    public StyleSheet() {
    }
 
@@ -25,6 +26,7 @@ public class StyleSheet extends Style {
 
    // For the client this will refresh the stylesheet but don't know what we need to do here.
    public void invalidate() {
+      super.invalidate();
    }
 
    public void outputBody(StringBuilder sb, OutputCtx ctx) {

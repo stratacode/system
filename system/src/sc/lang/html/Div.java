@@ -16,13 +16,11 @@ public class Div extends HTMLElement {
    public Div(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public Div(TypeDeclaration concreteType, Object repeatVar, int repeatIx) {
-      super(concreteType);
-      setRepeatVar(repeatVar);
-      setRepeatIndex(repeatIx);
+   public Div(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, repeatVar, repeatIx);
    }
-   public Div(Object repeatVar, int repeatIx) {
-      super(repeatVar, repeatIx);
+   public Div(Element parent, Object repeatVar, int repeatIx) {
+      super(parent, repeatVar, repeatIx);
    }
 }
   
