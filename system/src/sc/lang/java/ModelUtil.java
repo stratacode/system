@@ -5958,6 +5958,28 @@ public class ModelUtil {
       return (varObj instanceof java.lang.Enum);
    }
 
+   public static String getEnumConstantName(Object enumConst) {
+      if (enumConst instanceof java.lang.Enum)
+         return ((java.lang.Enum) enumConst).name();
+      if (enumConst instanceof EnumConstant)
+         return ((EnumConstant) enumConst).typeName;
+      else if (enumConst instanceof ITypeDeclaration) {
+         return ((ITypeDeclaration) enumConst).getTypeName(); // Modify of an enum constant
+      }
+      else if (enumConst instanceof CFField)
+         return ((CFField) enumConst).getFieldName();
+      else if (enumConst instanceof DynEnumConstant)
+         return ((DynEnumConstant) enumConst).name();
+      else if (enumConst instanceof Field)
+         return ((Field) enumConst).getName();
+      else if (enumConst instanceof IBeanMapper) {
+         Object field = ((IBeanMapper) enumConst).getField();
+         if (field != null)
+            return ModelUtil.getPropertyName(field);
+      }
+      throw new IllegalArgumentException("getEnumConstantName: Not an enum constant");
+   }
+
    public static boolean isInterface(Object obj) {
       if (obj instanceof Class)
          return ((Class) obj).isInterface();
@@ -5981,7 +6003,7 @@ public class ModelUtil {
    public static boolean isEnumType(Object varObj) {
       if (varObj instanceof ClientTypeDeclaration)
          varObj = ((ClientTypeDeclaration) varObj).getOriginal();
-      return varObj instanceof EnumDeclaration || ((varObj instanceof Class) && ((Class) varObj).isEnum()) ||
+      return varObj instanceof EnumDeclaration || ((varObj instanceof Class) && ((Class) varObj).isEnum()) || ((varObj instanceof ITypeDeclaration) && ((ITypeDeclaration) varObj).isEnumeratedType()) ||
              ((varObj instanceof CFClass) && ((CFClass) varObj).isEnum()) || (varObj instanceof ModifyDeclaration && isEnumType(((ModifyDeclaration) varObj).getModifiedType()));
    }
 
