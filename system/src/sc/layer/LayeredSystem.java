@@ -997,9 +997,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private static boolean containsAssign(ArrayList<PropertyAssignment> res, PropertyAssignment assign) {
-      for (PropertyAssignment pa:res)
+      if (assign.propertyName == null)
+         return false;
+      for (PropertyAssignment pa:res) {
+         if (pa.propertyName == null)
+            continue;
          if (pa.propertyName.equals(assign.propertyName) && ModelUtil.sameTypesAndLayers(pa.getLayeredSystem(), pa.getEnclosingType(), assign.getEnclosingType()))
             return true;
+      }
       return false;
    }
 
@@ -3944,7 +3949,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   return false;
                // Any script commands that come in here that are not valid should cause us to exit with an error
                default:
-                  cmd.processCommand(str);
+                  // TODO: prompt the user for another command?
                   anyErrors = true;
                   break;
             }
