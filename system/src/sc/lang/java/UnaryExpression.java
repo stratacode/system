@@ -50,11 +50,13 @@ public class UnaryExpression extends ChainedExpression {
 
    /** ++ or -- pre/post */
    private boolean isIncrementOperator() {
+      if (operator == null)
+         return false;
       return operator.equals("++") || operator.equals("--");
    }
 
    public Object getTypeDeclaration() {
-      if (operator.charAt(0) == '!')
+      if (operator != null && operator.charAt(0) == '!')
          return Boolean.TYPE;
       else
          return super.getTypeDeclaration();
