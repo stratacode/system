@@ -66,28 +66,14 @@ public class CommandInterpreter extends AbstractInterpreter {
             while ((nextLine = input.readLine()) != null) {
                currentLine++;
                Object result = null;
+               String lastCommand = null;
                if (currentWizard != null || nextLine.trim().length() != 0) {
                   pendingInput.append(nextLine);
 
-                  result = parseCommand(pendingInput.toString(), getParselet());
+                  lastCommand = pendingInput.toString();
+                  result = parseCommand(lastCommand, getParselet());
                }
-               if (result != null) {
-                  try {
-                     statementProcessor.processStatement(this, result);
-                  }
-                  catch (Throwable exc) {
-                     Object errSt = result;
-                     if (errSt instanceof List && ((List) errSt).size() == 1)
-                        errSt = ((List) errSt).get(0);
-                     System.err.println("Script error: " + exc.toString() + " for statement: " + errSt);
-                     if (system.options.verbose)
-                        exc.printStackTrace();
-                     if (exitOnError) {
-                        System.err.println("Exiting -1 on error because cmd.exitOnError configured as true");
-                        System.exit(-1);
-                     }
-                  }
-               }
+               doProcessStatement(result, lastCommand);
                if (pendingInput.length() > 0) {
                   if (!consoleDisabled && !noPrompt)
                      nextPrompt = "Incomplete statement: ";
