@@ -216,9 +216,15 @@ public class EditorContext extends ClientEditorContext {
    public synchronized void save() {
       for (JavaModel model:changedModels) {
          if (model.getSrcFile() != null) {
-            model.saveModel();
-            model.layer.addNewSrcFile(model.getSrcFile(), true);
-            model.unsavedModel = false;
+            model.layeredSystem.acquireDynLock(false);
+            try {
+               model.saveModel();
+               model.layer.addNewSrcFile(model.getSrcFile(), true);
+               model.unsavedModel = false;
+            }
+            finally {
+               model.layeredSystem.releaseDynLock(false);
+            }
          }
       }
       changedModels.clear();

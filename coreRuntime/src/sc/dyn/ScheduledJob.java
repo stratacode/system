@@ -3,6 +3,7 @@ package sc.dyn;
 import sc.obj.CurrentScopeContext;
 import sc.obj.ScopeDefinition;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ScheduledJob {
@@ -23,6 +24,34 @@ public class ScheduledJob {
          jobList.add(newJob);
       else
          jobList.add(i, newJob);
+   }
+
+   public static void runJobList(List<ScheduledJob> toRunLater, int minPriority, int maxPriority) {
+      int runCt = 0;
+      ArrayList<ScheduledJob> toRestore = null;
+      do {
+         runCt++;
+         ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
+         toRunLater.clear();
+         for (int i = 0; i < toRunNow.size(); i++) {
+            ScheduledJob toRun = toRunNow.get(i);
+            if (toRun.priority >= minPriority && toRun.priority < maxPriority)
+               toRun.run();
+            else {
+               if (toRestore == null)
+                  toRestore = new ArrayList<ScheduledJob>();
+               toRestore.add(toRun);
+            }
+         }
+         if (runCt > 16) {
+            System.err.println("*** execLaterJobs - exceeded indirection count!");
+            return;
+         }
+      }
+      while (toRunLater.size() > 0); // Make sure we run any jobs found when running these jobs
+
+      if (toRestore != null)
+         toRunLater.addAll(toRestore);
    }
 
    public void run() {

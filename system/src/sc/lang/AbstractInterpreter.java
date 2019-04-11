@@ -217,22 +217,27 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public abstract boolean inputBytesAvailable();
 
-   public void processCommand(String nextLine) {
-      Object result = null;
-      if (nextLine.trim().length() != 0) {
-         pendingInput.append(nextLine);
-
-         result = parseCommand(pendingInput.toString(), getParselet());
-      }
+   public void doProcessStatement(Object result, String lastCommand) {
       if (result != null) {
          try {
+            // Nice for testing to see the command we are about to process
+            if (echoInput && consoleDisabled && lastCommand != null && lastCommand.trim().length() > 0)
+               System.out.println("Script cmd: " + lastCommand);
             statementProcessor.processStatement(this, result);
+            if (pauseTime != 0 && !enableBatchMode)
+               sleep(pauseTime);
          }
          catch (Throwable exc) {
-            System.err.println(exc);
-            system.anyErrors = true;
+            Object errSt = result;
+            if (errSt instanceof List && ((List) errSt).size() == 1)
+               errSt = ((List) errSt).get(0);
+            System.err.println("Script error: " + exc.toString() + " for statement: " + errSt);
             if (system.options.verbose)
                exc.printStackTrace();
+            if (exitOnError) {
+               System.err.println("Exiting -1 on error because cmd.exitOnError configured as true");
+               System.exit(-1);
+            }
          }
       }
    }
@@ -1070,9 +1075,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       if (!model.hasErrors) {
          recordOutput(recordString, origIndent);
       }
-
-      if (pauseTime != 0 && !enableBatchMode)
-         sleep(pauseTime);
    }
 
    /**
@@ -1879,31 +1881,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       if (CurrentScopeContext.getThreadScopeContext() == null)
          pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
       try {
-         int runCt = 0;
-         ArrayList<ScheduledJob> toRestore = null;
-         do {
-            runCt++;
-            ArrayList<ScheduledJob> toRunNow = new ArrayList<ScheduledJob>(toRunLater);
-            toRunLater.clear();
-            for (int i = 0; i < toRunNow.size(); i++) {
-               ScheduledJob toRun = toRunNow.get(i);
-               if (toRun.priority >= minPriority && toRun.priority < maxPriority)
-                  toRun.run();
-               else {
-                  if (toRestore == null)
-                     toRestore = new ArrayList<ScheduledJob>();
-                  toRestore.add(toRun);
-               }
-            }
-            if (runCt > 16) {
-               System.err.println("*** execLaterJobs - exceeded indirection count!");
-               return;
-            }
-         }
-         while (toRunLater.size() > 0); // Make sure we run any jobs found when running these jobs
-
-         if (toRestore != null)
-            toRunLater.addAll(toRestore);
+         ScheduledJob.runJobList(toRunLater, minPriority, maxPriority);
       }
       finally {
          if (pushed)
