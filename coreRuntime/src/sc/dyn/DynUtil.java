@@ -38,6 +38,8 @@ public class DynUtil {
 
    static Map<Object,Integer> traceIds = (Map<Object,Integer>) PTypeUtil.getWeakHashMap();
 
+   static Map<Object,String> scopeNames = (Map<Object,String>) PTypeUtil.getWeakHashMap();
+
    // A table for each type name which lists the current unique integer for that type that we use to automatically generate semi-unique ids for each instance
    static Map<String,Integer> typeIdCounts = new HashMap<String,Integer>();
 
@@ -56,6 +58,7 @@ public class DynUtil {
 
    public static void flushCaches() {
       mappingCache.clear();
+      scopeNames.clear();
    }
 
    public static DynType getPropertyCache(Class beanClass) {
@@ -1242,6 +1245,7 @@ public class DynUtil {
       }
 
       objectIds.remove(new IdentityWrapper(obj));
+      scopeNames.remove(obj);
    }
 
    public static void initComponent(Object comp) {
@@ -1517,27 +1521,40 @@ public class DynUtil {
    }
 
    public static String getScopeName(Object obj) {
+      if (scopeNames.containsKey(obj)) // might be null
+         return scopeNames.get(obj);
       Object typeObj = DynUtil.getType(obj);
       String res = getScopeNameForType(typeObj);
       if (res != null)
          return res;
       Object outer = DynUtil.getOuterObject(obj);
-      if (outer != null)
-         return getScopeName(outer);
+      if (outer != null) {
+         res = getScopeName(outer);
+         // storing null if there's no scope name assigned
+         scopeNames.put(obj, res);
+      }
       return null;
    }
 
    public static String getScopeNameForType(Object typeObj) {
+      String scopeName = scopeNames.get(typeObj);
+      if (scopeName != null)
+         return scopeName;
       if (dynamicSystem != null) {
          // Need to check both the sc.obj.Scope and scope<name> in tandem so each can override the other
-         String scopeName = dynamicSystem.getInheritedScopeName(typeObj);
-         if (scopeName != null)
+         scopeName = dynamicSystem.getInheritedScopeName(typeObj);
+         if (scopeName != null) {
+            scopeNames.put(typeObj, scopeName);
             return scopeName;
+         }
       }
       else {
          Object scopeNameObj = getInheritedAnnotationValue(typeObj, "sc.obj.Scope", "name");
-         if (scopeNameObj != null)
-            return (String) scopeNameObj;
+         if (scopeNameObj != null) {
+            scopeName = (String) scopeNameObj;
+            scopeNames.put(typeObj, scopeName);
+            return scopeName;
+         }
       }
       return null;
    }

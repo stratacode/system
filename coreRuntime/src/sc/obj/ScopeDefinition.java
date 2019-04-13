@@ -216,6 +216,29 @@ public abstract class ScopeDefinition {
       return null;
    }
 
+   public static ScopeDefinition getScopeByType(Object pageType) {
+      String scopeName = DynUtil.getScopeNameForType(pageType);
+      if (scopeName != null && scopeName.length() > 0) {
+          ScopeDefinition scopeDef = ScopeDefinition.getScopeByName(scopeName);
+          if (scopeDef == null) {
+             System.err.println("*** Missing ScopeDefinition for scope: " + scopeName);
+          }
+          return scopeDef;
+      }
+      return null;
+   }
+
+   public static Object getScopeInstanceOfType(Object pageType) {
+      ScopeDefinition scopeDef = getScopeByType(pageType);
+      if (scopeDef != null) {
+         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+         if (scopeCtx != null) {
+            return scopeCtx.getValue(DynUtil.getTypeName(pageType, false));
+         }
+      }
+      return null;
+   }
+
    public boolean matchesScope(String scopeName) {
       if (aliases == null)
          return false;

@@ -7,6 +7,7 @@ package sc.lang.html;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.type.IBeanMapper;
+import sc.type.PTypeUtil;
 
 import java.util.List;
 import java.util.Map;
@@ -41,8 +42,16 @@ public class Select<RE> extends HTMLElement<RE> {
       return selectedIndex;
    }
    @Bindable(manual=true) public void setSelectedIndex(int _selectedIndex) {
-      selectedIndex = _selectedIndex;
-      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _selectedIndexProp, _selectedIndex);
+      if (_selectedIndex != selectedIndex) {
+         selectedIndex = _selectedIndex;
+         Object ds = optionDataSource;
+         int len = ds == null ? 0 : PTypeUtil.getArrayLength(ds);
+         if (_selectedIndex >= 0 && _selectedIndex < len)
+            setSelectedValue(PTypeUtil.getArrayElement(ds, _selectedIndex));
+         else
+            setSelectedValue(null);
+         Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _selectedIndexProp, _selectedIndex);
+      }
    }
 
    public boolean multiple = false;

@@ -13,6 +13,7 @@ import sc.layer.*;
 import sc.obj.GlobalScopeDefinition;
 import sc.obj.Remote;
 import sc.obj.Scope;
+import sc.obj.ScopeDefinition;
 import sc.parser.*;
 import sc.sync.SyncManager;
 import sc.sync.SyncOptions;
@@ -137,12 +138,22 @@ public class EditorContext extends ClientEditorContext {
       ArrayList<InstanceWrapper> ret = new ArrayList<InstanceWrapper>();
       if (type == null)
          return ret;
+      Object scopeType = type;
+      if (type instanceof TypeDeclaration) {
+         // To get the scope, we need to use the most specific version for this type
+         scopeType = ((TypeDeclaration) type).resolve(true);
+      }
+      // If there's a scope specific instance for the scope, use that one - the scopeInst as the first in the list.
+      // This is for the web context, where we might have a current instance for the browser user.
+      Object scopeInst = ScopeDefinition.getScopeInstanceOfType(scopeType);
       String typeName = ModelUtil.getTypeName(type);
       Iterator it = system.getInstancesOfTypeAndSubTypes(typeName);
       int i = 0;
       // Add a null entry at the front to represent the <type> selection
       if (addNull)
          ret.add(new InstanceWrapper(this, null, typeName));
+      if (scopeInst != null)
+         ret.add(new InstanceWrapper(this, scopeInst, typeName));
       while (i < max && it.hasNext()) {
          Object inst = it.next();
          ret.add(new InstanceWrapper(this, inst, typeName));

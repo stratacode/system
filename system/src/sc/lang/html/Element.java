@@ -3989,7 +3989,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          repeatTagsChanged();
 
       return childChanges;
-   }
+  }
 
    // These methods are implemented for JS where they update the DOM.
    public void appendElement(Element elem) {
@@ -4009,7 +4009,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    /** Before we can run the sync code this method gets called so we can populate any components */
    public void initChildren() {
       if (repeat != null || this instanceof IRepeatWrapper) {
-         syncRepeatTags(repeat);
+         if (syncRepeatTags(repeat)) {
+            bodyTxtValid = false;
+            invalidateBody();
+         }
       }
    }
 
@@ -4019,8 +4022,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * it has no effect.
     */
    public void refreshRepeat(boolean noRefresh) {
-      if (repeat != null)
-         syncRepeatTags(repeat);
+      if (repeat != null) {
+         if (syncRepeatTags(repeat)) {
+            bodyTxtValid = false;
+            invalidateBody();
+         }
+      }
    }
 
    public boolean isRepeatTag() {
@@ -4066,7 +4073,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                invalidateBody();
             }
             if (isServerTag() && !wrap)
-               outputRepeatTagMarker(sb);
+               outputRepeatTagMarker(sb, false);
             if (!bodyValid) {
                StringBuilder bodySB = new StringBuilder();
                outputRepeatBody(repeatVal, bodySB, ctx);
@@ -4081,6 +4088,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
             if (bodyCache != null)
                sb.append(bodyCache);
+            if (isServerTag() && !wrap)
+               outputRepeatTagMarker(sb, true);
          }
          else {
             if (!bodyOnly) {
@@ -4114,8 +4123,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   private void outputRepeatTagMarker(StringBuilder sb) {
-      sb.append("<span id=\'" + getId() + "' style='display:none'></span>"); // Warning - span tag cannot be 'self-closed' - TODO: is there a better tag to use here?  Meta is only supposed to be in the head section.
+   private void outputRepeatTagMarker(StringBuilder sb, boolean end) {
+      sb.append("<span id=\'" + getId() + (end ? "_end" : "") + "' style='display:none'></span>"); // Warning - span tag cannot be 'self-closed' - TODO: is there a better tag to use here?  Meta is only supposed to be in the head section.
    }
 
    private void outputRepeatBody(Object repeatVal, StringBuilder sb, OutputCtx ctx) {
