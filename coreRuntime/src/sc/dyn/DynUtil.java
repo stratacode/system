@@ -1532,6 +1532,7 @@ public class DynUtil {
          res = getScopeName(outer);
          // storing null if there's no scope name assigned
          scopeNames.put(obj, res);
+         return res;
       }
       return null;
    }
