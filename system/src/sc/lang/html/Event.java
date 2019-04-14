@@ -13,7 +13,7 @@ public class Event {
    public Element target;
    public double timeStamp;
 
-   // TODO: these are stubs for the client right now since there's no real event delivery on the server
+   // These are stubs so you can use these apis in Java code but they don't do anything.
    public void preventDefault() {
    }
    public void stopPropagation() {

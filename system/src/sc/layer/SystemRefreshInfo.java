@@ -16,6 +16,6 @@ public class SystemRefreshInfo {
       if (changedModels == null)
          return "<no changes>";
       else
-         return changedModels.toString();
+         return "Changed files: " + changedModels.toString();
    }
 }

@@ -4,6 +4,8 @@
 
 package sc.sync;
 
+import sc.bind.Bind;
+import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.bind.IListener;
 import sc.obj.Sync;
@@ -62,7 +64,7 @@ public abstract class SyncDestination {
    public int pollTime = realTime ? 500 : -1;
 
    /** Are we currently connected to the remote destination?  Set to true after a successful response and to false after a server error */
-   public boolean connected = false;
+   private boolean connected = false;
 
    public int defaultReconnectTime = 500;
 
@@ -186,9 +188,8 @@ public abstract class SyncDestination {
       return getSendLanguage().equals("stratacode") ? "js" : getSendLanguage();
    }
 
-   // TODO: rename this to isClient()
-   /** True if this destination is a a client sending a sync - returns false for the server */
-   public abstract boolean isSendingSync();
+   /** True if this destination is the client that is sending a sync - returns false for the server */
+   public abstract boolean isClient();
 
    /** Allows this class to be override in subclasses */
    public void initSyncManager() {
@@ -221,7 +222,7 @@ public abstract class SyncDestination {
 
       public void response(Object response) {
          String responseText = (String) response;
-         connected = true;
+         setConnected(true);
          completeSync(null, null);
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
@@ -238,7 +239,7 @@ public abstract class SyncDestination {
          // The server reset it's session which means it cannot respond to the sync.  We respond by sending the initial layer
          // to the server to reset it's data to what we have.
          if (errorCode == 205) {
-            connected = true;
+            setConnected(true);
             CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null, null);
             if (SyncManager.trace) {
                if (initSync.length() == 0) {
@@ -262,7 +263,7 @@ public abstract class SyncDestination {
          }
          // Server went away and told us it wasn't coming back so turn off realTime and we are now disconnected
          else if (errorCode == 410) {
-            connected = false;
+            setConnected(false);
             realTime = false;
             System.out.println("*** Server shutdown");
          }
@@ -271,9 +272,9 @@ public abstract class SyncDestination {
             if (serverError)
                System.out.println("*** Server error - code: " + errorCode);
             // If we're on the client and we get a server error, mark us as disconnected
-            if (serverError && isSendingSync()) {
+            if (serverError && isClient()) {
                if (connected) {
-                  connected = false;
+                  setConnected(false);
                   currentReconnectTime = defaultReconnectTime;
                }
                else {
@@ -300,7 +301,7 @@ public abstract class SyncDestination {
 
       if (anyChanges) {
          numSendsInProgress += incr;
-         if (isSendingSync())
+         if (isClient())
             syncManager.setNumSendsInProgress(syncManager.getNumSendsInProgress() + incr);
       }
       else {
@@ -372,5 +373,17 @@ public abstract class SyncDestination {
 
    public int getDefaultSyncPropOptions() {
       return SyncPropOptions.SYNC_SERVER;
+   }
+
+   @Bindable(manual = true)
+   public void setConnected(boolean c) {
+      if (c != connected) {
+         connected = c;
+         Bind.sendChange(this, "connected", c);
+      }
+   }
+
+   public boolean getConnected() {
+      return connected;
    }
 }

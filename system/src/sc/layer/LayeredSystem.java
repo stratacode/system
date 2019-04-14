@@ -970,7 +970,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          while (subTypes.hasNext()) {
             TypeDeclaration subType = subTypes.next();
 
-            Object assign = subType.definesMember(varDef.variableName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
+            String varName = varDef.variableName;
+            Object assign = varName == null ? null : subType.definesMember(varName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
             if (assign instanceof PropertyAssignment) {
                if (res == null)
                   res = new ArrayList<PropertyAssignment>();
@@ -13991,7 +13992,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public boolean removeSubType(TypeDeclaration superType, TypeDeclaration subType) {
       if (options.liveDynamicTypes) {
-         HashMap<String,Boolean> subTypeMap = subTypesByType.get(superType.getFullTypeName());
+         String superTypeName = superType.getFullTypeName();
+         HashMap<String,Boolean> subTypeMap = subTypesByType.get(superTypeName);
          if (subTypeMap != null) {
             Boolean res = subTypeMap.remove(subType.getFullTypeName());
             if (res == null)

@@ -4559,7 +4559,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       if (mtype.contains(MemberType.Variable)) {
          Template template = getEnclosingTemplate();
-         Parameter param = template.getDefaultOutputParameters();
+         Parameter param = template == null ? null : template.getDefaultOutputParameters();
          while (param != null) {
             if (param.variableName.equals(name))
                return param;
@@ -4886,7 +4886,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public static String escBody(Object in) {
       if (in == null)
-         return null;
+         return ""; // This makes for a better default in HTML - e.g. errorText in FieldValueEditor
       return StringUtil.escapeHTML(in.toString(), false).toString();
    }
 
@@ -5283,6 +5283,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     */
    public static void initSync() {
       SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[]{"type", "timeStamp", "currentTag"}, 0));
+      SyncManager.addSyncType(MouseEvent.class, new SyncProperties(null, null, new Object[]{"button", "clientX", "clientY", "screenX", "screenY", "altKey", "metaKey", "ctrlKey", "shiftKey"}, 0));
+      SyncManager.addSyncType(KeyboardEvent.class, new SyncProperties(null, null, new Object[]{"key", "altKey", "metaKey", "ctrlKey", "shiftKey"}, 0));
+      SyncManager.addSyncType(FocusEvent.class, new SyncProperties(null, null, new Object[]{"relatedTarget"}, 0));
       // By default, we'll synchronize any body content this tag has in a read-only way.  When it changes, there's a change event for innerHTML
       // and getInnerHTML() generates the new contents.  Same idea with startTagTxt for attribute changes.
       // Specific DOM type subclasses (e.g. input) have custom attributes that are sync'd for server tags we

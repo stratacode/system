@@ -156,7 +156,8 @@ public class EditorContext extends ClientEditorContext {
          ret.add(new InstanceWrapper(this, scopeInst, typeName));
       while (i < max && it.hasNext()) {
          Object inst = it.next();
-         ret.add(new InstanceWrapper(this, inst, typeName));
+         if (inst != scopeInst)
+            ret.add(new InstanceWrapper(this, inst, typeName));
       }
 
       /*

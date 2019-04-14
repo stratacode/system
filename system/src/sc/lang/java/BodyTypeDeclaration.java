@@ -2139,8 +2139,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * modifier is supplied, only methods with that modifier are returned.
     */
    public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      ModelUtil.ensureStarted(this, true);
-
+      // NOTE: we may not be started here and should not called ensureStarted at least when calling this from the updateType process.
+      // on the new type. We only start that one after we stop the old one so that we don't double-add to the sub-types table, and then remove
+      // the valid entry when we stop the old type
       if (body == null && hiddenBody == null)
          return null;
 

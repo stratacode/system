@@ -12,6 +12,4 @@ public class KeyboardEvent extends Event {
    public int shiftKey; // 1 if pressed, 0 otherwise
 
    public String key;
-
-   // TODO: what about the key properties here?  It seems like a shifting standard :(
 }

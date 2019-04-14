@@ -2104,6 +2104,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       List<Object> declProps = super.getAllInnerTypes(modifier, thisClassOnly);
       List<Object> modProps;
       if (!modifyInherited || !thisClassOnly) {
+
+         // Need to start this type here because we are about to get the modify object
+         ModelUtil.ensureStarted(this, false);
+
          Object modifyObj = getModifyObj();
          if (modifyObj == null)
             modProps = declProps;

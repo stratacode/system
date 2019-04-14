@@ -1898,7 +1898,7 @@ public class SyncManager {
          }
       }
 
-      void removeSyncInstInternal(InstInfo toRemove, Object inst, SyncProperties syncProps, boolean listenersOnly) {
+      void removeSyncInstInternal(InstInfo toRemove, Object inst, SyncProperties syncProps, boolean listenersOnly, boolean removeFromParentList) {
          if (trace)
             System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name + (toRemove.inherited ? " inherited from: " + toRemove.parContext.name : ""));
 
@@ -1928,12 +1928,12 @@ public class SyncManager {
                Set<InstInfo> children = childSyncInsts.get(inst);
                if (children != null) {
                   for (InstInfo child:children) {
-                     child.syncContext.removeSyncInstInternal(child, inst, syncProps, listenersOnly);
+                     child.syncContext.removeSyncInstInternal(child, inst, syncProps, listenersOnly, false);
                   }
                }
             }
          }
-         else if (toRemove.inherited) {
+         else if (toRemove.inherited && removeFromParentList) {
             if (listenersOnly)
                System.err.println("*** replacing sync instance but on child context?");
             Set<InstInfo> children = toRemove.parContext.childSyncInsts.get(inst);
@@ -1963,7 +1963,7 @@ public class SyncManager {
             System.err.println("*** Unable to find sync inst to remove: " + DynUtil.getInstanceName(inst));
          }
          else
-            removeSyncInstInternal(toRemove, inst, syncProps, false);
+            removeSyncInstInternal(toRemove, inst, syncProps, false, true);
       }
 
       void replaceSyncInst(Object fromInst, Object toInst, SyncProperties syncProps) {
@@ -1975,7 +1975,7 @@ public class SyncManager {
             return;
          }
          // Remove just the listeners.  Keep the changes in place so we can detect changed values when we add the new instance
-         removeSyncInstInternal(toRemove, fromInst, syncProps, true);
+         removeSyncInstInternal(toRemove, fromInst, syncProps, true, true);
 
          initSyncInst(null, toInst, toRemove, syncProps.initDefault, syncProps.defaultScopeId, syncProps, toRemove.args, false, toRemove.inherited, true, false, null);
       }
