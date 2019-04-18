@@ -55,12 +55,15 @@ public class HTMLElement<RE> extends Element<RE> {
    public final static sc.type.IBeanMapper _offsetWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetWidth");
    public final static sc.type.IBeanMapper _offsetHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetHeight");
 
+   public final static sc.type.IBeanMapper _mouseDownMoveUpProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "mouseDownMoveUp");
+
    static HashMap<String,IBeanMapper> domAttributes = new HashMap<String,IBeanMapper>();
    {
       domAttributes.put("clickEvent", HTMLElement._clickEventProp);
       domAttributes.put("dblClickEvent", HTMLElement._dblClickEventProp);
       domAttributes.put("mouseDownEvent", HTMLElement._mouseDownEventProp);
       domAttributes.put("mouseOutEvent", HTMLElement._mouseOutEventProp);
+      domAttributes.put("mouseMoveEvent", HTMLElement._mouseMoveEventProp);
       domAttributes.put("mouseUpEvent", HTMLElement._mouseUpEventProp);
       domAttributes.put("keyDownEvent", HTMLElement._keyDownEventProp);
       domAttributes.put("keyPressEvent", HTMLElement._keyPressEventProp);
@@ -73,8 +76,9 @@ public class HTMLElement<RE> extends Element<RE> {
       domAttributes.put("offsetLeft", HTMLElement._offsetLeftProp);
       domAttributes.put("offsetWith", HTMLElement._offsetWidthProp);
       domAttributes.put("offsetHeight", HTMLElement._offsetHeightProp);
-   }
 
+      domAttributes.put("mouseDownMoveUp", HTMLElement._mouseDownMoveUpProp);
+   }
 
    public HTMLElement() {
    }
@@ -97,7 +101,10 @@ public class HTMLElement<RE> extends Element<RE> {
    enum EventType {
 
       Click(true), DblClick(false), MouseDown(false), MouseMove(false), MouseOver(false), MouseOut(false), MouseUp(false), KeyDown(false), KeyPress(false), KeyUp(false), Submit(true), Change(false),
-      Focus(false), Blur(false);
+      Focus(false), Blur(false),
+
+      // Not a real DOM event - our way of representing a listener that will move from the window, to the document for mouseDown to Move/Up so you can implement drag style interfaces (or drag/drop)
+      MouseDownMoveUp(false);
 
       EventType(boolean preventDefault) {
          this.preventDefault = preventDefault;
@@ -212,6 +219,13 @@ public class HTMLElement<RE> extends Element<RE> {
    }
    @Bindable(manual=true) public void setBlurEvent(Event event) {
       setDOMEvent(EventType.Blur, event, _blurEventProp);
+   }
+
+   @Bindable(manual=true) public MouseEvent getMouseDownMoveUp() {
+      return pendingType == EventType.MouseDownMoveUp ? (MouseEvent) pendingEvent : null;
+   }
+   @Bindable(manual=true) public void setMouseDownMoveUp(MouseEvent event) {
+      setDOMEvent(EventType.MouseDownMoveUp, event, _mouseDownMoveUpProp);
    }
 
    protected Event getDOMEvent(EventType type) {

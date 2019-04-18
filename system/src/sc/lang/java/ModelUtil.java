@@ -6927,7 +6927,7 @@ public class ModelUtil {
                   Object prop = props[i];
                   if (prop != null) {
                      String pname = ModelUtil.getPropertyName(prop);
-                     if (pname.startsWith(prefix)) {
+                     if (pname != null && pname.startsWith(prefix)) {
                         if (!addCompletionCandidate(candidates, pname, max))
                            return false;
                      }
@@ -6953,7 +6953,7 @@ public class ModelUtil {
          if (types != null) {
             for (int i = 0; i < types.length; i++) {
                String mname = CTypeUtil.getClassName(ModelUtil.getTypeName(types[i]));
-               if (mname.startsWith(prefix))
+               if (mname != null && mname.startsWith(prefix))
                   if (!addCompletionCandidate(candidates, mname, max))
                      return false;
             }
