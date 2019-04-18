@@ -16,7 +16,6 @@ import sc.layer.*;
 import sc.obj.*;
 import sc.parser.ParseUtil;
 import sc.sync.SyncManager;
-import sc.sync.SyncOptions;
 import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.*;
@@ -8742,9 +8741,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public int getSyncFlags() {
       int flags = 0;
       if (syncInitDefault)
-         flags |= SyncOptions.SYNC_INIT_DEFAULT;
+         flags |= SyncPropOptions.SYNC_INIT;
       if (syncConstant)
-         flags |= SyncOptions.SYNC_CONSTANT;
+         flags |= SyncPropOptions.SYNC_CONSTANT;
       return flags;
    }
 
@@ -8893,9 +8892,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // Not using inherited annotation here because we walk the type hierarchy here.
                Object propSyncAnnot = ModelUtil.getAnnotation(prop, "sc.obj.Sync");
                SyncMode propSyncMode;
-               boolean propOnDemand = false;
-               boolean propInitDefault = false;
                if (propSyncAnnot != null) {
+                  boolean propOnDemand;
+                  boolean propInitDefault;
+                  boolean propConstant;
                   propSyncMode = (SyncMode) ModelUtil.getAnnotationValue(propSyncAnnot, "syncMode");
                   if (propSyncMode == null)
                      propSyncMode = SyncMode.Enabled; // @Sync with no explicit mode turns it on.
@@ -8907,6 +8907,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   propInitDefault = propInitDefaultObj != null && propInitDefaultObj;
                   if (propInitDefault)
                      propFlags |= SyncPropOptions.SYNC_INIT;
+                  Boolean constDefaultObj = (Boolean) ModelUtil.getAnnotationValue(propSyncAnnot, "constant");
+                  propConstant = constDefaultObj != null && constDefaultObj;
+                  if (propConstant)
+                     propFlags |= SyncPropOptions.SYNC_CONSTANT;
                }
                else {
                   propSyncMode = null;
@@ -8999,8 +9003,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      continue;
                   // TODO: should there be a more flexible way to specify this?  What if the server is the client for another server?
                   case ClientToServer:
-                     if ((!inheritedSync || thisIsWritable) && sys.runtimeProcessor instanceof JSRuntimeProcessor)
+                     if ((!inheritedSync || thisIsWritable)) {
                         addSyncProp = true;
+                        // On the server, we still need to add the property for authorization purposes but don't add a SyncListener
+                        if (!(sys.runtimeProcessor instanceof JSRuntimeProcessor)) {
+                           propFlags |= SyncPropOptions.SYNC_RECEIVE_ONLY;
+                        }
+                     }
                      break;
                   case ServerToClient:
                      if ((!inheritedSync || thisIsWritable) && sys.runtimeProcessor == null)

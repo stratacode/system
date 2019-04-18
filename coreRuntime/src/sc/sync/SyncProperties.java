@@ -38,16 +38,18 @@ public class SyncProperties {
    // Set this to true if a new instance should propagate even to child scope contexts that are not active.  For example, creating a new instance in a global scope propagates to all sessions, or in a session propagates to all windows
    public boolean broadcast = false;
 
+   public int defaultPropOptions = 0;
+
    IntCoalescedHashMap propIndex;
 
    Object[] allProps;
 
-   public SyncProperties(String destName, String syncGroup, Object[] props, int flags) {
-      this(destName, syncGroup, props, null, flags);
+   public SyncProperties(String destName, String syncGroup, Object[] props, int defaultPropOptions) {
+      this(destName, syncGroup, props, null, defaultPropOptions, -1);
    }
 
-   public SyncProperties(String destName, String syncGroup, Object[] props, Object chainedType, int flags) {
-      this(destName, syncGroup, props, chainedType, flags, -1);
+   public SyncProperties(String destName, String syncGroup, Object[] props, Object chainedType, int defaultPropOptions) {
+      this(destName, syncGroup, props, chainedType, defaultPropOptions, -1);
    }
 
    /**
@@ -55,17 +57,17 @@ public class SyncProperties {
     * you pass it to either addSyncType - when all instances are synchronized using the same properties/settings or addSyncInst - when
     * an individual instance is not synchronized like others with the same type.
     */
-   public SyncProperties(String destName, String syncGroup, Object[] props, Object chainedType, int flags, int scopeId) {
+   public SyncProperties(String destName, String syncGroup, Object[] props, Object chainedType, int defaultPropOptions, int scopeId) {
       this.destName = destName;
       this.syncGroup = syncGroup;
       this.defaultScopeId = scopeId;
+      this.defaultPropOptions = defaultPropOptions;
       classProps = props;
       // TODO: this assumes the sync type, the base type has already run.  Since we are doing this as part of the
       // static initialization of our class, doesn't that mean the static init of the base class has already been done?
       chainedProps = chainedType == null ? null : SyncManager.getSyncProperties(chainedType, destName);
       propIndex = new IntCoalescedHashMap(classProps == null ? 0 : classProps.length + (chainedProps == null ? 0 : chainedProps.getNumProperties()));
-      constant = (flags & SyncOptions.SYNC_CONSTANT) != 0;
-      initDefault = (flags & SyncOptions.SYNC_INIT_DEFAULT) != 0;
+      this.defaultPropOptions = defaultPropOptions;
       ArrayList<Object> newProps = null;
       if (props != null) {
          if (chainedProps != null)
@@ -82,7 +84,7 @@ public class SyncProperties {
                propName = opt.propName;
             }
             else {
-               options = 0;
+               options = defaultPropOptions;
                propName = (String) prop;
             }
             if (propIndex.put(propName, options) == -1 && chainedProps != null) {

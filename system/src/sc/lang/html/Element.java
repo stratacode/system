@@ -27,6 +27,7 @@ import sc.obj.*;
 import sc.parser.*;
 import sc.obj.IChildInit;
 import sc.sync.SyncManager;
+import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
@@ -4824,58 +4825,96 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res;
    }
 
-   // TODO: do we need to add these to the serverTags api?  Make them real fields and add them to the list we check
-   // for listeners on.
+   private int offsetWidth = -1;
    @Bindable(manual=true)
    public int getOffsetWidth() {
-      return -1;
+      return offsetWidth;
    }
+   public void setOffsetWidth(int ow) {
+      offsetWidth = ow;
+      Bind.sendChange(this, "offsetWidth", ow);
+   }
+
+   private int offsetHeight = -1;
    @Bindable(manual=true)
    public int getOffsetHeight() {
-      return -1;
+      return offsetHeight;
    }
+   public void setOffsetHeight(int oh) {
+      offsetHeight = oh;
+      Bind.sendChange(this, "offsetHeight", oh);
+   }
+
+   private int offsetTop = -1;
    @Bindable(manual=true)
    public int getOffsetTop() {
-      return -1;
+      return offsetTop;
    }
+   public void setOffsetTop(int ot) {
+      offsetTop = ot;
+      Bind.sendChange(this, "offsetTop", ot);
+   }
+
+   private int offsetLeft = -1;
    @Bindable(manual=true)
    public int getOffsetLeft() {
-      return -1;
+      return offsetLeft;
+   }
+   public void setOffsetLeft(int ol) {
+      offsetLeft = ol;
+      Bind.sendChange(this, "offsetLeft", ol);
    }
 
-   private int innerWidth = -1;
+   private int clientWidth = -1;
    @Bindable(manual=true)
-   public int getInnerWidth() {
-      return innerWidth;
+   public int getClientWidth() {
+      return clientWidth;
    }
    @Bindable(manual=true)
-   public void setInnerWidth(int iw) {
-      this.innerWidth = iw;
-      Bind.sendChange(this, "innerWidth", iw);
-   }
-
-   private int innerHeight = -1;
-   @Bindable(manual=true)
-   public int getInnerHeight() {
-      return innerHeight;
-   }
-   @Bindable(manual=true)
-   public void setInnerHeight(int ih) {
-      this.innerHeight = ih;
-      Bind.sendChange(this, "innerHeight", ih);
+   public void setClientWidth(int iw) {
+      this.clientWidth = iw;
+      Bind.sendChange(this, "clientWidth", iw);
    }
 
-   // TODO: implement these.  right now only used on the client.
+   private int clientHeight = -1;
+   @Bindable(manual=true)
+   public int getClientHeight() {
+      return clientHeight;
+   }
+   @Bindable(manual=true)
+   public void setClientHeight(int ih) {
+      this.clientHeight = ih;
+      Bind.sendChange(this, "clientHeight", ih);
+   }
+
    public Element getPreviousElementSibling() {
+      if (parentNode == null)
+         return null;
+      Object[] children = ((Element) parentNode).getObjChildren(false);
+      if (children == null)
+         return null;
+      Element prev = null;
+      for (int i = 0; i < children.length; i++) {
+         Object child = children[i];
+         if (child instanceof Element) {
+            if (child == this)
+               return prev;
+            prev = (Element) child;
+         }
+      }
+      System.err.println("*** Did not find element in getPreviousElementSibling");
       return null;
    }
 
+   private boolean hovered = false;
    @Bindable(manual=true)
    public boolean getHovered() {
-      return false;
+      return hovered;
    }
 
-   public void setHovered(boolean ignored) {
+   public void setHovered(boolean h) {
+      this.hovered = h;
+      Bind.sendChange(this, "hovered", h);
    }
 
    public static String escAtt(CharSequence in, boolean singleQuote) {
@@ -5146,6 +5185,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         // every synchronized object.
                         this.serverTag = true;
 
+                        // Even though this tag is already part of some ScopeContext, here we are registering it with it's tagId in the document.
+                        // It seems to make sense to use the DOM id over the wire for readability and they are shorter although some of these ids
+                        // are just the tag-name _ <ix>.
                         scopeCtx.setValue(tagId, this);
                         // Register this with the sync system so we can apply changes made on the client and detect changes
                         // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
@@ -5273,7 +5315,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * via the "accessSyncInst" accessHook.
     */
    public void resetPageContext() {
-
    }
 
    /**
@@ -5282,21 +5323,23 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * a smaller code footprint, or to mix and match Javascript client tag objects with html server-side rendered objects in a single page.
     */
    public static void initSync() {
-      SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[]{"type", "timeStamp", "currentTag"}, 0));
-      SyncManager.addSyncType(MouseEvent.class, new SyncProperties(null, null, new Object[]{"button", "clientX", "clientY", "screenX", "screenY", "altKey", "metaKey", "ctrlKey", "shiftKey"}, 0));
-      SyncManager.addSyncType(KeyboardEvent.class, new SyncProperties(null, null, new Object[]{"key", "altKey", "metaKey", "ctrlKey", "shiftKey"}, 0));
-      SyncManager.addSyncType(FocusEvent.class, new SyncProperties(null, null, new Object[]{"relatedTarget"}, 0));
+      SyncManager.addSyncType(Event.class, new SyncProperties(null, null, new Object[]{"type", "timeStamp", "currentTag"}, null, 0));
+      SyncManager.addSyncType(MouseEvent.class, new SyncProperties(null, null, new Object[]{"button", "clientX", "clientY", "screenX", "screenY", "altKey", "metaKey", "ctrlKey", "shiftKey"}, Event.class, 0));
+      SyncManager.addSyncType(KeyboardEvent.class, new SyncProperties(null, null, new Object[]{"key", "altKey", "metaKey", "ctrlKey", "shiftKey"}, Event.class, 0));
+      SyncManager.addSyncType(FocusEvent.class, new SyncProperties(null, null, new Object[]{"relatedTarget"}, Event.class, 0));
       // By default, we'll synchronize any body content this tag has in a read-only way.  When it changes, there's a change event for innerHTML
       // and getInnerHTML() generates the new contents.  Same idea with startTagTxt for attribute changes.
       // Specific DOM type subclasses (e.g. input) have custom attributes that are sync'd for server tags we
       SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{
             "startTagTxt", "innerHTML", "style", "class", "clickEvent", "dblClickEvent", "mouseDownEvent", "mouseOutEvent",
-            "mouseUpEvent", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "innerWidth", "innerHeight"}, 0));
+            "mouseUpEvent", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "clientWidth", "clientHeight", "offsetLeft", "offsetTop", "offsetWidth", "offsetHeight"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));
       SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));
       SyncManager.addSyncType(Window.class, new SyncProperties(null, null, new Object[]{"innerWidth", "innerHeight"}, null, 0));
+      // This class inherits from Element but we are not inheriting the sync properties of Element right now... this api is not for content, just for global events
+      SyncManager.addSyncType(Document.class, new SyncProperties(null, null, new Object[]{"mouseDownEvent", "mouseMoveEvent", "mouseUpEvent"}, null, SyncPropOptions.SYNC_RECEIVE_ONLY));
    }
 
    public boolean isCacheEnabled() {

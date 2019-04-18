@@ -127,29 +127,56 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
    public static String INTRO =  "The scc command builds, runs, and edits StrataCode programs.  You can specify a set of layers to build/run, use the -c option to compile only, use the -a option to build all (useful when incremental compilation runs into problems), or run with no options to build a new application from scratch using the command interpreter.\n\n";
 
-   public static String USAGE =  "Command Line Interface Help:\n\n" +
-           "In the command line editor, you can examine and modify your application like an ordinarily REPL (read-eval-print-loop).  There are two modes - in 'script mode' you essentially have a management UI for your application from the command line.  Navigate the object hierarchy," +
-           "select an instance, set properties on that instance.  In edit mode, you have the power to edit or build from scratch a Java file using structured editing commands.  There's a built-in 'cmd' object to provide control over the editor state.  You can use StrataCode's extended Java syntax from the command line and in supported terminal, there's TAB-completion of the available types and methods\n" +
-           "In edit mode, you navigate layers, set the current package, define imports, and find or create your current Java class or SC object.  Once you have a current class or instance, or method you need to complete that operation to return to the previous context.\n\n" +
-           "No Current Type:\n" +
+   public static String USAGE =  "Command line help:\n\n" +
+           "StrataCode's REPL (read-eval-print-loop) provides command line access to the dynamic runtime features of the current application. " +
+           "It can augment any management UI using the EditorContext apis. " +
+           "The command line syntax uses a slightly modified version of the .sc grammar (see sc.lang.CommandSCLanguage) for readability and static typing." +
+           "On addition is a global object called 'cmd' that provides many commands to access and control of the running application, and help build test scripts.\n\n" +
+           "In supported terminals, use TAB to suggest completions of the current context.\n\n" +
+           "Command line modes: Two modes are supported: one for program editing, the other for test scripts or " +
+           "controlling the current application. The first part of the prompt is 'edit:' if you are in edit mode" +
+           "(the default for the command line), or 'scr:' if you are in script mode (the default for test scripts). " +
+           "Enter: 'cmd.edit=false;' to switch to script mode or set it to true to switch back. Use edit mode for " +
+           "writing code from scratch or changing the configured value of a property and applying the change to all" +
+           "instances. Both modes let you add a new field, method or type to a temporary version of the current type or layer. " +
+           "Use cmd.save(); to save changes but be sure to check the current layer, the current source file, and use" +
+           "cmd.print(); or cmd.printChanges(); to check what will be saved to avoid corrupting source code!\n\n" +
+           "Navigation: The command line starts at the current layer, which is by default the last build layer of the main process. " +
+           "Before there is a current type, enter another layer name to switch layers. Create a new layer to build customizations of the current application using cmd.createLayer()." +
+           "Enter a type name relative to the current package, or a packageName, or change the current package using a 'package' statement. At this level, you also can add an import or define a new class or object:\n" +
+           " For example:" +
            "   layerName {                Change context to layerName.  \n" +
            "   typeName {                 Change context to the typeName specified.  If the type is defined in this layer, you are at this point editing that file from the command line incrementally.  Be careful!  If there is no definition of that type in this layer, a 'modify defineition' is automatically created and your changes are recorded in the new layer.\n" +
            "   packageName {              Set current context to the package name specified.\n" +
            "   class newClassName {\n" +
            "   object newInstanceName {   Define/replace a new top-level class or object with the current package in the current layer.  If this class is defined in a previous layer, you are replacing that definition.  Be careful!\n" +
            "   package newPackageName;    Change the current package\n" +
-           "   import newImportName;      Add an import.  level.  \n\n" +
-           "With a Current Type:\n" +
-           "   foo = 3;                  Set a property\n" +
-           "   foo;                      Eval an expression\n" +
-           "   int foo; void foo() {}    Add/replace fields or methods\n\n" +
+           "   import newImportName;      Add an import.\n\n" +
+           "When you have navigated to a current type, the commands are limited to that context until the } is used to go back. At this level:\n" +
+           "   foo = 3;                  Set a property - in edit mode, change all instances and stage a change to the current layer's source file, or add a new modify in this layer for this property of this type.\n" +
+           "   foo;                      Eval an expression against the current instance of the current type.\n" +
+           "   int foo; void foo() {}    Add/replace fields or methods - same in both edit and script modes\n\n" +
            "At any time:\n" +
            "   }                         To exit a type and return to the previous type or to the top-level with no type.\n" +
-           "   cmd.save();               To save your changes\n" +
+           "   cmd.save();               To save pendiung changes\n" +
            "   cmd.list();               Display current objects, classes, field, methods etc. in the current context\n" +
            "   <TAB>                     Command line completion with terminals supported by JLine\n" +
            "   cmd.edit = true/false;    Switch back and forth between edit and script modes\n" +
            "\n\n" +
+           "Expressions: At either the top-level or with a current type, evaluate any expression to see the result on the terminal:\n\n" +
+           "    if (cash == 10) System.out.println(\"tenspot\");\n\n" +
+           "Current instance: when navigating to a type, it's useful to select a current instance for the context of expressions evaluated. To control or examine\n" +
+           "   the state of a specific instance in the application. It's easy when the type is a singleton or inner instance. In that case a current instance is automatically selected.\n" +
+           "   In interactive mode, the fall-back is an interactive prompt to select an instance from a list.\n" +
+           "   For situations where there's is a current instance that's specific to a particular scope context - e.g. a browser-window, set cmd.scopeContextName to the\n" +
+           "   name of a CurrentScopeContext. The web framework runs this code when you use ?scopeContextName=\"\" in 'test mode (-tv/-tw)'\n" +
+           "                     CurrentScopeContext currentCtx = CurrentScopeContext.getCurrentScopeContext();\n" +
+           "                     CurrentScopeContext.register(scopeContextName, currentCtx); " +
+           "Runtimes/Processes: " +
+           "   By default, commands run on all matching runtimes.\n" +
+           "   Set cmd.targetRuntime = 'js', 'java' or other runtime name to target a specific runtime.  Or use a process identifier\n" +
+           "       like 'java_Server' to target a specific process. Annotations or the runtime which defines a particular entity control the default\n" +
+           "       but sometimes when changing a property that exists in both client and server runtimes, this will cause the change to be applied twice.\n\n" +
            /*
            "The Prompt                   Displays your current context - edit or script mode, the layer, package, and where you are in the layer stack using # before or after the layer name:\n\nExamples:\n" +
            "  (example.unitConverter.model:sc.example.unitConverter##) ->\n" +
@@ -158,7 +185,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "                    ^ 15 layers below\n\n" +
            */
 
-           "The cmd object is used to control the interpreter:\n" +
+           "The cmd object controls the interpreter and the dynamic runtime:\n" +
            "   cmd.list();         - Lists the types (if at the top level) or the current objects and properties if inside of a type.\n" +
            "   cmd.listLayers();\n" +
            "   cmd.listObjects();\n" +
@@ -177,10 +204,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "   cmd.rebuild();     - Rebuild the system after you've made code changes.\n" +
            "   cmd.rebuildAll();  - Rebuild the system from scratch.\n" +
            "   cmd.restart();     - Restart the process.\n" +
-           "   cmd.<TAB>          - list the remaining properties and methods\n\n" +
-           "Runtimes/Processes: " +
-           "   By default, the commands you enter are automatically targeted towards all matching runtimes.\n" +
-           "   Set cmd.targetRuntime = 'js' or 'java' to target a specific runtime.  Or 'java_Server' to target a specific process.";
+           "   cmd.<TAB>          - list the remaining properties and methods\n" +
+           "   cmd.targetRuntime  - Set to the runtime name or process identifier of the specific target. The default is to target all matching processes." +
+           "   cmd.scopeContextName - Set to the name of the CurrentScopeContext which identifies the specific target for the command." +
+           "\n\n";
 
    /** For commands like createLayer, we add a wizard which processes input temporarily */
    CommandWizard currentWizard = null;

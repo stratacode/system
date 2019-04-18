@@ -10,12 +10,12 @@ import sc.bind.BindingListener;
 import sc.js.ServerTag;
 import sc.obj.Constant;
 import sc.obj.IObjectId;
+import sc.obj.ScopeDefinition;
 import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 
-import java.util.ArrayList;
-import java.util.Map;
+import java.util.*;
 
 /**
  * In your Java code, retrieve the Window object with Window.getWindow().  In SC code, it's Window.window.
@@ -111,6 +111,21 @@ public class Window implements IObjectId {
 
    public static void setWindow(Window window) {
       PTypeUtil.setThreadLocal("window", window);
+   }
+
+   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag, Set<String> syncTypeFilter) {
+      ServerTag windowServerTag = getServerTagInfo();
+      ServerTag documentServerTag = document.getServerTagInfo();
+      if (windowServerTag != null || documentServerTag != null) {
+         if (serverTags == null) {
+            serverTags = new LinkedHashMap<String,ServerTag>();
+         }
+         if (windowServerTag != null)
+            serverTags.put("window", windowServerTag);
+         if (documentServerTag != null)
+            serverTags.put("document", documentServerTag);
+      }
+      return serverTags;
    }
 
    public ServerTag getServerTagInfo() {

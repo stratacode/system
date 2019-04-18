@@ -48,6 +48,13 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
    public List<String> excludeRuntimes = null;
    public List<String> includeRuntimes = null;
 
+   /**
+    * For scr files, this is set to true so that if there's a single runtime use it but only process them in the main runtime.
+    * Most often it doesn't matter that files once for each process a testing layer which is only in the java_Server runtime (for example) that we want to use.
+    * and since html/core is in the JS runtime and the JS runtime often is processed after the server runtime, that one overrides it.
+    */
+   public boolean mainSystemOnly = false;
+
    // Stores a mapping from file path to the most specific result file - used by LayerFileProcessor and the test script language to determine
    // which file is the most specific.  Since it's not used by languages which are processed, it's initialized only when it's needed by a subclass.
    protected HashMap<String,IFileProcessorResult> fileIndex = null;
@@ -148,6 +155,8 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
 
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
       if (disableProcessing)
+         return FileEnabledState.Disabled;
+      if (mainSystemOnly && fileLayer != null && !fileLayer.layeredSystem.isMainSystem())
          return FileEnabledState.Disabled;
       if (definedInLayer != null) {
          String runtimeName = definedInLayer.layeredSystem.getRuntimeName();

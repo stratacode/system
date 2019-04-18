@@ -16,7 +16,7 @@ import sc.obj.Scope;
 import sc.obj.ScopeDefinition;
 import sc.parser.*;
 import sc.sync.SyncManager;
-import sc.sync.SyncOptions;
+import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
@@ -1639,12 +1639,12 @@ public class EditorContext extends ClientEditorContext {
       syncInited = true;
       // Manually adding these (roughly based on the generated code from js/layer/lang/EditorContext.java - so we sync the same properties
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
+      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
-      SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
+      SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncInst(this, true, true, null, null);
 
-      SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+      SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
    }
 
    /** Rebuilds the system */

@@ -1358,7 +1358,7 @@ public class SyncManager {
                }
                else {
                   propName = (String) prop;
-                  flags = initDefault ? SyncPropOptions.SYNC_INIT : 0;
+                  flags = syncProps.defaultPropOptions;
                }
 
                if ((flags & SyncPropOptions.SYNC_ON_DEMAND) == 0 || ii.isFetchedOnDemand(propName)) {
@@ -1505,8 +1505,14 @@ public class SyncManager {
                   return false;
             }
 
+            boolean isConst = (flags & SyncPropOptions.SYNC_CONSTANT) != 0;
+
+            // For clientToServer properties, on the server, need to register the property but don't add a listener or init the value
+            if ((flags & SyncPropOptions.SYNC_RECEIVE_ONLY) != 0)
+               return false;
+
             // Inherited instances will get the changes propagated from the shared sync context so don't listen themselves
-            if (!inherited && !syncProps.constant)
+            if (!inherited && !isConst)
                Bind.addListener(inst, propName, syncListener, IListener.VALUE_CHANGED_MASK);
 
             Object curVal = DynUtil.getPropertyValue(inst, propName);
@@ -1543,7 +1549,7 @@ public class SyncManager {
                }
             }
 
-            if (!inherited && !syncProps.constant) {
+            if (!inherited && !isConst) {
                // Now add the listener for changes made to the property value
                addPropertyValueListener(inst, propName, curVal, syncProps.syncGroup);
             }
@@ -2406,7 +2412,7 @@ public class SyncManager {
 
    public static void initStandardTypes() {
       // Allows serialization of references to java.lang.Class objects through synchronization
-      SyncManager.addSyncType(ClassSyncWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, 0));
+      SyncManager.addSyncType(ClassSyncWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, 0));
    }
 
    public static void addSyncType(Object type, SyncProperties props) {

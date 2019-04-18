@@ -21,6 +21,8 @@ public class SyncPropOptions {
    public final static int SYNC_ON_DEMAND = 2;
    public final static int SYNC_SERVER = 4; // For on-demand properties, is this class the client or the server?
    public final static int SYNC_CLIENT = 8; // For on-demand properties, is this class the client or the server?
+   public final static int SYNC_RECEIVE_ONLY = 16; // For clientToServer properties when compiled for the server. We need to add the sync property for authorization. Don't a sync listener for these properties.
+   public final static int SYNC_CONSTANT = 32; // Like RECEIVE_ONLY, does not add the sync listener but will send the init value to the other side
 
    public String propName;
    public int flags;
@@ -40,7 +42,11 @@ public class SyncPropOptions {
       if ((flags & SYNC_SERVER) != 0)
          sb.append(" (server)");
       if ((flags & SYNC_CLIENT) != 0)
-         sb.append(" (server)");
+         sb.append(" (client)");
+      if ((flags & SYNC_RECEIVE_ONLY) != 0)
+         sb.append(" (receive only)");
+      if ((flags & SYNC_CONSTANT) != 0)
+         sb.append(" (constant)");
       return sb.toString();
    }
 }

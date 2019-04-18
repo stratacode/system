@@ -103,6 +103,7 @@ public class CommandSCLanguage extends SCLanguage {
       useSrcDir = false;
       fileIndex = new HashMap<String,IFileProcessorResult>();
       inheritFiles = false;
+      mainSystemOnly = true;
    }
 
    private boolean _inited = false;
@@ -122,7 +123,7 @@ public class CommandSCLanguage extends SCLanguage {
       super.initialize();
    }
 
-   /** TODO: This really should be isProcessed or isTransformed since we can parse these files */
+   /** TODO: This really should be called isProcessed or isTransformed since we can parse these files, we just don't during the build currently */
    public boolean isParsed() {
       return false;
    }

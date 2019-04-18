@@ -248,8 +248,19 @@ public class LayerUtil implements LayerConstants {
    public static String getLayerClassFileDirectory(Layer layer, String layerName, boolean srcDir) {
       LayeredSystem sys = layer.layeredSystem;
       // This is a convenience option which eliminates the layer_name/build from the paths we generate for the final build layer
-      if (sys.buildLayer == layer && sys.options.buildLayerAbsDir != null) {
-         return sys.options.buildLayerAbsDir;
+      if (sys.buildLayer == layer) {
+          if (sys.options.buildLayerAbsDir != null)
+             return sys.options.buildLayerAbsDir;
+          // When we have a peer runtime that does not have the same final buildLayer as a child system, we still
+          // want to use the same buildDir as the main system
+          if (sys.peerMode) {
+             // For the IDE the main system is just the first one and not necessarily the active one.
+             LayeredSystem activeSys = sys.getActiveLayeredSystem(null);
+             if (activeSys == null)
+                activeSys = sys.getMainLayeredSystem();
+             if (activeSys != sys && activeSys != null && activeSys.buildDir != null)
+                return activeSys.buildDir;
+          }
       }
       String sysBuildDir = srcDir && sys.options.buildSrcDir != null ?  sys.options.buildSrcDir : sys.options.buildDir;
       String mainLayerDir = sys.strataCodeMainDir;

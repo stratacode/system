@@ -22,7 +22,7 @@ import sc.parser.*;
 import sc.repos.RepositoryStore;
 import sc.repos.RepositorySystem;
 import sc.sync.SyncManager;
-import sc.sync.SyncOptions;
+import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.*;
 import sc.util.*;
@@ -613,62 +613,82 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * that should be explicitly made dynamic.
     */
    public void activateLayers(List<String> allLayerNames, List<String> dynLayers) {
+      boolean completed = false;
       // TODO: if any of the layer names in the run configuration have changed, throw it all away and restart from scratch.
       // this is the simple approach.  It would not be too hard to figure out the differences, and peel-away unused layers, and
       // add in used ones.  That would make the builds a lot faster I think in some cases since you can save the compiled state of
       // the previous layers.  But maybe a good incremental compile will be fast enough?  And now that we are doing external builds, this is not
       // going to be helpful since these layers are not being built.
-      if (activatedLayerNames == null || !activatedLayerNames.equals(allLayerNames) || !DynUtil.equalObjects(dynLayers, activatedDynLayerNames)) {
-         if (activatedLayerNames != null) {
+      try {
+         if (activatedLayerNames == null || !activatedLayerNames.equals(allLayerNames) || !DynUtil.equalObjects(dynLayers, activatedDynLayerNames)) {
+            if (activatedLayerNames != null) {
+               clearActiveLayers(true);
+            }
+
+            activatedLayerNames = new ArrayList<String>(allLayerNames);
+            activatedDynLayerNames = dynLayers == null ? null : new ArrayList<String>(dynLayers);
+            // This will create layers for all referenced dependent layers. We use this layered system to store that list while
+            // we figure out which runtimes and processes we want to include. After that, we mark the ones we will exclude then
+            // initialize the runtimes. We also must accumulate the list of processes and runtimes that are actually defined. There
+            // might be some layers which are included in a runtime or process, but that runtime or process is not referenced in this
+            // set of layers. We remove those layers at the end from all layered systems.
+            initLayersWithNames(allLayerNames, false, false, dynLayers, true, false);
+            // First mark all layers that will be excluded
+            removeExcludedLayers(true);
+
+            // Init the runtimes, using the excluded layers as a guide
+            initRuntimes(dynLayers, true, false, true);
+
+            ArrayList<IProcessDefinition> procs = new ArrayList<IProcessDefinition>();
+            ArrayList<IRuntimeProcessor> runtimes = new ArrayList<IRuntimeProcessor>();
+            for (int i = 0; i < layers.size(); i++) {
+               Layer l = layers.get(i);
+               if (l.hasDefinedProcess)
+                  procs.add(l.definedProcess);
+               if (l.hasDefinedRuntime)
+                  runtimes.add(l.definedRuntime);
+            }
+
+            if (!procs.contains(processDefinition) && (processDefinition.getProcessName() != null || !runtimes.contains(runtimeProcessor))) {
+               clearActiveLayers(false);
+            }
+            else {
+               // Now actually remove the excluded layers.
+               removeExcludedLayers(false);
+            }
+
+            for (int i = 0; i < peerSystems.size(); i++) {
+               LayeredSystem peerSys = peerSystems.get(i);
+               if (!procs.contains(peerSys.processDefinition) && (peerSys.processDefinition.getProcessName() != null || !runtimes.contains(peerSys.runtimeProcessor)))
+                  peerSys.clearActiveLayers(false);
+            }
+
+            LayeredSystem runtimeSys = getActiveLayeredSystem(null);
+            if (runtimeSys != null)
+               runtimeSys.initBuildSystem(true, true);
+
+            // Finally initialize the build system from scratch and we are ready to go.
+            initBuildSystem(true, true);
+
+            systemCompiled = false;
+
+            // TODO: do we need to always do a new build when the layers have changed?  We should at least skip this the first time
+            //if (!options.buildAllFiles)
+            //   options.buildAllFiles = true;
+
+         }
+         completed = true;
+      }
+      catch (RuntimeException exc) {
+         System.err.println("*** RuntimeException in activateLayers: " + exc);
+         throw exc;
+      }
+      finally {
+         if (!completed) {
+            System.err.println("*** Clearing active layers - failed to complete");
             clearActiveLayers(true);
+            activatedLayerNames = activatedDynLayerNames = null;
          }
-
-         activatedLayerNames = new ArrayList<String>(allLayerNames);
-         activatedDynLayerNames = dynLayers == null ? null : new ArrayList<String>(dynLayers);
-         // This will create layers for all referenced dependent layers. We use this layered system to store that list while
-         // we figure out which runtimes and processes we want to include. After that, we mark the ones we will exclude then
-         // initialize the runtimes. We also must accumulate the list of processes and runtimes that are actually defined. There
-         // might be some layers which are included in a runtime or process, but that runtime or process is not referenced in this
-         // set of layers. We remove those layers at the end from all layered systems.
-         initLayersWithNames(allLayerNames, false, false, dynLayers, true, false);
-         // First mark all layers that will be excluded
-         removeExcludedLayers(true);
-
-         // Init the runtimes, using the excluded layers as a guide
-         initRuntimes(dynLayers, true, false, true);
-
-         ArrayList<IProcessDefinition> procs = new ArrayList<IProcessDefinition>();
-         ArrayList<IRuntimeProcessor> runtimes = new ArrayList<IRuntimeProcessor>();
-         for (int i = 0; i < layers.size(); i++) {
-            Layer l = layers.get(i);
-            if (l.hasDefinedProcess)
-               procs.add(l.definedProcess);
-            if (l.hasDefinedRuntime)
-               runtimes.add(l.definedRuntime);
-         }
-
-         if (!procs.contains(processDefinition) && (processDefinition.getProcessName() != null || !runtimes.contains(runtimeProcessor))) {
-            clearActiveLayers(false);
-         }
-         else {
-            // Now actually remove the excluded layers.
-            removeExcludedLayers(false);
-         }
-
-         for (int i = 0; i < peerSystems.size(); i++) {
-            LayeredSystem peerSys = peerSystems.get(i);
-            if (!procs.contains(peerSys.processDefinition) && (peerSys.processDefinition.getProcessName() != null || !runtimes.contains(peerSys.runtimeProcessor)))
-               peerSys.clearActiveLayers(false);
-         }
-
-         // Finally initialize the build system from scratch and we are ready to go.
-         initBuildSystem(true, true);
-
-         systemCompiled = false;
-
-         // TODO: do we need to always do a new build when the layers have changed?  We should at least skip this the first time
-         //if (!options.buildAllFiles)
-         //   options.buildAllFiles = true;
       }
    }
 
@@ -1435,7 +1455,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       setCurrent(this);
 
-      initBuildSystem(false, true);
+      // The main system will initialize all of the peer system build layers.  It's important to init the main
+      // system first since it's the one which determines the buildDir in case one of the peer runtimes does not
+      // have the same buildLayer. We still want to use the shared web folder in the main system's buildLayer and
+      // that means we need to init the main system's buildLayer first.
+      if (!peerMode || parentSystem.buildDir != null)
+         initBuildSystem(!peerMode, true);
 
       if (excludedFiles != null) {
          excludedPatterns = new ArrayList<Pattern>(excludedFiles.size());
@@ -2321,6 +2346,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       System.err.println("*** Invalid LayeredSystem - no main layered system - peerMode is true but no other system which is acting as the main system");
       return null;
+   }
+
+   public boolean isMainSystem() {
+      return !peerMode;
    }
 
    public LayeredSystem getPeerLayeredSystem(String processIdent) {
@@ -3995,14 +4024,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // This part was originally copied from the code generated from the js version of LayeredSystem.  Yes, we could add the meta-data here and introduce a dependency so SC is required to build SC but still not willing to take that leap of tooling complexity yet :)
          // See also the lines in the class Options inner class.
          int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-         SyncManager.addSyncType(LayeredSystem.class, new SyncProperties(null, null, new Object[] { "options" , "staleCompiledModel"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
+         SyncManager.addSyncType(LayeredSystem.class, new SyncProperties(null, null, new Object[] { "options" , "staleCompiledModel"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
          SyncManager.addSyncType(Options.class, new SyncProperties(null, null,
                   new Object[] { "buildAllFiles" , "buildAllLayers" , "noCompile" , "verbose" , "info" , "debug" , "crossCompile" , "runFromBuildDir" , "runScript" ,
                                  "createNewLayer" , "dynamicLayers" , "allDynamic" , "liveDynamicTypes" , "useCommonBuildDir" , "buildDir" , "buildSrcDir" ,
-                                  "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId));
+                                  "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncPropOptions.SYNC_INIT, globalScopeId));
          SyncProperties typeProps = new SyncProperties(null, null, new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
                                                                                   "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags", "extendsTypeName"},
-                                                       null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
+                                                       null, SyncPropOptions.SYNC_INIT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ModifyDeclaration.class, LayerSyncHandler.class);
@@ -4025,14 +4054,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncType(ClientTypeDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Need this so we can use restore to go back
 
-         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags"}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
-         SyncManager.addSyncType(PropertyAssignment.class, new SyncProperties(null, null, new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags"},
+                                 null, SyncPropOptions.SYNC_INIT| SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(PropertyAssignment.class,
+              new SyncProperties(null, null,
+                                 new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags" },
+                                 null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
-         SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"}, null, SyncOptions.SYNC_INIT_DEFAULT, globalScopeId);
+         SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"},
+                                             null, SyncPropOptions.SYNC_INIT, globalScopeId);
          SyncManager.addSyncType(JavaModel.class, modelProps);
          SyncManager.addSyncType(SCModel.class, modelProps);
          SyncManager.addSyncType(Template.class, modelProps);
-         SyncManager.addSyncType(SrcEntry.class, new SyncProperties(null, null, new Object[] { "layer", "absFileName", "relFileName", "baseFileName", "prependPackage" }, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncType(SrcEntry.class, new SyncProperties(null, null, new Object[] { "layer", "absFileName", "relFileName", "baseFileName", "prependPackage" },
+                                 null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
          SyncManager.addSyncInst(options, true, true, null, null);
          SyncManager.addSyncInst(this, true, true, null, null);
 
@@ -4046,14 +4081,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(Template.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Layer.class, LayerSyncHandler.class);
 
-         //SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncOptions.SYNC_INIT_DEFAULT | SyncOptions.SYNC_CONSTANT, globalScopeId));
+         //SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncManager.addSyncType(Layer.class,
                  new SyncProperties(null, null,
                          new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
                                  "baseLayerNames", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
                                  "layerPosition", "codeType", "dependentLayers"},
-                         null, SyncOptions.SYNC_INIT_DEFAULT,  globalScopeId));
+                         null, SyncPropOptions.SYNC_INIT,  globalScopeId));
          for (Layer l:layers)
             l.initSync();
 
@@ -9861,7 +9896,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // The standard languages are processed during the process phase by default
       if (phase == null || phase == BuildPhase.Process) {
          IFileProcessor proc = Language.getLanguageByExtension(ext);
-         if (proc == null || (!includeDisabled && proc.enabledForPath(fileName, srcLayer, abs, generatedFile) == IFileProcessor.FileEnabledState.Disabled))
+         if (proc == null || (!includeDisabled && fileName != null && proc.enabledForPath(fileName, srcLayer, abs, generatedFile) == IFileProcessor.FileEnabledState.Disabled))
             return null;
          return proc;
       }

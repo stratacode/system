@@ -48,8 +48,12 @@ public class HTMLElement<RE> extends Element<RE> {
    public final static sc.type.IBeanMapper _keyUpEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "keyUpEvent");
    public final static sc.type.IBeanMapper _focusEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "focusEvent");
    public final static sc.type.IBeanMapper _blurEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "blurEvent");
-   public final static sc.type.IBeanMapper _innerWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "innerWidth");
-   public final static sc.type.IBeanMapper _innerHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "innerHeight");
+   public final static sc.type.IBeanMapper _clientWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "clientWidth");
+   public final static sc.type.IBeanMapper _clientHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "clientHeight");
+   public final static sc.type.IBeanMapper _offsetLeftProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetLeft");
+   public final static sc.type.IBeanMapper _offsetTopProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetTop");
+   public final static sc.type.IBeanMapper _offsetWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetWidth");
+   public final static sc.type.IBeanMapper _offsetHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetHeight");
 
    static HashMap<String,IBeanMapper> domAttributes = new HashMap<String,IBeanMapper>();
    {
@@ -63,8 +67,12 @@ public class HTMLElement<RE> extends Element<RE> {
       domAttributes.put("keyUpEvent", HTMLElement._keyUpEventProp);
       domAttributes.put("focusEvent", HTMLElement._focusEventProp);
       domAttributes.put("blurEvent", HTMLElement._blurEventProp);
-      domAttributes.put("innerWidth", HTMLElement._innerWidthProp);
-      domAttributes.put("innerHeight", HTMLElement._innerHeightProp);
+      domAttributes.put("clientWidth", HTMLElement._clientWidthProp);
+      domAttributes.put("clientHeight", HTMLElement._clientHeightProp);
+      domAttributes.put("offsetTop", HTMLElement._offsetTopProp);
+      domAttributes.put("offsetLeft", HTMLElement._offsetLeftProp);
+      domAttributes.put("offsetWith", HTMLElement._offsetWidthProp);
+      domAttributes.put("offsetHeight", HTMLElement._offsetHeightProp);
    }
 
 

@@ -269,8 +269,9 @@ public abstract class SyncDestination {
          }
          else {
             boolean serverError = errorCode == 500 || errorCode == 0;
-            if (serverError)
+            if (serverError) {
                System.out.println("*** Server error - code: " + errorCode);
+            }
             // If we're on the client and we get a server error, mark us as disconnected
             if (serverError && isClient()) {
                if (connected) {
