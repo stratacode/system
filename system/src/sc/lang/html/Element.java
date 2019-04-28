@@ -4,14 +4,12 @@
 
 package sc.lang.html;
 
-import sc.bind.Bind;
-import sc.bind.Bindable;
-import sc.bind.BindingListener;
-import sc.bind.IListener;
+import sc.bind.*;
 import sc.dyn.DynUtil;
 import sc.dyn.IObjChildren;
 import sc.dyn.IScheduler;
 import sc.js.ServerTag;
+import sc.js.ServerTagContext;
 import sc.js.URLPath;
 import sc.lang.*;
 import sc.lang.java.*;
@@ -214,15 +212,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (startTagValid) {
          invalidateStartTag();
          Element enclTag = getEnclosingTag();
-         if (enclTag != null)
+         if (enclTag != null) {
+            enclTag.bodyTxtValid = false;
             enclTag.invalidateBody();
+         }
       }
       // When we become visible, even if we are not valid, it's possible our parent's body is valid.  Need to invalidate the parent's body
       // so it re-renders the new list of children.
       else if (vis) {
          Element enclTag = getEnclosingTag();
-         if (enclTag != null)
+         if (enclTag != null) {
+            enclTag.bodyTxtValid = false;
             enclTag.invalidateBody();
+         }
       }
       Bind.sendChangedEvent(this, "visible");
    }
@@ -238,12 +240,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * This instance can be used in two modes - one as the controller of the array in which case repeat is set.  The other when it represents the element of the array and repeatVar is set to the element of the array.
     */
     public void setRepeat(Object rv) {
+      if (rv == repeat)
+          return;
+      Object oldRv = repeat;
+      if (repeatListener != null && oldRv instanceof IChangeable) {
+         Bind.removeListener(oldRv, null, repeatListener, IListener.VALUE_CHANGED);
+      }
       repeat = rv;
       if (rv != null) {
          if (repeatListener == null) {
             repeatListener = new RepeatListener(this);
             // TODO: need to use VALUE_CHANGED rather than just INVALIDATED because we do not propagate the 'invalidate' event across bindings otherwise.  I'm not sure this is right!  An example is when we try to add a 'todo' to the TodoList sample with the repeat := todos binding.
             Bind.addListener(this, "repeat", repeatListener, IListener.VALUE_CHANGED);
+         }
+
+         if (rv instanceof IChangeable) {
+            Bind.addListener(rv, null, repeatListener, IListener.VALUE_CHANGED);
          }
       }
       Bind.sendChangedEvent(this, "repeat");
@@ -4129,7 +4141,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private void outputRepeatBody(Object repeatVal, StringBuilder sb, OutputCtx ctx) {
-      syncRepeatTags(repeatVal);
+      if (syncRepeatTags(repeatVal)) {
+         // TODO: do we need to set bodyTxtValid = false here? It seems too late though to trigger that event since we should have caught this in refresh tags.
+      }
       markBodyValid(true);
       if (wrap) {
          callOutputStartTag(sb, ctx);
@@ -5093,13 +5107,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public ServerTag serverTagInfo = null;
 
-   public ServerTag getServerTagInfo() {
+   public ServerTag getServerTagInfo(String id) {
       if (serverTagInfo != null)
          return serverTagInfo;
 
       BindingListener[] listeners = Bind.getBindingListeners(this);
       ServerTag stag = null;
-      String id = getId();
       if (id != null) {
          stag = new ServerTag();
          stag.id = id;
@@ -5147,28 +5160,44 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return null;
    }
 
-   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag, Set<String> syncTypeFilter) {
+   private String getServerTagId() {
+      String tagId = getId();
+      if (tagId == null && isSingletonTag() && tagName != null) {
+         tagId = tagName;
+      }
+      return tagId;
+   }
+
+   public void addServerTags(ScopeDefinition scopeDef, ServerTagContext stCtx, boolean defaultServerTag) {
       if (defaultServerTag || serverTag) {
 
-         String tagId = getId();
-         if (tagId == null && isSingletonTag() && tagName != null) {
-            tagId = tagName;
-         }
+         String tagId = getServerTagId();
          if (tagId != null) {
-            ServerTag serverTagInfo = getServerTagInfo();
+            ServerTag serverTagInfo = getServerTagInfo(tagId);
             if (serverTagInfo != null) {
                // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
                if (serverTagInfo.eventSource) {
-                  if (serverTags == null)
-                     serverTags = new LinkedHashMap<String,ServerTag>();
 
-                  serverTags.put(tagId, serverTagInfo);
+                  if (stCtx.firstTime) {
+                     if (stCtx.serverTags == null)
+                        stCtx.serverTags = new LinkedHashMap<String,ServerTag>();
+
+                     stCtx.serverTags.put(tagId, serverTagInfo);
+                  }
+                  else {
+                     ServerTag oldSt = stCtx.serverTags.get(tagId);
+                     if (oldSt != null)
+                        oldSt.marked = true;
+                     else {
+                        stCtx.addNewServerTag(tagId, serverTagInfo);
+                     }
+                  }
                }
 
-               if (syncTypeFilter != null) {
-                  syncTypeFilter.add(DynUtil.getTypeName(DynUtil.getType(this), false));
+               if (stCtx.serverTagTypes != null) {
+                  stCtx.serverTagTypes.add(DynUtil.getTypeName(DynUtil.getType(this), false));
                   if (serverTag && !defaultServerTag) // These need to be added the first time only
-                     syncTypeFilter.addAll(Arrays.asList("sc.js.ServerTagManager", "sc.js.ServerTag"));
+                     stCtx.serverTagTypes.addAll(Arrays.asList("sc.js.ServerTagManager", "sc.js.ServerTag"));
                }
 
                if (scopeDef != null) {
@@ -5211,11 +5240,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (children != null) {
          for (Object child:children) {
             if (child instanceof Element) {
-               serverTags = ((Element) child).addServerTags(scopeDef, serverTags, defaultServerTag, syncTypeFilter);
+               ((Element) child).addServerTags(scopeDef, stCtx, defaultServerTag);
             }
          }
       }
-      return serverTags;
    }
 
 

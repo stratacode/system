@@ -5,6 +5,7 @@
 package sc.lang.html;
 
 import sc.js.ServerTag;
+import sc.js.ServerTagContext;
 import sc.lang.css.StyleSheet;
 import sc.obj.ScopeDefinition;
 
@@ -29,7 +30,7 @@ public class Head extends HTMLElement<Object> {
    // in the page changes.
    public transient String[] styleSheetPaths;
 
-   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag, Set<String> syncTypeFilter) {
+   public void addServerTags(ScopeDefinition scopeDef, ServerTagContext stCtx, boolean defaultServerTag) {
       if (styleSheetPaths != null) {
          Element page = getEnclosingTag();
          if (page instanceof HtmlPage) {
@@ -45,14 +46,13 @@ public class Head extends HTMLElement<Object> {
                         curSheet.serverTag = true;
                         if (curSheet.getId() == null)
                            curSheet.setId("_css." + curSheet.getClass().getSimpleName());
-                        serverTags = curSheet.addServerTags(scopeDef, serverTags, defaultServerTag, syncTypeFilter);
+                        curSheet.addServerTags(scopeDef, stCtx, defaultServerTag);
                      }
                   }
                }
             }
          }
       }
-      serverTags = super.addServerTags(scopeDef, serverTags, defaultServerTag, syncTypeFilter);
-      return serverTags;
+      super.addServerTags(scopeDef, stCtx, defaultServerTag);
    }
 }

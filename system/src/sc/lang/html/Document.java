@@ -49,7 +49,7 @@ public class Document extends HTMLElement implements IObjectId {
       setId("document");
    }
 
-   public ServerTag getServerTagInfo() {
+   public ServerTag getServerTagInfo(String id) {
       BindingListener[] listeners = Bind.getBindingListeners(this);
       ServerTag stag = null;
       if (listeners != null) {

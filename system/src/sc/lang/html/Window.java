@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingListener;
 import sc.js.ServerTag;
+import sc.js.ServerTagContext;
 import sc.obj.Constant;
 import sc.obj.IObjectId;
 import sc.obj.ScopeDefinition;
@@ -113,22 +114,15 @@ public class Window implements IObjectId {
       PTypeUtil.setThreadLocal("window", window);
    }
 
-   public Map<String,ServerTag> addServerTags(ScopeDefinition scopeDef, Map<String,ServerTag> serverTags, boolean defaultServerTag, Set<String> syncTypeFilter) {
-      ServerTag windowServerTag = getServerTagInfo();
-      ServerTag documentServerTag = document.getServerTagInfo();
-      if (windowServerTag != null || documentServerTag != null) {
-         if (serverTags == null) {
-            serverTags = new LinkedHashMap<String,ServerTag>();
-         }
-         if (windowServerTag != null)
-            serverTags.put("window", windowServerTag);
-         if (documentServerTag != null)
-            serverTags.put("document", documentServerTag);
-      }
-      return serverTags;
+   public void addServerTags(ServerTagContext stCtx) {
+      ServerTag windowServerTag = getServerTagInfo("window");
+      stCtx.updateServerTag("window", windowServerTag);
+
+      ServerTag documentServerTag = document.getServerTagInfo("document");
+      stCtx.updateServerTag("document", documentServerTag);
    }
 
-   public ServerTag getServerTagInfo() {
+   public ServerTag getServerTagInfo(String id) {
       BindingListener[] listeners = Bind.getBindingListeners(this);
       ServerTag stag = null;
       if (listeners != null) {
@@ -138,7 +132,7 @@ public class Window implements IObjectId {
             if (listener != null) {
                if (stag == null) {
                   stag = new ServerTag();
-                  stag.id = "window";
+                  stag.id = id;
                }
                if (stag.props == null)
                   stag.props = new ArrayList<Object>();
