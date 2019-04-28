@@ -6444,7 +6444,7 @@ public class ModelUtil {
       // This compares just the class name part of the type name.  That's because we'll inherit an inner type through
       // a base type which has a different full type name.  We still consider that the same type though.
       for (int i = 0; i < props.size(); i++)
-         if (ModelUtil.getClassName(props.get(i)).equals(ModelUtil.getClassName(prop)))
+         if (StringUtil.equalStrings(ModelUtil.getClassName(props.get(i)), ModelUtil.getClassName(prop)))
             return i;
       return -1;
    }
