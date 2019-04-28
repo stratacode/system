@@ -7671,7 +7671,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Layer peerLayer;
       // Find the first layer in the peer system which matches (if any)
       do {
-         peerLayer = peer.getLayerByDirName(srcLayer.layerDirName);
+         peerLayer = peer.getLayerByDirName(srcLayer.getLayerName());
          if (peerLayer == null)
             srcLayer = srcLayer.getPreviousLayer();
       } while (peerLayer == null && srcLayer != null);
@@ -8565,6 +8565,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
       }
+
 
       for (int i = 0; i < toStop.size(); i++) {
          ILanguageModel cachedModel = toStop.get(i);
