@@ -85,8 +85,15 @@ public class ParseError implements Cloneable, IParseResult {
          return sb.toString();
       }
       else {
-         MessageFormat formatter = new MessageFormat(errorCode);
-         return formatter.format(errorArgs) + " ";
+         try {
+            MessageFormat formatter = new MessageFormat(errorCode);
+            return formatter.format(errorArgs) + " ";
+         }
+         catch (IllegalArgumentException exc) {
+            System.err.println("*** Invalid parse error - errorCode: " + errorCode + " with errorArgs:" + errorArgs);
+            return "Invalid parse error!";
+
+         }
       }
    }
 
