@@ -22,13 +22,20 @@ public class TemplateDeclaration extends TypeDeclaration {
    }
 
    public String getFullTypeName() {
+     // TODO: it might be nice to cache this here, but if we the refreshStyle test breaks.  Somehow sc.test.editor2.EditorPanel.BaseTypeTree gets
+     // it's type name incorrectly as sc.test.editor2.div.BaseTypeTree due to this cached value.
+     // if (fullTypeName != null)
+     //    return fullTypeName;
       Element enclTag = getEnclosingTag();
-      if (enclTag != null && enclTag.needsObject())
-         return enclTag.getFullTypeName();
+      if (enclTag != null && enclTag.needsObject()) {
+         fullTypeName = enclTag.getFullTypeName();
+         return fullTypeName;
+      }
       Template temp = (Template) getJavaModel();
       if (temp == null)
          return "_internalTemplateDeclaration";
-      return temp.getModelTypeName();
+      fullTypeName = temp.getModelTypeName();
+      return fullTypeName;
    }
 
    public void unregister() {
