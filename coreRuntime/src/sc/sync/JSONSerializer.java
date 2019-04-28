@@ -13,6 +13,7 @@ import sc.type.CTypeUtil;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import sc.sync.JSONFormat.Commands;
 import sc.sync.JSONFormat.ExprPrefixes;
@@ -276,12 +277,24 @@ public class JSONSerializer extends SyncSerializer {
    public void formatArrayExpression(StringBuilder out, SyncManager.SyncContext syncContext, Object changedObj, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode,
                                      SyncSerializer postBlockCode, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
       out.append("[");
-      int sz = DynUtil.getArrayLength(changedObj);
-      for (int i = 0; i < sz; i++) {
-         if (i != 0)
-            out.append(",");
-         Object val = DynUtil.getArrayElement(changedObj, i);
-         syncContext.formatExpression(this, out, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, true, uniqueId + "_" + i, depChanges, syncLayer);
+      if (changedObj instanceof Set) {
+         Set s = (Set) changedObj;
+         int i = 0;
+         for (Object val:s) {
+            if (i != 0)
+               out.append(",");
+            syncContext.formatExpression(this, out, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, true, uniqueId + "_" + i, depChanges, syncLayer);
+            i++;
+         }
+      }
+      else {
+         int sz = DynUtil.getArrayLength(changedObj);
+         for (int i = 0; i < sz; i++) {
+            if (i != 0)
+               out.append(",");
+            Object val = DynUtil.getArrayElement(changedObj, i);
+            syncContext.formatExpression(this, out, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, true, uniqueId + "_" + i, depChanges, syncLayer);
+         }
       }
       out.append("]");
    }

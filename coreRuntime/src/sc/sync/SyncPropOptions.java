@@ -19,10 +19,14 @@ public class SyncPropOptions {
    public final static int SYNC_INIT = 1;
    /** Do not send the value of this property until it's value is requested by the remote side. */
    public final static int SYNC_ON_DEMAND = 2;
-   public final static int SYNC_SERVER = 4; // For on-demand properties, is this class the client or the server?
-   public final static int SYNC_CLIENT = 8; // For on-demand properties, is this class the client or the server?
-   public final static int SYNC_RECEIVE_ONLY = 16; // For clientToServer properties when compiled for the server. We need to add the sync property for authorization. Don't a sync listener for these properties.
-   public final static int SYNC_CONSTANT = 32; // Like RECEIVE_ONLY, does not add the sync listener but will send the init value to the other side
+   /** For on-demand properties, is this class the client or the server? */
+   public final static int SYNC_SERVER = 4;
+   /** For on-demand properties, is this class the client or the server? */
+   public final static int SYNC_CLIENT = 8;
+   /** For clientToServer properties when compiled for the server. We need to add the sync property for authorization. Don't a sync listener for these properties. */
+   public final static int SYNC_RECEIVE_ONLY = 16;
+   /** Do not add the sync listener for this property, but do send the initial value to the other side */
+   public final static int SYNC_CONSTANT = 32;
 
    public String propName;
    public int flags;
