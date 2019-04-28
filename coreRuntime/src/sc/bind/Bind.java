@@ -1102,7 +1102,8 @@ public class Bind {
       }
    }
 
-   private final static int RecursionDetectionThreadhold = 10000;
+   // TODO: make this configurable. It's possible to have valid long chains of bindings 
+   private final static int RecursionDetectionThreadhold = 150;
 
    public static int getNestedBindingCount() {
       ThreadState bindState = (ThreadState) PTypeUtil.getThreadLocal("bindingState");
