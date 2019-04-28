@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.bind.BindingDirection;
 import sc.bind.Bind;
 import sc.bind.IBinding;
+import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.ISrcStatement;
 import sc.lang.SCLanguage;
@@ -125,6 +126,8 @@ public class NewExpression extends IdentifierExpression {
          boundType = model.findTypeDeclaration(typeIdentifier, true);
          if (boundType == null) {
             displayTypeError("No type: ", typeIdentifier, " for: ");
+            boundType = findType(typeIdentifier);
+            boundType = model.findTypeDeclaration(typeIdentifier, true);
          }
       }
       if (boundTypeName != null && boundType != null)
@@ -683,12 +686,18 @@ public class NewExpression extends IdentifierExpression {
          bindArgs.add(ClassValueExpression.create(typeIdentifier));
       if (arrayDimensions == null) {
          bindArgs.add(constructor == null ? NullLiteral.create() : StringLiteral.create(ModelUtil.getTypeSignature(constructor)));
+
+         Object enclosingInstType = ModelUtil.getEnclosingInstType(boundType);
          // For instance "new" operators for inner classes
-         if (!bd.isStatic && isInnerInstanceClass()) {
+         if (!bd.isStatic && enclosingInstType != null) {
             SemanticNodeList<Expression> argsWithThis = new SemanticNodeList<Expression>(this, arguments.size() + 1);
             IdentifierExpression ic = IdentifierExpression.create("sc.bind.Bind.constantP");
             SemanticNodeList<Expression> thisArg = new SemanticNodeList<Expression>(1);
-            thisArg.add(IdentifierExpression.create("this"));
+            Object enclType = getEnclosingType();
+            if (ModelUtil.sameTypes(enclType, enclosingInstType))
+               thisArg.add(IdentifierExpression.create("this"));
+            else
+               thisArg.add(IdentifierExpression.create(ModelUtil.getClassName(enclosingInstType) + ".this"));
             ic.setProperty("arguments", thisArg);
             argsWithThis.add(ic);
             argsWithThis.addAll(arguments);
@@ -706,22 +715,24 @@ public class NewExpression extends IdentifierExpression {
       bindArgs.add(ModelUtil.getRuntimeType(boundType));
       if (arrayDimensions == null) {
          bindArgs.add(constructor == null ? null : ModelUtil.getTypeSignature(constructor));
+
+         Object enclosingInstType = ModelUtil.getEnclosingInstType(boundType);
          // For instance "new" operators for inner classes
-         if (!isStatic && isInnerInstanceClass()) {
-            /*
-            SemanticNodeList<Expression> argsWithThis = new SemanticNodeList<Expression>(this, arguments.size() + 1);
-            IdentifierExpression ic = IdentifierExpression.create("sc.bind.Bind.constantP");
-            SemanticNodeList<Expression> thisArg = new SemanticNodeList<Expression>(1);
-            thisArg.add(IdentifierExpression.create("this"));
-            ic.setProperty("arguments", thisArg);
-            argsWithThis.add(ic);
-            argsWithThis.addAll(arguments);
-            argsWithThis.parentNode = this;
-            ParseUtil.startComponent(argsWithThis);
-            bindArgs.add(evalBindingParameters(expectedType, ctx, argsWithThis.toArray(new Expression[argsWithThis.size()])));
-            */
+         if (!isStatic && enclosingInstType != null) {
             IBinding[] result = new IBinding[arguments.size()+1];
-            result[0] = Bind.constantP(ctx.getCurrentObject());
+            Object outerObj = ctx.getCurrentObject();
+            do {
+               if (!ModelUtil.isInstance(enclosingInstType, outerObj)) {
+                  outerObj = DynUtil.getOuterObject(outerObj);
+               }
+               else
+                  break;
+            } while (outerObj != null);
+
+            if (outerObj == null)
+               throw new IllegalArgumentException("Outer object for eval of new expression must match enclosing inst type: " + enclosingInstType);
+
+            result[0] = Bind.constantP(outerObj);
             for (int i = 0; i < arguments.size(); i++)
                result[i+1] = (IBinding) arguments.get(i).evalBinding(expectedType, ctx);
             bindArgs.add(result);
