@@ -197,17 +197,24 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
       }
 
+      Object[] ifaces = methodType.getAllImplementsTypeDeclarations();
+
       // We can't modify an interface method but if we override a method in a compile interface we
       // need that interface in the dynamic stub of the enclosing type.
-      if (methodType.implementsBoundTypes != null) {
+      if (ifaces != null) {
          Object implMeth;
          LayeredSystem sys = getLayeredSystem();
-         for (Object impl:methodType.implementsBoundTypes) {
+         for (Object impl:ifaces) {
             implMeth = name == null ? null : ModelUtil.definesMethod(impl, name, getParameterList(), null, null, false, false, null, null, sys);
-            ifaceMethod = implMeth;
-            if (inDynamicType && overridden == null && implMeth != null && ModelUtil.isCompiledMethod(implMeth)) {
-               methodType.setNeedsDynamicStub(true);
-               overridesCompiled = true;
+            if (implMeth != null) {
+               if (ifaceMethod == null) {
+                  ifaceMethod = implMeth;
+               }
+               // else - TODO: multiple values for ifaceMethod: do we need to pick 'the first' one if we could have inherited it from multiple interfaces?  Or should we store a list here?
+               if (inDynamicType && overridden == null && ModelUtil.isCompiledMethod(implMeth)) {
+                  methodType.setNeedsDynamicStub(true);
+                  overridesCompiled = true;
+               }
             }
          }
       }
@@ -770,6 +777,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes, HashSet<Object> visited) {
+      if (name == null)
+         return;
       ArrayList<TypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, false);
       if (modTypes != null) {
          for (TypeDeclaration modType:modTypes) {
