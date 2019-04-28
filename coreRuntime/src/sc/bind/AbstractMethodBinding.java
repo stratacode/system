@@ -342,8 +342,8 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          if ((dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp))) {
             Object currentValue = PBindUtil.getPropertyValue(srcObject, dstProp);
 
-
-            if (!equalObjects(currentValue, boundValue)) {
+            // IChangeable objects can change even when the object instance itself does not change.
+            if (!equalObjects(currentValue, boundValue) || boundValue instanceof IChangeable) {
 
                if (useReverseListener()) {
                   // We also listen for any events this object sends on itself if it is marked with IChangeable
@@ -386,7 +386,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          if ((dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp))) {
             Object currentValue = PBindUtil.getPropertyValue(srcObject, srcProp);
 
-            if (!equalObjects(currentValue, boundValue)) {
+            if (!equalObjects(currentValue, boundValue) || boundValue instanceof IChangeable) {
                return true;
             }
          }
