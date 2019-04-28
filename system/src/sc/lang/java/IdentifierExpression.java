@@ -5389,6 +5389,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (arguments != null) {
          boolean addOuter = false;
          int skipCt = 0;
+         boolean convertToCall = true;
          // Method super
          if (sz == 2) {
             if (getLayeredSystem() == null || getLayeredSystem().runtimeProcessor == null)
@@ -5400,8 +5401,8 @@ public class IdentifierExpression extends ArgumentsExpression {
                setIdentifier(0, getLayeredSystem().runtimeProcessor.getStaticPrefix(getTypeForIdentifier(0), this), IdentifierType.BoundTypeName, boundTypes[0]);
             }
          }
-         // Constructor super
-         else {
+         // Constructor this/super
+         else if (sz == 1) {
             superType = getTypeForIdentifier(0);
             enclType = getEnclosingType();
             if (superType == null) {
@@ -5423,16 +5424,23 @@ public class IdentifierExpression extends ArgumentsExpression {
                // else - this is the case where we are extending an inner class from a lower-level type.  Need to pass the super-type the original outer type which is now skipCt levels up the inner inst type hierarchy.
                addOuter = true;
             }
-            // convert from super.x(..) to JSType.call(this, ..)
+            // convert from super.x(..) to JSType_c.call(this, ..)
             setIdentifier(0, JSUtil.convertTypeName(getLayeredSystem(), ModelUtil.getTypeName(superType)), IdentifierType.BoundTypeName, boundTypes[0]);
          }
-         // Need to use MethodInvocation here - not idType because SuperExpression is treated differently in getGenericType - to not get the type of the method we are putting in this slot
-         if (idType == IdentifierType.SuperExpression)
-            idType = IdentifierType.MethodInvocation;
-         if (idType == IdentifierType.ThisExpression)
-            idType = IdentifierType.MethodInvocation;
-         addIdentifier(sz, "call", idType, boundTypes[sz-1]);
-         arguments.add(0, IdentifierExpression.create(new NonKeywordString("this")));
+         else {
+            // this.method(foo) which can keep this
+            convertToCall = false;
+         }
+
+         if (convertToCall) {
+            // Need to use MethodInvocation here - not idType because SuperExpression is treated differently in getGenericType - to not get the type of the method we are putting in this slot
+            if (idType == IdentifierType.SuperExpression)
+               idType = IdentifierType.MethodInvocation;
+            if (idType == IdentifierType.ThisExpression)
+               idType = IdentifierType.MethodInvocation;
+            addIdentifier(sz, "call", idType, boundTypes[sz-1]);
+            arguments.add(0, IdentifierExpression.create(new NonKeywordString("this")));
+         }
          if (addOuter) {
             // TODO: this won't bind to anything.   Maybe pre-initialize it's bound value here?
             IdentifierExpression outerExpr;
