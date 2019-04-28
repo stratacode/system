@@ -40,7 +40,7 @@ public class LayerIndexInfo {
          }
          else {
             if (system.options.verbose)
-               System.out.println("Layer: " + layerDirName + " extends layer excluded from project: " + extName + " found in layer path: " + layerPathRoot + " when building all layers index");
+               System.out.println("Layer: " + layerDirName + " extends layer: " + extName + " not found in found in layer path: " + layerPathRoot + " when  building the 'all layers' index");
          }
       }
       return null;
