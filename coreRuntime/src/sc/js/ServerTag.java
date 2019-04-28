@@ -1,5 +1,7 @@
 package sc.js;
 
+import sc.obj.IObjectId;
+
 import java.util.ArrayList;
 
 /**
@@ -10,7 +12,7 @@ import java.util.ArrayList;
  * nodes dynamically generated in code, as long as we know the parent tag element and start the tag.
  */
 @JSSettings(jsModuleFile="js/schtml.js", prefixAlias="sc_")
-public class ServerTag {
+public class ServerTag implements IObjectId {
 
    /** The value of the id attribute for the tag */
    public String id;
@@ -24,6 +26,8 @@ public class ServerTag {
    public String toString() {
       return "id=" + id + "(" + props + ")";
    }
+
+   public transient boolean marked;
 
    public int hashCode() {
       return id.hashCode();
@@ -47,5 +51,9 @@ public class ServerTag {
          return true;
       }
       return false;
+   }
+
+   public String getObjectId() {
+      return "sc.js.st_" + id;
    }
 }
