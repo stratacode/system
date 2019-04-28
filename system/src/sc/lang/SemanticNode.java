@@ -72,11 +72,17 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       DynType type = TypeUtil.getPropertyCache(getClass());
       IBeanMapper[] semanticProps = type.getSemanticPropertyList();
 
-      for (int i = 0; i < semanticProps.length; i++) {
-         IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
-         if (val instanceof ILifecycle)
-            ((ILifecycle) val).init();
+      try {
+         for (int i = 0; i < semanticProps.length; i++) {
+            IBeanMapper mapper = semanticProps[i];
+            Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
+            if (val instanceof ILifecycle)
+               ((ILifecycle) val).init();
+         }
+      }
+      catch (RuntimeException exc) {
+         clearInitialized();
+         throw exc;
       }
    }
 
@@ -183,6 +189,14 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
             ((ILifecycle) val).stop();
          }
       }
+   }
+
+   public void clearInitialized() {
+      initialized = false;
+      started = false;
+      validated = false;
+      if (parentNode != null && parentNode.isStarted())
+         parentNode.clearStarted();
    }
 
    public void clearStarted() {
