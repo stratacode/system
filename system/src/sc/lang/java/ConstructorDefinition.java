@@ -74,6 +74,10 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       return false;
    }
 
+   public boolean hasSetIndexMethod() {
+      return false;
+   }
+
    public Object getGetMethodFromSet() {
       return null;  //To change body of implemented methods use File | Settings | File Templates.
    }

@@ -1096,6 +1096,33 @@ public class JSTypeParameters extends ObjectTypeParameters {
             else
                sb = asb;
          }
+
+         if (type.getBoolCompilerSetting("needsPropertyNames")) {
+            StringBuilder psb = new StringBuilder();
+            psb.append(getShortJSTypeName());
+            psb.append("._PN = [");
+            boolean first = true;
+            visited = new TreeSet<String>();
+            for (Object prop:props) {
+               String propName = ModelUtil.getPropertyName(prop);
+
+               if (visited.contains(propName))
+                  continue;
+               visited.add(propName);
+
+               if (!first)
+                  psb.append(", ");
+               psb.append('"');
+               psb.append(propName);
+               psb.append('"');
+               first = false;
+            }
+            psb.append("];\n");
+            if (sb == null)
+               sb = psb;
+            else
+               sb.append(psb);
+         }
       }
       return sb == null ? "" : sb.toString();
    }

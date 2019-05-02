@@ -758,6 +758,10 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.hasSetMethod(method);
    }
 
+   public boolean hasSetIndexMethod() {
+      return ModelUtil.hasSetIndexMethod(method);
+   }
+
    public Object getGetMethodFromSet() {
       return ModelUtil.getGetMethodFromSet(method);
    }

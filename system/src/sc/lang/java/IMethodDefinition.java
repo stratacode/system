@@ -27,6 +27,8 @@ public interface IMethodDefinition extends IMember {
 
    boolean hasSetMethod();
 
+   boolean hasSetIndexMethod();
+
    Object getGetMethodFromSet();
 
    Object getSetMethodFromGet();

@@ -42,6 +42,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
       public static EnumSet<MemberType> FieldEnumSet = EnumSet.of(Field,Enum);
       public static EnumSet<MemberType> GetMethodSet = EnumSet.of(GetMethod);
       public static EnumSet<MemberType> SetMethodSet = EnumSet.of(SetMethod);
+      public static EnumSet<MemberType> SetIndexMethodSet = EnumSet.of(SetIndexed);
       public static EnumSet<MemberType> VariableSet = EnumSet.of(Variable);
       public static EnumSet<MemberType> AssignmentSet = EnumSet.of(Assignment);
       public static EnumSet<MemberType> PropertyGetSet = EnumSet.of(Field,GetMethod,Enum);

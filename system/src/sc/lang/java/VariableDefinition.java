@@ -871,5 +871,27 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
       return super.addNodeCompletions(origModel, origNode, matchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
    }
+
+   public String getArrayDimensions() {
+      if (arrayDimensions != null)
+         return arrayDimensions;
+      Definition def = getDefinition();
+      if (def instanceof TypedDefinition) {
+         JavaType type = ((TypedDefinition) def).type;
+         return type.arrayDimensions;
+      }
+      return null;
+   }
+
+   public boolean needsIndexedSetter() {
+      String dims = getArrayDimensions();
+      if (dims != null && dims.length() == 2 && convertGetSet) {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys == null || !sys.useIndexSetForArrays)
+            return false;
+         return true;
+      }
+      return false;
+   }
 }
 

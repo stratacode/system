@@ -207,14 +207,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          // Can't access inherited annotations in start
          Object setting;
          if (!needsCompiledClass) {
-            setting = getCompilerSetting("needsCompiledClass");
-            boolean ncc = setting != null && setting instanceof Boolean && (Boolean)setting;
+            boolean ncc = getBoolCompilerSetting("needsCompiledClass");
             if (ncc)
                enableNeedsCompiledClass();
          }
          if (!compiledOnly) {
-            setting = getCompilerSetting("compiledOnly");
-            compiledOnly = setting != null && setting instanceof Boolean && (Boolean)setting;
+            compiledOnly = getBoolCompilerSetting("compiledOnly");
          }
 
          initDynTypeInfo();

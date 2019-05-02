@@ -49,6 +49,10 @@ public class JSUtil {
          if (replace != null)
             return replace;
 
+         replace = jsrt.jsBuildInfo.replaceNativeTypes.get(fullTypeName);
+         if (replace != null)
+            return replace;
+
          String pendingName = fullTypeName;
          String middle = "";
 

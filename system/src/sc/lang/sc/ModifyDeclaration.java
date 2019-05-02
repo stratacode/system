@@ -1358,7 +1358,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
 
       if (modifyTypeDecl == null && getJavaModel().mergeDeclaration) {
-         System.err.println("**** Can't find a definition to modify " + typeName + " in layer previous to: " + getJavaModel().getLayer().getLayerUniqueName() + ": " + toDefinitionString());
+         System.err.println("**** No definition to modify " + typeName + " in layer previous to: " + getJavaModel().getLayer().getLayerUniqueName() + ": " + toDefinitionString());
          return true;
       }
 

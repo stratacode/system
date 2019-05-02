@@ -290,6 +290,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public int getRepeatIndex() {
+      if (repeatIndex == -1) {
+         Element enclTag = getEnclosingTag();
+         // Common error to refer to repeatIndex on a tag that is inside of the actual repeated tag so want an error when that happens
+         if (enclTag != null && !enclTag.isRepeatTag())
+            throw new IllegalArgumentException("Illegal access of repeatIndex on non-repeat tag: " + getId() + ". Use repeatTag.this.repeatIndex to refer to the right tag");
+      }
       return repeatIndex;
    }
 

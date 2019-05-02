@@ -319,7 +319,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       /** Used to implement mappings so you can replace one package source in the java/compiled world with another during the JS environment - e.g. how we substitute in the JS version of the binding code */
       public HashMap<String,HashSet<String>> aliasedPackages = new HashMap<String,HashSet<String>>();
 
+      /** Map from Java full type name to the JS type name to use */
       public HashMap<String,String> replaceTypes = new HashMap<String,String>();
+
+      /** Like replaceTypes but for types where there's no _c variant for types */
+      public HashMap<String,String> replaceNativeTypes = new HashMap<String,String>();
 
       /** The inverse of replaceTypes - the list of Java types registered for a given JS type */
       public HashMap<String,List<String>> typeAliases = new HashMap<String,List<String>>();
@@ -355,13 +359,16 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          replaceTypes.put("long", "Number");
          replaceTypes.put("short", "Number");
          replaceTypes.put("java.lang.Class", "jv_Object"); // TODO
-         addReplaceType("sc.lang.JLineInterpreter", "sc_EditorContext");
+         addReplaceType("sc.lang.JLineInterpreter", "sc_EditorContext", false);
 
          prefixAliases.put("java.util", "jv_");
       }
 
-      public void addReplaceType(String javaType, String jsType) {
-         replaceTypes.put(javaType, jsType);
+      public void addReplaceType(String javaType, String jsType, boolean nativeReplace) {
+         if (nativeReplace)
+            replaceNativeTypes.put(javaType, jsType);
+         else
+            replaceTypes.put(javaType, jsType);
          List<String> aliases = typeAliases.get(jsType);
          if (aliases == null) {
             aliases = new ArrayList<String>(2);
@@ -1720,7 +1727,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    boolean hasAlias(Object type) {
       String typeName = ModelUtil.getTypeName(type);
-      if (jsBuildInfo.replaceTypes.get(typeName) != null)
+      if (jsBuildInfo.replaceTypes.get(typeName) != null || jsBuildInfo.replaceNativeTypes.get(typeName) != null)
          return true;
 
       if (ModelUtil.isCompiledClass(type)) {
@@ -1795,8 +1802,14 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          String typeName = ModelUtil.getTypeName(type);
          String replaceWith = (String) ModelUtil.getAnnotationValue(settingsObj, "replaceWith");
+         boolean nativeReplace = false;
+         if (replaceWith == null) {
+            replaceWith = (String) ModelUtil.getAnnotationValue(settingsObj, "replaceWithNative");
+            if (replaceWith != null && replaceWith.length() > 0)
+               nativeReplace = true;
+         }
          if (replaceWith != null && replaceWith.length() > 0) {
-            jsBuildInfo.addReplaceType(typeName, replaceWith);
+            jsBuildInfo.addReplaceType(typeName, replaceWith, nativeReplace);
             handled = true;
             if (jsBuildInfo.jsLibFilesForType.get(typeName) == null)
                jsBuildInfo.jsLibFilesForType.put(typeName, HAS_ALIAS_SENTINEL);
@@ -1831,7 +1844,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
       if (!handled) {
          String typeName = ModelUtil.getTypeName(type, false);
-         if (jsBuildInfo.replaceTypes.get(typeName) != null)
+         if (jsBuildInfo.replaceTypes.get(typeName) != null || jsBuildInfo.replaceNativeTypes.get(typeName) != null)
             return new String[0];
          return null;
       }
@@ -1992,6 +2005,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       if (typeObj instanceof ArrayTypeDeclaration)
          return "jv_Array" + typeNameSuffix;
+
+      String typeName = ModelUtil.getTypeName(typeObj);
+      String replaceType = jsBuildInfo.replaceNativeTypes.get(typeName);
+      if (replaceType != null)
+         return replaceType;
 
       boolean useRuntime = model != null && model.customResolver != null && model.customResolver.useRuntimeResolution();
       typeObj = ModelUtil.resolveSrcTypeDeclaration(system, typeObj, useRuntime, false, null);

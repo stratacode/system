@@ -72,7 +72,7 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    String dynChildManager() default "";      
    /** Class implementing IDynObjManager - used to define how objects are constructed */
    String dynObjManager() default "";      
-   // TODO: rename these two?  They are different features - needsCompiledClass forces a dynamic stub when the class is dynamic and compiledOnly disables dynamic mode entirely
+   // TODO: Find better names for these two?  They are different features - needsCompiledClass forces a dynamic stub when the class is dynamic and compiledOnly disables dynamic mode entirely
    /** Set to true for classes that even when dynamic need a specific .class generated for them */
    boolean needsCompiledClass() default false; 
    /** Set to true for classes that must be compiled classes because their implementation won't allow them to be implemented using the SC dynamic stub paradigm. (e.g. a class used by Hibernate or called from code that's no managed as source within StrataCode).  */
@@ -80,7 +80,9 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    /** If this type does not support liveDynamicTypes, you can turn this off via this flag */
    boolean liveDynamicTypes() default true; 
    /** If false, compile in extra type info to avoid need for reflection */
-   boolean useRuntimeReflection() default true; 
+   boolean useRuntimeReflection() default true;
+   /** Set to true for types access with DynUtil.getPropertyNames(type) in Javascript.  The current generated JS does not otherwise let us find the properties of a type */
+   boolean needsPropertyNames() default false;
    /** If true, use a separate class to hold reflective code when useRuntimeReflection = false (i.e. if you are replacing a JDK class whose signature can't be modified or do not have source to the class you are using in data binding or reflection, and so can't generate a new version of it) */
    boolean useExternalDynType() default false; 
    /**

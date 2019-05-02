@@ -3939,7 +3939,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   Object getCompilerSetting(String settingName) {
+   public boolean getBoolCompilerSetting(String settingName) {
+      Boolean res = (Boolean) getCompilerSetting(settingName);
+      return res != null && res;
+   }
+
+   public Object getCompilerSetting(String settingName) {
       Object compilerSettings = getInheritedAnnotation("sc.obj.CompilerSettings");
       if (compilerSettings != null) {
          return ModelUtil.getAnnotationValue(compilerSettings, settingName);

@@ -489,6 +489,26 @@ public class DynUtil {
          throw new IllegalArgumentException("Invalid dynamic type: " + typeObj);
    }
 
+   public static String[] getPropertyNames(Object typeObj) {
+      IBeanMapper[] mappers = getProperties(typeObj);
+      if (mappers == null)
+         return null;
+
+      int len = mappers.length;
+      ArrayList<String> res = new ArrayList<String>(len);
+      for (int i = 0; i < len; i++) {
+         IBeanMapper mapper = mappers[i];
+         if (mapper != null) {
+            String name = mapper.getPropertyName();
+            // Right now this is only used for user-visible properties so removing this one, but maybe it should be settable via EditorSettings to hide this property in some base class
+            if (name.equals("class"))
+               continue;
+            res.add(name);
+         }
+      }
+      return res.toArray(new String[res.size()]);
+   }
+
    public static IBeanMapper[] getStaticProperties(Object typeObj) {
       if (typeObj instanceof Class)
          return TypeUtil.getStaticProperties((Class) typeObj);

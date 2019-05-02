@@ -141,8 +141,15 @@ public class ArrayElementExpression extends IdentifierExpression {
    public boolean needsSetMethod() {
       if (arrayDimensions == null || arrayDimensions.size() == 1) {
          Object assignedProp = getAssignedProperty();
+         int last = idTypes.length-1;
          // Used to do this for any setX method but we really need to be sure there's an indexed method - e.g. set(int, value) method
-         return assignedProp != null && ModelUtil.isSetIndexMethod(assignedProp);
+         if (assignedProp != null && ModelUtil.hasSetIndexMethod(assignedProp)) {
+            // Conversion is disabled for when you are in the setX method for this type or the method is marked as manual get set
+            if (inPropertyMethodForDef(boundTypes[last]) || isManualGetSet())
+               return false;
+
+            return true;
+         }
       }
       return false;
    }

@@ -171,6 +171,7 @@ public class ArrayElementBinding extends VariableBinding {
             if (changed) {
                bindingInvalidated(apply);
             }
+            return changed;
          }
       }
       return false;

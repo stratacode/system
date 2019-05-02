@@ -1139,27 +1139,7 @@ public class Bind {
                System.err.println("*** No binding context for object" + obj);
          }
       }
-      ThreadState bindState = (ThreadState) PTypeUtil.getThreadLocal("bindingState");
-      if (bindState == null) {
-         bindState = new ThreadState();
-         PTypeUtil.setThreadLocal("bindingState", bindState);
-      }
-      bindState.nestedLevel++;
-      bindState.obj = obj;
-      bindState.prop = prop;
-      // When nestedLevel > the threshold.  Turn on recursion detection.  For each new frame we add: obj, prop, listener, eventDetail? to a list.  Keep recording until we find a matching list already in the list.  Then gather up the list, format it into a nice error message.
-      if (bindState.nestedLevel >= RecursionDetectionThreadhold) {
-         if (bindState.recurseFrames == null)
-            bindState.recurseFrames = new ArrayList<BindFrame>();
-         BindFrame bf = new BindFrame();
-         bf.obj = obj;
-         bf.prop = prop;
-         bf.listener = listener;
-         if (bindState.recurseFrames.contains(bf) || bindState.recurseFrames.size() > 100) {
-            throw new BindingLoopException(bindState.recurseFrames);
-         }
-         bindState.recurseFrames.add(bf);
-      }
+      ThreadState threadState = initThreadState(obj, prop, listener);
       try {
          switch (event) {
             case IListener.VALUE_INVALIDATED:
@@ -1187,7 +1167,7 @@ public class Bind {
       }
       catch (BindingLoopException exc) {
          // Unwind till we have the top event - the one that triggered the whole thing.
-         if (bindState.nestedLevel != 1)
+         if (threadState.nestedLevel != 1)
             throw exc;
          else {
             StringBuilder sb = new StringBuilder();
@@ -1198,8 +1178,33 @@ public class Bind {
          }
       }
       finally {
-         bindState.nestedLevel--;
+         threadState.nestedLevel--;
       }
+   }
+
+   private static ThreadState initThreadState(Object obj, IBeanMapper prop, IListener listener) {
+      ThreadState bindState = (ThreadState) PTypeUtil.getThreadLocal("bindingState");
+      if (bindState == null) {
+         bindState = new ThreadState();
+         PTypeUtil.setThreadLocal("bindingState", bindState);
+      }
+      bindState.nestedLevel++;
+      bindState.obj = obj;
+      bindState.prop = prop;
+      // When nestedLevel > the threshold.  Turn on recursion detection.  For each new frame we add: obj, prop, listener, eventDetail? to a list.  Keep recording until we find a matching list already in the list.  Then gather up the list, format it into a nice error message.
+      if (bindState.nestedLevel >= RecursionDetectionThreadhold) {
+         if (bindState.recurseFrames == null)
+            bindState.recurseFrames = new ArrayList<BindFrame>();
+         BindFrame bf = new BindFrame();
+         bf.obj = obj;
+         bf.prop = prop;
+         bf.listener = listener;
+         if (bindState.recurseFrames.contains(bf) || bindState.recurseFrames.size() > 100) {
+            throw new BindingLoopException(bindState.recurseFrames);
+         }
+         bindState.recurseFrames.add(bf);
+      }
+      return bindState;
    }
 
    public static Class getClassForInstance(Object dstObj) {

@@ -144,6 +144,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
               ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null, null) != null;
    }
 
+   public boolean hasSetIndexMethod() {
+      return isSetIndexMethod() ||
+              ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetIndexMethodSet, null, null, null) != null;
+   }
+
    public Object getSetMethodFromGet() {
       if (isGetMethod())
         return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, null, getLayeredSystem());

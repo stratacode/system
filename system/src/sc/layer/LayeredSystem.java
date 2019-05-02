@@ -648,8 +648,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (l.hasDefinedRuntime)
                   runtimes.add(l.definedRuntime);
             }
+            // When no framework layers are included, no runtimes are defined, need to at least include the default runtime or else no runtime matches
+            if (procs.size() == 0 && runtimes.size() == 0)
+               runtimes.add(null);
 
-            if (!procs.contains(processDefinition) && (processDefinition.getProcessName() != null || !runtimes.contains(runtimeProcessor))) {
+            if (!procs.contains(processDefinition) && ((procs.size() > 0 && processDefinition.getProcessName() != null) || !runtimes.contains(runtimeProcessor))) {
                clearActiveLayers(false);
             }
             else {

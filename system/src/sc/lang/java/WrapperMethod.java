@@ -54,6 +54,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.hasSetMethod(wrapped);
    }
 
+   public boolean hasSetIndexMethod() {
+      return ModelUtil.hasSetIndexMethod(wrapped);
+   }
+
    public boolean isGetMethod() {
       return ModelUtil.isGetMethod(wrapped);
    }

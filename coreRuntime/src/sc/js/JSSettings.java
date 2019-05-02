@@ -31,6 +31,10 @@ public @interface JSSettings {
     * Don't specify the java type name here - e.g. use String rather than java.lang.String
     */
    String replaceWith() default "";
+
+   /** Like replaceWith but for types without the _c on the end */
+   String replaceWithNative() default "";
+
    /** Comma separated list of jsLibFiles which this lib file depends on being included before it */
    String dependentJSFiles() default "";
 

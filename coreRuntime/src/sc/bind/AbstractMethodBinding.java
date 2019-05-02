@@ -246,10 +246,17 @@ public abstract class AbstractMethodBinding extends DestinationListener {
 
       if (activated) {
          try {
+            // Before we apply this method, if there's a parent binding we need to make sure it's valid and that we have the up-to-date version of the current object for this binding (the methObj).
+            if (needsMethodObj() && dstObj == dstProp) {
+               Object newMethObj = ((DestinationListener) dstObj).getBoundValueForChild(this);
+               if (newMethObj != UNSET_VALUE_SENTINEL)
+                  setMethObj(newMethObj);
+            }
             // When we don't have a method object and there is no current value, we can't apply the method
-            // or it will get an RTE.
-            if (obj == null && (needsMethodObj() && methObj == null))
-               newBoundValue = null;
+            // or it will get an RTE.  Need to set it to UNSET sentinel so that we don't mark this guy as valid
+            if (obj == null && (needsMethodObj() && methObj == null)) {
+               newBoundValue = UNSET_VALUE_SENTINEL;
+            }
             else
                newBoundValue = invokeMethod(obj == null ? methObj : obj);
          }
@@ -512,7 +519,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       return false;
    }
 
-   // A nested method in a has a pending result.
+   // A method nested inside of this one has a pending result.
    protected void applyPendingChildValue(Object pendingResult, IBinding src) {
       for (int i = 0; i < paramValues.length; i++) {
          if (boundParams[i] == src) {
@@ -523,6 +530,10 @@ public abstract class AbstractMethodBinding extends DestinationListener {
             break;
          }
       }
+   }
+
+   protected Object getBoundValueForChild(IBinding child) {
+      return UNSET_VALUE_SENTINEL;  // In this case, the methObj in the child should have been set to the this object when it was created.
    }
 
    protected boolean hasPendingParams() {

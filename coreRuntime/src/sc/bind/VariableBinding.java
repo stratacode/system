@@ -474,6 +474,10 @@ public class VariableBinding extends DestinationListener {
    }
 
    protected boolean validateBinding() {
+      return validateBinding(boundProps.length);
+   }
+
+   protected boolean validateBinding(int validateTo) {
       boolean changed;
 
       if (cacheValue() && activated) {
@@ -482,7 +486,7 @@ public class VariableBinding extends DestinationListener {
          // Starting at the root binding, moving down the binding chain.  Look for the property which
          // this change event is for.  If the value has changed, update the listeners for all subsequent
          // elements since they may well have changed.
-         for (int i = 0; i < boundProps.length; i++) {
+         for (int i = 0; i < validateTo; i++) {
             Object newValue = getBoundProperty(bindingParent, i);
 
             if (!equalValues(i, newValue)) {
@@ -497,7 +501,8 @@ public class VariableBinding extends DestinationListener {
             bindingParent = boundValues[i];
          }
 
-         valid = true;
+         if (validateTo == boundProps.length)
+            valid = true;
       }
       else
          changed = true;
@@ -869,5 +874,21 @@ public class VariableBinding extends DestinationListener {
             }
          }
       }
+   }
+
+   protected Object getBoundValueForChild(IBinding child) {
+      int childCt = 0;
+      for (; childCt < boundProps.length; childCt++) {
+         if (boundProps[childCt] == child)
+            break;
+      }
+      // Validate up until the property before the child who needs the parent value.
+      // This will not mark the binding as 'valid' because we still need to apply it up
+      // it's chain.
+      if (!valid)
+         validateBinding(childCt);
+      if (childCt == 0)
+         return srcObj;
+      return boundValues[childCt-1];
    }
 }

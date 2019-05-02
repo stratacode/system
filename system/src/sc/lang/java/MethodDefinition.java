@@ -56,10 +56,13 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (type != null) {
             if ((propertyName = ModelUtil.isGetMethod(name, paramJavaTypes, type)) != null)
                propertyMethodType = propertyName.startsWith("i") ? PropertyMethodType.Is : PropertyMethodType.Get;
-            else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null)
-               propertyMethodType = PropertyMethodType.Set;
-            else if ((propertyName = ModelUtil.isSetIndexMethod(name, paramJavaTypes, type)) != null)
-               propertyMethodType = PropertyMethodType.SetIndexed;
+            else if ((propertyName = ModelUtil.isSetMethod(name, paramJavaTypes, type)) != null) {
+               // Note: right now isSetMethod includes both setX(ix, val) and setX(val) so need to do this here
+               if (ModelUtil.isSetIndexMethod(name, paramJavaTypes, type) != null)
+                  propertyMethodType = PropertyMethodType.SetIndexed;
+               else
+                  propertyMethodType = PropertyMethodType.Set;
+            }
             else if ((propertyName = ModelUtil.isGetIndexMethod(name, paramJavaTypes, type)) != null)
                propertyMethodType = PropertyMethodType.GetIndexed;
          }
@@ -82,6 +85,13 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
    public void start() {
       if (started) return;
+
+      if (override && name != null) {
+         Object prevMethod = getPreviousDefinition();
+         if (prevMethod == null) {
+            displayTypeError("No method: " + name + " for override: ");
+         }
+      }
 
       if (body != null) {
          Object retType = getTypeDeclaration();
@@ -612,6 +622,10 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
    public boolean hasSetMethod() {
       return isSetMethod() || getEnclosingType().definesMember(propertyName, MemberType.SetMethodSet, null, null) != null;
+   }
+
+   public boolean hasSetIndexMethod() {
+      return isSetIndexMethod() || getEnclosingType().definesMember(propertyName, MemberType.SetIndexMethodSet, null, null) != null;
    }
 
    public Object getSetMethodFromGet() {

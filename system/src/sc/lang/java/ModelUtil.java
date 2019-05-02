@@ -4367,8 +4367,11 @@ public class ModelUtil {
       return null;
    }
 
-   /** For set methods, we allow both void setX(int) and "? setX(int)".  Some folks may need int setX(int) and others
-    *  do this setX(y) to chain methods. */
+   /**
+    * For set methods, we allow both void setX(int) and "? setX(int)".  Some folks may need int setX(int) and others
+    * do this setX(y) to chain methods.
+    * Note: including indexed setters here - i.e. setX(ix, val).  Not sure that's right and corresponds to logic calling this in MethodDefinition.
+    */
    public static String isSetMethod(String name, Object[] paramJavaTypes, Object returnType) {
       if (name.startsWith("set") && name.length() >= 4 && paramJavaTypes != null && (paramJavaTypes.length == 1 ||
           (paramJavaTypes.length == 2 && isInteger(paramJavaTypes[0])))
@@ -4442,7 +4445,24 @@ public class ModelUtil {
          return ((IMethodDefinition) method).isSetIndexMethod();
       else if (method instanceof Method)
          return RTypeUtil.isSetIndexMethod((Method) method);
-      else if (method instanceof VariableDefinition || ModelUtil.isField(method))
+      else if (method instanceof VariableDefinition) {
+         return ((VariableDefinition) method).needsIndexedSetter();
+      }
+      else if (ModelUtil.isField(method))
+         return false;
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static boolean hasSetIndexMethod(Object method) {
+      if (method instanceof IMethodDefinition)
+         return ((IMethodDefinition) method).hasSetIndexMethod();
+      else if (method instanceof Method)
+         return RTypeUtil.isSetIndexMethod((Method) method); // TODO: do we need a hasSetIndexMethod here?
+      else if (method instanceof VariableDefinition) {
+         return ((VariableDefinition) method).needsIndexedSetter();
+      }
+      else if (ModelUtil.isField(method))
          return false;
       else
          throw new UnsupportedOperationException();

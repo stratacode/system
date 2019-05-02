@@ -2517,7 +2517,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       return (sz == 1 && inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || isManualGetSet() || (isAssignment && i == sz-1);
    }
 
-   private boolean isManualGetSet() {
+   boolean isManualGetSet() {
       AbstractMethodDefinition enclMeth = getEnclosingMethod();
       if (enclMeth != null) {
          Object annotObj = enclMeth.getAnnotation("sc.obj.ManualGetSet");
@@ -3198,7 +3198,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             else if (idTypes[j] == BoundObjectName || idTypes[j] == IdentifierType.GetVariable ||
                      idTypes[j] == IdentifierType.IsVariable ||
-                     (idTypes[j] == IdentifierType.FieldName && ModelUtil.needsGetSet(boundTypes[j]) && !isGetSetConversionDisabled(j) && (!isAssignment || j != sz-1 || this instanceof ArrayElementExpression))) {
+                     (idTypes[j] == IdentifierType.FieldName && ModelUtil.needsGetSet(boundTypes[j]) && !isGetSetConversionDisabled(j) && (!isAssignment || j != sz-1 || (this instanceof ArrayElementExpression && !needsSetMethod())))) {
                boolean subDynamic = ModelUtil.isDynamicProperty(boundTypes[j]);
                SemanticNodeList<Expression> subArgs = new SemanticNodeList<Expression>(1);
                if (subDynamic) {

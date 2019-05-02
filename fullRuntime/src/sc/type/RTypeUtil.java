@@ -955,7 +955,6 @@ public class RTypeUtil {
       return false;
    }
 
-
    /** For set methods, we allow both void setX(int) and "? setX(int)".  Some do int setX(int) and others this setX(int) */
    public static boolean isSetMethod(Method method) {
       String name = method.getName();
