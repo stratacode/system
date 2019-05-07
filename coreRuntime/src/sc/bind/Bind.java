@@ -49,7 +49,10 @@ public class Bind {
    */
 
    /** These are option flags you can combine in the flags argument to various calls to create bindings.  Settable via @Bindable using code-generation */
-   public static int INACTIVE = 1, TRACE = 2, VERBOSE = 4, QUEUED = 8, IMMEDIATE = 16, CROSS_SCOPE = 32, DO_LATER = 64, HISTORY = 128, ORIGIN = 256;
+   public static int INACTIVE = 1, TRACE = 2, VERBOSE = 4, QUEUED = 8, IMMEDIATE = 16, CROSS_SCOPE = 32, DO_LATER = 64, HISTORY = 128, ORIGIN = 256, SKIP_NULL = 512;
+
+   /** The OR'd list of flags to be propagated to all child bindings */
+   static int PROPAGATED_FLAGS = SKIP_NULL;
 
    static class BindingListenerEntry {
       int numProps = 0;
@@ -1439,5 +1442,4 @@ public class Bind {
       if (prop instanceof IBinding)
          ((IBinding) prop).parentBindingChanged();
    }
-
 }

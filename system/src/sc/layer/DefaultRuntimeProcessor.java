@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.lang.java.*;
+import sc.obj.ScopeContext;
 import sc.util.FileUtil;
 
 import java.io.*;
@@ -267,7 +268,7 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
       }
    }
 
-   public Object invokeRemoteStatement(BodyTypeDeclaration type, Object inst, Statement expr) {
+   public Object invokeRemoteStatement(BodyTypeDeclaration type, Object inst, Statement expr, ScopeContext target) {
       throw new UnsupportedOperationException();
    }
 

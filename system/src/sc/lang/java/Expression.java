@@ -497,8 +497,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       bindingExpr.transform(runtime);
    }
 
-   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope"};
-   private final static String [] bindFlagConstNames = {"sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY", "sc.bind.Bind.ORIGIN", "sc.bind.Bind.CROSS_SCOPE"};
+   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope", "skipNull"};
+   private final static String [] bindFlagConstNames = {"sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY", "sc.bind.Bind.ORIGIN", "sc.bind.Bind.CROSS_SCOPE", "sc.bind.Bind.SKIP_NULL"};
 
    void addBindFlagsAndOptionsExpr(SemanticNodeList<Expression> bindArgs) {
       Expression flagsExpr = null;
@@ -506,14 +506,23 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
       if (bindingStatement != null) {
          ArrayList<String> flagConstNames = new ArrayList<String>();
-         Object annotObj = ModelUtil.getAnnotation(bindingStatement, "sc.bind.Bindable");
-         if (annotObj != null) {
-            for (int i = 0; i < bindFlagAnnotNames.length; i++) {
-               String annotName = bindFlagAnnotNames[i];
-               String constName = bindFlagConstNames[i];
-               addFlagConstName(flagConstNames, annotObj, annotName, constName);
+         JavaModel model = getJavaModel();
+         if (model != null) {
+            int foundFlags = 0;
+            List<Object> annotObjs = ModelUtil.getAllInheritedAnnotations(model.layeredSystem, bindingStatement, "sc.bind.Bindable", false, model.getLayer(), model.isLayerModel);
+            if (annotObjs != null) {
+               for (Object annotObj:annotObjs) {
+                  if (annotObj != null) {
+                     for (int i = 0; i < bindFlagAnnotNames.length; i++) {
+                        String annotName = bindFlagAnnotNames[i];
+                        String constName = bindFlagConstNames[i];
+                        if ((foundFlags & (1 << i)) == 0)
+                           foundFlags = addFlagConstName(flagConstNames, annotObj, annotName, constName, foundFlags, i);
+                     }
+                     // TODO: set optsExpr here
+                  }
+               }
             }
-            // TODO: set optsExpr here
          }
          // For references, we might need to add 'cross scope' - if the bindingStatement and
          //addExtraBindFlags(flagConstNames);
@@ -544,28 +553,45 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       int flags = 0;
       if (bindingStatement != null) {
          ArrayList<String> flagNames = new ArrayList<String>();
-         Object annotObj = ModelUtil.getAnnotation(bindingStatement, "sc.bind.Bindable");
-         if (annotObj != null) {
-            String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope"};
-            int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN, sc.bind.Bind.CROSS_SCOPE};
-            for (int i = 0; i < bindFlagAnnotNames.length; i++) {
-               String annotName = bindFlagAnnotNames[i];
-               Boolean isSet = (Boolean) ModelUtil.getAnnotationValue(annotObj, annotName);
-               if (isSet != null && isSet)
-                  flags |= bindFlagConstVals[i];
+         //Object annotObj = ModelUtil.getAnnotation(bindingStatement, "sc.bind.Bindable");
+         JavaModel model = getJavaModel();
+         if (model != null) {
+            // Looks for @Bindable on the statement, the type, or the layer to inherit these settings
+            List<Object> annotObjs = ModelUtil.getAllInheritedAnnotations(model.layeredSystem, bindingStatement, "sc.bind.Bindable", false, model.getLayer(), model.isLayerModel);
+            int foundFlags = 0;
+            if (annotObjs != null) {
+               for (Object annotObj: annotObjs) {
+                  String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope", "skipNull"};
+                  int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN, sc.bind.Bind.CROSS_SCOPE, Bind.SKIP_NULL};
+                  for (int i = 0; i < bindFlagAnnotNames.length; i++) {
+                     String annotName = bindFlagAnnotNames[i];
+                     int currentFlag = bindFlagConstVals[i];
+                     if ((foundFlags & currentFlag) != 0) // Found an @Bindable annotation on a more specific type for this flag
+                        continue;
+                     Boolean isSet = (Boolean) ModelUtil.getAnnotationValue(annotObj, annotName);
+                     if (isSet != null) {
+                        foundFlags |= currentFlag;
+                        if (isSet)
+                           flags |= currentFlag;
+                     }
+                  }
+                  // TODO: set BindSettings opts argument here
+               }
             }
-            // TODO: set BindSettings opts argument here
          }
       }
       bindArgs.add(flags); // flags
       bindArgs.add(opts);
    }
 
-   private void addFlagConstName(ArrayList<String> flagConstNames, Object annotObj, String flagAnnotName, String flagConstName) {
+   private int addFlagConstName(ArrayList<String> flagConstNames, Object annotObj, String flagAnnotName, String flagConstName, int foundFlags, int ix) {
       Boolean isSet = (Boolean) ModelUtil.getAnnotationValue(annotObj, flagAnnotName);
-      if (isSet != null && isSet) {
-         flagConstNames.add(flagConstName);
+      if (isSet != null) {
+         foundFlags |= (1 << ix);
+         if (isSet)
+            flagConstNames.add(flagConstName);
       }
+      return foundFlags;
    }
 
    /**

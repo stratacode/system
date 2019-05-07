@@ -16,6 +16,7 @@ import sc.lang.java.Package;
 import sc.lang.java.*;
 import sc.layer.*;
 import sc.obj.CurrentScopeContext;
+import sc.obj.ScopeContext;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
@@ -820,7 +821,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                            }
                            else {
                               peerAssign.parentNode = peerType;
-                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerAssign);
+                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerAssign, getTargetScopeContext());
                               if (remoteRes != null) {
                                  System.out.println(remoteRes);
                               }
@@ -896,6 +897,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          Object curObj = null;
 
          Expression expr = (Expression) statement;
+
+         if (expr.toString().contains("click("))
+            System.out.println("***");
          BodyTypeDeclaration currentType = currentTypes.size() == 0 ? null : currentTypes.get(currentTypes.size() - 1);
          if (currentType == null)
             expr.parentNode = getModel();
@@ -945,7 +949,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                               if (!ignoreRemoteStatement(peerSys, peerExpr)) {
                                  if (system.options.verboseExec)
                                     system.info("Exec remote expr: " + expr + " on: " + peerSys.getProcessIdent());
-                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
+                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr, getTargetScopeContext());
                                  System.out.println(remoteRes);
                               }
                            }
@@ -1005,7 +1009,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         }
                         else {
                            peerBlock.parentNode = peerType;
-                           Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerBlock);
+                           Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerBlock, getTargetScopeContext());
                            if (remoteRes != null) {
                               System.out.println(remoteRes);
                            }
@@ -1072,7 +1076,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                               if (!ignoreRemoteStatement(peerSys, peerExpr)) {
                                  if (system.options.verboseExec)
                                     system.info("Exec remote statement: " + peerExpr + " on: " + peerSys.getProcessIdent());
-                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr);
+                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr, getTargetScopeContext());
                                  System.out.println(remoteRes);
                               }
                            }
@@ -1290,6 +1294,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public String scopeContextName = "defaultCmdContext";
+   public String targetScopeName = null;
 
    protected CurrentScopeContext currentScopeCtx = null;
    /**
@@ -1332,6 +1337,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       CurrentScopeContext ctx = CurrentScopeContext.waitForReady(scopeContextName, timeout);
       this.scopeContextName = scopeContextName;
       return ctx;
+   }
+
+   public ScopeContext getTargetScopeContext() {
+      if (currentScopeCtx == null)
+         return null;
+      if (targetScopeName == null)
+         currentScopeCtx.getEventScopeContext();
+      return currentScopeCtx.getScopeContextByName(targetScopeName);
    }
 
    private void removeFromCurrentObject(JavaModel model, BodyTypeDeclaration parentType, Statement type) {

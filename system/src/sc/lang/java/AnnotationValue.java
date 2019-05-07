@@ -4,11 +4,13 @@
 
 package sc.lang.java;
 
+import sc.lang.ISemanticNode;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public class AnnotationValue extends JavaSemanticNode {
+public class AnnotationValue extends ErrorSemanticNode {
    public String identifier;
    // Expression, Annotation, List<elementValue>
    public Object elementValue;
@@ -86,6 +88,15 @@ public class AnnotationValue extends JavaSemanticNode {
          res.add(elemValToPrimitiveValue(elemVal.get(i)));
       }
       return res;
+   }
+
+   public Annotation getAnnotation() {
+      if (parentNode == null)
+         return null;
+      ISemanticNode par = parentNode;
+      while (par != null && !(par instanceof Annotation))
+         par = par.getParentNode();
+      return (Annotation) par;
    }
 
 }

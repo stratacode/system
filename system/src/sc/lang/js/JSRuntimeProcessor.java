@@ -3481,20 +3481,24 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       model.setLayeredSystem(system);
       // TODO: should we enable type errors if this is the selected runtime or do we always properly report them against the main runtime?
       model.setDisableTypeErrors(true);
+      // TODO: we don't have a non-transformed model in this case but this has to be non-null for the type resolution to work since we test this field directly.
+      model.nonTransformedModel = model;
       modDecl.addBodyStatement(st);
       ParseUtil.initAndStartComponent(model);
       if (!st.execForRuntime(system))
          return null;
+      if (!model.isProcessed())
+         model.process();
       model.transform(ILanguageModel.RuntimeType.JAVA);
       exprParams.evalStatements = modDecl.body;
       exprParams.currentInstance = instance;
       return TransformUtil.evalTemplate(exprParams, getEvalTemplate(currentType));
    }
 
-   public Object invokeRemoteStatement(BodyTypeDeclaration currentType, Object instance, Statement st) {
+   public Object invokeRemoteStatement(BodyTypeDeclaration currentType, Object instance, Statement st, ScopeContext target) {
       String jsScript = transformStatement(currentType, instance, st);
       if (jsScript != null && jsScript.length() > 0) {
-         return DynUtil.evalScript(jsScript);
+         return DynUtil.evalRemoteScript(target, jsScript);
       }
       return null;
    }

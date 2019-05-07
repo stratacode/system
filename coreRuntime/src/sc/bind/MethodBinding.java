@@ -21,8 +21,6 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
 
    IReverseMethodMapper reverseMethodMapper;
 
-   boolean requireValidParameters = false;
-
    Object[] paramTypes;
 
    /** A method binding which is nested inside of another binding */
@@ -109,7 +107,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
          Object val, type;
          Class typeClass;
          val = boundParams[i].getPropertyValue(obj, false);
-         if (val == UNSET_VALUE_SENTINEL) {
+         if (val == UNSET_VALUE_SENTINEL || (val == null && (flags & Bind.SKIP_NULL) != 0)) {
             valid = false;
             val = null;
          }
@@ -146,7 +144,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
       }
 
       // If we weren't able to evaluate one of our parameters, this value is unset
-      if (!updateParams(obj) && requireValidParameters) {
+      if (!updateParams(obj) && (flags & Bind.SKIP_NULL) != 0) {
          if (hasPendingParams())
             return PENDING_VALUE_SENTINEL;
          return UNSET_VALUE_SENTINEL;
@@ -191,7 +189,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
       if (reverseMethodMapper != null) {
          // If we fire the reverse method before the forward one is valid, need to try at least to init the params
          if (!valid) {
-            if (!updateParams(null) && requireValidParameters)
+            if (!updateParams(null) && (flags & Bind.SKIP_NULL) != 0)
                return hasPendingParams() ? PENDING_VALUE_SENTINEL : UNSET_VALUE_SENTINEL;
          }
 

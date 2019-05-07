@@ -5589,6 +5589,26 @@ public class ModelUtil {
    public static ArrayList<Object> getAllInheritedAnnotations(LayeredSystem system, Object superType, String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       if (superType instanceof ITypeDeclaration)
          return ((ITypeDeclaration) superType).getAllInheritedAnnotations(annotationName, skipCompiled, refLayer, layerResolve);
+      else if (superType instanceof IBeanMapper || ModelUtil.isMethod(superType) ||
+              ModelUtil.isField(superType) || superType instanceof PropertyAssignment || superType instanceof AssignmentExpression) {
+         ArrayList<Object> res = null;
+         Object thisRes = getInheritedAnnotation(system, superType, annotationName, skipCompiled, refLayer, layerResolve);
+         if (thisRes != null) {
+            res = new ArrayList<Object>();
+            res.add(thisRes);
+         }
+         Object enclType = getEnclosingType(superType);
+         if (enclType != null) {
+            ArrayList<Object> typeRes = getAllInheritedAnnotations(system, enclType, annotationName, skipCompiled, refLayer, layerResolve);
+            if (typeRes != null) {
+               if (res == null)
+                  res = typeRes;
+               else
+                  res.addAll(typeRes);
+            }
+         }
+         return res;
+      }
       else {
          ArrayList<Object> res = null;
          Class superClass = (Class) superType;
@@ -5655,7 +5675,7 @@ public class ModelUtil {
       if (superType instanceof ITypeDeclaration)
          return ((ITypeDeclaration) superType).getInheritedAnnotation(annotationName, skipCompiled, refLayer, layerResolve);
       else if (superType instanceof IBeanMapper || ModelUtil.isMethod(superType) ||
-               ModelUtil.isField(superType) || superType instanceof PropertyAssignment) {
+               ModelUtil.isField(superType) || superType instanceof PropertyAssignment || superType instanceof AssignmentExpression) {
          return getAnnotation(superType, annotationName);
       }
       else if (superType instanceof Class) {

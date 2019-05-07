@@ -28,6 +28,7 @@ public @interface Bindable {
    boolean trace() default false;  // Set to enable selective tracing - each time the binding is initialized, set, retrieved, destroyed
    boolean verbose() default false; // Set to enable init, set, destroy events only
    boolean crossScope() default false; // Set to true for those bindings where the changeEvents might come from some other thread operating in another context.  Adds extra thread-local lookup for the init and apply calls plus any necessary context switching overhead
+   boolean skipNull() default false; // Set to true to eliminate a null value being passed to a method as part of the binding
    boolean queued() default false; // Set to true to force queued mode (default depends on BindingContext)
    boolean immediate() default false; // Set to true to force immediate mode (default depends on BindingContext)
    // TODO: the history, origin, delay, and doLater are not implemented yet

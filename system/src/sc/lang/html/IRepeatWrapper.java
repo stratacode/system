@@ -29,5 +29,9 @@ public interface IRepeatWrapper {
     * in oldTag and return it.
     */
    Element createElement(Object value, int ix, Element oldTag);
+   /**
+    * Called when elements have been re-ordered in the list, starting at fromIx.
+    * In this method, set the repeat index for all elements after fromIx in the list.
+    */
    void updateElementIndexes(int fromIx);
 }

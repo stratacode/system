@@ -37,6 +37,11 @@ public abstract class DestinationListener extends AbstractListener implements IB
       }
       if ((flags & Bind.CROSS_SCOPE) != 0)
          curScopeCtx = CurrentScopeContext.getCurrentScopeContext();
+
+      int propFlags = (flags & Bind.PROPAGATED_FLAGS);
+      if (propFlags != 0) {
+         initFlagsOnChildren(propFlags);
+      }
    }
 
    public String toString(String operation, boolean displayValue) {
@@ -103,4 +108,8 @@ public abstract class DestinationListener extends AbstractListener implements IB
    public boolean isCrossScope() { return (flags & Bind.CROSS_SCOPE) != 0; }
 
    public CurrentScopeContext getCurrentScopeContext() { return curScopeCtx; }
+
+   protected void initFlagsOnChildren(int flags) {
+      this.flags |= flags;
+   }
 }

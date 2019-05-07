@@ -67,6 +67,20 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
             if (model != null)
                boundType = model.findTypeDeclaration(typeName, true);
          }
+         else {
+            if (elementValue instanceof SemanticNodeList) {
+               SemanticNodeList<Object> elemValList = (SemanticNodeList<Object>) elementValue;
+               for (Object avObj:elemValList) {
+                  if (avObj instanceof AnnotationValue) {
+                     AnnotationValue av = (AnnotationValue) avObj;
+                     Object annotValType = getAnnotationValueType(av.identifier);
+                     if (annotValType == null) {
+                        av.displayTypeError("No annotation method: " + av.identifier + " for type: " + typeName + " for: ");
+                     }
+                  }
+               }
+            }
+         }
       }
       catch (RuntimeException exc) {
          clearStarted();

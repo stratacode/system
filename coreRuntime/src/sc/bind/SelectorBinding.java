@@ -620,5 +620,13 @@ public class SelectorBinding extends DestinationListener {
          return dstObj == dstProp ? null : dstObj;
       return boundValues[childCt-1];
    }
+
+   protected void initFlagsOnChildren(int flags) {
+      if (boundProps != null) {
+         for (Object bp:boundProps)
+            if (bp instanceof DestinationListener)
+               ((DestinationListener) bp).flags |= flags;
+      }
+   }
 }
 
