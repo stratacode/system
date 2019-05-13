@@ -3547,7 +3547,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ((Element) inst).serverTag = true;
    }
 
-   public void initDynComponent(Object inst, ExecutionContext ctx, boolean doInit, Object outerObj, boolean initSyncInst) {
+   public void initDynComponent(Object inst, ExecutionContext ctx, boolean doInit, Object outerObj, Object[] params, boolean initSyncInst) {
       IDynChildManager mgr = getDynChildManager();
       int numChildren = 0;
       Object[] children = null;
@@ -3558,7 +3558,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Either put the postAssignments into the dynamic stub or change the generated code to pass the constructor
       // args through so we can do it here at runtime.
       if (initSyncInst)
-         initDynSyncInst(inst);
+         initDynSyncInst(inst, params);
 
       if (isComponent || mgr != null) {
          ctx.pushCurrentObject(inst);
@@ -3734,7 +3734,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void initDynamicInstance(Object inst) {
       ExecutionContext ctx = new ExecutionContext(getJavaModel());
-      initDynInstance(inst, ctx, true, true, null);
+      initDynInstance(inst, ctx, true, true, null, null);
    }
 
    public void constructDynamicInstance(Object inst, Object outerObj, ExecutionContext ctx, String constrSig, Object... params) {
@@ -3796,11 +3796,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       try {
          ctx.pushCurrentObject(inst);
          // initialize the fields
-         initDynInstance(inst, ctx, true, false, outerObj);
+         initDynInstance(inst, ctx, true, false, outerObj, params);
          // call the dynamic constructors if any
          constructDynamicInstance(inst, outerObj, ctx, constrSig, params);
          // initialize the component
-         initDynInstance(inst, ctx, false, true, outerObj);
+         initDynInstance(inst, ctx, false, true, outerObj, params);
       }
       finally {
          ctx.popCurrentObject();
@@ -3891,7 +3891,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public void initDynInstance(Object inst, ExecutionContext ctx, boolean initClassPhase, boolean completeObj, Object outerObj) {
+   public void initDynInstance(Object inst, ExecutionContext ctx, boolean initClassPhase, boolean completeObj, Object outerObj, Object[] params) {
       LayeredSystem sys = getLayeredSystem();
       ClassLoader ctxLoader;
       ClassLoader sysLoader = sys.getSysClassLoader();
@@ -3931,7 +3931,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             initDynamicFields(inst, ctx);
 
          if (completeObj)
-            initDynComponent(inst, ctx, true, outerObj, true);
+            initDynComponent(inst, ctx, true, outerObj, params, true);
       }
       finally {
          if (completeObj)
@@ -6830,7 +6830,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       Object inst = PTypeUtil.createInstance(compClass, null, allValues);
       if (inst != null)
-         initDynInstance(inst, ctx, true, false, outerObj);
+         initDynInstance(inst, ctx, true, false, outerObj, argValues);
 
       return inst;
    }
@@ -6961,7 +6961,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                      initNewSyncInst(argValues, inst);
 
-                     initDynComponent(inst, ctx, true, outerObj, false);
+                     initDynComponent(inst, ctx, true, outerObj, argValues, false);
                      // Fetches the object pushed from constructInstance, as called indirectly when super() is evaled.
                   }
                   ctx.popCurrentObject();
@@ -7052,7 +7052,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          if (needsInit) { // TODO: not sure this is needed anymore
-            initDynInstance(inst, ctx, true, true, outerObj);
+            initDynInstance(inst, ctx, true, true, outerObj, argValues);
          }
 
          ScopeDefinition sd = getScopeDefinition();
@@ -7077,15 +7077,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       initServerTag(inst);
    }
 
-   public void initDynSyncInst(Object inst) {
+   public void initDynSyncInst(Object inst, Object[] params) {
       Object extType = getDerivedTypeDeclaration();
       // For compiled types, we compile in the addSyncInst call so it happens for each type.  Apparently we rely on this
       // happening for cases where the sub-class disables sync mode but it was on for the base class.
       if (extType instanceof BodyTypeDeclaration) {
-         ((BodyTypeDeclaration) extType).initDynSyncInst(inst);
+         ((BodyTypeDeclaration) extType).initDynSyncInst(inst, params);
       }
       if (getSyncProperties() != null) {
-         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null);
+         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null, params);
       }
       initServerTag(inst);
    }
@@ -9194,7 +9194,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             // but we have enabled the sync queue so we know this will happen before we actually add the sync inst itself, so it will get the right name.
             // Since this reference comes from the client, we do want to reset the name when there's a new client for the same session (i.e. a refresh).
             if (syncCtx != null)
-               syncCtx.registerObjName(inst, typeName, true, false);
+               syncCtx.registerObjName(inst, typeName, true, false, true);
 
             // Now that we've registered the real name for the instance, we can do the addSyncInst call we queued up.
             if (flushQueue)

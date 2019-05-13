@@ -381,7 +381,10 @@ public class CurrentScopeContext {
       return null;
    }
 
-   public void addSyncTypeToFilter(String typeName) {
+   public void addSyncTypeToFilter(String typeName, String reason) {
+      if (ScopeDefinition.verbose)
+         System.out.println("Adding type: " + typeName + " to sync type filter for: " + reason);
+
       if (syncTypeFilter != null) // null means no filtering in this context
          syncTypeFilter.add(typeName);
    }

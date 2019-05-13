@@ -17,6 +17,8 @@ import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ComponentImpl;
+import sc.obj.CurrentScopeContext;
+import sc.obj.ScopeDefinition;
 import sc.parser.*;
 import sc.type.*;
 import sc.util.PerfMon;
@@ -2224,7 +2226,16 @@ public class IdentifierExpression extends ArgumentsExpression {
                   System.err.println("*** Error - super() not supported for remote methods"); // this error should be caught earlier!
                   throw new UnsupportedOperationException();
                }
-               return ModelUtil.invokeRemoteMethod(getLayeredSystem(), value, boundTypes[i], arguments, expectedType, ctx, true, null);
+               method = boundTypes[i];
+               if (jmodel.commandInterpreter != null) {
+                  CurrentScopeContext scopeCtx = jmodel.commandInterpreter.currentScopeCtx;
+                  if (scopeCtx != null) {
+                     Object type = DynUtil.getType(value);
+                     String typeName = ModelUtil.getTypeName(type);
+                     scopeCtx.addSyncTypeToFilter(typeName, " command line expression: " + this);
+                  }
+               }
+               return ModelUtil.invokeRemoteMethod(getLayeredSystem(), value, method, arguments, expectedType, ctx, true, null);
             }
             else if (idTypes[i] == IdentifierType.MethodInvocation && !superMethod) {
                method = boundTypes[i];

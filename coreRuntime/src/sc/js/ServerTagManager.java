@@ -8,7 +8,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-@JSSettings(jsModuleFile="js/schtml.js", prefixAlias="sc_")
+@JSSettings(jsLibFiles="js/tags.js", prefixAlias="sc_")
 public class ServerTagManager implements IObjectId {
    private Map<String,ServerTag> serverTags;
    public void setServerTags(Map<String,ServerTag> sts) {

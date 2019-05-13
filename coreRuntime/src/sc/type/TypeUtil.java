@@ -134,8 +134,9 @@ public class TypeUtil  {
 
    public static DynType getPropertyCache(Class beanClass) {
       DynType cache = DynUtil.getPropertyCache(beanClass);
-      if (cache == null)
+      if (cache == null) {
          cache = PTypeUtil.initPropertyCache(beanClass);
+      }
       return cache;
    }
 

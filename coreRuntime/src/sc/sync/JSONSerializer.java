@@ -271,11 +271,11 @@ public class JSONSerializer extends SyncSerializer {
    // This variants also takes the typeName of the array elements (as required in Java - new type[] { ...}, but for JSON we currently don't convey that type, but instead just use a JSON array
    public void formatNewArrayDef(StringBuilder out, SyncManager.SyncContext syncContext, Object changedObj, String typeName, ArrayList<String> currentObjNames, String currentPackageName,
                                  SyncSerializer preBlockCode, SyncSerializer postBlockCode, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
-      formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
+      formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, inBlock, uniqueId, depChanges, syncLayer);
    }
 
    public void formatArrayExpression(StringBuilder out, SyncManager.SyncContext syncContext, Object changedObj, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode,
-                                     SyncSerializer postBlockCode, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
+                                     SyncSerializer postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
       out.append("[");
       if (changedObj instanceof Set) {
          Set s = (Set) changedObj;
@@ -314,7 +314,7 @@ public class JSONSerializer extends SyncSerializer {
       appendString(smc.getCallId());
 
       appendName(MethodArgs.args.toString());
-      formatArrayExpression(sb, syncContext, smc.args, newObjNames, newLastPackageName, null, null, false, null, depChanges, syncLayer);
+      formatArrayExpression(sb, syncContext, smc.args, newObjNames, newLastPackageName, null, null, null, false, null, depChanges, syncLayer);
       if (ix == 0)
          appendObjEnd();
    }

@@ -691,7 +691,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean hasCurrentObject = hasCurrentObject();
          boolean checkCurrentObject = parentType == null || hasCurrentObject;
          if (currentScopeCtx != null)
-            currentScopeCtx.addSyncTypeToFilter(typeName);
+            currentScopeCtx.addSyncTypeToFilter(typeName, " command line statement: " + statement);
 
          Object parentObj = getCurrentObjectWithDefault();
          currentTypes.add(type);
@@ -897,9 +897,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          Object curObj = null;
 
          Expression expr = (Expression) statement;
-
-         if (expr.toString().contains("click("))
-            System.out.println("***");
          BodyTypeDeclaration currentType = currentTypes.size() == 0 ? null : currentTypes.get(currentTypes.size() - 1);
          if (currentType == null)
             expr.parentNode = getModel();
@@ -1296,7 +1293,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public String scopeContextName = "defaultCmdContext";
    public String targetScopeName = null;
 
-   protected CurrentScopeContext currentScopeCtx = null;
+   public CurrentScopeContext currentScopeCtx = null;
    /**
     * Before we run any object resolveName methods or expressions from the command, we may need to select a CurrentScopeContext that's
     * been registered by the framework, to select the specific context these commands operate in.  For example, when the command
@@ -1339,6 +1336,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       return ctx;
    }
 
+   /** Selects the specific targeted ScopeContext (e.g. 'window') from the list in the CurrentScopeContext which is the list of available ScopeContexts */
    public ScopeContext getTargetScopeContext() {
       if (currentScopeCtx == null)
          return null;

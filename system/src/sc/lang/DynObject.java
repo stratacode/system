@@ -428,7 +428,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             ModelUtil.invokeMethod(null, constr, args, ctx);
          }
 
-         dynType.initDynComponent(dynObj, ctx, doInit, outerObj, true);
+         dynType.initDynComponent(dynObj, ctx, doInit, outerObj, args, true);
       }
       finally {
          if (outerObj != null)

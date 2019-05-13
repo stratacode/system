@@ -281,14 +281,14 @@ public class SyncSerializer {
    }
 
    public void formatArrayExpression(StringBuilder out, SyncManager.SyncContext syncContext, Object changedObj, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode,
-                                     SyncSerializer postBlockCode, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
+                                     SyncSerializer postBlockCode, String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
       int sz = DynUtil.getArrayLength(changedObj);
       out.append("{");
       for (int i = 0; i < sz; i++) {
          Object val = DynUtil.getArrayElement(changedObj, i);
          if (i != 0)
             out.append(", ");
-         syncContext.formatExpression(this, out, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, null, inBlock, uniqueId + "_" + i, depChanges, syncLayer);
+         syncContext.formatExpression(this, out, val, currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId + "_" + i, depChanges, syncLayer);
       }
       out.append("}");
    }

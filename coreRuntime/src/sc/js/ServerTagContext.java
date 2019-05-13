@@ -2,7 +2,7 @@ package sc.js;
 
 import java.util.*;
 
-/** Used to gather up the changes in the serverTags for a given request. */
+/** Used to gather up the changes in the serverTags for a given server request (does not run in the client) */
 public class ServerTagContext {
    /** Pass in null for oldServerTags the first time.  In that case,  */
    public ServerTagContext(ServerTagManager mgr) {

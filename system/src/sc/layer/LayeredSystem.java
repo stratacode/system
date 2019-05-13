@@ -1005,7 +1005,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       ArrayList<TypeDeclaration> modTypes = getModifiedTypesOfType(enclType, false, checkPeers);
-      if (modTypes != null) {
+      if (modTypes != null && varDef.variableName != null) {
          for (TypeDeclaration modType:modTypes) {
             Object assign = modType.definesMember(varDef.variableName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
             if (assign instanceof PropertyAssignment) {
@@ -3555,11 +3555,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    @Override
    public Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params) {
       if (isComponentType(typeObj)) {
-         Class compClass = ModelUtil.getCompiledClass(typeObj);
-         if (outerObj != null)
-            return RTypeUtil.newInnerComponent(outerObj, ModelUtil.getCompiledClass(DynUtil.getType(outerObj)), compClass, ModelUtil.getTypeName(typeObj), params);
-         else
-            return RTypeUtil.newComponent(compClass, params);
+         if (ModelUtil.isDynamicType(typeObj)) {
+            TypeDeclaration typeDecl = (TypeDeclaration) typeObj;
+
+            ExecutionContext ctx = new ExecutionContext(typeDecl.getJavaModel());
+            Object inst = typeDecl.constructInstance(ctx, outerObj, params, false);
+            typeDecl.initDynInstance(inst, ctx, false, true, outerObj, params);
+            return inst;
+         }
+         else {
+            Class compClass = ModelUtil.getCompiledClass(typeObj);
+            if (outerObj != null)
+               return RTypeUtil.newInnerComponent(outerObj, ModelUtil.getCompiledClass(DynUtil.getType(outerObj)), compClass, ModelUtil.getTypeName(typeObj), params);
+            else
+               return RTypeUtil.newComponent(compClass, params);
+         }
       }
       else
          return DynUtil.createInnerInstance(typeObj, outerObj, constrSig, params);
@@ -3625,8 +3635,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object createInstance(Object typeObj, String constrSig, Object[] params) {
-      if (typeObj instanceof TypeDeclaration)
-         return DynObject.create((TypeDeclaration) typeObj, constrSig, params);
+      if (typeObj instanceof TypeDeclaration) {
+         if (ModelUtil.isDynamicType(typeObj) || ModelUtil.isDynamicNew(typeObj))
+            return DynObject.create((TypeDeclaration) typeObj, constrSig, params);
+         else
+            return createInstance(ModelUtil.getCompiledClass(typeObj), constrSig, params);
+      }
       // TODO: need to deal with constructor signature here
       else if (typeObj instanceof Class)
          return PTypeUtil.createInstance((Class) typeObj, constrSig, params);
@@ -9181,6 +9195,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                        verbose("File: " + genFile.relFileName + " in layer: " + genLayer + " inheriting previous version at: " + genLayer.getPrevSrcFileLayer(genFile.relFileName));
                                     FileUtil.renameFile(genFile.absFileName, FileUtil.replaceExtension(genFile.absFileName, Language.INHERIT_SUFFIX));
                                     LayerUtil.removeFileAndClasses(genFile.absFileName);
+                                    String classFileName = LayerUtil.getClassFileName(genLayer, genFile);
+                                    LayerUtil.removeFileAndClasses(classFileName);
                                  }
                               }
                               else if (genProc != null && genProc.getNeedsCompile()) {
@@ -13194,7 +13210,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
                else {
-                  nextObj = DynUtil.getProperty(nextObj, nextProp);
+                  Object childObj = null;
+                  if (nextObj instanceof INamedChildren) {
+                     childObj = ((INamedChildren) nextObj).getChildForName(nextProp);
+                  }
+                  if (childObj != null)
+                     nextObj = childObj;
+                  else
+                     nextObj = DynUtil.getProperty(nextObj, nextProp);
                }
 
                pathIx = nextIx+1;
@@ -13262,6 +13285,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             if (obj instanceof IObjectId)
                return outerName + "." + DynUtil.getInstanceId(obj);
+
+            // Let the parent provide the name for the child - used for repeating components or others that
+            // will have dynamically created child objects
+            if (outer instanceof INamedChildren) {
+               String childName = ((INamedChildren) outer).getNameForChild(obj);
+               if (childName != null)
+                  return outerName + "." + childName;
+            }
             return DynUtil.getObjectId(obj, null, objTypeName);
          }
       }

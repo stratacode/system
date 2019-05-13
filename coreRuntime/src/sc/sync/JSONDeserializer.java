@@ -283,10 +283,10 @@ public class JSONDeserializer {
             return;
          }
          // Sync up with the binding system - in case any property changes influence the inputs of this method invocation
-         if (bindCtx != null)
-            bindCtx.dispatchEvents(null);
+         //if (bindCtx != null)
+        //    bindCtx.dispatchEvents(null);
          // Start queuing up sync events - add inst etc. so we don't process them until scopes or other info required for the instances are available
-         boolean flushQueue = SyncManager.beginSyncQueue();
+         //boolean flushQueue = SyncManager.beginSyncQueue();
          try {
             if (args.size() > 0) {
                Object[] paramTypes = DynUtil.getParameterTypes(meth);
@@ -311,24 +311,26 @@ public class JSONDeserializer {
                exceptionStr = methError + ":\n" + PTypeUtil.getStackTrace(methError);
             }
 
+            /*
             if (flushQueue) {
                SyncManager.flushSyncQueue();
                flushQueue = false;
             }
+            */
             // Again - make sure any bindings fired during the invocation of the method are logged before we queue our
             // result so the stream of change events is in the right order - in other words, side-effects of the method invocation are
             // queued before the return value itself is queued.
-            if (bindCtx != null)
-               bindCtx.dispatchEvents(null);
+            //if (bindCtx != null)
+            //   bindCtx.dispatchEvents(null);
 
             if (returnVal != null) {
-               syncCtx.registerObjName(returnVal, callId, false, false);
+               syncCtx.registerObjName(returnVal, callId, false, false, false);
             }
             syncCtx.addMethodResult(isType ? null : curObj, isType ? curType : null, callId, returnVal, exceptionStr);
          }
          finally {
-            if (flushQueue)
-               SyncManager.flushSyncQueue();
+            //if (flushQueue)
+            //   SyncManager.flushSyncQueue();
          }
       }
    }
@@ -354,15 +356,24 @@ public class JSONDeserializer {
          // send a batch of property changes, it breaks when used with RPC so this is a compromise but I think the right one.
          IListener.SyncType oldSyncType = null;
          if (bindCtx != null) {
+            // Before we switch to immediate mode, need to first flush out all of the 'addSyncInst' calls so new items are created,
+            // then flush out property change events that might refer to the new instances.
+            SyncManager.flushSyncQueue();
             bindCtx.dispatchEvents(null);
             oldSyncType = bindCtx.getDefaultSyncType();
             bindCtx.setDefaultSyncType(IListener.SyncType.IMMEDIATE);
+            // We need to explicit tell the sync system this is to be recorded for the case where we are applying changes.  We use nestedBindingCount currently but it would
+            // good to find a cleaner way to differentiate properties we set which are part of the previous state versus the recorded state.
          }
+         // When the syncState is 'applyingChanges' it won't record so need to switch the state around the method call
+         SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.RecordingChanges);
          try {
             invokeMethod(methName, typeSig, args, callIdVal);
          }
          finally {
+            SyncManager.setSyncState(oldState);
             if (bindCtx != null) {
+               SyncManager.beginSyncQueue();
                bindCtx.dispatchEvents(null);
                bindCtx.setDefaultSyncType(oldSyncType);
             }

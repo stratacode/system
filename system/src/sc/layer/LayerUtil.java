@@ -277,7 +277,11 @@ public class LayerUtil implements LayerConstants {
 
    /** Takes the generated srcEnt */
    public static File getClassFile(Layer genLayer, SrcEntry srcEnt) {
-      return new File(FileUtil.concat(genLayer.buildClassesDir,  srcEnt.getRelDir(), FileUtil.replaceExtension(srcEnt.baseFileName, "class")));
+      return new File(getClassFileName(genLayer, srcEnt));
+   }
+
+   public static String getClassFileName(Layer genLayer, SrcEntry srcEnt) {
+      return FileUtil.concat(genLayer.buildClassesDir,  srcEnt.getRelDir(), FileUtil.replaceExtension(srcEnt.baseFileName, "class"));
    }
 
    public static String getClassFileFromJavaFile(String javaFileName) {

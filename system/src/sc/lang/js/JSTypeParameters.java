@@ -20,6 +20,7 @@ import sc.sync.SyncLayer;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.MethodBindSettings;
+import sc.type.PTypeUtil;
 import sc.util.FileUtil;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
@@ -1125,6 +1126,67 @@ public class JSTypeParameters extends ObjectTypeParameters {
          }
       }
       return sb == null ? "" : sb.toString();
+   }
+
+   // Returns a one-letter code for any method parameters that might need conversion on the client side before
+   // translating a deserialized value
+   private String getJSTypeConversionCode(Object type) {
+      if (ModelUtil.isArray(type))
+         return "[";
+      else if (ModelUtil.isAssignableFrom(List.class, type))
+         return "L";
+      else if (ModelUtil.isAssignableFrom(Set.class, type))
+         return "S";
+      else if (ModelUtil.isAssignableFrom(Map.class, type))
+         return "M";
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   // For synchronized types, if the constructor has parameters that need conversion, do send over
+   // some metadata so we can do the right conversion (e.g. [] or List)
+   // TODO: need to include any remotely calleable methods that need conversion?  Maybe it's any method on
+   // a sync'd type if we want to support test scripts and stuff like that?
+   public String getMethodMetadata() {
+      if (type.getSyncProperties() == null)
+         return "";
+      Object[] constrs = type.getConstructors(null);
+      if (constrs == null)
+         return "";
+      StringBuilder sb = null;
+      for (Object constr:constrs) {
+         Object[] paramTypes = ModelUtil.getParameterTypes(constr);
+         if (paramTypes != null) {
+            for (Object paramType:paramTypes) {
+               if (needsJSMetadata(paramType)) {
+                  if (sb == null) {
+                     sb = new StringBuilder();
+                     sb.append(getShortJSTypeName());
+                     sb.append("._MM = {\n");
+                     sb.append("   \"");
+                     sb.append("<init>");
+                     sb.append("\":[\"");
+                  }
+                  else
+                     sb.append(",\n \"");
+                  for (int i = 0; i < paramTypes.length; i++) {
+                     paramType = paramTypes[i];
+                     if (!needsJSMetadata(paramType))
+                        sb.append(".");
+                     else
+                        sb.append(getJSTypeConversionCode(paramType));
+                  }
+                  sb.append("\"");
+                  break;
+               }
+            }
+         }
+      }
+      if (sb != null) {
+         sb.append("]\n};\n");
+         return sb.toString();
+      }
+      return "";
    }
 
    private boolean needsJSMetadata(Object propType) {

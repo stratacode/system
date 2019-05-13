@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.*;
 import sc.dyn.DynUtil;
+import sc.dyn.INamedChildren;
 import sc.dyn.IObjChildren;
 import sc.dyn.IScheduler;
 import sc.js.ServerTag;
@@ -57,7 +58,7 @@ import java.util.*;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 @CompilerSettings(dynChildManager="sc.lang.html.TagDynChildManager")
 @ResultSuffix("html")
-public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable {
+public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObjChildren, ITypeUpdateHandler, ISrcStatement, IStoppable, INamedChildren {
    // Set to true for trace and/or verbose messages - great for debugging problems with schtml
    public static boolean trace = false, verbose = false;
    private final static sc.type.IBeanMapper _startTagTxtProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "startTagTxt");
@@ -5412,5 +5413,36 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
          }
       }
+   }
+
+   public String getNameForChild(Object child) {
+      if (repeatTags == null)
+         return null;
+      int i = 0;
+      for (; i < repeatTags.size(); i++) {
+         if (child == repeatTags.get(i)) {
+            String className = CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getType(child), false));
+            return className + "_" + i;
+         }
+      }
+      return null;
+   }
+
+   public Object getChildForName(String name) {
+      if (repeatTags == null)
+         return null;
+      int uix = name.lastIndexOf('_');
+      if (uix == -1)
+         return null;
+      String uixVal = name.substring(uix+1);
+      if (uixVal.length() == 0)
+         return null;
+      try {
+         int ix = Integer.parseInt(uixVal);
+         if (ix >= 0 && ix < repeatTags.size())
+            return repeatTags.get(ix);
+      }
+      catch (NumberFormatException exc) {}
+      return null;
    }
 }

@@ -7,6 +7,7 @@ package sc.sync;
 import sc.bind.*;
 import sc.dyn.DynUtil;
 import sc.dyn.INameContext;
+import sc.dyn.INamedChildren;
 import sc.dyn.RemoteResult;
 import sc.obj.*;
 import sc.type.CTypeUtil;
@@ -561,7 +562,7 @@ public class SyncManager {
          syncListenerInfo.remove(parentObj);
       }
 
-      public void registerObjName(Object inst, String objName, boolean fixedName, boolean initInst) {
+      public void registerObjName(Object inst, String objName, boolean fixedName, boolean initInst, boolean receivedChange) {
          String scopeName = DynUtil.getScopeName(inst);
          ScopeDefinition def = getScopeDefinitionByName(scopeName);
          SyncContext useCtx = getSyncContext(def.scopeId, true);
@@ -575,9 +576,15 @@ public class SyncManager {
                if (ii != null)
                   ii = createAndRegisterInheritedInstInfo(inst, ii);
             }
-            if (ii != null)
+            if (ii != null) {
                ii.nameQueued = true;
+               ii.registered = receivedChange;
+            }
          }
+      }
+
+      private void putInstInfo(Object inst, InstInfo ii) {
+         syncInsts.put(inst, ii);
       }
 
       void registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued) {
@@ -589,7 +596,7 @@ public class SyncManager {
             }
             else {
                ii = new InstInfo(this, null, false, false);
-               syncInsts.put(inst, ii);
+               putInstInfo(inst, ii);
             }
 
             // When we are registering a new object on the remote side, if it's synchronized on this side, initialize it as an on-demand instance so we send the changes back.
@@ -649,7 +656,7 @@ public class SyncManager {
             ii.registered = true;
             ii.nameQueued = true;
             ii.fixedObject = true;
-            syncInsts.put(inst, ii);
+            putInstInfo(inst, ii);
             return false;
          }
          else {
@@ -867,7 +874,7 @@ public class SyncManager {
                ii = new InstInfo(this, null, false, false);
             }
             ii.setName(parentName);
-            syncInsts.put(changedObj, ii);
+            putInstInfo(changedObj, ii);
             objectIndex.put(parentName, changedObj);
          }
          else {
@@ -914,8 +921,16 @@ public class SyncManager {
                hasFixedId = true;
             }
             else {
-               baseName = CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getSType(obj), false));
+               baseName = null;
                hasFixedId = DynUtil.isObjectType(DynUtil.getSType(obj));
+               if (!hasFixedId && outer instanceof INamedChildren) {
+                  baseName = ((INamedChildren) outer).getNameForChild(obj);
+                  if (baseName != null)
+                     hasFixedId = true;
+               }
+               if (baseName == null) {
+                  baseName = CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getSType(obj), false));
+               }
             }
 
             String outerName = findObjectName(outer);
@@ -1162,7 +1177,7 @@ public class SyncManager {
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
             ii = new InstInfo(this, args, initDefault, onDemand);
-            syncInsts.put(inst, ii);
+            putInstInfo(inst, ii);
          }
          else {
             if (ii.args == null && args != null && args.length > 0)
@@ -1203,13 +1218,16 @@ public class SyncManager {
                      // created the child type.
                      if (args != null)
                         childII.args = args;
-                     if (!childII.nameQueued)
+                     if (!childII.nameQueued) {
                         childII.nameQueued = true;
+                        childII.initialized = true;
+                     }
                   }
                   if ((syncProps != null && syncProps.broadcast) || childCtx.scope.isCurrent()) {
                      if (childII == null) {
                         childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
                         childII.nameQueued = true;
+                        childII.initialized = true;
                      }
                      if (initChildContexts == null) {
                         initChildContexts = new ArrayList<SyncContext>();
@@ -1297,7 +1315,7 @@ public class SyncManager {
 
       public InstInfo createAndRegisterInheritedInstInfo(Object inst, InstInfo ii) {
          InstInfo childInstInfo = createInheritedInstInfo(inst, ii);
-         syncInsts.put(inst, childInstInfo);
+         putInstInfo(inst, childInstInfo);
          if (ii.name != null) {
             objectIndex.put(ii.name, inst);
          }
@@ -1332,7 +1350,7 @@ public class SyncManager {
          else {
             if (ii.name != null)
                objectIndex.put(ii.name, inst);
-            syncInsts.put(inst, ii);
+            putInstInfo(inst, ii);
          }
 
          // If the instance sends a "default change event" - i.e. prop = null, it's a signal that its properties have changed so add the listener for that event.
@@ -1869,8 +1887,10 @@ public class SyncManager {
             // Could handle this else case by just creating the sync properties on the fly.  That would need some limitation though
             // since we don't want to accidentally serialize any types to the client.  Only those that are declared be shared via a
             // particular destination should go.
-            else
-               System.err.println("*** Error: unable to synchronize object reference to object: " + DynUtil.getInstanceId(changedObj) + ": value will be null on the other side");
+            else {
+               System.err.println("*** Synchronized ref to unsync'd type: " + DynUtil.getTypeName(DynUtil.getTypeOfObj(changedObj), false) + (varName != null ? " from: " + varName : "") +
+                      " instance: " + DynUtil.getInstanceId(changedObj) + ": value will be null on the other side");
+            }
          }
          return null;
       }
@@ -2264,7 +2284,8 @@ public class SyncManager {
                System.err.println("Create type not allowed for: " + typeName + " for sync context: " + this);
                return null;
             }
-            registerObjName(inst, name, isClient, true);
+            // Because we always use this to 'receive' a new instance set registered in this SyncContext to keep us from trying to send it back
+            registerObjName(inst, name, isClient, true, true);
          }
          finally {
             if (flushSyncQueue)
@@ -2833,13 +2854,13 @@ public class SyncManager {
 
    public static void registerSyncInst(Object inst, String instName, boolean fixedName, boolean initInst) {
       SyncContext ctx = getDefaultSyncContext();
-      ctx.registerObjName(inst, instName, fixedName, initInst);
+      ctx.registerObjName(inst, instName, fixedName, initInst, false);
    }
 
    // Used by the JS code
    public static void registerSyncInst(Object inst, String instName) {
       SyncContext ctx = getDefaultSyncContext();
-      ctx.registerObjName(inst, instName, ctx.getSyncManager().syncDestination.clientDestination, true);
+      ctx.registerObjName(inst, instName, ctx.getSyncManager().syncDestination.clientDestination, true, false);
    }
 
    /** Returns the SyncContext to use for a sync instance which has already been added to the system. */
@@ -3256,9 +3277,9 @@ public class SyncManager {
 
       boolean handled = false;
       if (currentSyncLayers != null) {
+         if (trace || verbose)
+            System.out.println("Processing remote method result: " + callId + " = " + retValue);
          for (SyncLayer currentSyncLayer:currentSyncLayers) {
-            if (trace || verbose)
-               System.out.println("Processing remote method result: " + callId + " = " + retValue);
             if (currentSyncLayer.processMethodReturn(callId, retValue, exceptionStr)) {
                handled = true;
                break;

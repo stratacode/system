@@ -5,6 +5,7 @@
 package sc.obj;
 
 import sc.dyn.DynUtil;
+import sc.dyn.INamedChildren;
 import sc.type.CTypeUtil;
 
 import java.util.ArrayList;
@@ -182,9 +183,12 @@ public abstract class ScopeDefinition {
                   }
                   if (!enumFound) {
                      if (!isEnum) {
-                        // TODO: the precedence here seems off.  We should be testing for an inner type, enum etc. before
-                        // we look for a lower case property that does not exist.
-                        propName = CTypeUtil.decapitalizePropertyName(propName);
+                        if (value instanceof INamedChildren) {
+                           Object childRes = ((INamedChildren) value).getChildForName(propName);
+                           if (childRes != null)
+                              return childRes;
+                        }
+                        propName = CTypeUtil.decapitalizePropertyName(propName); // TODO: is this necessary?
                         // Will get back null here if the property does not exist
                         value = DynUtil.getPropertyValue(value, propName, true);
                      }

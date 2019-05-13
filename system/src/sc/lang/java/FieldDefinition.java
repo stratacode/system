@@ -279,7 +279,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
                // Since this reference comes from the client, when the client refreshes, we do need to send the register inst the next time (hence false for the fixedName when
                // we are on the server but true if we ever run this )
                if (newValue != null) {
-                  syncCtx.registerObjName(newValue, objName, syncCtx.getSyncManager().syncDestination.clientDestination, false);
+                  syncCtx.registerObjName(newValue, objName, syncCtx.getSyncManager().syncDestination.clientDestination, false, true);
                }
 
                if (flushQueue) {

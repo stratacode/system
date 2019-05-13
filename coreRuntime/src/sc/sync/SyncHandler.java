@@ -110,7 +110,7 @@ public class SyncHandler {
             }
             // In this case it is a simple variable definition so we can use array initializer syntax
             else {
-               ser.formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, inBlock, uniqueId, depChanges, syncLayer);
+               ser.formatArrayExpression(out, syncContext, changedObj, currentObjNames, currentPackageName, preBlockCode, postBlockCode, varName, inBlock, uniqueId, depChanges, syncLayer);
             }
          }
       }
@@ -194,7 +194,7 @@ public class SyncHandler {
             if (type == List.class) // TODO: need to handle more of these - use the SyncHandler interface here?
                type = ArrayList.class;
             // TODO - security: validate this type is allowed to be deserialized
-            value = DynUtil.createInstance(type, null, value);
+            value = DynUtil.createInstance(type, "Ljava/util/Collection;", value);
          }
       }
       return value;

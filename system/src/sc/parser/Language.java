@@ -100,6 +100,7 @@ public abstract class Language extends LayerFileComponent {
 
    public Language(Layer layer) {
       super(layer);
+      inheritFiles = true;
    }
 
    public Object parse(File file) {
