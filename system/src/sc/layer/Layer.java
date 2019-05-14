@@ -261,6 +261,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public IProcessDefinition definedProcess = null;
    String definedProcessName;
 
+   /**
+    * Set this to true for the layer to be included in the 'initialization runtime' - the server runtime when using client/server or the only runtime
+    * in a single-process configuration
+    */
+   public boolean includeForInit = false;
+
    /** Enable or disable the default sync mode for types which are defined in this layer. TODO - deprecated.  Use @Sync on the layer */
    public SyncMode defaultSyncMode = SyncMode.Disabled;
 
@@ -518,6 +524,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                return false;
          }
       }
+
+      if (includeForInit)
+         return false;
       return true;
    }
 
@@ -551,6 +560,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
           }
       }
+      if (includeForInit)
+         return false;
       return true;
    }
 
@@ -1016,6 +1027,12 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public LayerEnabledState isExplicitlyEnabledForRuntime(IRuntimeProcessor proc, boolean checkPeers) {
+      if (includeForInit) {
+         if (LayeredSystem.isInitRuntime(proc))
+            return LayerEnabledState.Enabled;
+         else
+            return LayerEnabledState.Disabled;
+      }
       // If this layer explicitly defines a runtime, it's clearly enabled for that runtime
       if (hasDefinedRuntime) {
          if (proc == definedRuntime)
@@ -4838,6 +4855,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             first = opAppend(sb, " includes: " + includeProcesses, first);
          if (hasDefinedProcess)
             first = opAppend(sb, " only: " + (definedProcess == null ? "<default>" : definedProcess), first);
+         if (includeForInit)
+            first = opAppend(sb, " includeForInit", first);
       }
       if (sync) {
          if (syncMode != SyncMode.Disabled && syncMode != null)

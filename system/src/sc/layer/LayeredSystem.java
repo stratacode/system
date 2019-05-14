@@ -2136,6 +2136,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
+   public List<LayeredSystem> getActiveLayeredSystems() {
+      ArrayList<LayeredSystem> res = new ArrayList<LayeredSystem>();
+      if (layers.size() > 0)
+         res.add(this);
+      if (peerSystems != null) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peerSys = peerSystems.get(i);
+            if (peerSys.layers.size() > 0)
+               res.add(peerSys);
+         }
+      }
+      return res;
+   }
+
    public static IRuntimeProcessor getRuntime(String name) {
       if (runtimes == null)
          return null;
@@ -2253,7 +2267,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       LayeredSystem main = getMainLayeredSystem();
       if (main == this)
          return serverEnabled;
-      return  main.serverEnabled;
+      return main.serverEnabled;
    }
 
    public String getServerURL() {
@@ -15455,6 +15469,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (f.isDirectory()) {
          FileUtil.removeFileOrDirectory(f);
       }
+   }
+
+   public static boolean isInitRuntime(IRuntimeProcessor proc) {
+      return runtimes.indexOf(proc) == 0;
    }
 }
 
