@@ -156,7 +156,8 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
    public FileEnabledState enabledForPath(String pathName, Layer fileLayer, boolean abs, boolean generatedFile) {
       if (disableProcessing)
          return FileEnabledState.Disabled;
-      if (mainSystemOnly && fileLayer != null && !fileLayer.layeredSystem.isMainSystem())
+      // When activated, some file types like 'scr' files only want to be processed by the main system.
+      if (mainSystemOnly && fileLayer != null && fileLayer.activated && !fileLayer.layeredSystem.isMainSystem())
          return FileEnabledState.Disabled;
       if (definedInLayer != null) {
          String runtimeName = definedInLayer.layeredSystem.getRuntimeName();

@@ -382,10 +382,6 @@ public class Options {
                      SyncManager.defaultLanguage = "stratacode";
                   else if (opt.equals("scr"))
                      scriptMode = true;
-                  else if (opt.equals("sw")) {
-                     headlessSet = true;
-                     System.out.println("Warning - deprecated sw option - use tw instead of tv");
-                  }
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
@@ -742,7 +738,7 @@ public class Options {
       if (testMode) {
          PTypeUtil.testMode = true;
          openPageAtStartup = false;
-         // By default test modes should not display unless you use -sw
+         // By default test modes should not display unless you use -tw
          if (!headlessSet)
             headless = true;
       }

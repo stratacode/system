@@ -15471,7 +15471,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
+   /** Returns true for the IRuntimeProcessor which defines the process which should initialize the other processes. */
    public static boolean isInitRuntime(IRuntimeProcessor proc) {
+      // TODO: might need to improve the logic here... this is called early on, before the peerSystems are defined so
+      // need to use the runtimes and processes lists to determine which is the process should initialize the other one. It's used
+      // for layers like the example.todo.data layer which should not run in both the client and the server, but should run in
+      // client-only mode when there's only a client.
       return runtimes.indexOf(proc) == 0;
    }
 }
