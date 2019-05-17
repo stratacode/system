@@ -1340,9 +1340,9 @@ public class DynUtil {
       return evalRemoteScript(null, script);
    }
 
-   public static void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+   public static boolean applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
       if (dynamicSystem != null)
-         dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval, ctx);
+         return dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval, ctx);
       else
          throw new UnsupportedOperationException(("Attempt to evalCode without a dynamic runtime"));
    }

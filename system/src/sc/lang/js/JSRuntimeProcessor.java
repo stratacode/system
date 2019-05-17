@@ -2179,7 +2179,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      // TODO: For incremental builds, do we need to keep track of which generated JS files are inherited?  It can get tricky to figure out
                      // because of a case where the module entry point's class extends a class which is overridden in the new layer.  That changes the JS file
                      // but currently does not modify the entry point so we don't know it's modified in the subsequent layer.
-                     if (!thisGenJSFile.canRead() || thisGenJSFile.lastModified() < baseFile.lastModified() || sys.options.buildAllFiles) {
+                     // Removed 'lastModified' test because if the file is not inherited, that means we pick up the wrong version of the file - e.g. scgen.js in
+                     // js_appPerPage.main does not have SyncMode and ScopeContext but in later layers those classes are added to that file. If another app is built
+                     // it updates the same scgen.js file which is now newer and then replaces the good one with the lastModified test.  We should probably record
+                     // whether or not each js file is inherited when we do the clean build, then we'll add that test here.
+                     if (!thisGenJSFile.canRead() || /* thisGenJSFile.lastModified() < baseFile.lastModified() || */ sys.options.buildAllFiles) {
                         if (sys.options.verbose)
                            System.out.println("Inheriting js file: " + jsFile + " from build layer: " + baseSrc.layer + " to: " + genLayer);
 

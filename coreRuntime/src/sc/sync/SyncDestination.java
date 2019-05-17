@@ -97,8 +97,9 @@ public abstract class SyncDestination {
     * When receiving SC or json, we'll parse the layer definition and apply it as a set of changes to the instances.
     * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and get the receive language out of the text
     * The detail is for debug messages - in what context is the applySyncLayer being performed (e.g. init, response)
+    * Returns true if any changes were applied.
     */
-   public void applySyncLayer(String input, String receiveLanguage, boolean resetSync, String detail) {
+   public boolean applySyncLayer(String input, String receiveLanguage, boolean resetSync, String detail) {
       SyncManager.SyncState oldSyncState = SyncManager.getSyncState();
 
       // After we've resolved all of the objects which are referenced on the client, we do a "reset" since this will line us
@@ -113,6 +114,8 @@ public abstract class SyncDestination {
       BindingContext ctx = new BindingContext(IListener.SyncType.QUEUED);
       BindingContext oldBindCtx = BindingContext.getBindingContext();
       BindingContext.setBindingContext(ctx);
+
+      boolean anyChanges = false;
 
       while (input != null && input.length() > 0) {
          String layerDef = input;
@@ -156,7 +159,8 @@ public abstract class SyncDestination {
             SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
             SerializerFormat format = SerializerFormat.getFormat(receiveLanguage);
             if (format != null) {
-               format.applySyncLayer(name, defaultScope, layerDef, resetSync, allowCodeEval, ctx);
+               if (format.applySyncLayer(name, defaultScope, layerDef, resetSync, allowCodeEval, ctx))
+                  anyChanges = true;
             }
             else
                throw new IllegalArgumentException("Unrecognized receive language for applySyncLayer: " + receiveLanguage);
@@ -170,6 +174,11 @@ public abstract class SyncDestination {
          if (input != null)
             receiveLanguage = null; // Reset this so we look for it the next time
       }
+
+      if (anyChanges)
+         SyncManager.callAfterApplySync();
+
+      return anyChanges;
    }
 
    public SyncSerializer createSerializer() {

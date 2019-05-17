@@ -152,7 +152,7 @@ public interface IDynamicSystem {
 
    int getLayerPosition(Object type);
 
-   void applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx);
+   boolean applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx);
 
    Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params);
 

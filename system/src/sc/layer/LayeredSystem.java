@@ -3546,13 +3546,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return -1;
    }
 
-   public void applySyncLayer(String language, String destName, String scopeName, String codeString, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+   public boolean applySyncLayer(String language, String destName, String scopeName, String codeString, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
       if (language.equals("js")) {
          throw new IllegalArgumentException("javascript layers - only supported in the browser");
       }
       else if (language.equals("stratacode") ) {
          if (codeString == null || codeString.length() == 0)
-            return;
+            return false;
 
          ModelStream stream = ModelStream.convertToModelStream(codeString, ctx);
 
@@ -3564,6 +3564,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                System.out.println("Applied sync layer to system in: " + StringUtil.formatFloat((System.currentTimeMillis() - startTime)/1000.0) + " secs");
          }
       }
+      return true;
    }
 
    @Override
@@ -15382,6 +15383,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                JavaModel otherJavaModel = (JavaModel) otherModel;
                if (otherJavaModel.layeredSystem != peerSys)
                   System.err.println("*** Mismatching system in index");
+
                Layer otherLayer = otherModel.getLayer();
                ILanguageModel clonedModel = peerSys.cloneModel(otherLayer, (JavaModel) model);
                peerSys.addNewModel(clonedModel, null, null, null, otherJavaModel.isLayerModel, false);

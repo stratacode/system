@@ -354,10 +354,6 @@ public class LayerListTypeIndex {
          LayerTypeIndex layerTypeIndex = typeIndexEnt.getValue();
          String layerName = typeIndexEnt.getKey();
 
-         if (sys == null) {
-            continue;
-         }
-
          if (refLayer != null && sys != null && layerName != null) {
             // Using lookup here so we only look through layers that have been loaded.  Otherwise there's a concurrent modification exception as we modify this index
             Layer indexLayer = sys.lookupInactiveLayer(layerName, true, true);

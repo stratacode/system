@@ -35,9 +35,9 @@ public class JSONFormat extends SerializerFormat {
       return new JSONSerializer(this, mgr);
    }
 
-   public void applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+   public boolean applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
       JSONDeserializer dser = new JSONDeserializer(destName, scopeName, layerDef, isReset, allowCodeEval, ctx);
-      dser.apply();
+      return dser.apply();
    }
 
    // These are the individual commands found in the sync array

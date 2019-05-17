@@ -5264,6 +5264,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return null;
    }
 
+   /** Call this method in order to indicate some page state might have changed that could affect the need to call refreshBindings if the page object is marked */
+   // TODO: implement this on the server using a doLater to call refreshBindings?  It seems like in response to a sync that we apply, we might need to register
+   // IFrameworkListener and update any page objects affected by the current request.
+   public static void scheduleRefresh() {
+      System.err.println("*** scheduleRefresh not implemented for Java currently. It is a client-only method used to implement the 'refreshBindings' property");
+   }
+
    /**
     * This is a step we do after refreshing all of the bindings before rendering to improve incremental refresh efficiency.
     * If any 'repeat' properties have changed, we'll now go through and
@@ -5445,4 +5452,5 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       catch (NumberFormatException exc) {}
       return null;
    }
+
 }

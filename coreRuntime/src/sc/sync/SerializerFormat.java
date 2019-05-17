@@ -40,7 +40,7 @@ public class SerializerFormat {
       return new SyncSerializer(this, mgr);
    }
 
-   public void applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
-      DynUtil.applySyncLayer(language, destName, scopeName, layerDef, isReset, allowCodeEval, ctx);
+   public boolean applySyncLayer(String destName, String scopeName, String layerDef, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+      return DynUtil.applySyncLayer(language, destName, scopeName, layerDef, isReset, allowCodeEval, ctx);
    }
 }

@@ -60,6 +60,7 @@ public class SyncManager {
    private static HashMap<Object, Class> syncHandlerRegistry = new HashMap<Object, Class>();
 
    private static List<INameContext> frameworkNameContexts = null;
+   private static List<IFrameworkListener> frameworkListeners = null;
 
    /** Traces synchronization layers between client and server for understanding and debugging client/server issues */
    public static boolean trace = false;
@@ -3065,11 +3066,14 @@ public class SyncManager {
    }
 
    /** Used from the generated code for the browser to apply a sync layer to the default destination */
-   public static void applySyncLayer(String language, String data, String detail) {
+   public static boolean applySyncLayer(String language, String data, String detail) {
+      boolean anyChanges = false;
       for (SyncManager syncManager:syncManagers) {
-         // TODO: compare language and syncDestination.receiveLanguage?
-         syncManager.syncDestination.applySyncLayer(data, language, false, detail);
+         // TODO: validate that language and syncDestination.receiveLanguage match?
+         if (syncManager.syncDestination.applySyncLayer(data, language, false, detail))
+            anyChanges = true;
       }
+      return anyChanges;
    }
 
    public static CharSequence getInitialSync(String destName, int scopeId, boolean resetSync, String outputLanguage, Set<String> syncTypeFilter) {
@@ -3305,7 +3309,10 @@ public class SyncManager {
       ctx.addMethodResult(curObj, type, callId, retValue, exceptionStr);
    }
 
-   /** Called either with a scopeDefinition - to choose the current context in that scope, an explicit ScopeContext or neither to choose the default scope, default context. */
+   /**
+    * Called either with a scopeDefinition (to choose the current context in that scope), or an explicit ScopeContext as the target of the call,
+    * or pass null for both to choose the default scope, default context.
+    */
    public static RemoteResult invokeRemoteDest(ScopeDefinition def, ScopeContext scopeCtx, String destName, String syncGroup, Object obj, Object type, String methName, Object retType, String paramSig, Object...args) {
       SyncManager mgr = getSyncManager(destName);
       int scopeId;
@@ -3398,6 +3405,19 @@ public class SyncManager {
       if (frameworkNameContexts == null)
          frameworkNameContexts = new ArrayList<INameContext>();
       frameworkNameContexts.add(nameResolver);
+   }
+
+   /** A hook point for frameworks to add listeners for sync events like after an applySync. */
+   public static void addFrameworkListener(IFrameworkListener l) {
+      if (frameworkListeners == null)
+         frameworkListeners = new ArrayList<IFrameworkListener>();
+      frameworkListeners.add(l);
+   }
+
+   public static void callAfterApplySync() {
+      if (frameworkListeners != null)
+         for (IFrameworkListener fl:frameworkListeners)
+            fl.afterApplySync();
    }
 
    public static ScopeDefinition getScopeDefinitionByName(String scopeName) {

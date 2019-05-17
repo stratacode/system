@@ -42,12 +42,14 @@ public class JSONDeserializer {
       this.bindCtx = bindCtx;
    }
 
-   public void apply() {
+   public boolean apply() {
       if (parser.len == 0) // empty documents are ok
-         return;
+         return false;
+      boolean anyChanges = false;
       // TODO: remove this and replace it with just a top-level object?
       if (parser.parseCharToken('{') && expectName("sync") && parser.parseCharToken('[')) {
          do {
+            anyChanges = true;
             if (!parser.parseCharToken('{'))
                throw new IllegalArgumentException("Sync array value not an object in: " + parser);
             CharSequence cmdName = parser.parseName();
@@ -78,6 +80,7 @@ public class JSONDeserializer {
       else {
          throw new IllegalArgumentException("JSON format error - expected { \"sync\": [ ... ] - found: " + parser);
       }
+      return anyChanges;
    }
 
    public CharSequence parseMethName() {

@@ -249,7 +249,10 @@ public class CurrentScopeContext {
                break;
             }
             try {
-               ctx.wait(timeout - (now - startTime));
+               long waitTime = timeout - (now - startTime);
+               if (ScopeDefinition.verbose)
+                  System.out.println("waitForReady waiting up to: " + waitTime + " millis for scope context to be ready: " + scopeContextName);
+               ctx.wait(waitTime);
             }
             catch (InterruptedException exc) {}
          }

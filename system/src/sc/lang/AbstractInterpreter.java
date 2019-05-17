@@ -268,13 +268,28 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    private String getSyncPromptStr() {
       List<LayeredSystem> syncSystems = system.getSyncSystems();
-      if (!sync || syncSystems == null)
+      if (!sync || syncSystems == null || syncSystems.size() == 0)
          return "";
       else {
-         if (syncSystems.size() == 1)
-            return system.getRuntimeName() + "," + syncSystems.get(0).getRuntimeName();
-         return "*";
+         StringBuilder sb = new StringBuilder();
+         sb.append("sync:");
+         for (int i = 0; i < syncSystems.size(); i++) {
+            LayeredSystem syncSys = syncSystems.get(i);
+            if (i != 0)
+               sb.append(",");
+            sb.append(getPromptForRuntime(syncSys));
+         }
+         sb.append("<=>");
+         sb.append(getPromptForRuntime(system));
+         return sb.toString();
       }
+   }
+
+   private String getPromptForRuntime(LayeredSystem rtSys) {
+      if (targetRuntime == null || runtimeNameMatches(rtSys, targetRuntime))
+         return "(" + rtSys.getRuntimeName() + ")";
+      else
+         return rtSys.getRuntimeName();
    }
 
    protected String prompt() {
@@ -1261,13 +1276,13 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       if (performedOnce && !targetAllRuntimes)
          return false;
 
-      if (targetRuntime == null) {
-         return true;
-      }
-
-      if (targetRuntime.equals(sys.getProcessIdent()) || targetRuntime.equals(sys.getRuntimeName()))
+      if (targetRuntime == null || runtimeNameMatches(sys, targetRuntime))
          return true;
       return false;
+   }
+
+   private static boolean runtimeNameMatches(LayeredSystem sys, String rtName) {
+      return rtName.equals(sys.getProcessIdent()) || rtName.equals(sys.getRuntimeName());
    }
 
    private void recordOutput(String recordString, int indent) {
@@ -1276,7 +1291,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          recordOutputWriter.println(recordString);
          recordOutputWriter.flush();
       }
-
    }
 
    private boolean hasCurrentObject() {
