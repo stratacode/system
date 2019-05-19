@@ -7897,7 +7897,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          super.start();
 
       // Need to do this after we start the @Exec annotation
-      if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && !ModelUtil.execForRuntime(sys, layer, this, sys)) {
+      if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && ModelUtil.execForRuntime(sys, layer, this, sys) == RuntimeStatus.Disabled) {
          if (!excluded) {
             if (sys.options.verbose || sys.options.verboseExec)
                sys.info("Excluding type: " + typeName + " for: " + sys.getProcessIdent());

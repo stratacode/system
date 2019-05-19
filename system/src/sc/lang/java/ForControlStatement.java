@@ -32,15 +32,15 @@ public class ForControlStatement extends ForStatement {
             for (int i = 0; i < forInit.size(); i++) {
                Definition d = forInit.get(i);
                if (d instanceof VariableStatement) {
-                  ((VariableStatement) d).exec(ctx);
+                  ((VariableStatement) d).execSys(ctx);
                }
                else if (d instanceof Expression) {
-                  ((Expression) d).exec(ctx);
+                  ((Expression) d).execSys(ctx);
                }
             }
          }
          while ((Boolean) condition.eval(Boolean.TYPE, ctx)) {
-            switch (statement.exec(ctx)) {
+            switch (statement.execSys(ctx)) {
                case Return:
                   return ExecResult.Return;
                case Break:
@@ -51,7 +51,7 @@ public class ForControlStatement extends ForStatement {
                   if (ctx.currentLabel == null || isLabeled(ctx.currentLabel)) {
                      if (repeat != null) {
                         for (int i = 0; i < repeat.size(); i++)
-                           repeat.get(i).exec(ctx);
+                           repeat.get(i).execSys(ctx);
                      }
                      continue;
                   }
@@ -60,7 +60,7 @@ public class ForControlStatement extends ForStatement {
             }
             if (repeat != null) {
                for (int i = 0; i < repeat.size(); i++)
-                  repeat.get(i).exec(ctx);
+                  repeat.get(i).execSys(ctx);
             }
          }
       }

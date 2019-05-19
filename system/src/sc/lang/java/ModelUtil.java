@@ -37,6 +37,8 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.util.*;
 
+import sc.lang.java.Statement.RuntimeStatus;
+
 /**
  * This interface contains a wide range of operations on Java objects defined in either java.lang.Class, or ITypeDeclaration as the
  * primary types.  For ITypeDeclaration there are two primary implementations: CFClass - the .class file parser, or sc.lang.java.TypeDeclaration,
@@ -3474,7 +3476,7 @@ public class ModelUtil {
       for (int i = 0; i < sz; i++) {
          try {
             currentStatement = statements.get(i);
-            res = currentStatement.exec(ctx);
+            res = currentStatement.execSys(ctx);
          }
          catch (RuntimeException exc) {
             throw (RuntimeException) wrapRuntimeException(currentStatement, exc);
@@ -3930,14 +3932,14 @@ public class ModelUtil {
    }
 
    public static Object invokeRemoteMethod(LayeredSystem locSys, Object methThis, Object methToInvoke, SemanticNodeList<Expression> arguments, Class expectedType, ExecutionContext ctx,
-                                           boolean repeatArgs, ParamTypedMethod pmeth) {
+                                           boolean repeatArgs, ParamTypedMethod pmeth, ScopeContext targetCtx) {
       Object[] argValues = expressionListToValues(arguments, ctx);
 
       if (repeatArgs && argValues.length > 0) {
          argValues = convertArgsForRepeating(methToInvoke, pmeth, arguments, argValues);
       }
       SyncDestination dest = SyncDestination.defaultDestination;
-      return DynUtil.invokeRemoteSync(null, null, dest.name, dest.defaultTimeout, methThis, methToInvoke, argValues);
+      return DynUtil.invokeRemoteSync(null, targetCtx, dest.name, dest.defaultTimeout, methThis, methToInvoke, argValues);
    }
 
    private static Object[] convertArgsForRepeating(Object meth, ParamTypedMethod pmeth, List<Expression> arguments, Object[] argValues) {
@@ -5732,6 +5734,10 @@ public class ModelUtil {
             }
             superClass = next;
          }
+      }
+      else if (superType instanceof VariableDefinition) {
+         Definition def = ((VariableDefinition) superType).getDefinition();
+         return getAnnotation(def, annotationName);
       }
       else {
          System.err.println("*** Unrecognized type in getInheritedAnnotation: " + superType);
@@ -7672,7 +7678,7 @@ public class ModelUtil {
         if (val instanceof IDynObject) {
            Object valType = ((IDynObject) val).getDynType();
            if (!ModelUtil.isAssignableFrom(castType, valType))
-              throw new ClassCastException("Invalid cast: " + ModelUtil.getTypeName(valType) + " to: " + ModelUtil.getTypeName(castType));
+              throw new ClassCastException("Class cast - mismatching classes: " + ModelUtil.getTypeName(valType) + " cannot be cast to: " + ModelUtil.getTypeName(castType));
         }
         return val;
      }
@@ -9051,11 +9057,11 @@ public class ModelUtil {
       return null;
    }
 
-   public static boolean execForRuntime(LayeredSystem refSys, Layer refLayer, Object refTypeOrMember, LayeredSystem runtimeSys) {
+   public static RuntimeStatus execForRuntime(LayeredSystem refSys, Layer refLayer, Object refTypeOrMember, LayeredSystem runtimeSys) {
       if (refTypeOrMember instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration td = (BodyTypeDeclaration) refTypeOrMember;
          if (td.isExcludedStub) // The stub is included even though it's underlying type has been excluded
-            return true;
+            return RuntimeStatus.Enabled;
       }
       Object execAnnot = ModelUtil.getInheritedAnnotation(refSys, refTypeOrMember, "sc.obj.Exec", false, refLayer, false);
       if (execAnnot != null) {
@@ -9064,25 +9070,25 @@ public class ModelUtil {
             String[] rtNames = execRuntimes.split(",");
             for (String rtName:rtNames) {
                if (rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
-                  return true;
+                  return RuntimeStatus.Enabled;
                if (rtName.equals("default") && runtimeSys.isDefaultSystem())
-                  return true;
+                  return RuntimeStatus.Enabled;
                if (rtName.equals("server") && runtimeSys.serverEnabled)
-                  return true;
+                  return RuntimeStatus.Enabled;
                if (rtName.equals("client") && !runtimeSys.serverEnabled)
-                  return true;
+                  return RuntimeStatus.Enabled;
             }
-            return false;
+            return RuntimeStatus.Disabled;
          }
          Boolean serverOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "serverOnly");
          Boolean clientOnly = (Boolean) ModelUtil.getAnnotationValue(execAnnot, "clientOnly");
          if (serverOnly != null && serverOnly) {
             if (clientOnly != null && clientOnly)
                System.err.println("Exec annotation for type: " + ModelUtil.getTypeName(refTypeOrMember) + " has both clientOnly and serverOnly");
-            return runtimeSys.serverEnabled;
+            return runtimeSys.serverEnabled ? RuntimeStatus.Enabled : RuntimeStatus.Disabled;
          }
          if (clientOnly != null && clientOnly) {
-            return !runtimeSys.serverEnabled;
+            return !runtimeSys.serverEnabled ? RuntimeStatus.Enabled : RuntimeStatus.Disabled;
          }
       }
       if (ModelUtil.isMethod(refTypeOrMember) || ModelUtil.isField(refTypeOrMember) || refTypeOrMember instanceof IBeanMapper)
@@ -9090,13 +9096,14 @@ public class ModelUtil {
 
       if (refTypeOrMember instanceof ParamTypeDeclaration)
          refTypeOrMember = ((ParamTypeDeclaration) refTypeOrMember).getBaseType();
+      /*
       if (refTypeOrMember instanceof BodyTypeDeclaration) {
          if (refSys != runtimeSys)
             System.out.println("*** Note: found mismatching runtime in execForRuntime - make sure this is right!");
-         return refSys == runtimeSys;
+         return refSys == runtimeSys ? RuntimeStatus.Enabled : RuntimeStatus.Disabled;
       }
-      else
-         return true;
+      else */
+      return RuntimeStatus.Unset;
    }
 
    public static Object getPropertyTypeFromType(Object type, String propName) {

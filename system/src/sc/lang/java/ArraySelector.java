@@ -94,4 +94,8 @@ public class ArraySelector extends Selector {
       if (expression != null)
          expression.addBreakpointNodes(res, srcStatement);
    }
+
+   public String toString() {
+      return toGenerateString();
+   }
 }

@@ -268,7 +268,7 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
       }
    }
 
-   public Object invokeRemoteStatement(BodyTypeDeclaration type, Object inst, Statement expr, ScopeContext target) {
+   public Object invokeRemoteStatement(BodyTypeDeclaration type, Object inst, Statement expr, ExecutionContext ctx, ScopeContext target) {
       throw new UnsupportedOperationException();
    }
 

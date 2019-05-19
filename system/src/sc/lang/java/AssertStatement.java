@@ -71,10 +71,10 @@ public class AssertStatement extends Statement {
       return repl;
    }
 
-   public boolean execForRuntime(LayeredSystem sys) {
+   public RuntimeStatus execForRuntime(LayeredSystem sys) {
       if (expression != null)
          return expression.execForRuntime(sys);
-      return false;
+      return RuntimeStatus.Unset;
    }
 
    public String toString() {

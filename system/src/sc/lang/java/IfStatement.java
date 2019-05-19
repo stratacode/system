@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.lang.ILanguageModel;
 import sc.lang.ISrcStatement;
 import sc.layer.LayeredSystem;
 import sc.parser.GenFileLineIndex;
@@ -41,10 +42,10 @@ public class IfStatement extends NonIndentedStatement {
 
    public ExecResult exec(ExecutionContext ctx) {
       if ((Boolean) expression.eval(Boolean.TYPE, ctx)) {
-         return trueStatement.exec(ctx);
+         return trueStatement.execSys(ctx);
       }
       else if (falseStatement != null)
-         return falseStatement.exec(ctx);
+         return falseStatement.execSys(ctx);
       return ExecResult.Next;
    }
 
@@ -208,11 +209,18 @@ public class IfStatement extends NonIndentedStatement {
    }
 
    /**
-    * For IfStatement, only run it in a runtime if we can do the whole thing remotely.  Otherwise, the main runtime will need to split it up
-    * and send out individual remote requests for the expression and statement
+    * First see if the expression part must be run here, then look for a setting on the true and false statements.
     */
-   public boolean execForRuntime(LayeredSystem sys) {
-      return expression.execForRuntime(sys) && trueStatement.execForRuntime(sys) && (falseStatement == null || falseStatement.execForRuntime(sys));
+   public RuntimeStatus execForRuntime(LayeredSystem sys) {
+      RuntimeStatus exprStat = expression.execForRuntime(sys);
+      if (exprStat != RuntimeStatus.Unset)
+         return exprStat;
+      RuntimeStatus trueStat = trueStatement.execForRuntime(sys);
+      if (trueStat != RuntimeStatus.Unset)
+         return trueStat;
+      if (falseStatement != null)
+         return falseStatement.execForRuntime(sys);
+      return RuntimeStatus.Unset;
    }
 
 }

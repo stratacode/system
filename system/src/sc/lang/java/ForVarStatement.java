@@ -84,7 +84,7 @@ public class ForVarStatement extends ForStatement implements IVariable {
             Object[] arrVal = (Object[]) arrObj;
             for (int i = 0; i < arrVal.length; i++) {
                ctx.setVariable(identifier, arrVal[i]);
-               switch (statement.exec(ctx)) {
+               switch (statement.execSys(ctx)) {
                   case Return:
                      return ExecResult.Return;
                   case Break:
@@ -104,7 +104,7 @@ public class ForVarStatement extends ForStatement implements IVariable {
             Iterator it = itable.iterator();
             while (it.hasNext()) {
                ctx.setVariable(identifier, it.next());
-               switch (statement.exec(ctx)) {
+               switch (statement.execSys(ctx)) {
                   case Return:
                      return ExecResult.Return;
                   case Break:

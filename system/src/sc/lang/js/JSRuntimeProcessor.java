@@ -28,6 +28,8 @@ import sc.util.FileUtil;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
 
+import sc.lang.java.Statement.RuntimeStatus;
+
 import java.io.*;
 import java.lang.reflect.TypeVariable;
 import java.util.*;
@@ -957,7 +959,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return;
 
       LayeredSystem sys = javaModel.getLayeredSystem();
-      boolean execForJS = ModelUtil.execForRuntime(sys, javaModel.getLayer(), type, sys);
+      boolean execForJS = ModelUtil.execForRuntime(sys, javaModel.getLayer(), type, sys) != Statement.RuntimeStatus.Disabled;
 
       JSFileEntry jsEnt = new JSFileEntry();
       jsEnt.fullTypeName = type.getFullTypeName();
@@ -3489,7 +3491,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       model.nonTransformedModel = model;
       modDecl.addBodyStatement(st);
       ParseUtil.initAndStartComponent(model);
-      if (!st.execForRuntime(system))
+      if (st.execForRuntime(system) == RuntimeStatus.Disabled)
          return null;
       if (!model.isProcessed())
          model.process();
@@ -3499,7 +3501,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return TransformUtil.evalTemplate(exprParams, getEvalTemplate(currentType));
    }
 
-   public Object invokeRemoteStatement(BodyTypeDeclaration currentType, Object instance, Statement st, ScopeContext target) {
+   public Object invokeRemoteStatement(BodyTypeDeclaration currentType, Object instance, Statement st, ExecutionContext execCtx, ScopeContext target) {
+      st.evalRemoteExprs(execCtx);
       String jsScript = transformStatement(currentType, instance, st);
       if (jsScript != null && jsScript.length() > 0) {
          return DynUtil.evalRemoteScript(target, jsScript);

@@ -1065,9 +1065,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return props;
    }
 
-   public boolean execForRuntime(LayeredSystem runtimeSys) {
+   public RuntimeStatus execForRuntime(LayeredSystem runtimeSys) {
       if (assignedProperty == null)
-         return false;
+         return RuntimeStatus.Unset;
       JavaModel model = getJavaModel();
       Layer refLayer = model == null ? null : model.getLayer();
       return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, assignedProperty, runtimeSys);

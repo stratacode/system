@@ -35,6 +35,7 @@ import java.util.*;
 
 // Labelling this scope so bindings to this type know they are shared
 @Scope(name="global")
+@sc.obj.Exec(runtimes="default")
 public class EditorContext extends ClientEditorContext {
    static IBeanMapper canUndoProperty = TypeUtil.getPropertyMapping(EditorContext.class, "canUndo");
    static IBeanMapper canRedoProperty = TypeUtil.getPropertyMapping(EditorContext.class, "canRedo");
@@ -175,6 +176,8 @@ public class EditorContext extends ClientEditorContext {
    public EditorContext(LayeredSystem sys) {
       system = sys;
       execContext.system = sys;
+      // This turns on the ability to run statements in multiple processes
+      execContext.syncExec = true;
       updateLayerState();
    }
 

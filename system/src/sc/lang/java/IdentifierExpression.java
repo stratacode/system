@@ -18,6 +18,7 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ComponentImpl;
 import sc.obj.CurrentScopeContext;
+import sc.obj.ScopeContext;
 import sc.obj.ScopeDefinition;
 import sc.parser.*;
 import sc.type.*;
@@ -1721,7 +1722,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          LayeredSystem sys = expr.getLayeredSystem();
          ITypeDeclaration enclType = expr.getEnclosingIType();
          if (enclType != null && sys != null && !enclType.isLayerType() && !enclType.isLayerComponent())
-            remote = !ModelUtil.execForRuntime(sys, enclType.getLayer(), meth, sys);
+            remote = ModelUtil.execForRuntime(sys, enclType.getLayer(), meth, sys) == RuntimeStatus.Disabled;
       }
       return remote ? IdentifierType.RemoteMethodInvocation : IdentifierType.MethodInvocation;
    }
@@ -2103,8 +2104,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (!ctx.allowInvoke(methToInvoke))
                   throw new IllegalArgumentException("Not allowed to invoke method: " + methToInvoke);
 
-               if (idTypes[0] == RemoteMethodInvocation)
-                  return ModelUtil.invokeRemoteMethod(getLayeredSystem(), methThis, methToInvoke, arguments, expectedType, ctx, true, null);
+               if (idTypes[0] == RemoteMethodInvocation) {
+                  return invokeRemoteMethod(jmodel, methThis, methToInvoke, expectedType, ctx);
+                  //return ModelUtil.invokeRemoteMethod(getLayeredSystem(), methThis, methToInvoke, arguments, expectedType, ctx, true, null);
+               }
                else
                   return ModelUtil.invokeMethod(methThis, methToInvoke, arguments, expectedType, ctx, true, true, null);
 
@@ -2227,15 +2230,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   throw new UnsupportedOperationException();
                }
                method = boundTypes[i];
-               if (jmodel.commandInterpreter != null) {
-                  CurrentScopeContext scopeCtx = jmodel.commandInterpreter.currentScopeCtx;
-                  if (scopeCtx != null) {
-                     Object type = DynUtil.getType(value);
-                     String typeName = ModelUtil.getTypeName(type);
-                     scopeCtx.addSyncTypeToFilter(typeName, " command line expression: " + this);
-                  }
-               }
-               return ModelUtil.invokeRemoteMethod(getLayeredSystem(), value, method, arguments, expectedType, ctx, true, null);
+               return invokeRemoteMethod(jmodel, value, method, expectedType, ctx);
             }
             else if (idTypes[i] == IdentifierType.MethodInvocation && !superMethod) {
                method = boundTypes[i];
@@ -2277,6 +2272,20 @@ public class IdentifierExpression extends ArgumentsExpression {
          displayError("Eval failed - illegal argument: " + exc + " for ");
          throw exc;
       }
+   }
+
+   private Object invokeRemoteMethod(JavaModel jmodel, Object methThis, Object method, Class expectedType, ExecutionContext ctx) {
+      ScopeContext targetCtx = null;
+      if (jmodel.commandInterpreter != null && ctx.syncExec) {
+         CurrentScopeContext scopeCtx = jmodel.commandInterpreter.currentScopeCtx;
+         if (scopeCtx != null) {
+            Object type = DynUtil.getType(methThis);
+            String typeName = ModelUtil.getTypeName(type);
+            scopeCtx.addSyncTypeToFilter(typeName, " command line expression: " + this);
+         }
+         targetCtx = jmodel.commandInterpreter.getTargetScopeContext();
+      }
+      return ModelUtil.invokeRemoteMethod(getLayeredSystem(), methThis, method, arguments, expectedType, ctx, true, null, targetCtx);
    }
 
    public void setValue(Object valueToSet, ExecutionContext ctx) {
@@ -5769,22 +5778,50 @@ public class IdentifierExpression extends ArgumentsExpression {
       return true;
    }
 
-   public boolean execForRuntime(LayeredSystem runtimeSys) {
-      Object boundType = getBoundType(identifiers.size()-1);
-      if (boundType != null) {
-         JavaModel model = getJavaModel();
-         Layer refLayer = model == null ? null : model.getLayer();
-         return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, boundType, runtimeSys);
+   public RuntimeStatus execForRuntime(LayeredSystem runtimeSys) {
+      RuntimeStatus last = null;
+      JavaModel model = getJavaModel();
+      Layer refLayer = model == null ? null : model.getLayer();
+      for (int i = 0; i < identifiers.size(); i++) {
+         switch (idTypes[i]) {
+            case PackageName:
+               continue;
+            case BoundName:
+               Object boundName = getBoundType(i);
+               if (boundName != null)
+                  return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, DynUtil.getType(boundName), runtimeSys);
+               break;
+            case BoundTypeName:
+            case BoundObjectName:
+            case BoundInstanceName:
+            case ResolvedObjectName:
+            case VariableName:
+            case FieldName:
+            case GetVariable:
+            case IsVariable:
+            case SetVariable:
+            case ThisExpression:
+            case SuperExpression:
+            case MethodInvocation:
+            case UnboundMethodName:
+            case ArraySelector:
+            case GetSetMethodInvocation:
+            case GetObjectMethodInvocation:
+            case EnumName:
+            case NewMethodInvocation:
+               Object boundType = getBoundType(i);
+               if (boundType == null)
+                  return RuntimeStatus.Disabled;
+               return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, boundType, runtimeSys);
+            case RemoteMethodInvocation:
+               return RuntimeStatus.Unset; // We can eval in this runtime as a remote method
+            case UnboundName:
+               return RuntimeStatus.Disabled;
+            case Unknown:
+               break;
+         }
       }
-      /*
-      Object refType = getReferenceType();
-      if (refType != null) {
-         JavaModel model = getJavaModel();
-         Layer refLayer = model == null ? null : model.getLayer();
-         return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, refType, runtimeSys);
-      }
-      */
-      return false; // Did not resolve properly for this runtime - maybe the variable is not defined?
+      return RuntimeStatus.Disabled; // Did not resolve properly for this runtime - variable may not be defined in this runtime
    }
 
    public void setParentNode(ISemanticNode node) {

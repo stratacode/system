@@ -644,6 +644,9 @@ public class SelectorExpression extends ChainedExpression {
       if (transformed)
          return false;
 
+      if (toString().equals("authors[0].books[1].title"))
+         System.out.println("***");
+
       if (bindingStatement != null)
          return super.transform(runtime);
 

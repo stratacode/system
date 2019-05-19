@@ -56,7 +56,7 @@ public class TryStatement extends Statement implements IBlockStatement {
          if (!popped) ctx.popFrame();
 
          if (finallyStatement != null)
-            finallyStatement.exec(ctx);
+            finallyStatement.execSys(ctx);
       }
       return res;
    }

@@ -481,8 +481,18 @@ public class AssignmentExpression extends TwoOperatorExpression {
       return true;
    }
 
-   public boolean execForRuntime(LayeredSystem sys) {
-      return lhs != null && lhs.execForRuntime(sys);
+   public RuntimeStatus execForRuntime(LayeredSystem sys) {
+      if (lhs == null)
+         return RuntimeStatus.Unset;
+      return lhs.execForRuntime(sys);
+   }
+
+   public void evalRemoteExprs(ExecutionContext ctx) {
+      if (rhs != null && rhs.execForRuntime(getLayeredSystem()) == RuntimeStatus.Disabled) {
+         Class cl = ModelUtil.typeToClass(lhs.getTypeDeclaration());
+         Object rhsVal = rhs.eval(cl, ctx);
+         setProperty("rhs", AbstractLiteral.createFromValue(rhsVal, false));
+      }
    }
 }
 

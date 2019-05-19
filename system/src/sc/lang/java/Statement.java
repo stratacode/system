@@ -21,6 +21,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public transient Object[] errorArgs;
    public transient int childNestingDepth = -1;
 
+   public enum RuntimeStatus {
+      Enabled, Disabled, Unset
+   }
+
    // During code-generation, one statement may be generated from another, e.g. for templates we clone statements that are children of a template declaration.  This
    // stores that references so we can find the original source Statement.
    public transient ISrcStatement fromStatement;
@@ -605,8 +609,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    /** When choosing in which runtimes to run this statement, returns the member or type of the method or field used in the expression.  Not always possible to determine so return null in those other cases. */
-   public boolean execForRuntime(LayeredSystem sys) {
-      return true;
+   public RuntimeStatus execForRuntime(LayeredSystem sys) {
+      return RuntimeStatus.Unset;
    }
 
 
@@ -668,5 +672,72 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          return true;
       }
       return false;
+   }
+
+   public ExecResult execSys(ExecutionContext ctx) {
+      boolean evalPerformed = false;
+      JavaModel model = getJavaModel();
+      LayeredSystem sys = model.layeredSystem;
+      AbstractInterpreter cmd = model.commandInterpreter;
+      boolean syncExec = ctx.syncExec;
+      ExecResult execResult = null;
+      RuntimeStatus sysStatus = null;
+      if (!syncExec || cmd == null || ((sysStatus = getRuntimeStatus(sys)) != RuntimeStatus.Disabled &&
+                    (sysStatus == RuntimeStatus.Enabled || cmd.performUpdatesToSystem(sys, false)))) {
+         if (sys.options.verboseExec)
+            sys.info("Exec local statement: " + this + " on: " + sys.getProcessIdent());
+         execResult = exec(ctx);
+         evalPerformed = true;
+      }
+
+      if (syncExec && cmd != null) {
+         List<LayeredSystem> syncSystems = getLayeredSystem().getSyncSystems();
+         Layer currentLayer = cmd.currentLayer;
+         BodyTypeDeclaration currentType = cmd.getCurrentType();
+         if (syncSystems != null && currentType != null && currentLayer != null && sysStatus != RuntimeStatus.Enabled) {
+            for (LayeredSystem peerSys:syncSystems) {
+               if (sysStatus == RuntimeStatus.Disabled || cmd.performUpdatesToSystem(peerSys, evalPerformed)) {
+                  Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
+                  BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
+                  if (peerType != null && !peerType.excluded) {
+                     Statement peerExpr = deepCopy(0, null);
+                     peerExpr.parentNode = peerType;
+
+                     RuntimeStatus peerStatus = peerExpr.getRuntimeStatus(peerSys);
+                     if (peerStatus != RuntimeStatus.Disabled) {
+                        if (sys.options.verboseExec)
+                           sys.info("Exec remote statement: " + peerExpr + " on: " + peerSys.getProcessIdent());
+                        Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, ctx.getCurrentObject(), peerExpr, ctx, cmd.getTargetScopeContext());
+                        if (sys.options.verboseExec)
+                           sys.info("Exec remote result: " + peerExpr + " returns: " + remoteRes);
+                     }
+                  }
+               }
+            }
+         }
+      }
+      if (execResult == null)
+         execResult = ExecResult.Next;
+      return execResult;
+   }
+
+   public RuntimeStatus getRuntimeStatus(LayeredSystem sys) {
+      JavaModel stModel = getJavaModel();
+      if (stModel == null)
+         return RuntimeStatus.Disabled;
+      boolean oldDisable = stModel.disableTypeErrors;
+      try {
+         stModel.disableTypeErrors = true;
+         ParseUtil.initAndStartComponent(this);
+         if (errorArgs != null) // An error starting this statement means not to run it - the
+            return RuntimeStatus.Disabled;
+         return execForRuntime(sys);
+      }
+      finally {
+         stModel.disableTypeErrors = oldDisable;
+      }
+   }
+
+   public void evalRemoteExprs(ExecutionContext ctx) {
    }
 }

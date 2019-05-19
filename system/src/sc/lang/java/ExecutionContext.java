@@ -42,6 +42,12 @@ public class ExecutionContext {
 
    public boolean createObjects = true;
 
+   /**
+    * Set to true to enable 'sync' of statements to multiple processes. Used for the command line to control where statements
+    * are run when dealing with a multi-process application
+    */
+   public boolean syncExec = false;
+
    public INameContext resolver;
 
    public LayeredSystem system;

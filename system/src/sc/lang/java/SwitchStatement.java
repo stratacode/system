@@ -67,7 +67,7 @@ public class SwitchStatement extends Statement implements IBlockStatement {
                   for (; i < statements.size(); i++) {
                      statement = statements.get(i);
                      if (!(statement instanceof SwitchLabel)) {
-                        ExecResult res = statement.exec(ctx);
+                        ExecResult res = statement.execSys(ctx);
                         if (res != ExecResult.Next) {
                            if (res == ExecResult.Break)
                               return ExecResult.Next;
@@ -86,7 +86,7 @@ public class SwitchStatement extends Statement implements IBlockStatement {
          for (int i = defaultIndex; i < statements.size(); i++) {
             Statement statement = statements.get(i);
             if (!(statement instanceof SwitchLabel)) {
-               ExecResult res = statement.exec(ctx);
+               ExecResult res = statement.execSys(ctx);
                if (res != ExecResult.Next) {
                   if (res == ExecResult.Break)
                      return ExecResult.Next;

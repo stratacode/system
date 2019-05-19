@@ -28,6 +28,8 @@ import java.io.*;
 import java.util.*;
 import sc.dyn.ScheduledJob;
 
+import sc.lang.java.Statement.RuntimeStatus;
+
 // We want these commands to be run for the Java_Server runtime when there's a server and the js runtime when it
 // is the only runtime.
 @sc.obj.Exec(runtimes="default")
@@ -791,7 +793,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             ParseUtil.initAndStartComponent(assign);
 
-            if (!assign.hasErrors() && performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, assign)) {
+            RuntimeStatus sysStatus = getRuntimeStatus(system, assign);
+            if (!assign.hasErrors() && sysStatus != RuntimeStatus.Disabled &&
+                  (sysStatus == RuntimeStatus.Enabled || performUpdatesToSystem(system, false))) {
                performedOnce = true;
 
                if (system.options.verboseExec)
@@ -813,17 +817,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   System.err.println("*** No object for property update: " + current.typeName + ". " + assign.propertyName);
             }
 
-            if (!assign.hasErrors() && sync && syncSystems != null && currentLayer != null && !skipEval) {
+            if (!assign.hasErrors() && sync && syncSystems != null && currentLayer != null && !skipEval && sysStatus != RuntimeStatus.Enabled) {
                boolean any = false;
                for (LayeredSystem peerSys:syncSystems) {
-                  if (performUpdatesToSystem(peerSys, performedOnce)) {
+                  if (sysStatus == RuntimeStatus.Disabled || performUpdatesToSystem(peerSys, performedOnce)) {
                      Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                      BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(current.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                      if (peerType != null && !peerType.excluded) {
                         PropertyAssignment peerAssign = assign.deepCopy(ISemanticNode.CopyAll, null);
                         peerAssign.parentNode = peerType;
 
-                        if (!ignoreRemoteStatement(peerSys, peerAssign)) {
+                        if (getRuntimeStatus(peerSys, peerAssign) != RuntimeStatus.Disabled) {
                            if (system.options.verboseExec)
                               system.info("Exec: " + peerAssign + " on system: " + peerSys.getProcessIdent());
 
@@ -836,7 +840,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                            }
                            else {
                               peerAssign.parentNode = peerType;
-                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerAssign, getTargetScopeContext());
+                              Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerAssign, execContext, getTargetScopeContext());
                               if (remoteRes != null) {
                                  System.out.println(remoteRes);
                               }
@@ -936,7 +940,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             try {
                if (!skipEval) {
                   boolean evalPerformed = false;
-                  if (performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, expr)) {
+                  RuntimeStatus sysStatus = getRuntimeStatus(system, expr);
+                  if (sysStatus == RuntimeStatus.Enabled || (sysStatus != RuntimeStatus.Disabled &&
+                          performUpdatesToSystem(system, false))) {
                      if (system.options.verboseExec)
                         system.info("Exec local expr: " + expr + " on: " + system.getProcessIdent());
 
@@ -950,18 +956,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         System.out.println(exprResult);
                   }
 
-                  if (syncSystems != null && currentType != null && currentLayer != null) {
+                  if (syncSystems != null && currentType != null && currentLayer != null && sysStatus != RuntimeStatus.Enabled) {
                      for (LayeredSystem peerSys:syncSystems) {
-                        if (performUpdatesToSystem(peerSys, evalPerformed)) {
+                        if (sysStatus == RuntimeStatus.Disabled || performUpdatesToSystem(peerSys, evalPerformed)) {
                            Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                            BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                            if (peerType != null && !peerType.excluded) {
                               Expression peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
-                              if (!ignoreRemoteStatement(peerSys, peerExpr)) {
+                              if (getRuntimeStatus(peerSys, peerExpr) != RuntimeStatus.Disabled) {
                                  if (system.options.verboseExec)
                                     system.info("Exec remote expr: " + expr + " on: " + peerSys.getProcessIdent());
-                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr, getTargetScopeContext());
+                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr, execContext, getTargetScopeContext());
                                  System.out.println(remoteRes);
                               }
                            }
@@ -1009,7 +1015,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
             if (sync && syncSystems != null && currentLayer != null && !skipEval) {
                for (LayeredSystem peerSys:syncSystems) {
-                  if (performUpdatesToSystem(system, updatedAlready)) {
+                  if (performUpdatesToSystem(peerSys, updatedAlready)) {
                      Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                      BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                      if (peerType != null && !peerType.excluded) {
@@ -1021,7 +1027,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                         }
                         else {
                            peerBlock.parentNode = peerType;
-                           Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerBlock, getTargetScopeContext());
+                           Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerBlock, execContext, getTargetScopeContext());
                            if (remoteRes != null) {
                               System.out.println(remoteRes);
                            }
@@ -1067,7 +1073,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             try {
                if (!skipEval) {
                   boolean evalPerformed = false;
-                  if (performUpdatesToSystem(system, false) && !ignoreRemoteStatement(system, expr)) {
+                  // TODO: replace this entire invocation with a call to execSys
+                  RuntimeStatus sysStatus = getRuntimeStatus(system, expr);
+                  if (sysStatus == RuntimeStatus.Enabled || (sysStatus != RuntimeStatus.Disabled &&
+                      performUpdatesToSystem(system, false))) {
                      if (system.options.verboseExec)
                         system.info("Exec local statement: " + expr + " on: " + system.getProcessIdent());
                      ExecResult execResult = expr.exec(execContext);
@@ -1078,17 +1087,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
                   if (syncSystems != null && currentType != null && currentLayer != null) {
                      for (LayeredSystem peerSys:syncSystems) {
-                        if (performUpdatesToSystem(peerSys, evalPerformed)) {
+                        if (sysStatus == RuntimeStatus.Disabled || performUpdatesToSystem(peerSys, evalPerformed)) {
                            Layer peerLayer = peerSys.getLayerByName(currentLayer.layerUniqueName);
                            BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentType.getFullTypeName(), peerLayer == null ? null : peerLayer.getNextLayer(), true);
                            if (peerType != null && !peerType.excluded) {
                               Statement peerExpr = expr.deepCopy(0, null);
                               peerExpr.parentNode = peerType;
 
-                              if (!ignoreRemoteStatement(peerSys, peerExpr)) {
+                              if (getRuntimeStatus(peerSys, peerExpr) != RuntimeStatus.Disabled) {
                                  if (system.options.verboseExec)
                                     system.info("Exec remote statement: " + peerExpr + " on: " + peerSys.getProcessIdent());
-                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr, getTargetScopeContext());
+                                 Object remoteRes = peerSys.runtimeProcessor.invokeRemoteStatement(peerType, curObj, peerExpr, execContext, getTargetScopeContext());
                                  System.out.println(remoteRes);
                               }
                            }
@@ -1254,24 +1263,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
    }
 
-   private static boolean ignoreRemoteStatement(LayeredSystem sys, Statement st) {
-      JavaModel stModel = st.getJavaModel();
-      if (stModel == null)
-         return true;
-      boolean oldDisable = stModel.disableTypeErrors;
-      try {
-         stModel.disableTypeErrors = true;
-         ParseUtil.initAndStartComponent(st);
-         if (st.errorArgs != null) // An error starting this statement means not to run it - the
-            return true;
-         return !st.execForRuntime(sys);
-      }
-      finally {
-         stModel.disableTypeErrors = oldDisable;
-      }
+   private static Statement.RuntimeStatus getRuntimeStatus(LayeredSystem sys, Statement st) {
+      return st.getRuntimeStatus(sys);
    }
 
-   private boolean performUpdatesToSystem(LayeredSystem sys, boolean performedOnce) {
+   public boolean performUpdatesToSystem(LayeredSystem sys, boolean performedOnce) {
       // Only targeting the first runtime and this statement was already invoked once
       if (performedOnce && !targetAllRuntimes)
          return false;

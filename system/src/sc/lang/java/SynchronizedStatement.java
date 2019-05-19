@@ -14,7 +14,7 @@ public class SynchronizedStatement extends Statement implements IStatementWrappe
    public ExecResult exec(ExecutionContext ctx) {
       Object val = expression.eval(null, ctx);
       synchronized (val) {
-         return statement.exec(ctx);
+         return statement.execSys(ctx);
       }
    }
 

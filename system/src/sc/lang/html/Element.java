@@ -970,6 +970,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (idStr.equals(ALT_ID)) { // For the 'alt' element which is a child of another tag, use _alt as the suffix
                return getAltId();
             }
+            if (idStr.trim().length() == 0) {
+               useAttr.displayError("Invalid empty id: " + idStr);
+               return null;
+            }
             return CTypeUtil.escapeIdentifierString(idStr);
          }
          else

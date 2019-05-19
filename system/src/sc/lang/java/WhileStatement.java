@@ -18,7 +18,7 @@ public class WhileStatement extends ExpressionStatement implements IStatementWra
       // Do statement
       if (operator.charAt(0) == 'd') {
          do {
-            ExecResult res = statement.exec(ctx);
+            ExecResult res = statement.execSys(ctx);
             switch (res) {
                case Return:
                   return ExecResult.Return;
@@ -36,7 +36,7 @@ public class WhileStatement extends ExpressionStatement implements IStatementWra
       }
       else {
          while ((Boolean) expression.eval(Boolean.TYPE, ctx)) {
-            ExecResult res = statement.exec(ctx);
+            ExecResult res = statement.execSys(ctx);
             switch (res) {
                case Return:
                   return ExecResult.Return;
