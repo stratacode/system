@@ -104,7 +104,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
             // The type hierarchy needs to be defined before we can call "getMethods" so this should not be in "start"
             if (sys != null) {
                for (VariableDefinition varDef:variableDefinitions) {
-                  if (StringUtil.equalStrings(sys.getRuntimeName(), "js") && enclType.getMethods(varDef.variableName, null) != null)
+                  if (varDef.variableName != null && StringUtil.equalStrings(sys.getRuntimeName(), "js") && enclType.getMethods(varDef.variableName, null) != null)
                      varDef.shadowedByMethod = true;
                }
             }

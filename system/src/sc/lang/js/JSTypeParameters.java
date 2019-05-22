@@ -958,21 +958,38 @@ public class JSTypeParameters extends ObjectTypeParameters {
             AnnotationValue av = (AnnotationValue) annotObj;
             sb.append(av.identifier);
             sb.append(": ");
-            if (av.elementValue instanceof AbstractLiteral)
-               sb.append(((AbstractLiteral)av.elementValue).getExprValue());
-            else if (av.elementValue instanceof Expression) {
-               Expression attValExpr = (Expression) av.elementValue;
-
-               sb.append(JSUtil.convertAndFormatExpression(attValExpr));
-            }
-            else
-               sb.append(av.elementValue.toString());
+            appendAnnotAttrValue(sb, av.elementValue);
             i++;
          }
          sb.append("}");
       }
       else {
          sb.append(elementValue.toString());
+      }
+   }
+
+   private static void appendAnnotAttrValue(StringBuilder sb, Object elemVal) {
+      if (elemVal instanceof AbstractLiteral)
+         sb.append(((AbstractLiteral)elemVal).getExprValue());
+      else if (elemVal instanceof Expression) {
+         Expression attValExpr = (Expression) elemVal;
+
+         sb.append(JSUtil.convertAndFormatExpression(attValExpr));
+      }
+      else if (elemVal instanceof List) {
+         sb.append("[");
+         List annotList = (List) elemVal;
+         for (int alIx = 0; alIx < annotList.size(); alIx++) {
+            Object alVal = annotList.get(alIx);
+            if (alIx != 0)
+               sb.append(", ");
+            appendAnnotAttrValue(sb, alVal);
+         }
+         sb.append("]");
+      }
+      else {
+         // TODO: do we need this or is it hiding possible unhandled data types?
+         sb.append(elemVal.toString());
       }
    }
 

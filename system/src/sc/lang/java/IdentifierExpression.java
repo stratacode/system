@@ -31,10 +31,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
-import static sc.lang.java.IdentifierExpression.IdentifierType.BoundInstanceName;
-import static sc.lang.java.IdentifierExpression.IdentifierType.BoundObjectName;
-import static sc.lang.java.IdentifierExpression.IdentifierType.RemoteMethodInvocation;
-
 public class IdentifierExpression extends ArgumentsExpression {
    public List<IString> identifiers;
    public NewExpression innerCreator;
@@ -317,7 +313,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   }
                }
                if (boundTypes[0] instanceof ITypeDeclaration) {
-                  idTypes[0] = BoundObjectName;
+                  idTypes[0] = IdentifierType.BoundObjectName;
                }
                // TODO: When this identifier expression is inside of of a Template, the enclType is the rootType but this expression still lives in the
                // template hierarchy.  So when it does the findMethod inside of the Template it never checks the root type.  If the enclType is the Template
@@ -370,11 +366,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
 
                if (typeObj instanceof AbstractInterpreter) {
-                  idTypes[0] = BoundInstanceName;
+                  idTypes[0] = IdentifierType.BoundInstanceName;
                   boundTypes[0] = typeObj;
                }
                else if (typeObj != null && ModelUtil.isObjectType(typeObj)) {
-                  idTypes[0] = BoundObjectName;
+                  idTypes[0] = IdentifierType.BoundObjectName;
                   boundTypes[0] = typeObj;
                   if (varObj != null && varObj instanceof IVariable) {
                      IVariable var = (IVariable) varObj;
@@ -429,7 +425,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      if (propObj instanceof ParamTypedMember)
                         varObj = propObj = ((ParamTypedMember) propObj).getMemberObject();
                      if (propObj != null && ModelUtil.isObjectType(propObj))
-                        idTypes[0] = BoundObjectName;
+                        idTypes[0] = IdentifierType.BoundObjectName;
                      else {
                         boolean needsGetSet = isAssignment ? ModelUtil.hasSetMethod(propObj) : ModelUtil.isPropertyGetSet(propObj);
                         if (!useExtensions) {
@@ -470,7 +466,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                     ((model = getJavaModel()) != null && (boundTypes[0] = model.findTypeDeclaration(firstIdentifier, true)) != null)) {
                if (boundTypes[0] instanceof ITypeDeclaration) {
                   if (((ITypeDeclaration)boundTypes[0]).getDeclarationType() == DeclarationType.OBJECT)
-                     idTypes[0] = BoundObjectName;
+                     idTypes[0] = IdentifierType.BoundObjectName;
                      // If we can resolve this identifier through the custom resolver, it's an object.  This handles class types which are top-level types like
                      // pages etc. which are created as objects.
                   else if (model == null || model.customResolver == null || model.customResolver.resolveType(model.getPackagePrefix(), firstIdentifier, false, null) == null)
@@ -481,7 +477,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // TODO: detect "object" types from the class
                else if (boundTypes[0] instanceof Class || boundTypes[0] instanceof CFClass) {
                   if (ModelUtil.isObjectType(boundTypes[0]))
-                     idTypes[0] = BoundObjectName;
+                     idTypes[0] = IdentifierType.BoundObjectName;
                   else
                      idTypes[0] = IdentifierType.BoundTypeName;
                }
@@ -539,11 +535,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                            // Even if we've matched a child type, need to check if that object is a subobject
                            // of another parent, since the parent will need transforming too.
                            else {
-                              idTypes[k] = ModelUtil.isObjectType(rootType) ? BoundObjectName : IdentifierType.BoundTypeName;
+                              idTypes[k] = ModelUtil.isObjectType(rootType) ? IdentifierType.BoundObjectName : IdentifierType.BoundTypeName;
                               boundTypes[k] = rootType;
                            }
                         }
-                        idTypes[k] = ModelUtil.isObjectType(resolvedType) ? BoundObjectName : IdentifierType.BoundTypeName;
+                        idTypes[k] = ModelUtil.isObjectType(resolvedType) ? IdentifierType.BoundObjectName : IdentifierType.BoundTypeName;
 
                         // Explicitly disallow a.b.c where c is a class unless it is an object
                         if (k == sz-1 && !allowClassBinding() && idTypes[k] == IdentifierType.BoundTypeName) {
@@ -621,7 +617,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                // If we resolved the last entry as an object but its a static member, treat that as a class, not an object.
                // It's also a type if it's an unbound method name at that spot - i.e. ObjectType.getObjectType() where getObjectType() won't exist as a method
                int last;
-               if (i > 0 && idTypes[last = (i - 1)] == BoundObjectName && (isStaticTarget(i) || idTypes[i] == IdentifierType.UnboundMethodName)) {
+               if (i > 0 && idTypes[last = (i - 1)] == IdentifierType.BoundObjectName && (isStaticTarget(i) || idTypes[i] == IdentifierType.UnboundMethodName)) {
                   idTypes[last] = IdentifierType.BoundTypeName;
                }
             }
@@ -805,7 +801,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             continue;
 
          // Remote methods must be in a binding expression
-         if (idTypes[i] == RemoteMethodInvocation) {
+         if (idTypes[i] == IdentifierType.RemoteMethodInvocation) {
             // When we validate the expressions inside of the tag itself, we won't have set up binding so just defer this error to the other version which is in the tag object.
             if (bindingDirection == null && getEnclosingTag() == null) {
                LayeredSystem sys = getLayeredSystem();
@@ -861,7 +857,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          ret = IdentifierType.EnumName;
       else if (boundType instanceof ITypeDeclaration) {
          if (((ITypeDeclaration)boundType).getDeclarationType() == DeclarationType.OBJECT)
-            ret = BoundObjectName;
+            ret = IdentifierType.BoundObjectName;
          else
             ret = IdentifierType.BoundTypeName;
       }
@@ -1254,7 +1250,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       else if (idType == IdentifierExpression.IdentifierType.MethodInvocation) {
          checkForDynMethod(boundType, referenceType, (Expression) expr);
       }
-      else if (idType == BoundObjectName) {
+      else if (idType == IdentifierType.BoundObjectName) {
          if (boundType instanceof BodyTypeDeclaration)
             ModelUtil.markNeedsDynAccess(boundType);
          // We can have an object which is in compiled form, not anything we need to do
@@ -1461,7 +1457,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments(), expr.getLayeredSystem());
          if (meth != null) {
             boundTypes[ix] = meth;
-            idTypes[ix] = RemoteMethodInvocation;
+            idTypes[ix] = IdentifierType.RemoteMethodInvocation;
             if (meth instanceof AbstractMethodDefinition) {
                ((AbstractMethodDefinition) meth).addRemoteRuntime(sys.getRuntimeName());
             }
@@ -1498,7 +1494,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (methVar != null) {
                // getX() can return a ClassDeclaration in some cases
                if (methVar instanceof ITypeDeclaration) {
-                  idTypes[i] = BoundObjectName;
+                  idTypes[i] = IdentifierType.BoundObjectName;
                }
                else {
                   methVar = parameterizeMethod(expr, methVar, currentTypeDecl, inferredType, arguments, methodTypeArgs);
@@ -1510,13 +1506,25 @@ public class IdentifierExpression extends ArgumentsExpression {
                   boundTypes[i-1] = ModelUtil.getEnclosingType(methVar);
             }
             else {
+               if (model != null && model.enableExtensions()) {
+                  // If this is a getX or setX reference, look for a VariableDefinition that matches that might not have been transformed yet
+                  String propertyName = setLast ? ModelUtil.isSetMethod(nextName, ModelUtil.listToTypes(arguments), null) :
+                          ModelUtil.isGetMethod(nextName, ModelUtil.listToTypes(arguments), null);
+                  if (propertyName != null) {
+                     Object fieldObj = currentTypeDecl.definesMember(propertyName, MemberType.FieldSet, enclosingType, null);
+                     if (fieldObj instanceof VariableDefinition) {
+                        methVar = boundTypes[i] = fieldObj;
+                        idTypes[i] = IdentifierType.GetSetMethodInvocation;
+                     }
+                  }
+               }
                // For a super, when it's a modify that also has an extends, we need to try the extends if the modify failed
-               if (i > 0 && idTypes[i-1] == IdentifierType.SuperExpression && enclosingType != null) {
+               if (methVar == null && i > 0 && idTypes[i-1] == IdentifierType.SuperExpression && enclosingType != null) {
                   Object newCurrentType = ModelUtil.getExtendsClass(enclosingType);
                   if (newCurrentType != null && newCurrentType != currentType) {
                      methVar = ModelUtil.definesMethod(newCurrentType, nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs, enclosingType.getLayeredSystem());
                      if (methVar != null) {
-                        idTypes[i] = methVar instanceof ITypeDeclaration ? BoundObjectName : IdentifierType.MethodInvocation;
+                        idTypes[i] = methVar instanceof ITypeDeclaration ? IdentifierType.BoundObjectName : IdentifierType.MethodInvocation;
                         boundTypes[i] = methVar;
                         // Now the "super" really refers to this type.  This is important to get right for JS conversion, so it points to the right type.
                         boundTypes[i-1] = ModelUtil.getEnclosingType(methVar);
@@ -1586,7 +1594,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   else {
                      if ((boundTypes[i] = currentTypeDecl.getInnerType(nextName, null)) != null) {
                         if (ModelUtil.getDeclarationType(boundTypes[i]) == DeclarationType.OBJECT)
-                           idTypes[i] = BoundObjectName;
+                           idTypes[i] = IdentifierType.BoundObjectName;
                         else
                            idTypes[i] = IdentifierType.BoundTypeName;
                      }
@@ -1865,7 +1873,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (boundType != ArrayTypeDeclaration.LENGTH_FIELD && isStaticTarget(i)) {
          Object enclType = ModelUtil.getEnclosingType(boundType);
          // Better error for this case
-         if (idTypes[i] == BoundObjectName && enclType == null)
+         if (idTypes[i] == IdentifierType.BoundObjectName && enclType == null)
             throw new NullPointerException("Null object: " + varName + " evaluating: " + this.toSafeLanguageString());
          else {
             // This will not look at extends types so can't use the current static type here (i.e. thisObj)
@@ -2104,7 +2112,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (!ctx.allowInvoke(methToInvoke))
                   throw new IllegalArgumentException("Not allowed to invoke method: " + methToInvoke);
 
-               if (idTypes[0] == RemoteMethodInvocation) {
+               if (idTypes[0] == IdentifierType.RemoteMethodInvocation) {
                   return invokeRemoteMethod(jmodel, methThis, methToInvoke, expectedType, ctx);
                   //return ModelUtil.invokeRemoteMethod(getLayeredSystem(), methThis, methToInvoke, arguments, expectedType, ctx, true, null);
                }
@@ -2224,7 +2232,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                checkNull(value, methodName);
 
             Object method;
-            if (idTypes[i] == RemoteMethodInvocation) {
+            if (idTypes[i] == IdentifierType.RemoteMethodInvocation) {
                if (superMethod) {
                   System.err.println("*** Error - super() not supported for remote methods"); // this error should be caught earlier!
                   throw new UnsupportedOperationException();
@@ -2669,7 +2677,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                       * the containing classes identifier.
                      */
                      if (!enclosingTypeExtends(accessClass)) {
-                        addIdentifier(i, ModelUtil.getClassName(accessClass), BoundObjectName, type);
+                        addIdentifier(i, ModelUtil.getClassName(accessClass), IdentifierType.BoundObjectName, type);
                         sz++;
                         i++;
                      }
@@ -2688,7 +2696,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      if (ModelUtil.isDynamicNew(type) && !ModelUtil.isDynamicStub(type, false) && model.mergeDeclaration) {
                         if (i != sz - 1) {
                            // Resolving A.B.C where they are all objects - we can just resolve the leaf node
-                           while (i < sz - 1 && idTypes[i+1] == BoundObjectName) {
+                           while (i < sz - 1 && idTypes[i+1] == IdentifierType.BoundObjectName) {
                               i++;
                               type = boundTypes[i];
                            }
@@ -3216,7 +3224,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
                v.setProperty("arguments", arguments);
             }
-            else if (idTypes[j] == BoundObjectName || idTypes[j] == IdentifierType.GetVariable ||
+            else if (idTypes[j] == IdentifierType.BoundObjectName || idTypes[j] == IdentifierType.GetVariable ||
                      idTypes[j] == IdentifierType.IsVariable ||
                      (idTypes[j] == IdentifierType.FieldName && ModelUtil.needsGetSet(boundTypes[j]) && !isGetSetConversionDisabled(j) && (!isAssignment || j != sz-1 || (this instanceof ArrayElementExpression && !needsSetMethod())))) {
                boolean subDynamic = ModelUtil.isDynamicProperty(boundTypes[j]);
@@ -3715,7 +3723,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       Object boundType = boundTypes[i];
 
-      return idType == IdentifierType.MethodInvocation || idType == RemoteMethodInvocation ?
+      return idType == IdentifierType.MethodInvocation || idType == IdentifierType.RemoteMethodInvocation ?
               (nestedBinding ? "methodP" : "method") :
               idType == IdentifierType.EnumName || isFinal(boundType)  ?
                    (nestedBinding ? "constantP" : "constant") :
@@ -3903,7 +3911,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    /** Determines whether the first part of an object reference is part of a "this" expression or not */
    private boolean isThisObjectReference() {
-      assert idTypes[0] == BoundObjectName;
+      assert idTypes[0] == IdentifierType.BoundObjectName;
       Object enclType = ModelUtil.getEnclosingType(boundTypes[0]);
       return enclType != null && !ModelUtil.hasModifier(boundTypes[0], "static") && !(enclType instanceof Template);
    }
@@ -3965,7 +3973,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             break;
          case BoundTypeName:
-            if (idents.size() == 1 || (idTypes[1] != IdentifierType.MethodInvocation && idTypes[1] != RemoteMethodInvocation)) {
+            if (idents.size() == 1 || (idTypes[1] != IdentifierType.MethodInvocation && idTypes[1] != IdentifierType.RemoteMethodInvocation)) {
                srcObj = ModelUtil.getRuntimeType(boundTypes[0]);
                startPropertyIndex = 1;// Consumes the first name
                if (srcObj == null) {
@@ -4012,7 +4020,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (idTypes[pi] != IdentifierType.PackageName) {
                   if (idTypes[pi] == IdentifierType.BoundTypeName) {
                      startPropertyIndex = pi+1;
-                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != RemoteMethodInvocation))
+                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != IdentifierType.RemoteMethodInvocation))
                         srcObj = ctx.resolveName(getIdentifierPathName(startPropertyIndex), true);
                      else {
                         srcObj = null;
@@ -4213,7 +4221,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                }
             }
             // If it is an expression based off of the class itself, do a class value expression
-            else if (idents.size() == typeIx || (idTypes[typeIx] != IdentifierType.MethodInvocation && idTypes[typeIx] != RemoteMethodInvocation)) {
+            else if (idents.size() == typeIx || (idTypes[typeIx] != IdentifierType.MethodInvocation && idTypes[typeIx] != IdentifierType.RemoteMethodInvocation)) {
                // TODO: Shouldn't we use identifiers.get(0) as below?
                srcObj = ClassValueExpression.create(ModelUtil.getTypeName(srcType = boundTypes[0]));
             }
@@ -4256,7 +4264,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      }
 
                      startPropertyIndex = pi+1;
-                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != RemoteMethodInvocation))
+                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != IdentifierType.RemoteMethodInvocation))
                         srcObj = ClassValueExpression.create(ModelUtil.getTypeName(srcType));
                      else {
                         srcObj = null;
@@ -4330,7 +4338,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                identifier = idents.get(i).toString();
             if (i == idents.size()-1 && arguments != null) {
                // Bind.methodP(getMethod call, arguments converted to IBinding[])
-               props.add(createChildMethodBinding(getTypeForIdentifier(i-1), identifier, boundTypes[i], arguments, idTypes[i] == RemoteMethodInvocation));
+               props.add(createChildMethodBinding(getTypeForIdentifier(i-1), identifier, boundTypes[i], arguments, idTypes[i] == IdentifierType.RemoteMethodInvocation));
             }
             else {
                props.add(createGetPropertyMappingCall(lastObj, identifier));
@@ -4351,7 +4359,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          Object methodDeclaringClass;
          int ix = idents.size()-1;
          Object methodType = boundTypes[ix];
-         boolean isRemote = idTypes[ix] == RemoteMethodInvocation;
+         boolean isRemote = idTypes[ix] == IdentifierType.RemoteMethodInvocation;
          if (idents.size() == 1) {
 
             if (methodType == null) {
@@ -5123,7 +5131,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                idents.set(i, new PString(JSUtil.ShadowedPropertyPrefix + ident));
          }
 
-         if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == RemoteMethodInvocation) {
+         if (idTypes[i] == IdentifierType.MethodInvocation || idTypes[i] == IdentifierType.RemoteMethodInvocation) {
             Object meth = boundTypes[i];
             // Meth here is TypeDeclaration when we have a newX method that we could not resolve
             if (meth != null && !(meth instanceof TypeDeclaration)) {
