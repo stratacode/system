@@ -1301,6 +1301,9 @@ public class DynUtil {
    }
 
    public static Object findType(String typeName) {
+      Type type = Type.getPrimitiveType(typeName);
+      if (type != null)
+         return type.primitiveClass;
       if (dynamicSystem != null)
          return dynamicSystem.findType(typeName);
       return PTypeUtil.findType(typeName);
