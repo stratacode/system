@@ -59,6 +59,8 @@ public class ParseInStream extends BinfInStream {
                   childParselet = getNextParselet(parser, rctx);
                }
                Object childPN = readChild(parser, childParselet, rctx);
+               // Need this to set the semantic value for qualifiedIdentifier
+               //ppn.add(childPN, childParselet, -1, nestedParselet.getParseletSlotIx(childParselet), false, parser);
                ppn.addGeneratedNode(childPN);
             }
             if (parser.getCurrentIndex() != startIndex + ppn.length())
@@ -86,7 +88,7 @@ public class ParseInStream extends BinfInStream {
             // TODO: is this the best way to create a StringToken?  How will this work with the 'buffer' in Parser... will it ever be incremental?  seems like we should have the file as a byte array and point directly do that here to avoid pulling in extra stuff
             startIndex = readUInt();
             if (startIndex != parser.getCurrentIndex())
-               System.err.println("*** String token restored to wrong location!");
+               throw new IllegalArgumentException("*** String token restored to wrong location!");
             int len = readUInt();
             StringToken st = new StringToken(parser, startIndex, len);
             parser.changeCurrentIndex(startIndex + len);

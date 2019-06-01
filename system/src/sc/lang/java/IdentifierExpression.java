@@ -435,7 +435,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         else {
                            idTypes[0] = needsGetSet ?
                                    (isAssignment ? IdentifierType.SetVariable :
-                                           ModelUtil.isPropertyIs(propObj) ? IdentifierType.IsVariable : IdentifierType.GetVariable) :
+                                           propObj != null && ModelUtil.isPropertyIs(propObj) ? IdentifierType.IsVariable : IdentifierType.GetVariable) :
                                    ModelUtil.isField(varObj) || ModelUtil.hasField(varObj) ? IdentifierType.FieldName : ModelUtil.isEnum(varObj) ?
                                            IdentifierType.EnumName : IdentifierType.VariableName;
                         }

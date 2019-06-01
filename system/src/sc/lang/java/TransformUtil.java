@@ -409,7 +409,7 @@ public class TransformUtil {
                   accessClass.body.addAll(insertPos, list);
             }
             else {
-               accessClass.initHiddenBody();
+               accessClass.initHiddenBody(false);
                if (insertPos == -1)
                   accessClass.hiddenBody.addAll(list);
                else
@@ -1280,7 +1280,7 @@ public class TransformUtil {
       bst.setProperty("statements", toInsert);
 
       if (hidden)
-         objType.addToHiddenBody(bst);
+         objType.addToHiddenBody(bst, true);
       else
          objType.addBodyStatement(bst);
    }

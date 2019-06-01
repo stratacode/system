@@ -734,7 +734,7 @@ public class ClassDeclaration extends TypeDeclaration {
             else {
                // Remove this declaration since we'll use our parent type.
                outer.body.remove(ix);
-               outer.addToHiddenBody(this);
+               outer.addToHiddenBody(this, true);
 
                transformIx = ix;
             }

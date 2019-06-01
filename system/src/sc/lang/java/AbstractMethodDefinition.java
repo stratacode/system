@@ -7,14 +7,18 @@ package sc.lang.java;
 import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.template.GlueStatement;
+import sc.layer.BuildInfo;
 import sc.layer.Layer;
+import sc.layer.LayeredSystem;
+import sc.obj.IObjectId;
 import sc.parser.GenFileLineIndex;
 import sc.parser.IParseNode;
 import sc.parser.ParseUtil;
+import sc.util.StringUtil;
 
 import java.util.*;
 
-public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode, IBlockStatementWrapper {
+public abstract class AbstractMethodDefinition extends TypedDefinition implements IMethodDefinition, INamedNode, IBlockStatementWrapper, IObjectId {
    public String name;
    public Parameter parameters;
    public String arrayDimensions;
@@ -54,6 +58,32 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          origName = name;
       templateBody = body != null && body.statements != null && body.statements.size() == 1 &&
                      body.statements.get(0) instanceof GlueStatement;
+   }
+
+   public void process() {
+      super.process();
+      Object editorSettings = getAnnotation("sc.obj.EditorCreate"); // TODO: need getInheritedAnnotation for methods
+      if (editorSettings != null) {
+         String constrParamNames = (String) ModelUtil.getAnnotationValue(editorSettings, "constructorParamNames");
+         if (constrParamNames != null && constrParamNames.length() > 0) {
+            String[] paramNames = StringUtil.split(constrParamNames, ',');
+            if (paramNames.length != getNumParameters()) {
+               displayError("EditorCreate.constructorParamNames num params does not match: " + paramNames.length + " != " + getNumParameters());
+            }
+         }
+         BodyTypeDeclaration enclType = getEnclosingType();
+         if (!isConstructor()) {
+            Object returnType = getReturnType(false);
+            if (returnType != null && !ModelUtil.isAssignableFrom(returnType, enclType)) {
+               displayError("EditorCreate method return type: " + ModelUtil.getTypeName(returnType) + " does not match class type: " + enclType.typeName + " for: ");
+            }
+         }
+         if (enclType != null) {
+            LayeredSystem sys = getLayeredSystem();
+            BuildInfo bi = sys.buildInfo;
+            bi.addTypeGroupMember(enclType.getFullTypeName(),  enclType.getTemplatePathName(), BuildInfo.AllowEditorCreateGroupName);
+         }
+      }
    }
 
    public boolean transform(ILanguageModel.RuntimeType type) {
@@ -963,5 +993,20 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          return false; // TODO: When we have a body this incorrectly reports errors because we fail to clear the 'errorNode' flag during a reparse... possibly need to restrict the cases where we propagate the errorNode flag down the tree?
       return false; // TODO: It seems like we should be able to use the super here but it reports false errors - the result is that we lose the nicer placement of the incomplete error message for a missing ;
       //return super.isIncompleteStatement();
+   }
+
+   // Used for serializing a metadata model from this instance
+   public String getMethodTypeName() {
+      return getEnclosingType().getFullTypeName();
+   }
+
+   public void setMethodTypeName(String mtn) {
+      throw new UnsupportedOperationException();
+   }
+
+   // Must stay in sync with the client version
+   public String getObjectId() {
+      String methName = name == null ? "_init_" : name;
+      return DynUtil.getObjectId(this, null, "MMD_" + getMethodTypeName()  + "_" + methName);
    }
 }

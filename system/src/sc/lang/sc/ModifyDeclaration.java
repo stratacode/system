@@ -1304,7 +1304,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             nextType = rest;
          } while (rest != null);
          BodyTypeDeclaration parentType = getEnclosingType();
-         parentType.addToHiddenBody(theRoot);
+         parentType.addToHiddenBody(theRoot, false);
          hiddenByRoot = theRoot;
          hiddenByType = subType;
       }

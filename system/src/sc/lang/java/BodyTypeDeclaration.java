@@ -605,6 +605,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    protected void bodyChanged() {
       incrVersion();
+      if (hasBeenStopped)
+         incrSubTypeVersions();
       clearCachedMemberInfo();
    }
 
@@ -641,7 +643,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Layer layer = getLayer();
             if (layer != null && this instanceof TypeDeclaration) {
                // If there are any cached sub-types (passing cachedOnly = true), we want to invalidate their entries.
-               Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer.activated, false, false, true, true);
+               Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer, false, false, true, true);
                if (subTypes != null) {
                   while (subTypes.hasNext()) {
                      TypeDeclaration subType = subTypes.next();
@@ -1192,8 +1194,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public void initHiddenBody() {
-      incrVersion(); // Increment the version number each time we change the body so code will refresh caches
+   public void initHiddenBody(boolean skipVersion) {
+      if (!skipVersion)
+         incrVersion(); // Increment the version number each time we change the body so code will refresh caches
       if (hiddenBody == null) {
          // This order reduces generation overhead a little...
          SemanticNodeList<Statement> newStatements = new SemanticNodeList<Statement>(1);
@@ -1207,8 +1210,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return super.isSemanticChildValue(child);
    }
 
-   public void addToHiddenBody(Statement s) {
-      initHiddenBody();
+   public void addToHiddenBody(Statement s, boolean skipVersion) {
+      initHiddenBody(skipVersion);
       // Don't try to re-generate the language representation for anything in the hidden body.
       s.parseNode = null;
       JavaModel m = getJavaModel();
@@ -7861,7 +7864,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       defaultConstructor = new ConstructorDefinition();
 
       // Needs to be parent of the parent/child hierarchy
-      addToHiddenBody(defaultConstructor);
+      addToHiddenBody(defaultConstructor, true);
 
       return defaultConstructor;
    }
@@ -8127,6 +8130,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (initOnStartup != null && ((Boolean) initOnStartup)) {
                bi.addTypeGroupMember(getFullTypeName(),  getTemplatePathName(), BuildInfo.InitGroupName);
             }
+         }
+
+         Object editorSettings = getInheritedAnnotation("sc.obj.EditorCreate");
+         if (editorSettings != null) {
+            LayeredSystem sys = getLayeredSystem();
+            BuildInfo bi = sys.buildInfo;
+            bi.addTypeGroupMember(getFullTypeName(),  getTemplatePathName(), BuildInfo.AllowEditorCreateGroupName);
          }
       }
 
@@ -9274,6 +9284,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setFullTypeName(getFullTypeName());
          ctd.setDeclarationType(getDeclarationType());
          ctd.setDeclaredProperties(getDeclaredProperties());
+         ctd.setConstructorParamNames(getConstructorParamNames());
+         ctd.setEditorCreateMethod(getEditorCreateMethod());
          ctd.setExtendsTypeName(getExtendsTypeName());
          ctd.setPackageName(getPackageName());
          ctd.setScopeName(getScopeName());
@@ -9871,5 +9883,21 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public final void markNeedsDynamicStub(boolean val) {
       needsDynamicStub = val;
+   }
+
+   public AbstractMethodDefinition getEditorCreateMethod() {
+      return (AbstractMethodDefinition) ModelUtil.getEditorCreateMethod(this);
+   }
+
+   public String getConstructorParamNames() {
+      Object createMeth = getEditorCreateMethod();
+      if (createMeth == null)
+         return null;
+      Object annot = ModelUtil.getInheritedAnnotation(getLayeredSystem(), createMeth, "sc.obj.EditorCreate");
+      if (annot != null) {
+         String annotValue = (String) ModelUtil.getAnnotationValue(annot, "constructorParamNames");
+         return annotValue;
+      }
+      return null;
    }
 }

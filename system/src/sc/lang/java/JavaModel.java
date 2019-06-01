@@ -324,6 +324,16 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return CTypeUtil.prefixPath(getPackagePrefix(), useTypeName);
    }
 
+   /** Called after reparse so we can invalidate the member cache and member caches that reference this type explicitly */
+   public void modelChanged() {
+      if (types != null) {
+         for (TypeDeclaration type:types) {
+            // clear out the member cache after any changes made during reparse
+            type.bodyChanged();
+         }
+      }
+   }
+
    private static class WildcardImport {
       public String typeName;
       public WildcardImport(String tn) {
@@ -3420,19 +3430,26 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 
-   public void restoreParseNode() {
+   public boolean restoreParseNode() {
       if (parseNode == null) {
          LayeredSystem sys = getLayeredSystem();
          SrcEntry srcEnt = getSrcFile();
          if (srcEnt == null)
-            return;
+            return false;
          IFileProcessor processor = sys.getFileProcessorForSrcEnt(srcEnt, null, false);
-         LayerUtil.restoreParseNodes(sys, (Language) processor, srcEnt, getLastModifiedTime(), this);
-         if (sys.options.verbose)
-            sys.verbose("Restoring parse node for: " + this);
+         Object res = LayerUtil.restoreParseNodes(sys, (Language) processor, srcEnt, getLastModifiedTime(), this);
+         if (res instanceof ParseError || res == null) {
+            return false;
+         }
+         else if (sys.options.verbose)
+            sys.verbose("Restored parse node for: " + this);
       }
-      if (parseNode == null)
+      if (parseNode == null) {
          System.err.println("*** Failed to restore parse node!");
+         return false;
+      }
+      else
+         return true;
    }
 }
 

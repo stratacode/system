@@ -38,6 +38,8 @@ public abstract class ClientEditorContext {
 
    private boolean memorySessionChanged = false;
 
+   private List<String> createInstTypeNames;
+
    /** A list of packages that are used to search for a type name - by default, we'll take any exported packages from the layers in the stack as the importPackages */
    ArrayList<String> importPackages = new ArrayList<String>();
 
@@ -156,4 +158,17 @@ public abstract class ClientEditorContext {
       return "???";
    }
 
+   @Bindable(manual=true)
+   public List<String> getCreateInstTypeNames() {
+      return createInstTypeNames;
+   }
+
+   public void setCreateInstTypeNames(List<String> nl) {
+      createInstTypeNames = nl;
+      Bind.sendChangedEvent(this, "createInstTypeNames");
+   }
+
+   public boolean isCreateInstType(String typeName) {
+      return createInstTypeNames != null && createInstTypeNames.contains(typeName);
+   }
 }

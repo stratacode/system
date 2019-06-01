@@ -37,6 +37,7 @@ public class BuildInfo {
    transient List<SrcEntry> toCompile;
    public final static String StartupGroupName = "_startup";
    public final static String InitGroupName = "_init";
+   public final static String AllowEditorCreateGroupName = "_allowEditorCreate";
 
    public BuildInfo() {
    }
@@ -622,6 +623,16 @@ public class BuildInfo {
             agms.add(memb);
       }
       return agms;
+   }
+
+   public List<String> getTypeGroupTypeNames(String groupName) {
+      List<TypeGroupMember> tgms = getTypeGroupMembers(groupName);
+      if (tgms == null)
+         return null;
+      ArrayList<String> res = new ArrayList<String>(tgms.size());
+      for (TypeGroupMember tgm:tgms)
+         res.add(tgm.typeName);
+      return res;
    }
 
    public void merge(BuildInfo src) {

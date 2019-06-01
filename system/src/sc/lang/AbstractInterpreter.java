@@ -1208,7 +1208,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             int max = 10;
             try {
                system.acquireDynLock(false);
-               instances = getInstancesOfType(currentType, max, false);
+               instances = getInstancesOfType(currentType, max, false, null, false);
             }
             finally {
                system.releaseDynLock(false);

@@ -46,7 +46,7 @@ public class LayerSyncHandler extends SyncHandler {
       if (inst instanceof ParamTypeDeclaration)
          return replaceInstance(((ParamTypeDeclaration) inst).getBaseType());
 
-      if (inst instanceof Method || inst instanceof MethodDefinition) {
+      if (inst instanceof Method || (inst instanceof MethodDefinition && ((MethodDefinition) inst).propertyName != null)) {
          VariableDefinition varDef = new VariableDefinition();
          varDef.variableName = ModelUtil.getPropertyName(inst);
          varDef.frozenTypeDecl = ModelUtil.getPropertyType(inst);

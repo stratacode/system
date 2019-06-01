@@ -114,7 +114,7 @@ public class BinaryExpression extends Expression {
                   newParent = (BinaryExpression) newParent.rhs;
                }
 
-               if (TypeUtil.operatorPrecedes(op.operator, newParent.operator)) {
+               if (op.operator == null || newParent.operator == null || TypeUtil.operatorPrecedes(op.operator, newParent.operator)) {
                   if (newParent.rhs instanceof Expression) {
                      newExpr = createExpression((Expression) newParent.rhs, op);
                      newParent.setProperty("rhs", newExpr, false, false);
@@ -191,6 +191,10 @@ public class BinaryExpression extends Expression {
       */
 
       OperatorType type = getOperatorType(operator);
+      if (type == null) {
+         getErrorRoot().displayError("No operator for binary expression");
+         return;
+      }
 
       Object lhsType, rhsType;
       switch (type) {

@@ -982,12 +982,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public ArrayList<PropertyAssignment> getAssignmentsToProperty(VariableDefinition varDef, boolean activeOnly, boolean openLayers, boolean checkPeers) {
+   public ArrayList<PropertyAssignment> getAssignmentsToProperty(VariableDefinition varDef, Layer refLayer, boolean openLayers, boolean checkPeers) {
       TypeDeclaration enclType = varDef.getEnclosingType();
       if (enclType == null)
          return null;
 
-      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(enclType, activeOnly, openLayers, checkPeers, true, false);
+      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(enclType, refLayer, openLayers, checkPeers, true, false);
       ArrayList<PropertyAssignment> res = null;
       if (subTypes != null) {
          while (subTypes.hasNext()) {
@@ -3438,6 +3438,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object invokeMethod(Object obj, Object method, Object[] argValues) {
+      //return ModelUtil.invokeMethod(obj, method, argValues, new ExecutionContext(this));
+      // Need to use callMethod here in order to set the current object, find the right virtual method etc.
       return ModelUtil.callMethod(obj, method, argValues);
    }
 
@@ -3824,6 +3826,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // is finished before we start running commands, and that the prompt is the last thing we output so it's visible.
       sys.acquireDynLock(false);
 
+      if (sys.cmd != null)
+         sys.cmd.buildComplete();
+
       if (options.needsClassLoaderReset) {
          // There are situations where we need to reset the class loader - i.e. we cannot use the layered class loaders
          // for a runtime application.   The problem is that some layers included Java classes at runtime look at their
@@ -4061,9 +4066,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   new Object[] { "buildAllFiles" , "buildAllLayers" , "noCompile" , "verbose" , "info" , "debug" , "crossCompile" , "runFromBuildDir" , "runScript" ,
                                  "createNewLayer" , "dynamicLayers" , "allDynamic" , "liveDynamicTypes" , "useCommonBuildDir" , "buildDir" , "buildSrcDir" ,
                                   "recordFile" , "restartArgsFile" , "compileOnly" }, null, SyncPropOptions.SYNC_INIT, globalScopeId));
-         SyncProperties typeProps = new SyncProperties(null, null, new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
-                                                                                  "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags", "extendsTypeName"},
-                                                       null, SyncPropOptions.SYNC_INIT, globalScopeId);
+         SyncProperties typeProps = new SyncProperties(null, null,
+                   new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
+                                  "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags", "extendsTypeName",
+                                  "constructorParamNames", "editorCreateMethod"},
+                                            null, SyncPropOptions.SYNC_INIT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ModifyDeclaration.class, LayerSyncHandler.class);
@@ -4093,6 +4100,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags" },
                                  null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
+         SyncManager.addSyncType(MethodDefinition.class,
+                 new SyncProperties(null, null,
+                         new Object[] { "name" , "parameterList", "layer" , "comment", "methodTypeName", "returnTypeName", "annotations", "modifierFlags" },
+                         null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+         SyncManager.addSyncHandler(MethodDefinition.class, LayerSyncHandler.class);
+
+         SyncManager.addSyncType(ConstructorDefinition.class,
+                 new SyncProperties(null, null,
+                         new Object[] { "name" , "parameterList", "layer" , "comment", "methodTypeName", "annotations", "modifierFlags" },
+                         null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+
+         SyncManager.addSyncType(Parameter.class,
+                 new SyncProperties(null, null,
+                         new Object[] { "variableName" , "parameterTypeName" },
+                         null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+
          SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"},
                                              null, SyncPropOptions.SYNC_INIT, globalScopeId);
          SyncManager.addSyncType(JavaModel.class, modelProps);
@@ -4107,13 +4130,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(ParamTypeDeclaration.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Field.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Method.class, LayerSyncHandler.class);
-         SyncManager.addSyncHandler(MethodDefinition.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(BeanMapper.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(BeanIndexMapper.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Template.class, LayerSyncHandler.class);
          SyncManager.addSyncHandler(Layer.class, LayerSyncHandler.class);
-
-         //SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncManager.addSyncType(Layer.class,
                  new SyncProperties(null, null,
@@ -4888,7 +4908,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             typeName = CTypeUtil.prefixPath(newLayer.packagePrefix, typeName);
             // Need to lookup the table from the previous layer since the cache's fromPosition won't know about this new layer yet
             // Checking for any type here...
-            TypeDeclaration type = getCachedTypeDeclaration(typeName, null, null, false, true);
+            TypeDeclaration type = getCachedTypeDeclaration(typeName, null, null, false, true, null, false);
 
             // If'we've loaded this type, we need to refresh the system so that we get the new type
             // Need to do this all after the build though... oterhwise we can end up loading the modules twice.  Another option would be
@@ -7795,7 +7815,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null; // possibly not processed in this phase
       if (proc.getProducesTypes()) {
          // We may have already parsed and initialized this component from a reference.
-         TypeDeclaration cachedType = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false);
+         TypeDeclaration cachedType = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer.getNextLayer(), null, false, false, null, false);
          // Make sure it's from the right layer
          if (cachedType != null && cachedType.getLayer() == toGenEnt.layer)
             modelObj = cachedType;
@@ -7881,7 +7901,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (incrCompile)
             jmodel.readReverseDeps(genLayer);
          else {
-            TypeDeclaration prevModelType = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer, null, false, false);
+            TypeDeclaration prevModelType = getCachedTypeDeclaration(proc.getPrependLayerPackage() ? toGenEnt.getTypeName() : toGenEnt.getRelTypeName(), toGenEnt.layer, null, false, false, null, false);
             if (prevModelType != null && prevModelType != INVALID_TYPE_DECLARATION_SENTINEL) {
                JavaModel prevModel = prevModelType.getJavaModel();
                ParseUtil.startComponent(prevModel);
@@ -8498,7 +8518,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      // If we've already loaded a version of this type in a previous layer, even if it's not changed we still need to
                      // start the overriding type so that it can update the previous types for the next build.
                      TypeDeclaration cachedType;
-                     if (!needsGenerate && (cachedType = getCachedTypeDeclaration(srcTypeName, null, null, false, true)) != null) {
+                     if (!needsGenerate && (cachedType = getCachedTypeDeclaration(srcTypeName, null, null, false, true, null, false)) != null) {
                         if (cachedType != INVALID_TYPE_DECLARATION_SENTINEL && cachedType.layer != null && cachedType.layer.getLayerPosition() < newSrcEnt.layer.getLayerPosition()) {
                            SrcEntry prevEnt;
                            if ((prevEnt = bd.unchangedFiles.get(srcTypeName)) != null) {
@@ -8780,7 +8800,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (depModelObj == null)
                      depModelObj = getCachedModel(depFile, false);
                   if (depModelObj == null) {
-                     TypeDeclaration depType = getCachedTypeDeclaration(dep.typeName, genLayer, null, false, true);
+                     TypeDeclaration depType = getCachedTypeDeclaration(dep.typeName, genLayer, null, false, true, null, false);
                      if (depType != null && depType != INVALID_TYPE_DECLARATION_SENTINEL)
                         depModelObj = depType.getJavaModel();
 
@@ -10036,6 +10056,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!(modelObj instanceof IFileProcessorResult))
                return modelObj;
 
+            if (modelObj instanceof JavaModel) {
+               TypeDeclaration td = ((JavaModel) modelObj).getModelTypeDeclaration();
+               if (td != null && td.typeName == null)
+                  System.err.println("**** Reparsed buffer has null type name!");
+            }
+
             initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, true);
 
             return modelObj;
@@ -11165,9 +11191,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   public void notifyModelListeners(JavaModel model) {
+   public void notifyModelAdded(JavaModel model) {
       if (model.removed) {
-         warning("notifying removed listener");
+         warning("Ignoring call to notify model added with removed model");
          return;
       }
       for (IModelListener ml: modelListeners) {
@@ -11177,7 +11203,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void notifyInnerTypeAdded(BodyTypeDeclaration innerType) {
       if (innerType.getJavaModel().removed) {
-         warning("*** notifying removed inner listener");
+         warning("Ignoring call to notify inner type added with removed model");
          return;
       }
       for (IModelListener ml: modelListeners) {
@@ -11188,7 +11214,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public void notifyInnerTypeRemoved(BodyTypeDeclaration innerType) {
       if (innerType.getJavaModel().removed) {
-         warning("*** notifying removed inner listener");
+         warning("Ignoring call to notify inner type removed with removed model");
          return;
       }
       for (IModelListener ml: modelListeners) {
@@ -11196,6 +11222,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       removeFromInnerTypeCache(innerType.getFullTypeName());
    }
+
+   /*
+   public void notifyInstancedAdded(BodyTypeDeclaration innerType, Object inst) {
+      for (IModelListener ml: modelListeners) {
+         ml.instanceAdded(innerType, inst);
+      }
+      removeFromInnerTypeCache(innerType.getFullTypeName());
+   }
+   */
 
    public void addNewModelListener(IModelListener l) {
       modelListeners.add(l);
@@ -11292,7 +11327,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       Layer layer = model.getLayer();
       updateModelIndex(layer, model, absName);
-      if (model instanceof JavaModel && layer != null && layer.activated) {
+      // We need to call updateModel even for inactive types so that types which modify this type are updated to point to the new version
+      // We originally added that test for performance - overhead in the first time editing a given file, starting types and stuff so need to keep
+      // an eye on that that.
+      if (model instanceof JavaModel && layer != null /* && layer.activated */) {
          JavaModel newModel = (JavaModel) model;
          if (oldModel != null) {
             // TODO: should we be calling updateModel here?
@@ -11705,53 +11743,83 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       INVALID_TYPE_DECLARATION_SENTINEL.typeName = "<invalid>";
    }
 
-   public TypeDeclaration getCachedTypeDeclaration(String typeName, Layer fromLayer, Layer srcLayer, boolean updateFrom, boolean anyTypeInLayer) {
-      TypeDeclarationCacheEntry decls = typesByName.get(typeName);
-      if (decls != null && decls.size() != 0) {
-         int fromPosition = anyTypeInLayer ? -1 : fromLayer == null ? getLastStartedPosition() : fromLayer.layerPosition;
+   public TypeDeclaration getCachedTypeDeclaration(String typeName, Layer fromLayer, Layer srcLayer, boolean updateFrom, boolean anyTypeInLayer, Layer refLayer, boolean innerTypes) {
+      if (cacheForRefLayer(refLayer)) {
+         TypeDeclarationCacheEntry decls = typesByName.get(typeName);
+         if (decls != null && decls.size() != 0) {
+            int fromPosition = anyTypeInLayer ? -1 : fromLayer == null ? getLastStartedPosition() : fromLayer.layerPosition;
 
-         // If we have searched from this position before we can use the cache entry.
-         if (fromPosition == -1 || decls.fromPosition >= fromPosition) {
-            if (fromLayer == null)
+            // If we have searched from this position before we can use the cache entry.
+            if (fromPosition == -1 || decls.fromPosition >= fromPosition) {
+               if (fromLayer == null)
+                  return decls.get(0);
+               else {
+                  for (int i = 0; i < decls.size(); i++) {
+                     TypeDeclaration ldec = decls.get(i);
+
+                     if (ldec == INVALID_TYPE_DECLARATION_SENTINEL) {
+                        if (i == decls.size() - 1)
+                           return ldec;
+                        else
+                           continue;
+                     }
+
+                     // In case we are reloading the same layer though not sure why that would happen.
+                     if (ldec.getLayer().layerPosition < fromLayer.layerPosition) {
+                        return decls.get(i);
+                     }
+                  }
+               }
+            }
+            else if (decls.fromPosition == -1)
                return decls.get(0);
             else {
-               for (int i = 0; i < decls.size(); i++) {
-                  TypeDeclaration ldec = decls.get(i);
-
-                  if (ldec == INVALID_TYPE_DECLARATION_SENTINEL) {
-                     if (i == decls.size() - 1)
-                        return ldec;
-                     else
-                        continue;
+               int origFrom = decls.fromPosition;
+               // Hack note: when updateFrom = true, we are updating the search position here because after returning null
+               // we will immediately search for it from this position.  For coding convenience, this
+               // is updated here.  This would not be threadsafe and is a little ugly.
+               if (updateFrom) {
+                  if (fromPosition > decls.fromPosition) {
+                     decls.fromPosition = fromPosition;
                   }
+               }
 
-                  // In case we are reloading the same layer though not sure why that would happen.
-                  if (ldec.getLayer().layerPosition < fromLayer.layerPosition) {
-                     return decls.get(i);
-                  }
+               // If the caller provides the current src file with no layer, we can avoid reloading it
+               // and just update the cache.
+               if (srcLayer != null) {
+                  if (srcLayer.layerPosition < origFrom)
+                     return decls.get(0);
                }
             }
          }
-         else if (decls.fromPosition == -1)
-            return decls.get(0);
-         else {
-            int origFrom = decls.fromPosition;
-            // Hack note: when updateFrom = true, we are updating the search position here because after returning null
-            // we will immediately search for it from this position.  For coding convenience, this
-            // is updated here.  This would not be threadsafe and is a little ugly.
-            if (updateFrom) {
-               if (fromPosition > decls.fromPosition) {
-                  decls.fromPosition = fromPosition;
+      }
+      else {
+         SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null, refLayer, false);
+         if (srcEnt != null) {
+            ILanguageModel model = inactiveModelIndex.get(srcEnt.absFileName);
+            if (model != null)
+               return model.getModelTypeDeclaration();
+         }
+      }
+      if (innerTypes) {
+         String tailName = null;
+         do {
+            String rootTypeName = CTypeUtil.getPackageName(typeName);
+            tailName = CTypeUtil.prefixPath(CTypeUtil.getClassName(typeName), tailName);
+            if (rootTypeName != null) {
+               SrcEntry srcEnt = getSrcFileFromTypeName(rootTypeName, true, null, true, null, refLayer, false);
+               if (srcEnt != null) {
+                  TypeDeclaration rootType = getCachedTypeDeclaration(rootTypeName, fromLayer, srcLayer, updateFrom, anyTypeInLayer, refLayer, false);
+                  if (rootType != null) {
+                     Object res = rootType.getInnerType(tailName, null, true, false, true);
+                     if (res instanceof TypeDeclaration) {
+                        return (TypeDeclaration) res;
+                     }
+                  }
                }
             }
-
-            // If the caller provides the current src file with no layer, we can avoid reloading it
-            // and just update the cache. 
-            if (srcLayer != null) {
-               if (srcLayer.layerPosition < origFrom)
-                  return decls.get(0);
-            }
-         }
+            typeName = rootTypeName;
+         } while (typeName != null);
       }
       return null;
    }
@@ -11807,7 +11875,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (getUseCompiledForFinal() && fromLayer == null) {
          // First if we've loaded the src we need to return that.
          if (cacheForRefLayer(refLayer)) {
-            TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
+            TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false, null, false);
             if (decl != null) {
                if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
                   return null;
@@ -11855,7 +11923,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public TypeDeclaration getTypeFromCache(String typeName, Layer fromLayer, boolean prependPackage) {
       if (cacheForRefLayer(fromLayer)) {
-         TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
+         TypeDeclaration decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false, null, false);
          if (decl != null)
             return decl;
       }
@@ -11905,7 +11973,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       if (cacheForRefLayer(refLayer)) {
-         decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false);
+         decl = getCachedTypeDeclaration(typeName, fromLayer, null, true, false, refLayer, false);
          if (decl != null) {
             if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
                return null;
@@ -12001,7 +12069,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cacheForRefLayer(srcFile.layer)) {
             //else
             //   System.out.println(StringUtil.indent(nestLevel) + "using cached model " + typeName);
-            decl = getCachedTypeDeclaration(typeName, fromLayer, fromLayer == null ? srcFile.layer : null, false, false);
+            decl = getCachedTypeDeclaration(typeName, fromLayer, fromLayer == null ? srcFile.layer : null, false, false, srcFile.layer, false);
             if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
                return null;
             // Because we updated the fromPosition in the previous getCachedTypeDeclaration we might return the wrong
@@ -12032,7 +12100,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Returns false if there's no entry with this name - explicitly without parsing it if it's not already loaded */
    public boolean hasAnyTypeDeclaration(String typeName) {
-      TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
+      TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false, null, false);
       if (decl != null)
          return true;
       if (getCanUseCompiledType(typeName) && getClassWithPathName(typeName) != null)
@@ -12058,7 +12126,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Object getTypeDeclaration(String typeName, boolean srcOnly, Layer refLayer, boolean layerResolve) {
       boolean beingReplaced = false;
       if (cacheForRefLayer(refLayer)) {
-         TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false);
+         TypeDeclaration decl = getCachedTypeDeclaration(typeName, null, null, true, false, refLayer, false);
          if (decl != null) {
             if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
                return null;
@@ -12418,7 +12486,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cacheForRefLayer(refLayer)) {
             // If we did not specify a limit to the layer, use the current file's layer.  If we add a new layer we'll
             // only reload if there is a file for this type in that new layer.
-            TypeDeclaration decl = getCachedTypeDeclaration(fullTypeName, fromLayer, fromLayer == null ? srcFile.layer : null, true, false);
+            TypeDeclaration decl = getCachedTypeDeclaration(fullTypeName, fromLayer, fromLayer == null ? srcFile.layer : null, true, false, refLayer, false);
             if (decl != null) {
                if (decl == INVALID_TYPE_DECLARATION_SENTINEL)
                   return null;
@@ -13880,6 +13948,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                JavaModel typeModel = type.getJavaModel();
                // Need to start here so the sub-types get registered
                ParseUtil.initAndStartComponent(typeModel);
+               //notifyInstancedAdded(type, inst);
             }
          }
       }
@@ -14097,14 +14166,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type) {
-      return getSubTypesOfType(type, true, true, false, false, false);
+      return getSubTypesOfType(type, type.getLayer(), true, false, false, false);
    }
 
    /**
     * Returns the sub-types of the specified type.  If activeOnly is true, only those types active in this system are checked.  If activeOnly is false
     * and checkPeers is true, the type name is used to find sub-types in the peer systems as well.
     */
-   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, boolean activeOnly, boolean openLayers, boolean checkPeers, boolean includeModifiedTypes, boolean cachedOnly) {
+   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, Layer refLayer, boolean openLayers, boolean checkPeers, boolean includeModifiedTypes, boolean cachedOnly) {
       if (!type.isRealType())
          return NO_TYPES;
       String typeName = type.getFullTypeName();
@@ -14117,7 +14186,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Check sub-types in this layered system only if this type is from this system or the layer is also in that layer
       if (checkThisSystem && (typeLayer == null || typeLayer.activated)) {
             HashMap<String,Boolean> subTypesMap = subTypesByType.get(typeName);
-            if (activeOnly && subTypesMap == null)
+            if ((refLayer == null || refLayer.activated) && subTypesMap == null)
                return NO_TYPES;
 
          if (subTypesMap != null) {
@@ -14131,13 +14200,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
                else {
-                  Layer refLayer = type.getLayer();
                   if (refLayer == null)
-                     System.err.println("*** Error node without a parent layer");
+                     System.err.println("*** Error type without a ref layer");
                   if (refLayer != null && refLayer.layeredSystem != this)
                      refLayer = getPeerLayerFromRemote(refLayer);
                   // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
-                  TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                  TypeDeclaration res = cachedOnly ?
+                                       getCachedTypeDeclaration(subTypeName, null, null, false, false, refLayer, true) :
+                                       (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                   // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                   if (res != null && res.getFullTypeName().equals(subTypeName))
                      result.add(res);
@@ -14146,13 +14216,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (!activeOnly) {
+      if (refLayer != null && !refLayer.activated) {
          if (!cachedOnly)
             typeIndex.refreshReverseTypeIndex(this);
          if (checkPeers && !peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
                LayeredSystem peerSys = peerSystems.get(i);
-               Iterator<TypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, false, openLayers, false, includeModifiedTypes, cachedOnly);
+               Iterator<TypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, refLayer, openLayers, false, includeModifiedTypes, cachedOnly);
                if (peerRes != null) {
                   while (peerRes.hasNext())
                      result.add(peerRes.next());
@@ -14172,12 +14242,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         result.add(subLayer.model.getModelTypeDeclaration());
                   }
                   else {
-                     Layer refLayer = type.getLayer();
-                     if (refLayer == null)
-                        System.err.println("*** Error node without a parent layer");
                      if (refLayer != null && refLayer.layeredSystem != this)
                         refLayer = getPeerLayerFromRemote(refLayer);
-                     TypeDeclaration res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                     TypeDeclaration res = cachedOnly ?
+                               getCachedTypeDeclaration(subTypeName, null, null, false, false, refLayer, true) :
+                               (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                      // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
                      if (res != null) {
                         // Make sure we don't add any sub-types which are from the same layer as this one.
@@ -14207,7 +14276,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                               if (!subTypeLayer.closed) {
                                  // We may not find this sub-type in this system because we share the same type index across all processes in the runtime.  It might be
                                  // a different runtime.
-                                 res = cachedOnly ? getCachedTypeDeclaration(subTypeName, null, null, false, false) : (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                                 res = cachedOnly ?
+                                         getCachedTypeDeclaration(subTypeName, null, null, false, false, refLayer, true) :
+                                         (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
                                  if (res != null && res.getFullTypeName().equals(subTypeName) && !ModelUtil.sameTypesAndLayers(this, type, res))
                                     result.add(0, res);
                               }

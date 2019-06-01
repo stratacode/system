@@ -102,7 +102,7 @@ public class NewExpression extends IdentifierExpression {
             anonType.operator = "class";
             anonType.newExpr = this;
 
-            enclType.addToHiddenBody(anonType);
+            enclType.addToHiddenBody(anonType, true);
          }
       }
    }
@@ -538,7 +538,7 @@ public class NewExpression extends IdentifierExpression {
             if (anonTypeTransformed == null) {
                anonTypeTransformed = (AnonClassDeclaration) anonType.deepCopy(CopyAll | CopyTransformed, null);
                anonTypeTransformed.newExpr = this;
-               getEnclosingType().addToHiddenBody(anonTypeTransformed);
+               getEnclosingType().addToHiddenBody(anonTypeTransformed, true);
                anonTypeTransformed.transform(ILanguageModel.RuntimeType.JAVA);
             }
             return anonTypeTransformed;
@@ -608,7 +608,7 @@ public class NewExpression extends IdentifierExpression {
          anonType.setProperty("body", classBody.deepCopy(CopyNormal, null));
          if (needsAdd) {
             if (enclType != null)
-               enclType.addToHiddenBody(anonType);
+               enclType.addToHiddenBody(anonType, true);
          }
          else {
             // In case the type was started, init the type info on it again after we added the extends/implements.

@@ -5,11 +5,20 @@
 package sc.lang;
 
 import sc.dyn.DynUtil;
+import sc.lang.java.AbstractMethodDefinition;
+import sc.lang.java.BodyTypeDeclaration;
+import sc.lang.java.ConstructorDefinition;
+import sc.lang.java.Parameter;
 import sc.obj.IObjectId;
 import sc.obj.Sync;
 import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.obj.SyncMode;
+import sc.util.StringUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 
 @Sync(onDemand=true)
@@ -19,9 +28,20 @@ public class InstanceWrapper implements IObjectId {
    @Sync(syncMode=SyncMode.Disabled)
    public Object theInstance;
    @Sync(syncMode=SyncMode.Disabled)
-   boolean canCreate = false;
-   @Sync(syncMode=SyncMode.Disabled)
    public String typeName;
+
+   @Sync(syncMode=SyncMode.Disabled)
+   public boolean pendingCreate = false;
+
+   @Sync(syncMode=SyncMode.Disabled)
+   public boolean selectToCreate = false;
+
+   @Sync(syncMode=SyncMode.Disabled)
+   public Map<String,Object> pendingValues = null;
+
+   @Sync(syncMode=SyncMode.Disabled)
+   public String labelName = null;
+
    /*
    public InstanceWrapper(EditorContext ctx, boolean canCreate, String typeName) {
       this.typeName = typeName;
@@ -34,10 +54,12 @@ public class InstanceWrapper implements IObjectId {
    // WARNING: if you change the parameters here, also update the last three args for the addSyncInst call made here.
    // This class is also (mostly) copied in js/layer/lang/InstanceWrapper.scj so changes made here
    // usually are also made there.
-   public InstanceWrapper(EditorContext ctx, Object inst, String typeName) {
+   public InstanceWrapper(EditorContext ctx, Object inst, String typeName, String labelName, boolean selectToCreate) {
       this.theInstance = inst;
       this.ctx = ctx;
       this.typeName = typeName;
+      this.labelName = labelName;
+      this.selectToCreate = selectToCreate;
       // Because this class is not compiled with SC, we need to include this call by hand
       SyncManager.addSyncInst(this, true, true, null, null, ctx, inst, typeName);
    }
@@ -46,16 +68,20 @@ public class InstanceWrapper implements IObjectId {
       if (theInstance != null)
          return theInstance;
 
-      if (canCreate)
+      if (selectToCreate) {
          return theInstance = DynUtil.resolveName(typeName, true, false);
+      }
 
       return null;
    }
 
    public String toString() {
+      if (labelName != null)
+         return labelName;
       if (theInstance == null)
-         return typeName != null ? (canCreate ? "<select to create>" : "<type>") : "<type>";
-      return DynUtil.getInstanceName(theInstance);
+         return typeName != null ? (selectToCreate ? "<select to create>" : "<type>") : "<type>";
+      String res = DynUtil.getInstanceName(theInstance);
+      return CTypeUtil.getClassName(res);
    }
 
    public boolean equals(Object other) {
@@ -69,7 +95,11 @@ public class InstanceWrapper implements IObjectId {
    }
 
    public int hashCode() {
-      if (theInstance == null) return 0;
+      if (theInstance == null) {
+         if (typeName != null)
+            return typeName.hashCode();
+         return 0;
+      }
       return theInstance.hashCode();
    }
 

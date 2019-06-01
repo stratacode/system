@@ -302,18 +302,18 @@ public class InterfaceDeclaration extends TypeDeclaration {
             // If this is not a constant field, we move the statement into the hidden body and remove it from the .java file's interface body
             // Instead, we add a get/set method for the field in the interface
             if (isInterfaceField(st)) {
-               addToHiddenBody((Statement) st.deepCopy(CopyNormal, null));
+               addToHiddenBody((Statement) st.deepCopy(CopyNormal, null), false);
             }
             else if (st instanceof PropertyAssignment) {
                body.remove(i);
                i--;
-               addToHiddenBody(st);
+               addToHiddenBody(st, false);
             }
             // Handle non-empty methods by moving them to the hiddenBody and getting rid of the body for the interface itself
             else if (st instanceof MethodDefinition) {
                MethodDefinition meth = (MethodDefinition) st;
                if (meth.suppressInterfaceMethod()) {
-                  addToHiddenBody((Statement) meth.deepCopy(CopyNormal, null));
+                  addToHiddenBody((Statement) meth.deepCopy(CopyNormal, null), false);
                   meth.setProperty("body", null);
                }
             }
@@ -331,7 +331,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
                MethodDefinition meth = (MethodDefinition) st;
                // For methods which have an implementation, we preserve them in hidden body and then nix the body
                if (meth.suppressInterfaceMethod()) {
-                  addToHiddenBody((Statement) st.deepCopy(CopyNormal, null));
+                  addToHiddenBody((Statement) st.deepCopy(CopyNormal, null), false);
                   meth.setProperty("body", null);
                   any = true;
                }

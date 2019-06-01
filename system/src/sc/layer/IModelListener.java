@@ -15,4 +15,8 @@ public interface IModelListener {
    void innerTypeAdded(ITypeDeclaration type);
    void innerTypeRemoved(ITypeDeclaration type);
    void runtimeAdded(LayeredSystem sys);
+   /* use DynUtil.addDynListener for these events
+   void instanceAdded(ITypeDeclaration type, Object inst);
+   void instanceRemoved(ITypeDeclaration type, Object inst);
+   */
 }

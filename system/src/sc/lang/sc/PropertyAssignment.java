@@ -333,7 +333,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                decl.body.get(ix).transform(runtime);
          }
 
-         decl.addToHiddenBody(this);
+         decl.addToHiddenBody(this, false);
 
          return true;
       }
@@ -986,7 +986,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (type == null)
          return this;
       if (bindingDirection == null || bindingDirection.doForward()) {
-         Object newAssign = type.declaresMember(propertyName, MemberType.AssignmentSet, null, null);
+         Object newAssign = propertyName == null ? null : type.declaresMember(propertyName, MemberType.AssignmentSet, null, null);
          if (newAssign instanceof PropertyAssignment)
             return (PropertyAssignment) newAssign;
          displayError("Property removed? ");
@@ -997,7 +997,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             for (Statement st : type.body) {
                if (st instanceof PropertyAssignment) {
                   PropertyAssignment other = (PropertyAssignment) st;
-                  if (other.propertyName.equals(propertyName) && StringUtil.equalStrings(operator, other.operator) && bindingDirection == other.bindingDirection &&
+                  if (StringUtil.equalStrings(other.propertyName, propertyName) && StringUtil.equalStrings(operator, other.operator) && bindingDirection == other.bindingDirection &&
                           DynUtil.equalObjects(initializer, other.initializer))
                      return other;
                }

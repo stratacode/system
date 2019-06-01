@@ -10,6 +10,7 @@ import sc.lang.SemanticNodeList;
 import sc.lang.template.GlueStatement;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
+import sc.obj.IObjectId;
 import sc.type.IBeanIndexMapper;
 import sc.type.IBeanMapper;
 import sc.type.PropertyMethodType;
@@ -805,7 +806,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                res.add(overMeth);
          }
       }
-      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, false, false, true, false, false);
+      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, enclType.getLayer(), false, true, false, false);
       while (subTypes.hasNext()) {
          TypeDeclaration subType = subTypes.next();
          if (subType == enclType) {

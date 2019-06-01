@@ -4,12 +4,14 @@
 
 package sc.lang.java;
 
+import sc.dyn.DynUtil;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
+import sc.obj.IObjectId;
 
 import java.util.*;
 
-public class Parameter extends AbstractVariable implements IVariable {
+public class Parameter extends AbstractVariable implements IVariable, IObjectId {
    public SemanticNodeList<Object> variableModifiers;
    public JavaType type;
    public boolean repeatingParameter;
@@ -215,4 +217,14 @@ public class Parameter extends AbstractVariable implements IVariable {
       return sb.toString();
    }
 
+   public String getParameterTypeName() {
+      Object type = getTypeDeclaration();
+      if (type == null)
+         return "<no type>";
+      return ModelUtil.getTypeName(type);
+   }
+
+   public String getObjectId() {
+      return DynUtil.getObjectId(this, null, "PMD_" + getParameterTypeName()  + "_" + variableName);
+   }
 }

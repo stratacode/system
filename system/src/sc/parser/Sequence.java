@@ -1066,6 +1066,9 @@ public class Sequence extends NestedParselet  {
             if (pIn != null && !skipRestore) {
                // Reads the parselet-id, offsets, etc. to recreate this parse-node since it's not defined in the semantic model
                nestedValue = pIn.readChild(parser, childParselet, rctx);
+               // Because we do not call ParentParseNode.add (which calls setSemanticValue, need to restore the old value here
+               if (nestedValue instanceof IParseNode && oldChildObj != null)
+                  ((IParseNode) nestedValue).setSemanticValue(oldChildObj, false);
                skipRestore = true;
             }
             oldChildNode = null;

@@ -56,7 +56,7 @@ public class EnumDeclaration extends TypeDeclaration {
          ClassType retType = (ClassType) ClassType.create(getFullTypeName());
          retType.arrayDimensions = "[]";
          valuesMethod.setProperty("type", retType);
-         addToHiddenBody(valuesMethod);
+         addToHiddenBody(valuesMethod, false);
       }
    }
 
@@ -70,7 +70,7 @@ public class EnumDeclaration extends TypeDeclaration {
          valueOfMethod.setProperty("type", ClassType.create(getFullTypeName()));
          valueOfMethod.addModifier("static");
          valueOfMethod.addModifier(Annotation.create("sc.js.JSMethodSettings", "replaceWith", "_valueOf"));
-         addToHiddenBody(valueOfMethod);
+         addToHiddenBody(valueOfMethod, false);
       }
    }
 

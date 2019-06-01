@@ -7,6 +7,7 @@ package sc.lang;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.IListener;
+import sc.dyn.DynUtil;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.SCModel;
 import sc.layer.*;
@@ -124,16 +125,23 @@ public class EditorContext extends ClientEditorContext {
       return obj;
    }
 
+   /**
+    * Called when the user selects a current instance for a given type. If this type is the current type, update the
+    * current object. Otherwise, just use it as the new default the next time this type is selected.
+    */
    public void setDefaultCurrentObj(Object type, Object inst) {
+      int ntypes = currentTypes.size();
       // Keep the execContext in sync with what's done in the UI.  So we are editing the same instance
-      if (currentTypes.size() > startTypeIndex && type != null && ModelUtil.isAssignableFrom(type, currentTypes.get(currentTypes.size()-1)) && inst != execContext.getCurrentObject()) {
-         execContext.popCurrentObject();
-         execContext.pushCurrentObject(inst);
+      if (ntypes > startTypeIndex && type != null && ModelUtil.isAssignableFrom(type, currentTypes.get(ntypes-1)) ) {
+         if (inst != execContext.getCurrentObject()) {
+            execContext.popCurrentObject();
+            execContext.pushCurrentObject(inst);
+         }
       }
       selectedInstances.put(ModelUtil.getTypeName(type), inst);
    }
 
-   public List<InstanceWrapper> getInstancesOfType(Object type, int max, boolean addNull) {
+   public List<InstanceWrapper> getInstancesOfType(Object type, int max, boolean addNull, String nullLabelName, boolean selectToCreate) {
       if (type instanceof ClientTypeDeclaration)
          type = ((ClientTypeDeclaration) type).getOriginal();
       ArrayList<InstanceWrapper> ret = new ArrayList<InstanceWrapper>();
@@ -152,13 +160,13 @@ public class EditorContext extends ClientEditorContext {
       int i = 0;
       // Add a null entry at the front to represent the <type> selection
       if (addNull)
-         ret.add(new InstanceWrapper(this, null, typeName));
+         ret.add(new InstanceWrapper(this, null, typeName, nullLabelName, selectToCreate));
       if (scopeInst != null)
-         ret.add(new InstanceWrapper(this, scopeInst, typeName));
+         ret.add(new InstanceWrapper(this, scopeInst, typeName, null, false));
       while (i < max && it.hasNext()) {
          Object inst = it.next();
          if (inst != scopeInst)
-            ret.add(new InstanceWrapper(this, inst, typeName));
+            ret.add(new InstanceWrapper(this, inst, typeName, null, false));
       }
 
       /*
@@ -168,7 +176,7 @@ public class EditorContext extends ClientEditorContext {
       */
 
       if (ModelUtil.isEnum(type)) {
-         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type), typeName));
+         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type), typeName, null, false));
       }
       return ret;
    }
@@ -184,6 +192,14 @@ public class EditorContext extends ClientEditorContext {
    public void updateLayerState() {
       currentLayer = system.lastLayer;
       layerPrefix = currentLayer != null ? currentLayer.packagePrefix : null;
+   }
+
+   public void buildComplete() {
+      if (system.buildInfo != null) {
+         List<String> instTypeNames = system.buildInfo.getTypeGroupTypeNames(BuildInfo.AllowEditorCreateGroupName);
+         if (instTypeNames != null)
+            setCreateInstTypeNames(instTypeNames);
+      }
    }
 
    public void runtimeInitialized() {
@@ -788,7 +804,7 @@ public class EditorContext extends ClientEditorContext {
       // Make sure others can resolve this new type
       system.addNewModel(newModel, null, execContext, null, false, true);
 
-      system.notifyModelListeners(newModel);
+      system.notifyModelAdded(newModel);
 
       return td;
    }
@@ -1529,6 +1545,25 @@ public class EditorContext extends ClientEditorContext {
       return currentTypes.size() == (includeDefault ? 0 : startTypeIndex) ? null : currentTypes.get(currentTypes.size()-1);
    }
 
+   /*
+   public void pushCurrentType(BodyTypeDeclaration type) {
+      pushCurrentType(type, type.getDefinesCurrentObject() ? getDefaultCurrentObj(type) : null);
+   }
+
+   public void pushCurrentType(BodyTypeDeclaration type, Object inst) {
+      BodyTypeDeclaration  enclType = type.getEnclosingType();
+      if (enclType != null)
+         pushCurrentType(enclType);
+
+      currentTypes.add(type);
+      execContext.pushStaticFrame(type);
+      if (inst != null) {
+         execContext.popCurrentObject(); // pop off the null for the static frame and add the current instance
+         execContext.pushCurrentObject(inst);
+      }
+   }
+   */
+
    public void pushCurrentType(BodyTypeDeclaration type) {
       BodyTypeDeclaration  enclType = type.getEnclosingType();
       if (enclType != null)
@@ -1669,4 +1704,5 @@ public class EditorContext extends ClientEditorContext {
    public String getCurrentFilePosition() {
       return "line: " + currentLine;
    }
+
 }

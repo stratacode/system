@@ -198,6 +198,19 @@ public class LayerUtil implements LayerConstants {
       try {
          restored = lang.restore(srcEnt.absFileName, deserModel,  pIn, false);
       }
+      catch (IllegalArgumentException exc) {
+         // Something is wrong with this parse node stream - maybe a bug or maybe our stream does not match the current file?
+         System.err.println("*** Failed to restore parse node for file: " + parseFileName + " - last modified: " + new Date(parseLastModified) +
+                            " with src last modified: " + new Date(new File(srcEnt.absFileName).lastModified()) + " - removing parse file");
+         parseFile.delete();
+         // Restore the model without the parse node stream
+         restored = lang.restore(srcEnt.absFileName, deserModel,  null, false);
+         if (restored == null) {
+            System.err.println("*** Failed to recover from a failed restore of parse node for file: " + parseFileName + " - last modified: " + new Date(parseLastModified) +
+                    " with src last modified: " + new Date(new File(srcEnt.absFileName).lastModified()) + " - removing parse file");
+         }
+         return restored;
+      }
       finally {
          PerfMon.end("restoreModel");
       }
@@ -1157,7 +1170,8 @@ public class LayerUtil implements LayerConstants {
          if (mtype != null) {
             IParseNode pn = m.getParseNode();
             snCt += m.getNodeCount();
-            pnCt += pn.getNodeCount();
+            if (pn != null)
+               pnCt += pn.getNodeCount();
          }
       }
       return "(sn=" + snCt + ", pn=" + pnCt + ")";

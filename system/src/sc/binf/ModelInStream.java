@@ -2,6 +2,7 @@ package sc.binf;
 
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.lang.sc.ModifyDeclaration;
 import sc.parser.IString;
 import sc.parser.PString;
 import sc.parser.Parselet;

@@ -3867,13 +3867,18 @@ public class ModelUtil {
       return argValues;
    }
 
+   // Warning: this version will not check for a dynamic method - use invokeMethod below instead unless you know the MethodDefinition is dynamic
    public static Object callMethod(Object thisObj, Object method, Object...argValues) {
       if (method instanceof Method) {
          Method jMethod = (Method) method;
          return PTypeUtil.invokeMethod(thisObj, jMethod, argValues);
       }
       else if (method instanceof AbstractMethodDefinition) {
-         return ((AbstractMethodDefinition) method).callVirtual(thisObj, argValues);
+         AbstractMethodDefinition methDef = (AbstractMethodDefinition) method;
+         if (methDef.isDynMethod())
+            return ((AbstractMethodDefinition) method).callVirtual(thisObj, argValues);
+         Object invMeth = methDef.getRuntimeMethod();
+         return ModelUtil.invokeMethod(thisObj, invMeth, argValues, new ExecutionContext(methDef.getLayeredSystem()));
       }
       else if (method instanceof CFMethod) {
          Method rtMeth = ((CFMethod) method).getRuntimeMethod();
@@ -5788,7 +5793,8 @@ public class ModelUtil {
       if (ModelUtil.isCompiledClass(type) || type instanceof ParameterizedType) {
          String typeName = ModelUtil.getTypeName(type);
          if (sys != null) {
-            Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true) : sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, false);
+            Object res = cachedOnly ? sys.getCachedTypeDeclaration(typeName, null, null, false, true, refLayer, true) :
+                                      sys.getSrcTypeDeclaration(typeName, null, true, false, srcOnly, refLayer, false);
             if (res != null)
                return res;
          }
@@ -9213,6 +9219,23 @@ public class ModelUtil {
          return syncTypeNames;
       }
       return Collections.emptySet();
+   }
+
+   public static Object getEditorCreateMethod(Object typeObj) {
+      Object[] methods = ModelUtil.getAllMethods(typeObj, "public", true, false, false);
+      if (methods == null)
+         return null;
+      for (Object method:methods) {
+         Object annot = ModelUtil.getAnnotation(method, "sc.obj.EditorCreate");
+         if (annot != null) {
+            if (ModelUtil.isConstructor(method)) {
+               if (ModelUtil.sameTypes(ModelUtil.getEnclosingType(method), typeObj))
+                  return method;
+            }
+            return method;
+         }
+      }
+      return null;
    }
 
 }

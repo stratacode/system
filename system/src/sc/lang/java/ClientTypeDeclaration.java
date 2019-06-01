@@ -48,6 +48,24 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
       declaredProperties = ap;
    }
 
+   private String constructorParamNames;
+   @Constant
+   public String getConstructorParamNames() {
+      return constructorParamNames;
+   }
+   public void setConstructorParamNames(String names) {
+      constructorParamNames = names;
+   }
+
+   private AbstractMethodDefinition editorCreateMethod;
+   @Constant
+   public AbstractMethodDefinition getEditorCreateMethod() {
+      return editorCreateMethod;
+   }
+   public void setEditorCreateMethod(AbstractMethodDefinition ecm) {
+      editorCreateMethod = ecm;
+   }
+
    private String packageName;
    @Constant
    public void setPackageName(String pn) {

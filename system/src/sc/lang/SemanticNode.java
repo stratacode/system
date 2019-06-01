@@ -8,6 +8,7 @@ import sc.binf.BinfConstants;
 import sc.binf.ModelOutStream;
 import sc.js.JSSettings;
 import sc.lang.java.*;
+import sc.lang.sc.ModifyDeclaration;
 import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
 import sc.obj.EditorSettings;
@@ -730,14 +731,15 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       return -1;
    }
 
-   public void restoreParseNode() {
+   public boolean restoreParseNode() {
       if (parseNode == null) {
          ISemanticNode rootNode = getRootNode();
          if (rootNode instanceof ILanguageModel) {
             ILanguageModel rootModel = (ILanguageModel) rootNode;
-            rootModel.restoreParseNode();
+            return rootModel.restoreParseNode();
          }
       }
+      return false;
    }
 
    private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
