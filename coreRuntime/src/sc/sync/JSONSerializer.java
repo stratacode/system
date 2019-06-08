@@ -396,7 +396,7 @@ public class JSONSerializer extends SyncSerializer {
    public void formatString(StringBuilder sb, String val) {
       // An edge case - we use ref: to denote references in values so if this happens to be in the string we are formatting
       // we need to escape it
-      if (val.startsWith(ExprPrefixes.ref.name()))
+      if (val.length() >= 4 && ExprPrefixes.isRefPrefix(val, 0))
          val = '\\' + val;
       super.formatString(sb, val);
    }
