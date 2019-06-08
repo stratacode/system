@@ -43,7 +43,8 @@ public class SysTypeIndex {
    }
 
    public void refreshReverseTypeIndex(LayeredSystem sys) {
-      inactiveTypeIndex.refreshReverseTypeIndex(sys);
+      if (sys == null || sys.typeIndexLoaded)
+         inactiveTypeIndex.refreshReverseTypeIndex(sys);
    }
 
    public boolean loadFromDir(String typeIndexDir) {

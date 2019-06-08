@@ -362,6 +362,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     */
    boolean typeIndexEnabled = false;
 
+   boolean typeIndexLoaded = false;
+
    String typeIndexDirName = null;
 
    public List<VMParameter> vmParameters;
@@ -4042,7 +4044,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
            "sc.lang.sc.PropertyAssignment", "sc.lang.java.JavaModel", "sc.lang.sc.SCModel",  "sc.lang.template.Template",
            "sc.layer.SrcEntry", "sc.lang.java.ParamTypedMember", "sc.lang.java.ParamTypeDeclaration",
            "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition",
-           "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer",
+           "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer", "sc.lang.java.Parameter",
            // From EditorContext (JLineInterpreter is replaced with EditorContext on the client so is implicitly sync'd)
            "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession"));
 
@@ -4102,13 +4104,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          SyncManager.addSyncType(MethodDefinition.class,
                  new SyncProperties(null, null,
-                         new Object[] { "name" , "parameterList", "layer" , "comment", "methodTypeName", "returnTypeName", "annotations", "modifierFlags" },
+                         new Object[] { "name" , "parameterList", "comment", "methodTypeName", "returnTypeName", "annotations", "modifierFlags" },
                          null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
          SyncManager.addSyncHandler(MethodDefinition.class, LayerSyncHandler.class);
 
          SyncManager.addSyncType(ConstructorDefinition.class,
                  new SyncProperties(null, null,
-                         new Object[] { "name" , "parameterList", "layer" , "comment", "methodTypeName", "annotations", "modifierFlags" },
+                         new Object[] { "name" , "parameterList", "comment", "methodTypeName", "annotations", "modifierFlags" },
                          null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncManager.addSyncType(Parameter.class,
@@ -7052,6 +7054,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       buildReverseTypeIndex(false);
 
       saveTypeIndexFiles();
+
+      typeIndexLoaded = true;
 
       // TODO: after we rebuild the type index from scratch (at least) it's nice if we go through and cull out unused types
       // to save memory.  But need to test this again after after updating the code to handle modified types
@@ -10109,19 +10113,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
                }
             }
-            if (clonedModels != null)
-               initClonedModels(clonedModels, srcEnt, modTimeStart, true);
 
+            // Need to be careful because when we call 'init' on the JavaModel it can throw a process cancelled exception.
+            // In that case, we still need to set the layer and add the model to the index. We'll try again later to call initModel
+            // on that model before we use it but if this stuff is not set, we won't reset it.
             try {
-               initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
+               if (clonedModels != null)
+                  initClonedModels(clonedModels, srcEnt, modTimeStart, true);
             }
             finally {
-               if (!dummy)
-                  beingLoaded.remove(srcEnt.absFileName);
-            }
+               try {
+                  initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
+               }
+               finally {
+                  if (!dummy)
+                     beingLoaded.remove(srcEnt.absFileName);
 
-            if (clonedModels != null)
-               initClonedModels(clonedModels, srcEnt, modTimeStart, false);
+                  // If initModel is aborted, we still want to register the models into the name space so things are not left in a half-finished situation
+                  if (clonedModels != null)
+                     initClonedModels(clonedModels, srcEnt, modTimeStart, false);
+               }
+            }
          }
       }
    }
@@ -10435,9 +10447,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          finally {
             beingLoaded.remove(copySrcEnt.absFileName);
-         }
 
-         addNewModel(copy, peerLayer.getNextLayer(), null, null, false, false);
+            // Even if the init model throws a cancelled exception, make sure to add the model so all we need to do is to re-init it later
+            addNewModel(copy, peerLayer.getNextLayer(), null, null, false, false);
+         }
       }
       else
          System.err.println("*** Error cloned model in layer not started");
@@ -11093,6 +11106,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          // Also register it in the layer model index
          srcEntLayer.layerModels.add(new IdentityWrapper(model));
+         srcEntLayer.addNewSrcFile(srcEnt, true);
       }
 
       if (updateInfo == null && active && updateInstances)
@@ -11478,7 +11492,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                }
             }
             */
-            if (isActivated(srcEnt.layer)) { System.err.println("*** not reached!!!");
+            if (isActivated(srcEnt.layer)) {
+               System.err.println("*** not reached!!!");
                if (!extModel.isAdded())
                   addNewModel(extModel, srcEnt.layer.getNextLayer(), null, null, extModel instanceof JavaModel && ((JavaModel) extModel).isLayerModel, false);
             }
@@ -12084,6 +12099,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             JavaModel javaModel = (JavaModel) modelObj;
             if (!javaModel.isInitialized())
                ParseUtil.initComponent(javaModel);
+            if (javaModel.isLayerModel) {
+               if (!layerResolve)
+                  return null;
+            }
             if (javaModel.getModelTypeName().equals(typeName))
                return javaModel.getLayerTypeDeclaration();
          }

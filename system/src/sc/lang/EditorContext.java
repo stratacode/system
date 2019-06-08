@@ -778,7 +778,7 @@ public class EditorContext extends ClientEditorContext {
       Object existingType = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(currentPackage, name), layer.getNextLayer(), true);
       TypeDeclaration td;
       if (existingType != null) {
-         // Just create a modify if there's already a type by tbat name... should we ensure mode matches the existing type?
+         // Just create a modify if there's already a type by that name... should we ensure mode matches the existing type?
          mode = null;
       }
 
@@ -1211,6 +1211,29 @@ public class EditorContext extends ClientEditorContext {
       return relPos;
    }
 
+   public int completeCreateInstanceType(String command, List<String> candidates) {
+      int relPos = 0;
+      if (candidates.size() == 0) {
+         List<String> res = getCreateInstTypeNames();
+         if (res != null) {
+            BodyTypeDeclaration last = null;
+            for (int i = 0; i < res.size(); i++) {
+               String typeName = res.get(i);
+               if (typeName.startsWith(command)) {
+                  candidates.add(typeName);
+               }
+               else {
+                  String className = CTypeUtil.getClassName(typeName);
+                  if (className.startsWith(command))
+                     candidates.add(className);
+               }
+            }
+         }
+         relPos = 0;
+      }
+      return relPos;
+   }
+
    static String getStatementCompleteStart(String input) {
       for (int i = input.length()-1; i >= 0; i--) {
          switch (input.charAt(i)) {
@@ -1545,7 +1568,6 @@ public class EditorContext extends ClientEditorContext {
       return currentTypes.size() == (includeDefault ? 0 : startTypeIndex) ? null : currentTypes.get(currentTypes.size()-1);
    }
 
-   /*
    public void pushCurrentType(BodyTypeDeclaration type) {
       pushCurrentType(type, type.getDefinesCurrentObject() ? getDefaultCurrentObj(type) : null);
    }
@@ -1562,8 +1584,8 @@ public class EditorContext extends ClientEditorContext {
          execContext.pushCurrentObject(inst);
       }
    }
-   */
 
+   /*
    public void pushCurrentType(BodyTypeDeclaration type) {
       BodyTypeDeclaration  enclType = type.getEnclosingType();
       if (enclType != null)
@@ -1574,6 +1596,7 @@ public class EditorContext extends ClientEditorContext {
       if (type.getDefinesCurrentObject())
          execContext.pushCurrentObject(getDefaultCurrentObj(type));
    }
+   */
 
    public void popCurrentType() {
       if (currentTypes.size() == startTypeIndex)

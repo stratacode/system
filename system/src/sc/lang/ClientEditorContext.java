@@ -12,6 +12,7 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.obj.Constant;
+import sc.type.CTypeUtil;
 
 import java.util.*;
 
@@ -170,5 +171,12 @@ public abstract class ClientEditorContext {
 
    public boolean isCreateInstType(String typeName) {
       return createInstTypeNames != null && createInstTypeNames.contains(typeName);
+   }
+
+   public String getCreateInstFullTypeName(String typeName) {
+      for (String tn:createInstTypeNames)
+         if (CTypeUtil.getClassName(tn).equals(typeName))
+            return tn;
+      return null;
    }
 }

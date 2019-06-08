@@ -1432,7 +1432,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       // Once we've finished processing, during the transform don't bother checking for remote methods.  Sometimes
       // we find them due to the problem that we don't transform getX/setX until after we've transformed the reference.
       // Remote methods should be resolved before the transform anyway.
-      if (expr.isProcessed() || exprModel == null || exprModel.inTransform || exprModel.isLayerModel || exprModel.disableTypeErrors || !exprModel.mergeDeclaration)
+      if (sys == null || expr.isProcessed() || exprModel == null || exprModel.inTransform || exprModel.isLayerModel || exprModel.disableTypeErrors || !exprModel.mergeDeclaration)
          return null;
 
       List<LayeredSystem> syncSystems = sys.getSyncSystems();
@@ -4263,9 +4263,23 @@ public class IdentifierExpression extends ArgumentsExpression {
                         srcType = boundTypes[pi];
                      }
 
-                     startPropertyIndex = pi+1;
-                     if (pi == idents.size()-1 || (idTypes[pi+1] != IdentifierType.MethodInvocation && idTypes[pi+1] != IdentifierType.RemoteMethodInvocation))
+                     int nextPi = pi+1;
+                     startPropertyIndex = nextPi;
+                     if (pi == idents.size()-1 ||
+                             (idTypes[nextPi] != IdentifierType.MethodInvocation &&
+                              idTypes[nextPi] != IdentifierType.RemoteMethodInvocation &&
+                              idTypes[nextPi] != IdentifierType.EnumName))
                         srcObj = ClassValueExpression.create(ModelUtil.getTypeName(srcType));
+                     else if (idTypes[nextPi] == IdentifierType.EnumName) {
+                        startPropertyIndex = nextPi + 1;
+                        srcObj = IdentifierExpression.create(getIdentifierPathName(startPropertyIndex));
+                        // Constant binding can't have props or args.
+                        if (startPropertyIndex == idents.size()) {
+                           bindArgs.add(srcObj);
+                           return;
+                        }
+                        // TODO: else - do we need to handle this?
+                     }
                      else {
                         srcObj = null;
                         srcType = null;
@@ -4316,7 +4330,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          Object lastObj = srcType;
          for (int i = startPropertyIndex; i < idents.size(); i++) {
             if (idTypes[i] == null) {
-               System.err.println("*** Data binding to dynamic types not yet implemented " + idents.get(i) + " not bound to a type for: " + toDefinitionString());
+               System.err.println("*** Data binding for uninitialized type: " + idents.get(i) + " not bound to a type for: " + toDefinitionString());
                bindArgs.remove(srcObj);
                return;
             }

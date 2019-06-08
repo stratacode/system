@@ -610,6 +610,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       clearCachedMemberInfo();
    }
 
+   protected void modelChanged() {
+      bodyChanged();
+      // If we have been reparsed, make sure to flush out the member cache for all inner types
+      if (hasBeenStopped) {
+         List<Object> innerTypes = getAllInnerTypes(null, true);
+         if (innerTypes != null) {
+            for (Object innerType:innerTypes) {
+               if (innerType instanceof BodyTypeDeclaration)
+                  ((BodyTypeDeclaration) innerType).modelChanged();
+            }
+         }
+      }
+   }
+
    public void clearCachedMemberInfo() {
       membersByName = null;
       methodsByName = null;
@@ -2137,7 +2151,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    /**
-    * Returns any methods defined by this type.  Does not include constructors.  If the
+    * Returns any inner types defined by this type.  If the
     * modifier is supplied, only methods with that modifier are returned.
     */
    public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {

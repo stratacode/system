@@ -924,4 +924,11 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       overridesCompiled = false;
       needsDynAccess = false;
    }
+
+   public String getReturnTypeName() {
+      Object type = getReturnType(false);
+      if (type != null)
+         return ModelUtil.getTypeName(type);
+      return null;
+   }
 }

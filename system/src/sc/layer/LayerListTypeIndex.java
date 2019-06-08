@@ -69,8 +69,10 @@ public class LayerListTypeIndex {
 
    public boolean loadFromDir(String typeIndexDir) {
       orderIndex = LayerOrderIndex.readFromFile(typeIndexDir, sys == null ? null : sys.messageHandler);
-      if (orderIndex == null)
+      if (orderIndex == null) {
+         orderIndex = new LayerOrderIndex();
          return false;
+      }
       return true;
    }
 

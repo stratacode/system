@@ -2045,6 +2045,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * When unique is false, all items for the given element are returned, included those that are inherited.
     */
    private SemanticNodeList<Object> addChildren(Element parentElement, Element derivedElement, SemanticNodeList<Object> res, boolean unique, boolean iface, boolean canInherit, AddChildResult childRes) {
+      if (derivedElement == this) {
+         System.out.println("*** Error - invalid recursive element tree!");
+         derivedElement = null;
+      }
       SemanticNodeList<Object> derivedChildren = derivedElement == null ? null : derivedElement.getChildren(false, true); // Get all inherited children - when we have to reorder, it's all or nothing.
 
       boolean needsSort = false;

@@ -2542,7 +2542,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          // them to remain in this consistent order so we can display them cleanly in the UI.
          if (!activated) {
             LayeredSystem sys = layeredSystem;
-            if (sys.typeIndex != null) {
+            if (sys.typeIndex != null && sys.typeIndexLoaded) {
                int oldPos = sys.typeIndex.inactiveTypeIndex.orderIndex.inactiveLayerNames.indexOf(getLayerName());
                if (oldPos != -1)
                   return oldPos;

@@ -781,8 +781,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public void addPropertyToMakeBindable(String propertyName, Object propType, JavaModel fromModel, boolean referenceOnly, JavaSemanticNode fromNode) {
-      assert isClassOrObjectType();
-
       Layer lyr = getLayer();
       LayeredSystem sys = lyr != null ? lyr.getLayeredSystem() : null;
 
