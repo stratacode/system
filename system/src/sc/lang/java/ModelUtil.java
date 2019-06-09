@@ -1861,7 +1861,7 @@ public class ModelUtil {
       ArrayList<Object> res = new ArrayList<Object>();
       for (int i = 0; i < if2.length; i++) {
          for (int j = 0; j < if1.length; j++) {
-            if (if1[j] == if2[i]) {
+            if (ModelUtil.sameTypes(if1[j], if2[i])) {
                res.add(if1[j]);
                break;
             }
