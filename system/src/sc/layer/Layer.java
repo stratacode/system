@@ -1934,7 +1934,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   zipFiles[i] = new ZipFile(classDir);
                }
                catch (IOException exc) {
-                  System.err.println("*** Can't open layer: " + layerPathName + "'s classPath entry as a zip file: " + classDir);
+                  error("*** Can't open zip file: " + classDir + " in classPath for layer: " + layerPathName);
                }
             }
          }
@@ -2535,6 +2535,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (compiledOnly)
          ct--;
       if (codeType == CodeType.Framework)
+         ct--;
+      if (configLayer)
          ct--;
 
       if (ct == 0) {
@@ -4734,7 +4736,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                props.load(new InputStreamReader(new FileInputStream(fileName)));
             }
             catch (IOException exc) {
-               System.err.println("*** Unable to read properties file: " + propSrcEnt.absFileName + " exc: " + exc);
+               error("*** Unable to read properties file: " + propSrcEnt.absFileName + " exc: " + exc);
             }
             propertiesCache.put(fileName, props);
          }

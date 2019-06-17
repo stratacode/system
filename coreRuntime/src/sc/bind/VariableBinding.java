@@ -388,7 +388,9 @@ public class VariableBinding extends DestinationListener {
                else {
                   Object newValue = getBoundProperty(bindingParent, i);
 
-                  if (!equalValues(i, newValue)) {
+                  // Using sameValues here, not equalValues because if an IChangeable instance has changed we need to re-register the listeners
+                  // in valueValidated.
+                  if (!sameValues(i, newValue)) {
                      changed = true;
                   }
                }
@@ -521,14 +523,18 @@ public class VariableBinding extends DestinationListener {
       }
 
       if (!isAssignment) {
-         // If it is marked as changeable, add the leaf property listener
-         if (oldValue != null && oldValue instanceof IChangeable)
-            Bind.removeListener(oldValue, null, this, VALUE_CHANGED_MASK);
-         if (newValue != null && newValue instanceof IChangeable)
-            Bind.addListener(newValue, null, this, VALUE_CHANGED_MASK);
+         updateChangeableListeners(oldValue, newValue);
       }
 
       boundValues[i] = newValue;
+   }
+
+   private void updateChangeableListeners(Object oldValue, Object newValue) {
+      // If it is marked as changeable, add the leaf property listener
+      if (oldValue instanceof IChangeable)
+         Bind.removeListener(oldValue, null, this, VALUE_CHANGED_MASK);
+      if (newValue instanceof IChangeable)
+         Bind.addListener(newValue, null, this, VALUE_CHANGED_MASK);
    }
 
    protected void bindingInvalidated(boolean apply) {
@@ -540,6 +546,13 @@ public class VariableBinding extends DestinationListener {
       }
    }
 
+   // Uses == for IChangeable - so we know to register the listeners
+   protected boolean sameValues(int index, Object newValue) {
+      Object oldValue = boundValues[index];
+      return newValue == oldValue || (!(oldValue instanceof IChangeable) && DynUtil.equalObjects(oldValue, newValue));
+   }
+
+   // Uses equals method to do the comparison
    protected boolean equalValues(int index, Object newValue) {
       return DynUtil.equalObjects(newValue, boundValues[index]);
    }

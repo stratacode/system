@@ -7516,15 +7516,23 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   // Is this an initialization method - i.e. an init method in a component type.
+   // If so, we can treat this expression as a 'referenceInitializer' and convert getX into
+   // getX(false) so that we don't fully initialize the object before returning it.  It allows
+   // all objects in the graph to be created first, then initialized, then started.
+   // TODO: should we use getX(List<Object>) and support getX() calls on components accessed in the preInit method? We could init a deeper component graph that way using this mechanism and still
+   // initialize any new objects created in a multi-step way. Right now we only init child inner objects using the graph style access pattern.
    public static boolean isChainedReferenceInitializer(MethodDefinition mdef) {
       Parameter params;
       if (mdef.propertyName != null && mdef.propertyMethodType.isGet() &&
               (params = mdef.parameters) != null && params.getNumParameters() == 1 && mdef.parameters.getParameterNames()[0].equals("doInit"))
          return true;
 
-      // TODO: probably need a better test than that - should be in the IComponent interface
-      if (mdef.name.equals("init") && mdef.getNumParameters() == 0)
+      // TODO: probably need a better test than that - should be in the IComponent interface and also the method should be accessing the getX of a sub-object
+      String methName = mdef.name;
+      if (methName.equals("init") && mdef.getNumParameters() == 0) {
          return true;
+      }
 
       // Is this a newX method that we generated.  TODO: this could be cleaner too: maybe use an annotation?
       if (mdef.name.startsWith("new") && mdef.getNumParameters() >= 1 && mdef.parameters.getParameterNames()[0].equals("doInit"))
