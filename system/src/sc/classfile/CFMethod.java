@@ -264,6 +264,10 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       return typeParameters.toArray();
    }
 
+   public int getNumParameters() {
+      return parameterJavaTypes == null ? 0 : parameterJavaTypes.length;
+   }
+
    public String toString() {
       StringBuilder sb = new StringBuilder();
       String modifiers = modifiersToString(true, true, true, true, false, null);

@@ -79,6 +79,9 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public void collectReferenceInitializers(List<Statement> refInits) {
    }
 
+   public void collectConstructorPropInit(ConstructorPropInfo cpi) {
+   }
+
    public ExecResult exec(ExecutionContext ctx) {
       throw new UnsupportedOperationException();
    }

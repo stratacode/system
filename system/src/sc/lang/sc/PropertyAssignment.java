@@ -7,10 +7,7 @@ package sc.lang.sc;
 import sc.bind.Bind;
 import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
-import sc.lang.ILanguageModel;
-import sc.lang.INamedNode;
-import sc.lang.ISrcStatement;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.html.Attr;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -28,7 +25,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    public String operator;
    public Expression initializer;
 
-   private transient boolean suppressGeneration = false;
+   public transient boolean suppressGeneration = false;
    public transient Object assignedProperty;   // Reference to the field or set method involved in the assignment
    public transient boolean needsCastOnConvert = false;
 
@@ -527,12 +524,30 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    public void collectReferenceInitializers(List<Statement> refInits) {
       Expression init = getInitializerExpr();
-      if (init == null)
+      // If this is a constructor property, suppressGeneration will already be set and we don't need to initialize it twice
+      if (init == null || suppressGeneration)
          return;
       if (init.isReferenceInitializer()) {
          // Make sure to pick up the inherited initializer/operator if this is an override statement
          refInits.add(convertToAssignmentExpression(null, false, getInheritedMember().getOperatorStr(), true));
+      }
+   }
 
+   /** Called during the transform from the enclosing class to find initialization statements for the constructor properties. */
+   public void collectConstructorPropInit(ConstructorPropInfo cpi) {
+      int ix = cpi.propNames.indexOf(propertyName);
+      if (ix != -1) {
+         // Create an assignment statement of the form:
+         //     propType propName = initializer;
+         // this will be placed in the beforeNewObject chunk before new Type(propName) in the generated code for an object Type statement.
+         Expression init = getInitializerExpr();
+         JavaType propType = (JavaType) getJavaType().deepCopy(ISemanticNode.CopyNormal, null);
+         cpi.propJavaTypes.set(ix, propType);
+         cpi.propTypes.set(ix, getTypeDeclaration());
+
+         VariableStatement varSt = VariableStatement.create(propType, propertyName, operator, init.deepCopy(ISemanticNode.CopyNormal, null));
+         cpi.initStatements.set(ix, varSt);
+         suppressGeneration = true;
       }
    }
 
@@ -1071,5 +1086,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       JavaModel model = getJavaModel();
       Layer refLayer = model == null ? null : model.getLayer();
       return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, assignedProperty, runtimeSys);
+   }
+
+   public JavaType getJavaType() {
+      Object def = getAssignedProperty();
+      return def == null ? null : ModelUtil.getJavaTypeFromDefinition(getLayeredSystem(), def, getEnclosingType());
    }
 }

@@ -950,11 +950,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object declaresConstructor(List<?> types, ITypeParamContext ctx) {
+      Object res = declaresConstructorBody(body, types, ctx);
+      if (res != null)
+         return res;
+      return declaresConstructorBody(hiddenBody, types, ctx);
+   }
+
+   private static Object declaresConstructorBody(SemanticNodeList<Statement> theBody, List<?> types, ITypeParamContext ctx) {
       Object res = null, newMeth;
-      if (body != null) {
+      if (theBody != null) {
          Object[] prevTypesArray = null;
          Object[] nextTypesArray;
-         for (Statement s:body) {
+         for (Statement s:theBody) {
             // Prevents us walking own the type hierarchy
             if (s instanceof TypeDeclaration)
                continue;
@@ -9913,5 +9920,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return annotValue;
       }
       return null;
+   }
+
+   public void addConstructorProps(ConstructorPropInfo cpi) {
+      if (body != null) {
+         for (Statement s:body) {
+            s.collectConstructorPropInit(cpi);
+         }
+      }
+      if (hiddenBody != null) {
+         for (Statement s:hiddenBody) {
+            s.collectConstructorPropInit(cpi);
+         }
+      }
    }
 }

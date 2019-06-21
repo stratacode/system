@@ -822,6 +822,10 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return methodTypeParams;
    }
 
+   public int getNumParameters() {
+      return ModelUtil.getNumParameters(method);
+   }
+
    public Object getAnnotation(String annotName) {
       return ModelUtil.getAnnotation(method, annotName);
    }

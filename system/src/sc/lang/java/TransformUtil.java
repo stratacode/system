@@ -202,8 +202,8 @@ public class TransformUtil {
        "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>() {\n" +
        "<% if (needsCustomResolver) { %>\n" +
           "<%= customResolver %>" +
-       "   if (_<%=lowerClassName%> == null) {\n" +
-       "      _<%=lowerClassName%> = new <%=typeName%>();\n" +
+       "   if (_<%=lowerClassName%> == null) {<%= beforeNewObject %>\n" +
+       "      _<%=lowerClassName%> = new <%=typeName%>(<%= constructorParams %>);\n" +
               "<%= customSetter %>" +
               "<%= preAssignment %>" +
        "      <%=getDynamicTypeDefinition('_' + lowerClassName, 2)%>\n<%=propertyAssignments%>\n" +
@@ -212,8 +212,8 @@ public class TransformUtil {
        "   } \n" +
        "   else {<%= accessHook %>\n      return _<%=lowerClassName%>;\n   }\n" +
        "<% } else { %>" +
-       "   if (<%=lowerClassName%> == null) {\n" +
-       "      <%=variableTypeName%> _<%=lowerClassName%> = new <%=typeName%>();\n" +
+       "   if (<%=lowerClassName%> == null) {<%= beforeNewObject %>\n" +
+       "      <%=variableTypeName%> _<%=lowerClassName%> = new <%=typeName%>(<%= constructorParams %>);\n" +
        "      <%=lowerClassName%> = _<%=lowerClassName%>;\n" +
              "<%= preAssignment %>" +
        "      <%=getDynamicTypeDefinition('_' + lowerClassName, 2)%>\n<%=propertyAssignments%>\n" +
@@ -243,8 +243,8 @@ public class TransformUtil {
                       "<%= customResolver %>" +
                    "<% } %> \n" +
                    "   if (<%=lowerClassName%> == null) {\n" +
-                   "      <%=variableTypeName%> _<%=lowerClassName%>;" +
-                   "      <%=lowerClassName%> = _<%=lowerClassName%> = new <%=typeName%>();\n" +
+                   "      <%=variableTypeName%> _<%=lowerClassName%>;<%=beforeNewObject%>\n" +
+                   "      <%=lowerClassName%> = _<%=lowerClassName%> = new <%=typeName%>(<%=constructorParams%>);\n" +
                          "<%= customSetter %>" +
                          "<%= preAssignment %>" +
                    "      _<%=lowerClassName%>.<%=altPrefix%>preInit();\n" +

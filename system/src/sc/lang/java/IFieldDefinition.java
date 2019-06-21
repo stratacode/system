@@ -8,4 +8,6 @@ public interface IFieldDefinition extends IMember, ITypedObject {
    public String getFieldName();
 
    public Object getFieldType();
+
+   public JavaType getJavaType();
 }

@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 import sc.lang.ILanguageModel;
+import sc.lang.ISemanticNode;
 import sc.lang.ISrcStatement;
 import sc.lang.SemanticNodeList;
 import sc.lang.js.JSFormatMode;
@@ -865,5 +866,34 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
          res.buildInitExpr = buildInitExpr;
       }
       return res;
+   }
+
+   public void collectConstructorPropInit(ConstructorPropInfo cpi) {
+      for (VariableDefinition varDef:variableDefinitions) {
+         int ix = cpi.propNames.indexOf(varDef.variableName);
+         if (ix != -1) {
+            // Create an assignment statement of the form:
+            //     propType propName = initializer;
+            // this will be placed in the beforeNewObject chunk before new Type(propName) in the generated code for an object Type statement.
+            Expression init = varDef.getInitializerExpr();
+            JavaType propJavaType = (JavaType) type.deepCopy(ISemanticNode.CopyNormal, null);
+            cpi.propJavaTypes.set(ix, propJavaType);
+            Object propType = type.getTypeDeclaration();
+            cpi.propTypes.set(ix, propType);
+
+            VariableStatement varSt;
+            if (init == null)
+               varSt = VariableStatement.create(propJavaType, varDef.variableName, "=",
+                       ModelUtil.isPrimitive(propJavaType) ?
+                               AbstractLiteral.createFromValue(Type.get((Class) propType).getDefaultObjectValue(), false) :
+                               NullLiteral.create());
+            else
+               varSt = VariableStatement.create(propJavaType, varDef.variableName, varDef.operator,
+                        init.deepCopy(ISemanticNode.CopyNormal, null));
+            cpi.initStatements.set(ix, varSt);
+            // TODO: mark this variable definition to remove the initializer during transform. Otherwise
+            // we'll do it twice - once before the constructor is called and again when the field is initialized.
+         }
+      }
    }
 }

@@ -58,6 +58,10 @@ public class CFField extends ClassFile.FieldMethodInfo implements IVariable, IFi
       return getTypeDeclaration();
    }
 
+   public JavaType getJavaType() {
+      return type;
+   }
+
    public String getOperator() {
       return "=";
    }

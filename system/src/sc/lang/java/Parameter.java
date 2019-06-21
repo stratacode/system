@@ -17,6 +17,7 @@ public class Parameter extends AbstractVariable implements IVariable, IObjectId 
    public boolean repeatingParameter;
    public Parameter nextParameter;
 
+   // Creates a parameter list with the given types and names. The types can either be JavaType, Class, or TypeDeclaration
    public static Parameter create(LayeredSystem sys, Object[] types, String[] names, ITypeParamContext ctx, ITypeDeclaration definedInType) {
       if (types == null || types.length == 0)
           return null;
@@ -24,7 +25,9 @@ public class Parameter extends AbstractVariable implements IVariable, IObjectId 
       int i = 0;
       for (Object type:types) {
          Parameter next = new Parameter();
-         if (type != null) {
+         if (type instanceof JavaType)
+            next.setProperty("type", type);
+         else if (type != null) {
             JavaType methType = JavaType.createFromParamType(sys, type, ctx, definedInType);
             next.setProperty("type", methType);
          }

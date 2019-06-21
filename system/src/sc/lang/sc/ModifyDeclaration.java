@@ -2935,4 +2935,17 @@ public class ModifyDeclaration extends TypeDeclaration {
          return CTypeUtil.getClassName(typeName);
       return typeName;
    }
+
+   public void addConstructorProps(ConstructorPropInfo cpi) {
+      if (modifyTypeDecl != null) {
+         modifyTypeDecl.addConstructorProps(cpi);
+      }
+      if (extendsBoundTypes != null) {
+         for (Object extBoundType:extendsBoundTypes) {
+            if (extBoundType instanceof BodyTypeDeclaration)
+               ((BodyTypeDeclaration) extBoundType).addConstructorProps(cpi);
+         }
+      }
+      super.addConstructorProps(cpi);
+   }
 }

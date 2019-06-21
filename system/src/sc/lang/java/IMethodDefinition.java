@@ -58,4 +58,6 @@ public interface IMethodDefinition extends IMember {
 
    Object[] getMethodTypeParameters();
 
+   int getNumParameters();
+
 }

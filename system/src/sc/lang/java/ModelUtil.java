@@ -715,6 +715,33 @@ public class ModelUtil {
       else throw new UnsupportedOperationException();
    }
 
+   public static JavaType getSetMethodJavaType(LayeredSystem sys, Object setMethod, Object definedInType) {
+      if (setMethod instanceof IMethodDefinition) {
+         JavaType[] paramTypes = ((IMethodDefinition) setMethod).getParameterJavaTypes(false);
+         if (paramTypes == null || paramTypes.length == 0)
+            throw new IllegalArgumentException("Set method without any parameters: " + setMethod);
+         if (paramTypes.length != 1) {
+            // Indexed setter?
+            if (paramTypes.length == 2 && isInteger(paramTypes[0]))
+               return paramTypes[1];
+            throw new IllegalArgumentException("Set method with too many parameters: " + setMethod);
+         }
+         return paramTypes[0];
+      }
+      else if (setMethod instanceof IBeanMapper)
+         return JavaType.createFromParamType(sys, ((IBeanMapper) setMethod).getPropertyType(), null, definedInType);
+      else if (setMethod instanceof Method) {
+         Class[] parameterTypes = ((Method) setMethod).getParameterTypes();
+         if (parameterTypes.length != 1)
+            throw new IllegalArgumentException("Set method with wrong number of parameters: " + setMethod);
+         return JavaType.createFromParamType(sys, parameterTypes[0], null, definedInType);
+      }
+      else if (setMethod instanceof ParamTypedMember) {
+         return getSetMethodJavaType(sys, ((ParamTypedMember) setMethod).getMemberObject(), definedInType);
+      }
+      else throw new UnsupportedOperationException();
+   }
+
    public static Object getMethodDeclaringClass(Object methodObj) {
       if (methodObj instanceof Method)
          return ((Method) methodObj).getDeclaringClass();
@@ -3444,6 +3471,21 @@ public class ModelUtil {
          throw new UnsupportedOperationException();
    }
 
+   public static JavaType getFieldJavaType(LayeredSystem sys, Object field, Object definedInType) {
+      if (field instanceof ParamTypedMember)
+         field = ((ParamTypedMember) field).getMemberObject();
+      if (field instanceof Field)
+         return JavaType.createFromParamType(sys, ((Field) field).getType(), null, definedInType);
+      else if (field instanceof FieldDefinition)
+         return ((FieldDefinition) field).type;
+      else if (field instanceof VariableDefinition)
+         return getFieldJavaType(sys, ((VariableDefinition) field).getDefinition(), definedInType);
+      else if (field instanceof IFieldDefinition)
+         return ((IFieldDefinition) field).getJavaType();
+      else
+         throw new UnsupportedOperationException();
+   }
+
    public static boolean isMethod(Object member) {
       if (member instanceof ParamTypedMember)
          member = ((ParamTypedMember) member).getMemberObject();
@@ -6103,6 +6145,17 @@ public class ModelUtil {
       // For constructors, we use just the class name part of the whole type name since methods cannot have that name
       else if (methObj instanceof Constructor)
          return CTypeUtil.getClassName(((Constructor) methObj).getName());
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static int getNumParameters(Object methObj) {
+      if (methObj instanceof Method)
+         return ((Method) methObj).getParameterCount();
+      else if (methObj instanceof Constructor)
+         return ((Constructor) methObj).getParameterCount();
+      else if (methObj instanceof IMethodDefinition)
+         return ((IMethodDefinition) methObj).getNumParameters();
       else
          throw new UnsupportedOperationException();
    }
@@ -9246,4 +9299,26 @@ public class ModelUtil {
       return null;
    }
 
+   public static JavaType getJavaTypeFromDefinition(LayeredSystem sys, Object def, Object definedInType) {
+      if (ModelUtil.isMethod(def)) {
+         if (ModelUtil.isSetMethod(def)) {
+            return getSetMethodJavaType(sys, def, definedInType);
+         }
+         if (ModelUtil.isGetMethod(def)) {
+            Object pt = ModelUtil.getReturnJavaType(def);
+            if (pt instanceof JavaType)
+               return (JavaType) pt;
+            return JavaType.createFromParamType(sys, pt, null, definedInType);
+         }
+         throw new UnsupportedOperationException();
+      }
+      else if (ModelUtil.isField(def)) {
+         return getFieldJavaType(sys, def, definedInType);
+      }
+      else if (def instanceof TypeDeclaration) {
+         return JavaType.createJavaTypeFromName(((TypeDeclaration) def).getFullTypeName());
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
 }

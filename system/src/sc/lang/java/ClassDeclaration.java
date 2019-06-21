@@ -28,6 +28,8 @@ public class ClassDeclaration extends TypeDeclaration {
    /** If we've resolved our extendsType at least once, this stores that type - used so we can unregister our type from the sub-types map as we are being stopped */
    private transient Object extendsBoundType;
 
+   private ConstructorPropInfo constructorPropInfo;
+
    public static ClassDeclaration create(String operator, String typeName, JavaType extendsType) {
       ClassDeclaration cd = new ClassDeclaration();
       cd.typeName = typeName;
@@ -170,6 +172,8 @@ public class ClassDeclaration extends TypeDeclaration {
             }
          }
       }
+
+      initConstructorPropInfo();
 
       super.validate();
    }
@@ -334,6 +338,9 @@ public class ClassDeclaration extends TypeDeclaration {
             Statement s = theBody.get(i);
             if (s instanceof PropertyAssignment) {
                PropertyAssignment assign = (PropertyAssignment) s;
+               // this is a constructor property which will have already been initialized before the object is created so don't do this twice
+               if (assign.suppressGeneration)
+                  continue;
                Expression newAssign = assign.convertToAssignmentExpression(varName, true, assign.operator, false);
                newAssign.parentNode = assign.parentNode;
                ParseUtil.initAndStartComponent(newAssign);
@@ -388,6 +395,7 @@ public class ClassDeclaration extends TypeDeclaration {
       boolean useAltComponent = false;
       JavaModel model = getJavaModel();
       LayeredSystem lsys = model.getLayeredSystem();
+      boolean classRemoved = false;
 
       // Capture this so we can rely on it when transforming sub-types.
       this.needsOwnClass = needsOwnClass;
@@ -588,6 +596,7 @@ public class ClassDeclaration extends TypeDeclaration {
          String newModifiers;
          Object compiledClass;
 
+
          if (outer != null) {
             if (!(outer instanceof ClassDeclaration)) {
                // The template declaration may contain a class but we've already made a copy of this type elsewhere and this does not affect the saved file so just ignore it.
@@ -736,6 +745,8 @@ public class ClassDeclaration extends TypeDeclaration {
                outer.body.remove(ix);
                outer.addToHiddenBody(this, true);
 
+               classRemoved = true;
+
                transformIx = ix;
             }
          }
@@ -812,18 +823,37 @@ public class ClassDeclaration extends TypeDeclaration {
          }
 
          Object[] constructors = null;
+         if (!isObject || useNewTemplate) {
+            constructors = isObject && !useNewTemplate ? null : getConstructors(null);
+            if (constructorPropInfo != null && constructorPropInfo.constr != null) {
+               if (constructors == null) {
+                  constructors = new Object[] {constructorPropInfo.constr};
+               }
+               else {
+                  ArrayList<Object> allConstrs = new ArrayList<Object>(Arrays.asList(constructors));
+                  allConstrs.add(constructorPropInfo.constr);
+                  constructors = allConstrs.toArray();
+               }
+            }
+         }
          int i = 0;
          String constDecls, constParams;
          Object currentConstructor;
          do {
-            if ((isObject && !useNewTemplate) || (constructors = getConstructors(null)) == null || constructors.length == 0 || automaticConstructor) {
+            if (constructors == null || constructors.length == 0 || automaticConstructor) {
                if (propagateConstructorArgs != null) {
                   constDecls = getDeclsFromTypes(propagateConstructorArgs);
                   constParams = getParamsFromTypes(propagateConstructorArgs);
                }
                else {
-                  constDecls = "";
-                  constParams = "";
+                  if (isObject && constructorPropInfo != null) {
+                     constDecls = getDeclsFromTypes(constructorPropInfo.propTypes.toArray());
+                     constParams = StringUtil.arrayToString(constructorPropInfo.propNames.toArray(new String[constructorPropInfo.propNames.size()]));
+                  }
+                  else {
+                     constDecls = "";
+                     constParams = "";
+                  }
                }
                currentConstructor = null;
             }
@@ -844,6 +874,9 @@ public class ClassDeclaration extends TypeDeclaration {
                           childNames, numChildren, childNamesByScope, ModelUtil.convertToCommaSeparatedStrings(objNames), isOverrideField,
                     isOverrideGet, needsMemberCast, isComponent, typeIsComponentClass, childTypeName, parentName, rootName, currentConstructor,
                     constDecls, constParams, accessClass, useAltComponent, customResolver, customResolverTemplate, customSetter, customSetterTemplate, needsField, preAssignments, postAssignments, accessHooks);
+
+            if (isObject && constructorPropInfo != null)
+               params.beforeNewObject = constructorPropInfo.getBeforeNewObject();
 
             TransformUtil.addObjectDefinition(accessClass, this, params,
                                               assignments, customTemplate, isObject && !useNewTemplate, isComponent, inHiddenBody, i == 0);
@@ -921,6 +954,12 @@ public class ClassDeclaration extends TypeDeclaration {
          }
          if (implementsTypes.size() == 0)
             setProperty("implementsTypes", null);
+      }
+
+      if (constructorPropInfo != null && constructorPropInfo.constr != null && !classRemoved) {
+         ConstructorDefinition constrCopy = (ConstructorDefinition) constructorPropInfo.constr.deepCopy(ISemanticNode.CopyNormal, null);
+         constrCopy.fromStatement = null;
+         addBodyStatementIndent(constrCopy);
       }
 
       if (super.transform(runtime))
@@ -1182,6 +1221,157 @@ public class ClassDeclaration extends TypeDeclaration {
       return referenceInits.size() > 0 ? referenceInits : null;
    }
 
+   public List<String> getConstructorPropNames() {
+      if (constructorPropInfo != null)
+         return constructorPropInfo.propNames;
+
+      BodyTypeDeclaration modType = resolve(true);
+      List<Object> compilerSettingsList = modType.getAllInheritedAnnotations("sc.obj.CompilerSettings");
+      if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
+         String constrPropStr = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorProperties");
+         if (constrPropStr != null && constrPropStr.length() > 0) {
+            return Arrays.asList(StringUtil.split(constrPropStr, ","));
+         }
+      }
+      return null;
+   }
+
+   public static List<String> getConstructorPropNamesForType(LayeredSystem sys, Object type, Layer refLayer) {
+      List<Object> compilerSettingsList = ModelUtil.getAllInheritedAnnotations(sys, type, "sc.obj.CompilerSettings", false, refLayer, false);
+      if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
+         String constrPropStr = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorProperties");
+         if (constrPropStr != null && constrPropStr.length() > 0) {
+            return Arrays.asList(StringUtil.split(constrPropStr, ","));
+         }
+      }
+      return null;
+   }
+
+   private void initConstructorPropInfo() {
+      BodyTypeDeclaration modType = resolve(true);
+
+      List<Object> compilerSettingsList = modType.getAllInheritedAnnotations("sc.obj.CompilerSettings");
+      if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
+         String constrPropStr = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorProperties");
+         if (constrPropStr != null && constrPropStr.length() > 0) {
+            ConstructorPropInfo cpi = new ConstructorPropInfo();
+            constructorPropInfo = cpi;
+            List<String> propNames = cpi.propNames = Arrays.asList(StringUtil.split(constrPropStr, ","));
+
+            LayeredSystem sys = getLayeredSystem();
+
+            int sz = propNames.size();
+            cpi.initStatements = new SemanticNodeList<Statement>(sz);
+            cpi.propJavaTypes = new ArrayList<JavaType>(sz);
+            cpi.propTypes = new ArrayList<Object>(sz);
+            for (int i = 0; i < sz; i++) {
+               cpi.initStatements.add(null);
+               cpi.propJavaTypes.add(null);
+               cpi.propTypes.add(null);
+            }
+
+            modType.addConstructorProps(cpi);
+
+            boolean valid = true;
+            // TODO: this check should be moved up to the validate step or sooner. Maybe we move all of the logic for retrieving this and build a ConstructorPropInfo
+            // structure which is stored in the type so it's easier to trace what's going on. We'll also have it for the dynamic case.
+            for (int i = 0; i < sz; i++) {
+               if (cpi.propTypes.get(i) == null) {
+                  displayError("No property: " + cpi.propNames.get(i) + " for constructorProperties for ");
+                  valid = false;
+               }
+               else if (cpi.initStatements.get(i) == null) {
+                  displayError("No initializer for constructor property: " + cpi.propNames.get(i) + " for ");
+                  valid = false;
+               }
+            }
+            int startIx = 0;
+            IdentifierExpression superExpr = null;
+            List<String> extPropNames = null;
+            if (valid) {
+               Object constrObj = declaresConstructor(cpi.propTypes, null);
+               Object superConstr = null;
+               Object extType = getExtendsTypeDeclaration();
+               if (extType != null) {
+                  extPropNames = getConstructorPropNamesForType(sys, extType, getLayer());
+                  if (extPropNames != null) {
+                     SemanticNodeList<Expression> superArgs = new SemanticNodeList<Expression>();
+                     for (int i = 0 ; i < extPropNames.size(); i++) {
+                        boolean found = false;
+                        String extProp = extPropNames.get(i);
+                        for (int j = 0; j < sz; j++) {
+                           if (cpi.propNames.get(j).equals(extProp)) {
+                              found = true;
+                              break;
+                           }
+                        }
+                        if (!found) {
+                           displayError("Sub type: " + typeName + " missing constructor property: " + extProp + " in super type: " + ModelUtil.getClassName(extType));
+                        }
+                        else
+                           superArgs.add(IdentifierExpression.create(extProp));
+                     }
+                     superExpr = IdentifierExpression.createMethodCall(superArgs, "super");
+                  }
+
+                  if (superExpr == null) {
+                     superConstr = ModelUtil.declaresConstructor(sys, extType, cpi.propTypes, null);
+                     // No exact matching constructor. Need to see if the extends type has constructorProperties. If so, it might be a subset of our list and so need to be initialized here
+                     if (superConstr == null) {
+                        Object[] cstrs = ModelUtil.getConstructors(extType, this);
+                        boolean zeroArgFound = false;
+                        if (cstrs != null) {
+                           for (Object cstr:cstrs) {
+                              if (ModelUtil.getNumParameters(cstr) == 0) {
+                                 zeroArgFound = true;
+                                 break;
+                              }
+                           }
+                        }
+                        if (!zeroArgFound && cstrs != null && cstrs.length > 0) {
+                           displayError("No matching constructor in super type: " + ModelUtil.getTypeName(extType) + " for base type: " + typeName + " with constructor properties");
+                        }
+                     }
+                  }
+               }
+               if (constrObj == null) {
+                  ConstructorDefinition constr = ConstructorDefinition.create(this,
+                          cpi.propJavaTypes.toArray(),
+                          cpi.propNames.toArray(new String[sz]));
+                  cpi.constr = constr;
+                  constr.addModifier("public");
+                  constr.parentNode = this;
+                  int start = 0; // start = 1 if we add super
+                  if (superExpr != null) {
+                     constr.addBodyStatementAt(0, superExpr);
+                     start = 1;
+                  }
+                  // constr.addBodyStatementAt(0, ...);
+                  for (int i = 0; i < sz; i++) {
+                     String propName = cpi.propNames.get(i);
+                     if (extPropNames != null) {
+                        boolean found = false;
+                        for (int j = 0; j < extPropNames.size(); j++) {
+                           if (extPropNames.get(j).equals(propName)) {
+                              found = true;
+                              break;
+                           }
+                        }
+                        // Don't assign it again if it's already set in the super
+                        if (found)
+                           continue;
+                     }
+                     AssignmentExpression ae = AssignmentExpression.create(IdentifierExpression.create("this." + propName), "=", IdentifierExpression.create(propName));
+                     constr.addBodyStatementAt(i + start, ae);
+                  }
+                  // Adding this to the hidden body so it can be found even if we do not transform the model
+                  addToHiddenBody(constr, false);
+               }
+            }
+         }
+      }
+   }
+
    private Statement createCallToInitMethod(JavaType fieldType, String variableName, String methodName, boolean useAltComponent) {
       Statement initStatement;
       // Note: this used to use getCompiledClass here but we do not want to load the compiled classes during transform, unless they are final
@@ -1426,6 +1616,8 @@ public class ClassDeclaration extends TypeDeclaration {
 
       if ((options & CopyInitLevels) != 0) {
          res.declarationType = declarationType;
+         if (constructorPropInfo != null)
+            res.constructorPropInfo = constructorPropInfo.copy();
       }
       return res;
    }
@@ -1464,5 +1656,12 @@ public class ClassDeclaration extends TypeDeclaration {
       if (res != null)
          extendsBoundType = res;
       return res;
+   }
+
+   public void addConstructorProps(ConstructorPropInfo cpi) {
+      if (extendsBoundType instanceof TypeDeclaration) {
+         ((TypeDeclaration) extendsBoundType).addConstructorProps(cpi);
+      }
+      super.addConstructorProps(cpi);
    }
 }

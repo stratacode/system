@@ -71,6 +71,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
    public boolean typeIsDynamic;          // Set to true when the type is dynamic.
 
+   public String beforeNewObject = "";        // Code to define variables for the constructor
+
    protected TypeDeclaration objType;
    
    protected Object compiledClass;
@@ -498,5 +500,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          }
          return sb.toString();
       }
+   }
+
+   public String getBeforeNewObject() {
+      return beforeNewObject;
    }
 }

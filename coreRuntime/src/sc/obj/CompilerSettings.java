@@ -95,5 +95,8 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    /** If true, the object or class is instantiated when the process starts */
    boolean createOnStartup() default false;     
    /** Controls the order in which and initOnStartup and createOnStartup types are initialized or started.  Higher priority types are initialized or started first. */
-   int startPriority() default 0;              
+   int startPriority() default 0;
+
+   /** Set this to a comma separated list of properties that should be defined as part of the constructor of this type. Use for properties that are initializable before the instance is created (i.e. the initializer does not refer to this) */
+   String constructorProperties() default "";
 }
