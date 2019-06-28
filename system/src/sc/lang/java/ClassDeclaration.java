@@ -86,7 +86,7 @@ public class ClassDeclaration extends TypeDeclaration {
                      // Perhaps a model fragment or something we can't really start
                      return;
                   }
-                  TypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName);
+                  BodyTypeDeclaration prevDecl = thisModel.getPreviousDeclaration(fullTypeName, false);
                   if (prevDecl != null && prevDecl != this && prevDecl.getFullTypeName().equals(fullTypeName))
                      prevDecl.updateReplacedByType(this);
                }
@@ -260,6 +260,12 @@ public class ClassDeclaration extends TypeDeclaration {
       if (extendsType != null) {
          if (extendsInvalid)
             return Object.class;
+         JavaSemanticNode resolver = getEnclosingType();
+         if (resolver == null)
+            resolver = getJavaModel();
+         if (extendsType.needsInit()) {
+            extendsType.initType(getLayeredSystem(), this, resolver, null, false, isLayerType, null);
+         }
          return extendsType.getTypeDeclaration();
       }
       return Object.class;
@@ -423,7 +429,7 @@ public class ClassDeclaration extends TypeDeclaration {
       transformIFields();
 
       // First we process the set of inherited compiler settings
-      List<Object> compilerSettingsList = getAllInheritedAnnotations("sc.obj.CompilerSettings");
+      List<Object> compilerSettingsList = getCompilerSettingsList();
 
       if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
          customTemplate = findTemplate(compilerSettingsList, isObject && !useNewTemplate ? "objectTemplate" : "newTemplate",
@@ -450,17 +456,9 @@ public class ClassDeclaration extends TypeDeclaration {
          overrideStartName = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "overrideStartName");
          if (overrideStartName == null || overrideStartName.length() == 0)
             overrideStartName = useAltComponent ? "_start" : "start";
-         String pConstructor = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "propagateConstructor");
-         if (pConstructor != null && pConstructor.length() > 0) {
-            String[] argTypeNames = StringUtil.split(pConstructor, ',');
-            propagateConstructorArgs = new Object[argTypeNames.length];
-            JavaModel m = getJavaModel();
-            for (int i = 0; i < argTypeNames.length; i++) {
-               propagateConstructorArgs[i] = m.findTypeDeclaration(argTypeNames[i], false);
-               if (propagateConstructorArgs[i] == null)
-                  displayError("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
-            }
-         }
+
+         propagateConstructorArgs = getPropagateConstructorArgs();
+
          Boolean boolObj;
          constructorInit = (boolObj = (Boolean) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorInit")) != null && boolObj.booleanValue();
          automaticConstructor = (boolObj = (Boolean) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "automaticConstructor")) != null && boolObj.booleanValue();
@@ -967,30 +965,6 @@ public class ClassDeclaration extends TypeDeclaration {
       return any;
    }
 
-   private String getDeclsFromTypes(Object[] types) {
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < types.length; i++) {
-         if (i != 0)
-            sb.append(", ");
-         sb.append(ModelUtil.getTypeName(types[i]));
-         sb.append(" ");
-         sb.append("_p");
-         sb.append(i);
-      }
-      return sb.toString();
-   }
-
-   private String getParamsFromTypes(Object[] types) {
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < types.length; i++) {
-         if (i != 0)
-            sb.append(", ");
-         sb.append("_p");
-         sb.append(i);
-      }
-      return sb.toString();
-   }
-
    private void completeConstructorInit(Object[] constArgs, MethodDefinition meth) {
       List constParams = constArgs == null ? null : Arrays.asList(constArgs);
       ConstructorDefinition constMeth = (ConstructorDefinition) declaresConstructor(constParams, null);
@@ -1221,23 +1195,9 @@ public class ClassDeclaration extends TypeDeclaration {
       return referenceInits.size() > 0 ? referenceInits : null;
    }
 
-   public List<String> getConstructorPropNames() {
-      if (constructorPropInfo != null)
-         return constructorPropInfo.propNames;
-
-      BodyTypeDeclaration modType = resolve(true);
-      List<Object> compilerSettingsList = modType.getAllInheritedAnnotations("sc.obj.CompilerSettings");
-      if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
-         String constrPropStr = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorProperties");
-         if (constrPropStr != null && constrPropStr.length() > 0) {
-            return Arrays.asList(StringUtil.split(constrPropStr, ","));
-         }
-      }
-      return null;
-   }
-
    public static List<String> getConstructorPropNamesForType(LayeredSystem sys, Object type, Layer refLayer) {
-      List<Object> compilerSettingsList = ModelUtil.getAllInheritedAnnotations(sys, type, "sc.obj.CompilerSettings", false, refLayer, false);
+      List<Object> compilerSettingsList = type instanceof BodyTypeDeclaration ? ((BodyTypeDeclaration) type).getCompilerSettingsList() :
+                                          ModelUtil.getAllInheritedAnnotations(sys, type, "sc.obj.CompilerSettings", false, refLayer, false);
       if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
          String constrPropStr = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorProperties");
          if (constrPropStr != null && constrPropStr.length() > 0) {
@@ -1250,7 +1210,7 @@ public class ClassDeclaration extends TypeDeclaration {
    private void initConstructorPropInfo() {
       BodyTypeDeclaration modType = resolve(true);
 
-      List<Object> compilerSettingsList = modType.getAllInheritedAnnotations("sc.obj.CompilerSettings");
+      List<Object> compilerSettingsList = modType.getCompilerSettingsList();
       if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
          String constrPropStr = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "constructorProperties");
          if (constrPropStr != null && constrPropStr.length() > 0) {

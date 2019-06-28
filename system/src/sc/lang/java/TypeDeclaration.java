@@ -184,6 +184,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             innerObjs = objList.toArray(new TypeDeclaration[objList.size()]);
       }
       super.start();
+
    }
 
    public void validate() {
@@ -313,6 +314,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             }
          }
 
+         if (m != null && !m.isLayerModel) {
+            // May add a new constructor and so needs to be done so methods like declaresConstructor works. It currently does not require that the model be started...
+            initPropagateConstructors();
+         }
+
          // Do any subclass type initialization before we apply the scope templates, so that we can get annotations, etc.
          // down the derived type hierarchy.
          completeInitTypeInfo();
@@ -332,6 +338,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          typeInfoCompleted = false;
          throw exc;
       }
+   }
+
+   public Object declaresConstructor(List<?> types, ITypeParamContext ctx) {
+      initTypeInfo(); // Need this for propagateConstructor
+      return super.declaresConstructor(types, ctx);
    }
 
    protected void completeInitTypeInfo() {
@@ -702,8 +713,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
+   // TODO: this is almost the same as the super method. Can we get rid of the duplication here?
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
-      TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false, false);
+      boolean isEnumType = base.isEnumeratedType();
+      TypeDeclaration otherType = (TypeDeclaration) base.getInnerType(typeName, null, true, false, false, isEnumType);
       Object annotObj;
       // We are inside of a modify but are defining a new type.  If this type is the same as the inherited type
       // we can just replace it, but if it's a new type, it just gets added to the modified type.
@@ -719,7 +732,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          }
          else {
             String otherTypeName = ((StringLiteral) annot.elementValue).stringValue;
-            TypeDeclaration indexType = (TypeDeclaration) base.getInnerType(otherTypeName, null, false, false, false);
+            TypeDeclaration indexType = (TypeDeclaration) base.getInnerType(otherTypeName, null, false, false, false, isEnumType);
             if (indexType == null) {
                System.err.println("*** Can't find type in annotation: " + annot.toDefinitionString() + " must be an object defined in: " + typeName);
             }
@@ -1268,15 +1281,15 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return typeParameters;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
-      Object t = super.getSimpleInnerType(name, ctx, checkBaseType, redirected, srcOnly);
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly, boolean includeEnums) {
+      Object t = super.getSimpleInnerType(name, ctx, checkBaseType, redirected, srcOnly, includeEnums);
       if (t != null)
          return t;
 
       if (checkBaseType) {
          if (implementsBoundTypes != null) {
             for (Object impl:implementsBoundTypes) {
-               if ((t = getSimpleInnerTypeFromExtends(impl, name, ctx, redirected, srcOnly)) != null)
+               if ((t = getSimpleInnerTypeFromExtends(impl, name, ctx, redirected, srcOnly, false)) != null)
                   return t;
             }
          }
@@ -1913,4 +1926,50 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          }
       }
    }
+
+   void initPropagateConstructors() {
+      BodyTypeDeclaration modType = resolve(true);
+
+      Object[] propagateConstructorArgs = modType.getPropagateConstructorArgs();
+      if (propagateConstructorArgs != null) {
+         int sz = propagateConstructorArgs.length;
+         List<?> paramTypes = Arrays.asList(propagateConstructorArgs);
+         Object constrObj = modType.declaresConstructor(paramTypes, null);
+         String[] propNames = getPropagateParamNames(propagateConstructorArgs);
+         if (constrObj == null) {
+            Object extType = modType.getExtendsTypeDeclaration();
+            if (extType == null) {
+               displayError("propagateConstructor on type with no extends type - no constructor to propagate for: ");
+               return;
+            }
+            Object extConstr = ModelUtil.definesConstructor(getLayeredSystem(), extType, paramTypes, null);
+            if (extConstr == null) {
+               StringBuilder sb = new StringBuilder();
+               for (int i = 0; i < propagateConstructorArgs.length; i++) {
+                  if (i != 0)
+                     sb.append(", ");
+                  sb.append(CTypeUtil.getClassName(ModelUtil.getTypeName(propagateConstructorArgs[i])));
+               }
+               displayError("propagateConstructor - no matching constructor for parameters: " + sb.toString() + " on type: " + extType + " for: ");
+               extConstr = ModelUtil.definesConstructor(getLayeredSystem(), extType, paramTypes, null);
+               return;
+            }
+            ConstructorDefinition constr = ConstructorDefinition.create(this,
+                    propagateConstructorArgs,
+                    propNames);
+            constr.addModifier("public");
+            constr.parentNode = this;
+            constr.propagatedFrom = extConstr;
+            int start = 0; // start = 1 if we add super
+            SemanticNodeList<Expression> superArgs = new SemanticNodeList<Expression>();
+            for (int i = 0; i < sz; i++)
+               superArgs.add(IdentifierExpression.create(propNames[i]));
+            constr.addBodyStatementAt(0, IdentifierExpression.createMethodCall(superArgs, "super"));
+
+            // Adding this to the hidden body so references resolve properly to this constructor
+            addToHiddenBody(constr, false);
+         }
+      }
+   }
+
 }

@@ -519,14 +519,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                         preTagContent = null;
 
                      singleElementType = true;
-                     Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(getFullTypeName()) : null;
+                     Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(getFullTypeName(), false) : null;
                      rootType = td = elem.convertToObject(this, null, modifyType, templateModifiers, preTagContent);
                      td.fromStatement = elem;
                   }
                }
 
                if (td == null && templateProcessor != null && templateProcessor.getDefaultModify()) {
-                  Object modifyType = getPreviousDeclaration(getFullTypeName());
+                  Object modifyType = getPreviousDeclaration(getFullTypeName(), false);
                   if (modifyType != null) {
                      td = ModifyDeclaration.create(CTypeUtil.getClassName(typeName));
                      if (templateProcessor != null) {

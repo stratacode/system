@@ -157,6 +157,10 @@ public class PrimitiveType extends JavaType {
       return true;
    }
 
+   public boolean needsInit() {
+      return false;
+   }
+
    public Object definesTypeParameter(Object typeParamName, ITypeParamContext ctx) {
       return null;
    }

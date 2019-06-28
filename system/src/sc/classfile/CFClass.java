@@ -559,6 +559,8 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
 
 
    public Object getExtendsTypeDeclaration() {
+      if (!started)
+         start();
 //      if (extendsType == null && isInterface() && implementsTypes != null && implementsTypes.size() > 0)
 //         return implementsTypes.get(0);
       return extendsType;

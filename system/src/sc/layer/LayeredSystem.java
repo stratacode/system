@@ -989,11 +989,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (enclType == null)
          return null;
 
-      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(enclType, refLayer, openLayers, checkPeers, true, false);
+      Iterator<BodyTypeDeclaration> subTypes = getSubTypesOfType(enclType, refLayer, openLayers, checkPeers, true, false);
       ArrayList<PropertyAssignment> res = null;
       if (subTypes != null) {
          while (subTypes.hasNext()) {
-            TypeDeclaration subType = subTypes.next();
+            BodyTypeDeclaration subType = subTypes.next();
 
             String varName = varDef.variableName;
             Object assign = varName == null ? null : subType.definesMember(varName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
@@ -1006,9 +1006,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
       }
-      ArrayList<TypeDeclaration> modTypes = getModifiedTypesOfType(enclType, false, checkPeers);
+      ArrayList<BodyTypeDeclaration> modTypes = getModifiedTypesOfType(enclType, false, checkPeers);
       if (modTypes != null && varDef.variableName != null) {
-         for (TypeDeclaration modType:modTypes) {
+         for (BodyTypeDeclaration modType:modTypes) {
             Object assign = modType.definesMember(varDef.variableName, JavaSemanticNode.MemberType.AssignmentSet, null, null, false, false);
             if (assign instanceof PropertyAssignment) {
                if (res == null)
@@ -2666,10 +2666,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       if (info.buildDirName != null) {
          info("Building scrt.jar from class dir: " + info.buildDirName + " into: " + outJarName);
-         if (getSystemBuildLayer(info.buildDirName) != null) {
-            // TODO: need to do the merge of coreRuntime and fullRuntime and copy that to the runtime libs dir.  That should be easy now that buildJarFile supports the mergePath
-            // Make sure fullRuntime overrides coreRuntime.
-            System.err.println("*** Unable to build scrt.jar file from standard build configuration yet");
+         String sysBuildDir = getSystemBuildLayer(info.buildDirName);
+         if (sysBuildDir != null) {
+            // Merge coreRuntime and fullRuntime and copy that to the runtime libs dir.
+
+            String scSourcePath = FileUtil.concat(sysBuildDir, "coreRuntime") + FileUtil.PATH_SEPARATOR + FileUtil.concat(sysBuildDir, "fullRuntime");
+            if (LayerUtil.buildJarFile(null, getRuntimePrefix(), outJarName, null, runtimePackages, null, scSourcePath, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
+               System.err.println("*** Unable to create jar of sc runtime files. dest path: " + outJarName + " from buildDir: " + info.buildDirName + " merging with path: " + scSourcePath);
+
          }
          else {
             if (LayerUtil.buildJarFile(info.buildDirName, getRuntimePrefix(), outJarName, null,  runtimePackages, /* userClassPath */ null, null, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
@@ -7976,7 +7980,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       classPath = getClassPathForLayer(genLayer, true, buildClassesDir, true);
       userClassPath = buildUserClassPath(classPath);
 
-      if (genLayer == buildLayer) {
+      if (genLayer == buildLayer && phase == BuildPhase.Process) {
          if (runtimeLibsDir != null) {
             syncRuntimeLibraries(runtimeLibsDir);
          }
@@ -9374,7 +9378,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            if (javaErrorFileName.startsWith(buildSrcDir)) {
                               String errorTypeName = FileUtil.removeExtension(javaErrorFileName.substring(buildSrcDir.length() + 1).replace(FileUtil.FILE_SEPARATOR_CHAR, '.'));
                               if (errorTypeName != null) {
-                                 TypeDeclaration td = (TypeDeclaration) getSrcTypeDeclaration(errorTypeName, null, true, false, true, buildLayer, false, true);
+                                 TypeDeclaration td = (TypeDeclaration) getSrcTypeDeclaration(errorTypeName, null, true, false, true, buildLayer, false, true, false);
                                  if (td != null) {
                                     JavaModel model = td.getJavaModel();
                                     SrcEntry srcEnt = model.getSrcFile();
@@ -11826,7 +11830,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (srcEnt != null) {
                   TypeDeclaration rootType = getCachedTypeDeclaration(rootTypeName, fromLayer, srcLayer, updateFrom, anyTypeInLayer, refLayer, false);
                   if (rootType != null) {
-                     Object res = rootType.getInnerType(tailName, null, true, false, true);
+                     Object res = rootType.getInnerType(tailName, null, true, false, true, false);
                      if (res instanceof TypeDeclaration) {
                         return (TypeDeclaration) res;
                      }
@@ -11958,7 +11962,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
-      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer, layerResolve, false);
+      return getSrcTypeDeclaration(typeName, fromLayer, prependPackage, notHidden, srcOnly, refLayer, layerResolve, false, false);
    }
 
    /** Retrieves a type declaration, usually the source definition with a given type name.  If fromLayer != null, it retrieves only types
@@ -11974,8 +11978,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     *
     * If refLayer is supplied, it refers to the referring layer.  It's not ordinarily used in an active application but for an inactive layer, it
     * changes how the lookup is performed.
+    *
+    * rootTypeOnly = true to skip inner types
+    *
+    * includeEnums = true to return enumerated constant values - i.e. the EnumConstant instance used for when we modify enums
     */
-   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve, boolean rootTypeOnly) {
+   public Object getSrcTypeDeclaration(String typeName, Layer fromLayer, boolean prependPackage, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve, boolean rootTypeOnly, boolean includeEnums) {
       SrcEntry srcFile = null;
       TypeDeclaration decl;
       Object skippedDecl = null;
@@ -12111,7 +12119,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // when the type name matches, but the package prefix does not.
       }
       else if (!rootTypeOnly) {
-         return getInnerClassDeclaration(typeName, fromLayer, notHidden, srcOnly, refLayer, layerResolve);
+         return getInnerClassDeclaration(typeName, fromLayer, notHidden, srcOnly, refLayer, layerResolve, includeEnums);
       }
       else
          return null;
@@ -12326,7 +12334,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /** Try peeling away the last part of the type name to find an inner type */
-   Object getInnerClassDeclaration(String typeName, Layer fromLayer, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve) {
+   Object getInnerClassDeclaration(String typeName, Layer fromLayer, boolean notHidden, boolean srcOnly, Layer refLayer, boolean layerResolve, boolean includeEnums) {
       String rootTypeName = typeName;
       String subTypeName = "";
       TypeDeclaration decl;
@@ -12375,7 +12383,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // Only look for the root type here - do not look for inner types.  Otherwise we do the same lookups repeatedly and we keep walking the rootFromLayer back each time.
             if (rootType == null)
-               rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true);
+               rootType = getSrcTypeDeclaration(rootTypeName, rootFrom, true, notHidden, true, refLayer == null ? fromLayer : refLayer, layerResolve, true, false);
 
             if (rootType == null && layerResolve && rootTypeName.equals(LayerConstants.LAYER_COMPONENT_FULL_TYPE_NAME)) {
                List<Layer> layersList = refLayer == null || refLayer == Layer.ANY_LAYER ? layers : (refLayer == Layer.ANY_INACTIVE_LAYER ? inactiveLayers : refLayer.getLayersList());
@@ -12398,7 +12406,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (rootType != null) {
                String rootTypeActualName = ModelUtil.getTypeName(rootType);
                boolean rootIsSameType = rootTypeActualName.equals(rootTypeName);
-               Object declObj = rootType instanceof BodyTypeDeclaration ? ((BodyTypeDeclaration) rootType).getInnerType(subTypeName, fromLayer != null ? new TypeContext(fromLayer, rootIsSameType) : null, true, false, srcOnly) :
+               Object declObj = rootType instanceof BodyTypeDeclaration ? ((BodyTypeDeclaration) rootType).getInnerType(subTypeName, fromLayer != null ? new TypeContext(fromLayer, rootIsSameType) : null, true, false, srcOnly, includeEnums) :
                                                             ModelUtil.getInnerType(rootType, subTypeName, null);
                //if (declObj == null && fromLayer != null) {
                //   declObj = rootType.getInnerType(subTypeName, null, true, false);
@@ -12427,6 +12435,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   return decl;
                }
                else if (declObj != null) {
+                  if (includeEnums && declObj instanceof EnumConstant)
+                     return declObj;
                   if (!srcOnly) {
                      if (fromLayer == null && cacheForRefLayer(refLayer))
                         addToInnerTypeCache(typeName, declObj);
@@ -12556,7 +12566,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
          return null;
       }
-      return getInnerClassDeclaration(CTypeUtil.prefixPath(packagePrefix, typeName), fromLayer, false, srcOnly, refLayer, layerResolve);
+      return getInnerClassDeclaration(CTypeUtil.prefixPath(packagePrefix, typeName), fromLayer, false, srcOnly, refLayer, layerResolve, false);
    }
 
    public Object parseInactiveFile(SrcEntry srcEnt) {
@@ -14112,11 +14122,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return insts.keySet().iterator();
    }
 
-   private Set<Object> addSubTypes(TypeDeclaration td, WeakIdentityHashMap<Object,Boolean> insts, Set<Object> res) {
-      Iterator<TypeDeclaration> subTypes = getSubTypesOfType(td);
+   private Set<Object> addSubTypes(BodyTypeDeclaration td, WeakIdentityHashMap<Object,Boolean> insts, Set<Object> res) {
+      Iterator<BodyTypeDeclaration> subTypes = getSubTypesOfType(td);
       if (subTypes != null) {
          while (subTypes.hasNext()) {
-            TypeDeclaration subType = subTypes.next();
+            BodyTypeDeclaration subType = subTypes.next();
 
             WeakIdentityHashMap<Object,Boolean> subInsts = instancesByType.get(subType.getFullTypeName());
             if (subInsts != null) {
@@ -14148,7 +14158,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return res == null ? insts == null ? null : insts.keySet() : res;
    }
 
-   private static final EmptyIterator<TypeDeclaration> NO_TYPES = new EmptyIterator<TypeDeclaration>();
+   private static final EmptyIterator<BodyTypeDeclaration> NO_TYPES = new EmptyIterator<BodyTypeDeclaration>();
    private static final EmptyIterator<String> NO_TYPE_NAMES = new EmptyIterator<String>();
 
    public void addSubType(TypeDeclaration superType, TypeDeclaration subType) {
@@ -14184,7 +14194,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return subTypesMap.keySet().iterator();
    }
 
-   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type) {
+   public Iterator<BodyTypeDeclaration> getSubTypesOfType(BodyTypeDeclaration type) {
       return getSubTypesOfType(type, type.getLayer(), true, false, false, false);
    }
 
@@ -14192,14 +14202,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * Returns the sub-types of the specified type.  If activeOnly is true, only those types active in this system are checked.  If activeOnly is false
     * and checkPeers is true, the type name is used to find sub-types in the peer systems as well.
     */
-   public Iterator<TypeDeclaration> getSubTypesOfType(TypeDeclaration type, Layer refLayer, boolean openLayers, boolean checkPeers, boolean includeModifiedTypes, boolean cachedOnly) {
+   public Iterator<BodyTypeDeclaration> getSubTypesOfType(BodyTypeDeclaration type, Layer refLayer, boolean openLayers, boolean checkPeers, boolean includeModifiedTypes, boolean cachedOnly) {
       if (!type.isRealType())
          return NO_TYPES;
       String typeName = type.getFullTypeName();
 
       Layer typeLayer = type.getLayer();
 
-      ArrayList<TypeDeclaration> result = new ArrayList<TypeDeclaration>();
+      ArrayList<BodyTypeDeclaration> result = new ArrayList<BodyTypeDeclaration>();
       boolean checkThisSystem = type.isLayerType || typeLayer == null || typeLayer.layeredSystem == this || getSameLayerFromRemote(typeLayer) != null ||
               typeIndex.getLayerTypeIndex(typeLayer.getLayerName(), typeLayer.activated) != null;
       // Check sub-types in this layered system only if this type is from this system or the layer is also in that layer
@@ -14241,7 +14251,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (checkPeers && !peerMode && peerSystems != null) {
             for (int i = 0; i < peerSystems.size(); i++) {
                LayeredSystem peerSys = peerSystems.get(i);
-               Iterator<TypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, refLayer, openLayers, false, includeModifiedTypes, cachedOnly);
+               Iterator<BodyTypeDeclaration> peerRes = peerSys.getSubTypesOfType(type, refLayer, openLayers, false, includeModifiedTypes, cachedOnly);
                if (peerRes != null) {
                   while (peerRes.hasNext())
                      result.add(peerRes.next());
@@ -14283,7 +14293,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                                  // Stop once we run into this type - so we don't return a recursive result and don't keep going returning base-types of the current type
                                  if (modType == type || ModelUtil.sameTypesAndLayers(this, type, modType))
                                     break;
-                                 ModelUtil.addUniqueLayerType(this, result, (TypeDeclaration) modType);
+                                 ModelUtil.addUniqueLayerType(this, result, modType);
                               }
                            }
                         }
@@ -14315,9 +14325,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return result.iterator();
    }
 
-   public ArrayList<TypeDeclaration> getModifiedTypesOfType(TypeDeclaration type, boolean before, boolean checkPeers) {
+   public ArrayList<BodyTypeDeclaration> getModifiedTypesOfType(BodyTypeDeclaration type, boolean before, boolean checkPeers) {
       TreeSet<String> checkedTypes = new TreeSet<String>();
-      ArrayList<TypeDeclaration> res = new ArrayList<TypeDeclaration>();
+      ArrayList<BodyTypeDeclaration> res = new ArrayList<BodyTypeDeclaration>();
 
       typeIndex.addModifiedTypesOfType(getProcessIdent(), this, type, before, checkedTypes, res);
 
@@ -14325,7 +14335,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          ArrayList<LayeredSystem> peerSystemsCopy = (ArrayList<LayeredSystem>) peerSystems.clone();
          for (LayeredSystem peerSys:peerSystemsCopy) {
             checkedTypes.add(peerSys.getProcessIdent());
-            ArrayList<TypeDeclaration> peerTypes = peerSys.getModifiedTypesOfType(type, before, false);
+            ArrayList<BodyTypeDeclaration> peerTypes = peerSys.getModifiedTypesOfType(type, before, false);
             if (peerTypes != null)
                res.addAll(peerTypes);
          }

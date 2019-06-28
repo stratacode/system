@@ -2407,7 +2407,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      childRepeatType.element = childElem;
                   }
                }
-               TypeDeclaration childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null, false, false, false);
+               TypeDeclaration childType = oldChildElem.tagObject == null  ? parentType : (TypeDeclaration) parentType.getInnerType(childName, null, false, false, false, false);
                if (childType != null)
                   childElem.assignChildTagObjects(childType, oldChildElem);
                /*

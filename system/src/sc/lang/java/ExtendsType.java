@@ -417,6 +417,10 @@ public class ExtendsType extends JavaType {
       return typeArgument == null || typeArgument.isBound();
    }
 
+   public boolean needsInit() {
+      return typeArgument == null || typeArgument.needsInit();
+   }
+
    public Object definesTypeParameter(Object typeParam, ITypeParamContext ctx) {
       if (typeArgument == null)
          return null;

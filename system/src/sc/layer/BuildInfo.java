@@ -574,7 +574,10 @@ public class BuildInfo {
          for (int j = 0; j < modelJarFiles.size(); j++) {
             ModelJar mjar = modelJarFiles.get(j);
             // Setting the classpath overrides the default classes...
-            if (LayerUtil.buildJarFile(system.buildDir, system.getRuntimePrefix(), FileUtil.unnormalize(mjar.jarName), mjar.mainClassName, mjar.packages, /* userClassPath */ null, mjar.includeDeps ? system.getDepsClassPath() : null, mjar.src ? LayerUtil.SRC_JAR_FILTER : LayerUtil.CLASSES_JAR_FILTER, system.options.verbose) != 0)
+            String rtPrefix = system.getRuntimePrefix();
+            //String jarUpLevelPrefix = rtPrefix != null && rtPrefix.length() > 0 ? ".." : null;
+            String jarUpLevelPrefix = null;
+            if (LayerUtil.buildJarFile(system.buildDir, system.getRuntimePrefix(), FileUtil.concat(system.buildDir, jarUpLevelPrefix, FileUtil.unnormalize(mjar.jarName)), mjar.mainClassName, mjar.packages, /* userClassPath */ null, mjar.includeDeps ? system.getDepsClassPath() : null, mjar.src ? LayerUtil.SRC_JAR_FILTER : LayerUtil.CLASSES_JAR_FILTER, system.options.verbose) != 0)
                return false;
          }
       }

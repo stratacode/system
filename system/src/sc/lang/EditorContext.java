@@ -91,10 +91,10 @@ public class EditorContext extends ClientEditorContext {
          // Also check the sub-types.  When inherit is true in particular, it makes sense to see if we've navigated
          // to a type from a sub-type.  If so, the current instance of that sub-type is the most relevant one for this
          // base type.
-         if (type instanceof TypeDeclaration) {
-            Iterator<TypeDeclaration> subTypes = system.getSubTypesOfType((TypeDeclaration) type);
+         if (type instanceof BodyTypeDeclaration) {
+            Iterator<BodyTypeDeclaration> subTypes = system.getSubTypesOfType((BodyTypeDeclaration)type);
             while (obj == null && subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
+               BodyTypeDeclaration subType = subTypes.next();
                String subTypeName = subType.getFullTypeName();
                obj = selectedInstances.get(subTypeName);
             }
@@ -1371,7 +1371,7 @@ public class EditorContext extends ClientEditorContext {
                      fragEncl = nextEncl;
                   }
 
-                  Object newType = currentType.getInnerType(innerName, null, true, false, true);
+                  Object newType = currentType.getInnerType(innerName, null, true, false, true, false);
                   if (newType instanceof TypeDeclaration)
                      currentType = (TypeDeclaration) newType;
                }

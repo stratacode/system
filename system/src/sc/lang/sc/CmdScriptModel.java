@@ -620,7 +620,7 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return true;
    }
 
-   public TypeDeclaration getPreviousDeclaration(String fullClassName) {
+   public TypeDeclaration getPreviousDeclaration(String fullClassName, boolean includeEnums) {
       // For the command scripts, modify is used to just select the most-specific type so we are passing fromLayer = null and
       return (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, null, prependLayerPackage, false, true, layer, isLayerModel);
    }

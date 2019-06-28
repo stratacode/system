@@ -196,8 +196,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       initialized = false;
       started = false;
       validated = false;
-      if (parentNode != null && parentNode.isStarted())
-         parentNode.clearStarted();
+      if (parentNode != null && parentNode.isInitialized())
+         parentNode.clearInitialized();
    }
 
    public void clearStarted() {

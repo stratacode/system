@@ -1257,11 +1257,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return srcFiles.get(0).getTypeName();
    }
 
-   public TypeDeclaration getPreviousDeclaration(String fullClassName) {
+   public BodyTypeDeclaration getPreviousDeclaration(String fullClassName, boolean includeEnums) {
       if (layeredSystem == null)
          return null;
       Layer layer = getLayer();
-      return (TypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage, false, true, layer, isLayerModel);
+      return (BodyTypeDeclaration) layeredSystem.getSrcTypeDeclaration(fullClassName, layer, prependLayerPackage, false, true, layer, isLayerModel, false, includeEnums);
    }
 
    private final static List<SrcEntry> emptySrcEntriesList = Collections.emptyList();

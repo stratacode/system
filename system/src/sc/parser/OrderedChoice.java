@@ -983,7 +983,7 @@ public class OrderedChoice extends NestedParselet  {
             childOldNode = (ISemanticNode) childOldObj;
 
          List<Parselet> matchingParselets = pIn == null ? getMatchingParselets(parser) : Collections.singletonList(pIn.getNextParselet(parser, rctx));
-         RepeatChildMode childMode = tryNullElement ? RepeatChildMode.NullElement : pIn == null ? null : RepeatChildMode.values()[pIn.readUInt()];
+         RepeatChildMode childMode = tryNullElement ? RepeatChildMode.NullElement : pIn == null ? null : RepeatChildMode.readMode(pIn.readUInt());
 
          if (childMode == RepeatChildMode.NullElement)
             childOldNode = null;
@@ -1102,7 +1102,14 @@ public class OrderedChoice extends NestedParselet  {
    }
 
    enum RepeatChildMode {
-      NullElement, SimpleArrayElement, ParseNodeElement
+      NullElement, SimpleArrayElement, ParseNodeElement;
+
+      static RepeatChildMode readMode(int val) {
+         RepeatChildMode[] allValues = values();
+         if (val >= allValues.length)
+            throw new IllegalArgumentException("Invalid value in stream for repeatChildMode");
+         return allValues[val];
+      }
    }
 
    public void saveParseRepeatingChoice(IParseNode pn, ISemanticNode sn, SaveParseCtx sctx) {

@@ -114,11 +114,15 @@ public interface ISemanticNode {
 
    public boolean getTransformed();
 
+   public boolean isInitialized();
+
    public boolean isStarted();
 
    public boolean isValidated();
 
    public void clearStarted();
+
+   public void clearInitialized();
 
    /** Regenerates the parsed description for this node */
    public boolean regenerate(boolean finalGen);

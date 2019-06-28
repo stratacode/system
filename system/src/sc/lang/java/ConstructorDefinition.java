@@ -8,11 +8,15 @@ import sc.lang.sc.ModifyDeclaration;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 
 public class ConstructorDefinition extends AbstractMethodDefinition {
 
    private transient boolean objectConstructor;
+
+   /** When this is a generated constructor, this stores the reference to the constructor from which it was generated */
+   public transient Object propagatedFrom = null;
 
    public static ConstructorDefinition create(TypeDeclaration type, Object[] paramTypes, String[] paramNames) {
       ConstructorDefinition cdef = new ConstructorDefinition();
@@ -238,6 +242,12 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       if (enclType instanceof EnumDeclaration)
          return false;
       return enclType.useDefaultModifier();
+   }
+
+   public ConstructorDefinition deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
+      ConstructorDefinition res = (ConstructorDefinition) super.deepCopy(options, oldNewMap);
+      res.propagatedFrom = propagatedFrom;
+      return res;
    }
 }
 

@@ -391,6 +391,8 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
 
    public abstract boolean isBound();
 
+   public abstract boolean needsInit();
+
    abstract void startWithType(Object type);
 
    abstract Object definesTypeParameter(Object typeVar, ITypeParamContext ctx);

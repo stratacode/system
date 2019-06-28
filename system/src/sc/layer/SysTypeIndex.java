@@ -4,6 +4,7 @@
 
 package sc.layer;
 
+import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.DeclarationType;
 import sc.lang.java.TypeDeclaration;
 import sc.type.CTypeUtil;
@@ -66,7 +67,7 @@ public class SysTypeIndex {
    }
 
    /** Adds the TypeDeclarations of any matching types.  The LayeredSystem passed may be the system or the main system so be careful to use the system from the layer to retrieve the type. */
-   public void addModifiedTypesOfType(String processIdent, LayeredSystem sys, TypeDeclaration type, boolean before, TreeSet<String> checkedTypes, ArrayList<TypeDeclaration> res) {
+   public void addModifiedTypesOfType(String processIdent, LayeredSystem sys, BodyTypeDeclaration type, boolean before, TreeSet<String> checkedTypes, ArrayList<BodyTypeDeclaration> res) {
       refreshReverseTypeIndex(sys);
 
       Layer typeLayer = type.getLayer();

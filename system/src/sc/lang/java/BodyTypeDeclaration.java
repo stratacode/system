@@ -32,6 +32,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public final static String INNER_STUB_SEPARATOR = "__";
 
    private final static TreeSet<String> componentMethodNames = new TreeSet<String>();
+
    static {
       componentMethodNames.addAll(Arrays.asList("preInit", "init", "start", "stop"));
    }
@@ -48,20 +49,28 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public transient BodyTypeDeclaration replacesType;  // This type replaced a previous type - the inverse to replacedByType
 
-   /** Names of changed methods from the previous types if this type has been updated at runtime */
+   /**
+    * Names of changed methods from the previous types if this type has been updated at runtime
+    */
    public transient TreeSet<String> changedMethods;
 
-   /** Cached of the members */
-   public transient Map<String,List<Statement>> membersByName;
+   /**
+    * Cached of the members
+    */
+   public transient Map<String, List<Statement>> membersByName;
 
-   /** Cached of the methods */
-   public transient TreeMap<String,List<Statement>> methodsByName;
+   /**
+    * Cached of the methods
+    */
+   public transient TreeMap<String, List<Statement>> methodsByName;
 
    public transient boolean replaced = false;  // Set to true when another type in the same layer has replaced this type
 
    public transient boolean removed = false;  // Set to true when the source for this type has been removed from the system.
 
-   /** Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime */
+   /**
+    * Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime
+    */
    transient public boolean excluded = false;
    /**
     * For an excluded type, a framework can designate a 'stub type' to replace an excluded type for a given runtime.
@@ -72,7 +81,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    transient public TypeDeclaration excludedStub = null;
    transient public boolean isExcludedStub = false; // Set to true for the excludedStub type itself
 
-   /** Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer */
+   /**
+    * Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer
+    */
    public transient boolean dynamicType = false;
 
    /**
@@ -81,28 +92,40 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     */
    public transient boolean dynamicNew = false;
 
-   /** Set to true if this type is not to be made dynamic even if in a dynamic layer */
+   /**
+    * Set to true if this type is not to be made dynamic even if in a dynamic layer
+    */
    public transient boolean compiledOnly = false;
 
-   /** List of properties not defined in this class which need to have bindability or get/setters generated for them by this class because of how this class is used.  It is a Tree so the order maintained is consistent even if the list is built up in a different order */
-   public transient TreeMap<String,Boolean> propertiesToMakeBindable;
+   /**
+    * List of properties not defined in this class which need to have bindability or get/setters generated for them by this class because of how this class is used.  It is a Tree so the order maintained is consistent even if the list is built up in a different order
+    */
+   public transient TreeMap<String, Boolean> propertiesToMakeBindable;
 
-   /** List of properties with @Bindable(manual=true) - we need to at least compile in some annotations for these properties so we don't spit out warnings when mixing the compiled code with the dynamic runtime. */
+   /**
+    * List of properties with @Bindable(manual=true) - we need to at least compile in some annotations for these properties so we don't spit out warnings when mixing the compiled code with the dynamic runtime.
+    */
    public transient ArrayList<String> propertiesAlreadyBindable;
 
-   /** List of property names marked @Constant but which can't be annotated directly cause there's no generated getX, setX, or field.  These would primarily be put on external dyn types for the case when we annotate a compiled class to mark a property as constant. */
+   /**
+    * List of property names marked @Constant but which can't be annotated directly cause there's no generated getX, setX, or field.  These would primarily be put on external dyn types for the case when we annotate a compiled class to mark a property as constant.
+    */
    //public transient ArrayList<String> constProps;
 
-   public transient TreeMap<String,Object> dynInvokeMethods;
+   public transient TreeMap<String, Object> dynInvokeMethods;
 
    public transient boolean isLayerType;
 
    protected transient boolean typeInfoCompleted = false;
 
-   /** Stores the current (and old/previous) mapping from slot to field+obj defs managed in the dynamic model */
+   /**
+    * Stores the current (and old/previous) mapping from slot to field+obj defs managed in the dynamic model
+    */
    public transient Object[] instFields, oldInstFields;
    public transient Object[] staticFields, oldStaticFields;
-   /** List of hidden interfaces, added automatically by the scope tag */
+   /**
+    * List of hidden interfaces, added automatically by the scope tag
+    */
    public transient Object[] scopeInterfaces;
 
    /* Parallel array to staticFields, stores the initial static properties for this type */
@@ -121,16 +144,24 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * For needCompiledClass dynamic types, we generate the constructors that mirror the original class hardcoding the type
     */
    public transient boolean needsCompiledClass = false;
-   /** True if a method overrides a compiled method - forcing a stub in cases where one is not usually needed.  Not to be confused with needsDynType - used when reflection is diabled and we need to generate dynType info for a compiled class (i.e. GWT) */
+   /**
+    * True if a method overrides a compiled method - forcing a stub in cases where one is not usually needed.  Not to be confused with needsDynType - used when reflection is diabled and we need to generate dynType info for a compiled class (i.e. GWT)
+    */
    public transient boolean needsDynamicStub = false;
 
-   /** Set to true for a compiled object type which cannot be optimized away due to an external dependency, such as a class reference or instanceof operation */
+   /**
+    * Set to true for a compiled object type which cannot be optimized away due to an external dependency, such as a class reference or instanceof operation
+    */
    public transient boolean needsOwnClass = false;
 
-   /** For processing template types, we want to create a dynamic type even if the class is marked compiled */
+   /**
+    * For processing template types, we want to create a dynamic type even if the class is marked compiled
+    */
    public transient boolean allowDynamic = false;
 
-   /** Cached the getFullTypeName property */
+   /**
+    * Cached the getFullTypeName property
+    */
    public transient String fullTypeName;
 
    /**
@@ -143,38 +174,54 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient boolean needsDynInnerStub = false;
    public transient boolean stubCompiled = false;
    public transient boolean stubGenerated = false;
-   /** Do we access this object type at runtime, i.e. through a binding */
+   /**
+    * Do we access this object type at runtime, i.e. through a binding
+    */
    public transient boolean needsDynAccess = false;
 
-   /** True when this object overrides an existing property defined by getX, setX methods. */
+   /**
+    * True when this object overrides an existing property defined by getX, setX methods.
+    */
    public transient boolean objectSetProperty = false;
 
-   /** Does code require the default constructor to be dynamic */
+   /**
+    * Does code require the default constructor to be dynamic
+    */
    public transient boolean needsDynDefaultConstructor = false;
 
    public transient boolean extendsInvalid = false;     // Set when the extends class is not found or leads to a cycle
    public transient boolean extendsOverridden = false;  // Set to true when the extends type is overridden in a subsequent layer
 
-   /** Index of properties for this type, lazily created  */
+   /**
+    * Index of properties for this type, lazily created
+    */
    private transient DynType propertyCache;
 
    private transient IDynChildManager dynChildManager;
    private transient IDynObjManager dynObjManager;
 
-   /** The list of inner types for this type only.  Because we may remove these during transformation, we need to grab a copy up front so the type system doesn't change after transform */
+   /**
+    * The list of inner types for this type only.  Because we may remove these during transformation, we need to grab a copy up front so the type system doesn't change after transform
+    */
    protected transient TypeDeclaration[] innerObjs;
 
-   /** In case we need a ConstructorDefinition to stub in for the implicitly defined zero arg constructor */
+   /**
+    * In case we need a ConstructorDefinition to stub in for the implicitly defined zero arg constructor
+    */
    private transient ConstructorDefinition defaultConstructor;
 
-   /** When updating the type, we may have removed a previous compiled extends class from this type.  Keep track of that class so we can properly detect stale runtimes when someone tries to update this type again with a different compiled class */
+   /**
+    * When updating the type, we may have removed a previous compiled extends class from this type.  Keep track of that class so we can properly detect stale runtimes when someone tries to update this type again with a different compiled class
+    */
    public transient Object prevCompiledExtends = null;
 
    private final static Object[] emptyObjectArray = new Object[0];
 
    protected transient MemberCache memberCache = null;
 
-   /** In the event we modify a compiled type which was an omitted object type, we need to freeze the compiled class name at the one which was actually compiled.   We could lazily cache the compiledClassName but maybe it will change during start/validate so we'd have to cache it the first time after we've compiled the system.  Instead, we cache it the first time we see that we're stale */
+   /**
+    * In the event we modify a compiled type which was an omitted object type, we need to freeze the compiled class name at the one which was actually compiled.   We could lazily cache the compiledClassName but maybe it will change during start/validate so we'd have to cache it the first time after we've compiled the system.  Instead, we cache it the first time we see that we're stale
+    */
    public transient String staleClassName = null;
 
    protected transient boolean memberCacheEnabled = true;
@@ -183,23 +230,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    protected transient Boolean cachedNeedsSync = null;
 
-   /** If we are synchronizing this type, should we start synchronizing eagerly when it's instantiated or wait for a reference to it and create it on demand. */
+   /**
+    * If we are synchronizing this type, should we start synchronizing eagerly when it's instantiated or wait for a reference to it and create it on demand.
+    */
    private transient boolean syncOnDemand = false;
 
-   /** If we are synchronizing this type, should we send initial values of properties over by default? */
+   /**
+    * If we are synchronizing this type, should we send initial values of properties over by default?
+    */
    private transient boolean syncInitDefault = false;
 
-   /** For sync types which are immutable - i.e. no need for listeners or state to be maintained for them. */
+   /**
+    * For sync types which are immutable - i.e. no need for listeners or state to be maintained for them.
+    */
    private transient boolean syncConstant = false;
 
    public transient Set<Object> dependentTypes = null;
 
    private ClientTypeDeclaration clientTypeDeclaration;
 
-   /** Contains the version of the type which we transformed. */
+   /**
+    * Contains the version of the type which we transformed.
+    */
    public transient BodyTypeDeclaration transformedType;
 
-   /** Caches whether we have the @Constant annotation to avoid the getInheritedAnnotation call */
+   /**
+    * Caches whether we have the @Constant annotation to avoid the getInheritedAnnotation call
+    */
    public transient Boolean autoComponent = null;
 
    transient int anonIdsAllocated = 0;
@@ -213,11 +270,42 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    transient public boolean temporaryType;
 
-   /** Set to true for types manipulated in the command line, so we know to make them live-dynamic types by default */
+   /**
+    * Set to true for types manipulated in the command line, so we know to make them live-dynamic types by default
+    */
 
    transient public boolean liveDynType = false;
 
    transient ArrayList<MethodDefinition> componentMethods = null;
+
+   static public List<Object> EMPTY_COMPILER_SETTINGS = Collections.emptyList();
+
+   transient public List<Object> compilerSettingsList = null;
+
+   public List<Object> getCompilerSettingsList() {
+      if (compilerSettingsList == null) {
+         compilerSettingsList = getAllInheritedAnnotations("sc.obj.CompilerSettings");
+         if (compilerSettingsList == null)
+            compilerSettingsList = EMPTY_COMPILER_SETTINGS;
+      }
+      return compilerSettingsList;
+   }
+
+   public Object[] getPropagateConstructorArgs() {
+      Object[] propagateConstructorArgs = null;
+      String pConstructor = (String) ModelUtil.getAnnotationValueFromList(getCompilerSettingsList(), "propagateConstructor");
+      if (pConstructor != null && pConstructor.length() > 0) {
+         String[] argTypeNames = StringUtil.split(pConstructor, ',');
+         propagateConstructorArgs = new Object[argTypeNames.length];
+         JavaModel m = getJavaModel();
+         for (int i = 0; i < argTypeNames.length; i++) {
+            propagateConstructorArgs[i] = m.findTypeDeclaration(argTypeNames[i], false);
+            if (propagateConstructorArgs[i] == null)
+               displayError("Bad value to CompilerSettings.propagateConstructor annotation " + pConstructor + " no type: " + argTypeNames[i]);
+         }
+      }
+      return propagateConstructorArgs;
+   }
 
    public Layer getLayer() {
       return layer;
@@ -238,7 +326,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private void switchLayersInBody(SemanticNodeList<Statement> bodyList, Layer lt) {
-      for (Statement st:bodyList)
+      for (Statement st : bodyList)
          if (st instanceof BodyTypeDeclaration)
             ((BodyTypeDeclaration) st).switchLayers(lt);
 
@@ -423,7 +511,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (obj != null)
          return obj;
 
-   // Need to check body first... otherwise we return objects in hiddenBody which we can't transform
+      // Need to check body first... otherwise we return objects in hiddenBody which we can't transform
       obj = findMemberInBody(hiddenBody, name, mtype, refType, ctx);
       if (obj != null)
          return obj;
@@ -437,7 +525,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private void initMethodsByName() {
-      methodsByName = new TreeMap<String,List<Statement>>();
+      methodsByName = new TreeMap<String, List<Statement>>();
       addMethodsFromBody(body);
       // after transforming an object, we put the types into the hiddenBody.  But at that point we want body to override the clases.  But in general
       // an object type must be resolved if there's a field in there as well.  If we store body and hiddenBody in the same list - we return the type when
@@ -452,7 +540,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          methodsByName.put(name, sts);
       }
       else {
-         for (Statement oldMeth:sts) {
+         for (Statement oldMeth : sts) {
             if (oldMeth == st)
                return;
             if (oldMeth instanceof AbstractMethodDefinition && ModelUtil.sameMethods(oldMeth, st)) {
@@ -470,7 +558,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void addMethodsFromBody(SemanticNodeList<Statement> bodyList) {
       if (bodyList == null)
          return;
-      for (Statement st:bodyList) {
+      for (Statement st : bodyList) {
          if (st instanceof AbstractMethodDefinition) {
             String name = ((AbstractMethodDefinition) st).name;
             if (name != null) {
@@ -487,7 +575,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private void initMembersByName() {
-      membersByName = new TreeMap<String,List<Statement>>();
+      membersByName = new TreeMap<String, List<Statement>>();
       addMembersFromBody(body);
       // If we combine body and hidden body in the same list it behaves differently due to stop-searching-sentinel
       //addMembersFromBody(hiddenBody);
@@ -496,7 +584,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void addMembersFromBody(SemanticNodeList<Statement> bodyList) {
       if (bodyList == null)
          return;
-      for (Statement st:bodyList) {
+      for (Statement st : bodyList) {
          // When we are in the midst of initializing the type, we may be trying to find a member as part of the findType method to determine
          // but we don't actually return the member in this case... so no harm in ignoring this warning.
          //if (!st.isInitialized())
@@ -616,7 +704,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (hasBeenStopped) {
          List<Object> innerTypes = getAllInnerTypes(null, true);
          if (innerTypes != null) {
-            for (Object innerType:innerTypes) {
+            for (Object innerType : innerTypes) {
                if (innerType instanceof BodyTypeDeclaration)
                   ((BodyTypeDeclaration) innerType).modelChanged();
             }
@@ -657,10 +745,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Layer layer = getLayer();
             if (layer != null && this instanceof TypeDeclaration) {
                // If there are any cached sub-types (passing cachedOnly = true), we want to invalidate their entries.
-               Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer, false, false, true, true);
+               Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this, layer, false, false, true, true);
                if (subTypes != null) {
                   while (subTypes.hasNext()) {
-                     TypeDeclaration subType = subTypes.next();
+                     BodyTypeDeclaration subType = subTypes.next();
                      if (subType == this) {
                         System.err.println("*** Recursive sub-type definition!");
                         continue;
@@ -848,7 +936,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return v;
    }
 
-   /** Just returns methods declared in this specific type */
+   /**
+    * Just returns methods declared in this specific type
+    */
    public Object declaresMethod(String name, List<? extends Object> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs, boolean includeModified) {
       if (methodsByName == null) {
          initMethodsByName();
@@ -920,7 +1010,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (body != null) {
          ArrayList<Object> res = null;
-         for (Statement s:body) {
+         for (Statement s : body) {
             if (s instanceof ConstructorDefinition && (refType == null || ModelUtil.checkAccess(refType, s))) {
                if (res == null)
                   res = new ArrayList<Object>();
@@ -961,7 +1051,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (theBody != null) {
          Object[] prevTypesArray = null;
          Object[] nextTypesArray;
-         for (Statement s:theBody) {
+         for (Statement s : theBody) {
             // Prevents us walking own the type hierarchy
             if (s instanceof TypeDeclaration)
                continue;
@@ -1029,7 +1119,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Check any interfaces appended on by annotations for for their own annotation.   This way, you can use
       // a meta layer to attach annotations onto a type which is automatically added via an annotation, e.g. GWT's EntryPoint
       // added by the GWTModule annotation.
-      for (Object scopeType:scopeTypes) {
+      for (Object scopeType : scopeTypes) {
          if ((annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().layeredSystem, scopeType, annotationName, false, refLayer, layerResolve)) != null)
             return annotObj;
       }
@@ -1064,7 +1154,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Check any interfaces appended on by annotations for for their own annotation.   This way, you can use
       // a meta layer to attach annotations onto a type which is automatically added via an annotation, e.g. GWT's EntryPoint
       // added by the GWTModule annotation.
-      for (Object scopeType:scopeTypes) {
+      for (Object scopeType : scopeTypes) {
          if ((superRes = ModelUtil.getAllInheritedAnnotations(getJavaModel().layeredSystem, scopeType, annotationName, false, refLayer, layerResolve)) != null) {
             res = ModelUtil.appendLists(res, superRes);
          }
@@ -1079,7 +1169,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return scopeName;
 
       Object superType = getDerivedTypeDeclaration();
-      scopeName  = ModelUtil.getInheritedScopeName(getLayeredSystem(), superType, getLayer());
+      scopeName = ModelUtil.getInheritedScopeName(getLayeredSystem(), superType, getLayer());
       if (scopeName != null)
          return scopeName;
 
@@ -1101,7 +1191,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (other != null) {
          if (res == null)
             res = new ArrayList<IDefinitionProcessor>();
-         for (IDefinitionProcessor o:other) {
+         for (IDefinitionProcessor o : other) {
             if (!res.contains(o))
                res.add(o);
          }
@@ -1109,7 +1199,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       boolean hasSync = false;
       boolean hasScope = false;
       if (res != null) {
-         for (IDefinitionProcessor proc:res) {
+         for (IDefinitionProcessor proc : res) {
             if (proc == SyncAnnotationProcessor.getSyncAnnotationProcessor())
                hasSync = true;
             if (proc instanceof BasicScopeProcessor)
@@ -1149,7 +1239,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // added by the GWTModule annotation.
          IDefinitionProcessor[] defProcs = getDefinitionProcessors();
          if (defProcs != null) {
-            for (IDefinitionProcessor proc:defProcs) {
+            for (IDefinitionProcessor proc : defProcs) {
                String[] scopeInterfaces = proc.getAppendInterfaces();
                if (scopeInterfaces != null) {
                   for (int si = 0; si < scopeInterfaces.length; si++) {
@@ -1180,7 +1270,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       ArrayList<JavaType> scopeTypes = null;
       IDefinitionProcessor[] defProcs = getDefinitionProcessors();
       if (defProcs != null) {
-         for (IDefinitionProcessor proc:defProcs) {
+         for (IDefinitionProcessor proc : defProcs) {
             String[] scopeInterfaces = proc.getAppendInterfaces();
             if (scopeInterfaces != null) {
                for (int si = 0; si < scopeInterfaces.length; si++) {
@@ -1340,14 +1430,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getInnerType(String name, TypeContext ctx) {
-      return getInnerType(name, ctx, true, false, false);
+      return getInnerType(name, ctx, true, false, false, false);
    }
 
    // TODO: For debugging purposes.  Remove at some point!  While editing some inner type in the IDE we hit an infinite loop here
    // so this is for diagnosing that problem.
    final static private int MAX_TYPE_NEST_COUNT = 200;
 
-   public Object getInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
+   public Object getInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly, boolean includeEnums) {
       int ix;
       boolean origSameType = ctx != null && ctx.sameType;
       Object type = this;
@@ -1357,7 +1447,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          String nextTypeName;
          if (ix != -1) {
             nextTypeName = name.substring(0, ix);
-            name = name.substring(ix+1);
+            name = name.substring(ix + 1);
             if (ctx != null)
                ctx.sameType = false;
          }
@@ -1373,7 +1463,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          if (type instanceof BodyTypeDeclaration)
-            nextType = ((BodyTypeDeclaration) type).getSimpleInnerType(nextTypeName, ctx, checkBaseType, redirected, srcOnly);
+            nextType = ((BodyTypeDeclaration) type).getSimpleInnerType(nextTypeName, ctx, checkBaseType, redirected, srcOnly, includeEnums);
          else
             nextType = ModelUtil.getInnerType(type, name, ctx);
 
@@ -1392,7 +1482,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return type;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly, boolean includeEnums) {
       /*
       IDefinitionProcessor[] procs = getDefinitionProcessors();
       if (procs != null) {
@@ -1435,12 +1525,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       for (int i = 0; i < 2; i++) {
          SemanticNodeList<Statement> theBody = i == 0 ? body : hiddenBody;
          if (theBody != null && !skipBody)
-            for (Statement s:theBody) {
+            for (Statement s : theBody) {
                if (s instanceof TypeDeclaration) {
                   TypeDeclaration st = (TypeDeclaration) s;
                   if (st.typeName != null && st.typeName.equals(name)) {
                      return s;
                   }
+               }
+               else if (includeEnums && s instanceof EnumConstant) {
+                  EnumConstant ec = (EnumConstant) s;
+                  if (StringUtil.equalStrings(ec.typeName, name))
+                     return ec;
                }
                else if (isMethod && s instanceof AbstractMethodDefinition) {
                   Object res = s.definesType(name, ctx);
@@ -1462,20 +1557,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // The redirected flag is set to true when we redirect to the same type.  It disables use of the "resolve" when we go to the extends type so when modify inherited is true, we are not redirecting.
          if (redirected && this instanceof ModifyDeclaration && ((ModifyDeclaration) this).modifyInherited)
             redirected = false;
-         return getSimpleInnerTypeFromExtends(extendsType, name, ctx, redirected, srcOnly);
+         return getSimpleInnerTypeFromExtends(extendsType, name, ctx, redirected, srcOnly, includeEnums);
       }
 
       return null;
    }
 
-   protected Object getSimpleInnerTypeFromExtends(Object extendsType, String name, TypeContext ctx, boolean redirected, boolean srcOnly) {
+   protected Object getSimpleInnerTypeFromExtends(Object extendsType, String name, TypeContext ctx, boolean redirected, boolean srcOnly, boolean includeEnums) {
       Object res;
       if (extendsType != null) {
          if (extendsType instanceof TypeDeclaration) {
             BodyTypeDeclaration ext = (TypeDeclaration) extendsType;
             if (!redirected && ext.replacedByType != null)
                ext = ext.resolve(true);
-            if ((res = ext.getInnerType(name, ctx, true, true, srcOnly)) != null)
+            if ((res = ext.getInnerType(name, ctx, true, true, srcOnly, includeEnums)) != null)
                if (ctx != null)
                   ctx.add(ext, this);
             return res;
@@ -1490,7 +1585,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                Object srcType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType, false, true, getLayer());
                if (srcType instanceof BodyTypeDeclaration) {
                   updateBoundExtendsType(srcType, extendsType);
-                  return getSimpleInnerTypeFromExtends(srcType, name, ctx, redirected, true);
+                  return getSimpleInnerTypeFromExtends(srcType, name, ctx, redirected, true, includeEnums);
                }
             }
             return ModelUtil.getInnerType(extendsType, name, ctx);
@@ -1558,7 +1653,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /**
     * For an object definition where we are optimizing out the class, we need to skip to get the actual runtime
     * class.  Then, convert that to a type name, then see if there is a class available.
-    *
+    * <p>
     * For dynamic types, the runtime class is DynObject if there's no extend class.  If we extend another
     * dynamic type, that classes runtime class is the one we use.  If our extends type is not dynamic,
     * this particular type needs to become a dynamic stuff so we use this class.
@@ -1702,7 +1797,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       throw new UnsupportedOperationException();
    }
 
-   /** Returns the type name not including the package prefix */
+   /**
+    * Returns the type name not including the package prefix
+    */
    public String getInnerTypeName() {
       if (parentNode == null)
          return typeName;
@@ -1727,7 +1824,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {
-      Object otherTypeObj = base.getInnerType(typeName, null, true, false, false);
+      boolean isEnumType = base.isEnumeratedType();
+      Object otherTypeObj = base.getInnerType(typeName, null, true, false, false, isEnumType);
       Object annotObj;
       if (otherTypeObj instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration otherType = (BodyTypeDeclaration) otherTypeObj;
@@ -1746,7 +1844,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          else {
             String otherTypeName = ((StringLiteral) annot.elementValue).stringValue;
-            Object indexType = base.getInnerType(otherTypeName, null, false, false, false);
+            Object indexType = base.getInnerType(otherTypeName, null, false, false, false, isEnumType);
             if (indexType == null || !(indexType instanceof BodyTypeDeclaration)) {
                System.err.println("*** Can't find type in annotation: " + annot.toDefinitionString() + " must be an object defined in: " + typeName);
             }
@@ -1757,7 +1855,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   if (annot.typeName.equals("AddBefore"))
                      base.body.add(ix, this);
                   else
-                     base.body.add(ix+1, this);
+                     base.body.add(ix + 1, this);
                }
                else {
                   System.err.println("*** Internal error: can't find position of type in base");
@@ -1787,7 +1885,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Note: weird case here where we may have not generated a compiled class for this type.  In that case, we have
       // to allow a match between a runtime class of the base type and this one even though it might be a false match.
       //if (otherName.equals(getCompiledClassName())) {
-         //System.out.println("---");
+      //System.out.println("---");
          /* TODO - remove. I don't like this case... feels like it should be an exception if we need it at all.  In any case, it should have the needsOwnClass guard here which was not here previously
          if (!needsOwnClass(true))
             return true;
@@ -1798,7 +1896,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return true;
       Class[] ifaces = other.getInterfaces();
       if (ifaces != null) {
-         for (Class c:ifaces)
+         for (Class c : ifaces)
             if (isAssignableFromClass(c))
                return true;
       }
@@ -1844,7 +1942,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getMethods(methodName, modifier, true);
    }
 
-   /** Returns the list of methods with the given name or null if there aren't any.  Does not look for constructors */
+   /**
+    * Returns the list of methods with the given name or null if there aren't any.  Does not look for constructors
+    */
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
       if (body == null)
          return null;
@@ -1853,7 +1953,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       for (int i = 0; i < body.size(); i++) {
          Definition member = body.get(i);
          if (member instanceof MethodDefinition && StringUtil.equalStrings(((MethodDefinition) member).name, methodName) &&
-             (modifier == null || member.hasModifier(modifier)))
+                 (modifier == null || member.hasModifier(modifier)))
             methods.add(member);
       }
       if (hiddenBody != null) {
@@ -1876,7 +1976,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // TODO: default constructor?
          return null;
       }
-      for (Object meth:methods) {
+      for (Object meth : methods) {
          if (StringUtil.equalStrings(ModelUtil.getTypeSignature(meth), signature)) {
             if (meth instanceof AbstractMethodDefinition) {
                AbstractMethodDefinition methDef = (AbstractMethodDefinition) meth;
@@ -1899,7 +1999,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getCachedAllMethods()[methodIndex];
    }
 
-   /** Returns the list of properties with the given modifiers or null if there aren't any. */
+   /**
+    * Returns the list of properties with the given modifiers or null if there aren't any.
+    */
    public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
       if (body == null)
          return null;
@@ -1924,7 +2026,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       throw new UnsupportedOperationException();
    }
 
-   /** Returns the list of properties with the given modifiers or null if there aren't any. */
+   /**
+    * Returns the list of properties with the given modifiers or null if there aren't any.
+    */
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
       return getDeclaredProperties(modifier, includeAssigns, false);
    }
@@ -1936,7 +2040,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                  (modifier == null || member.hasModifier(modifier))) {
             if (member instanceof FieldDefinition) {
                FieldDefinition field = (FieldDefinition) member;
-               for (VariableDefinition def:field.variableDefinitions) {
+               for (VariableDefinition def : field.variableDefinitions) {
                   props.add(def);
                }
             }
@@ -1967,7 +2071,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       */
    }
 
-   /** Returns the list of fields with the given name or null if there aren't any */
+   /**
+    * Returns the list of fields with the given name or null if there aren't any
+    */
    public List<Object> getDeclaredIFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns) {
       return null;
    }
@@ -1976,7 +2082,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getDeclaredFields(modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
    }
 
-   /** Returns the list of fields with the given name or null if there aren't any */
+   /**
+    * Returns the list of fields with the given name or null if there aren't any
+    */
    public List<Object> getDeclaredFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       List<Object> props = new ArrayList<Object>();
       addAllFields(body, props, modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
@@ -1997,7 +2105,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if ((modifier == null || member.hasModifier(modifier) == hasModifier)) {
             if (member instanceof FieldDefinition) {
                FieldDefinition field = (FieldDefinition) member;
-               for (VariableDefinition def:field.variableDefinitions) {
+               for (VariableDefinition def : field.variableDefinitions) {
                   // Do not add if we already have the object for include objs
                   if (includeObjs) {
                      int rix = ModelUtil.propertyIndexOf(props, def, true);
@@ -2073,7 +2181,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          System.err.println("*** Error - recursive replaced by type");
          return this;
       }
-     return replacedByType.resolve(modified);
+      return replacedByType.resolve(modified);
    }
 
    public BodyTypeDeclaration getDeclarationForLayer(Layer layer, boolean includeInherited, boolean merge) {
@@ -2095,7 +2203,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          Object[] implTypes = getImplementsTypeDeclarations();
          if (implTypes != null) {
-            for (Object implObj:implTypes) {
+            for (Object implObj : implTypes) {
                if (implObj instanceof BodyTypeDeclaration) {
                   BodyTypeDeclaration implDecl = (BodyTypeDeclaration) implObj;
                   if (implDecl.getDeclarationForLayer(layer, true, merge) != null)
@@ -2119,7 +2227,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return realType.replacedByType.resolve(false);
    }
 
-   /** Returns the root level type corresponding to this type declaration.  In other words, the most specific type in the modify chain */
+   /**
+    * Returns the root level type corresponding to this type declaration.  In other words, the most specific type in the modify chain
+    */
    public BodyTypeDeclaration getModifiedByRoot() {
       BodyTypeDeclaration ret = getModifiedByType();
       if (ret == null || ret == this)
@@ -2127,7 +2237,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       else return ret.getModifiedByRoot();
    }
 
-   /** Like getModifiedType but returns null for modifyInherited cases - i.e. when you modify a type which you inherited from a sub-type.  That pattern works more like an extends of a new type rather than changing the same type. */
+   /**
+    * Like getModifiedType but returns null for modifyInherited cases - i.e. when you modify a type which you inherited from a sub-type.  That pattern works more like an extends of a new type rather than changing the same type.
+    */
    public BodyTypeDeclaration getPureModifiedType() {
       return null;
    }
@@ -2188,7 +2300,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return types.size() > 0 ? types : null;
    }
 
-   private static void addAllInnerTypes(List<Object> types,  SemanticNodeList<Statement> bodyList, String modifier, boolean check) {
+   private static void addAllInnerTypes(List<Object> types, SemanticNodeList<Statement> bodyList, String modifier, boolean check) {
       if (bodyList == null)
          return;
       for (int i = 0; i < bodyList.size(); i++) {
@@ -2264,12 +2376,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (isLayerType)
          return;
       if (body != null) {
-         for (Statement st:body) {
+         for (Statement st : body) {
             st.refreshBoundTypes(flags);
          }
       }
       if (hiddenBody != null) {
-         for (Statement st:hiddenBody) {
+         for (Statement st : hiddenBody) {
             st.refreshBoundTypes(flags);
          }
       }
@@ -2368,9 +2480,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Need to make any inner types dynamic as well.  Ordinarily they will inherit this from us but in the case
       // where a modified type is setting this on us, it won't be propagated properly.
       if (body != null) {
-         for (Statement st:body) {
+         for (Statement st : body) {
             if (st instanceof BodyTypeDeclaration)
-               ((BodyTypeDeclaration)st).setDynamicType(dt);
+               ((BodyTypeDeclaration) st).setDynamicType(dt);
          }
       }
 
@@ -2391,7 +2503,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       dynamicNew = dt;
    }
 
-   public void addAllPropertiesToMakeBindable(TreeMap<String,Boolean> properties) {
+   public void addAllPropertiesToMakeBindable(TreeMap<String, Boolean> properties) {
       LayeredSystem sys = getLayeredSystem();
       if (sys.buildLayer.compiled && properties.size() > 0)
          sys.setStaleCompiledModel(true, "Recompile needed to bind to compiled properties: ", properties.toString());
@@ -2425,11 +2537,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public void addStaticFields(List<Object> fields) {
       if (body == null)
          return;
-      for (Statement st:body) {
+      for (Statement st : body) {
          if (st instanceof FieldDefinition) {
             FieldDefinition fd = (FieldDefinition) st;
             if (fd.hasModifier("static")) {
-               for (VariableDefinition vdef:fd.variableDefinitions) {
+               for (VariableDefinition vdef : fd.variableDefinitions) {
                   fields.add(vdef);
                }
             }
@@ -2529,11 +2641,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       LayeredSystem sys = getLayeredSystem();
-      Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration)this) : null;
+      Iterator<BodyTypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
       if (subTypes != null) {
          while (subTypes.hasNext()) {
-            TypeDeclaration subType = subTypes.next();
-            subType = (TypeDeclaration) subType.resolve(true);
+            BodyTypeDeclaration subType = subTypes.next();
+            subType = subType.resolve(true);
             subType.addDynInstFieldLeaf(fieldObj, updateType);
          }
       }
@@ -2578,11 +2690,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return TypeUtil.EMPTY_ARRAY;
 
       if (staticFields == null) {
-        // We used to start here but for layer types at least, we can't start the type this early.  We need to resolve the
-        // fields so we can create the layer instance, then build separate layers, then once those are in the classpath we
-        // start the layers that depend on those types.
-        // if (!isStarted())
-        //    ModelUtil.ensureStarted(this, true);
+         // We used to start here but for layer types at least, we can't start the type this early.  We need to resolve the
+         // fields so we can create the layer instance, then build separate layers, then once those are in the classpath we
+         // start the layers that depend on those types.
+         // if (!isStarted())
+         //    ModelUtil.ensureStarted(this, true);
 
          ArrayList<Object> fields = new ArrayList<Object>();
          addStaticFields(fields);
@@ -2603,7 +2715,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return oldStaticFields;
    }
 
-   /** Initializes the type's static fields for interpreting */
+   /**
+    * Initializes the type's static fields for interpreting
+    */
    public void staticInit() {
       ensureValidated();
 
@@ -2629,7 +2743,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    private void preInitStaticBody(Object[] staticVals, SemanticNodeList<Statement> bodyList, ExecutionContext ctx) {
       // Lazy init sentinels need to get put in before we start executing static code
-      for (Statement st:bodyList) {
+      for (Statement st : bodyList) {
          if (st instanceof BodyTypeDeclaration) {
             int i;
             BodyTypeDeclaration td = (BodyTypeDeclaration) st;
@@ -2645,11 +2759,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void initStaticValuesBody(Object[] staticVals, SemanticNodeList<Statement> bodyList, ExecutionContext ctx) {
       int i;
-      for (Statement st:bodyList) {
+      for (Statement st : bodyList) {
          if (st instanceof FieldDefinition) {
             FieldDefinition fd = (FieldDefinition) st;
             if (fd.hasModifier("static") && fd.isDynamicType()) {
-               for (VariableDefinition staticField:fd.variableDefinitions) {
+               for (VariableDefinition staticField : fd.variableDefinitions) {
                   Object newField;
                   // Make sure we get the latest one in case it was modified
                   newField = getStaticPropertyObject(staticField.variableName);
@@ -2760,7 +2874,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       staticFieldMap = new IntCoalescedHashMap(sfs.length);
       int i = 0;
-      for (Object varDef:sfs) {
+      for (Object varDef : sfs) {
          staticFieldMap.put(ModelUtil.getPropertyName(varDef), i++);
       }
    }
@@ -2820,7 +2934,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       int i = 1; // Always use 1 so that sub-class slot #'s are consistent with base supers even when the base type has no outer class
       dynInstFieldMap = new IntCoalescedHashMap(i + sfs.length);
       dynTransientFields = new BitSet(sfs.length);
-      for (Object vardef:sfs) {
+      for (Object vardef : sfs) {
          String n = ModelUtil.getPropertyName(vardef);
          if (ModelUtil.hasModifier(vardef, "transient"))
             dynTransientFields.set(i);
@@ -2831,7 +2945,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // serializable but the RepositoryPackage is.  We don't need to restore the parent child relationship here on de-serialize
       // as we only care about serializing the RepositoryPackage itself so here we detect and avoid this error ahead of time.
       Object enclInstType = getEnclosingInstType();
-      if (!ModelUtil.isAssignableFrom(Serializable.class,enclInstType))
+      if (!ModelUtil.isAssignableFrom(Serializable.class, enclInstType))
          dynTransientFields.set(0);
    }
 
@@ -3087,7 +3201,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (implementTypes != null) {
             int i = 0;
             implDynTypes = new DynType[implementTypes.length];
-            for (Object implType:implementTypes) {
+            for (Object implType : implementTypes) {
                DynType ifType = ModelUtil.getPropertyCache(implType);
                implDynTypes[i] = ifType;
                ifaceCount += ifType.propertyCount;
@@ -3099,7 +3213,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (extTypes != null) {
             int i = 0;
             extDynTypes = new DynType[extTypes.length];
-            for (Object etype:extTypes) {
+            for (Object etype : extTypes) {
                if (etype != null) {
                   DynType exType = ModelUtil.getPropertyCache(etype);
                   extDynTypes[i] = exType;
@@ -3176,13 +3290,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // Need to do these at the end so that we do not assign new positions for any interface properties which
          // are defined in the body or base type.
          if (implDynTypes != null) {
-            for (DynType ifType:implDynTypes)
+            for (DynType ifType : implDynTypes)
                pos = addInterfaceTypePropertyCache(ifType, pos);
          }
 
          // Since all layer properties use dynamic lookup the indexes don't have to be consistent for each type (hopefully - since that's not possible for multiple inheritance)
          if (extTypes != null) {
-            for (DynType layerType:extDynTypes) {
+            for (DynType layerType : extDynTypes) {
                if (layerType != null)
                   pos = addLayerTypePropertyCache(layerType, pos);
             }
@@ -3233,7 +3347,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    private void addFieldToPropertyCache(FieldDefinition field, DynType cache, boolean isInterface) {
       boolean isStatic = field.hasModifier("static");
-      for (VariableDefinition varDef:field.variableDefinitions) {
+      for (VariableDefinition varDef : field.variableDefinitions) {
          addVarDefToPropertyCache(varDef, cache, isInterface, isStatic);
       }
    }
@@ -3256,7 +3370,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // Skip this property if there's already a property mapper from the super type.  It might be compiled and
                // we can't override a compiled field with a dynamic one since they are in different ranges.
                if (innerType.getDeclarationType() == DeclarationType.OBJECT && !innerType.isHiddenType() &&
-                   cache.getPropertyMapper(name) == null) {
+                       cache.getPropertyMapper(name) == null) {
                   boolean isStatic = innerType.isStaticType();
                   newMapper = new DynBeanMapper(innerType);
                   IBeanMapper oldMapper;
@@ -3474,7 +3588,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getExtendsTypeDeclaration();
    }
 
-   /** Returns the enclosing type only if it is not a static inner type - i.e. to determine if there's a "this" for the parent in the child */
+   /**
+    * Returns the enclosing type only if it is not a static inner type - i.e. to determine if there's a "this" for the parent in the child
+    */
    public BodyTypeDeclaration getEnclosingInstType() {
       BodyTypeDeclaration type = getEnclosingType();
       return type == null ? null : (isStaticType() ? null : type);
@@ -3485,7 +3601,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       int numChildren;
       StringBuilder childNames = new StringBuilder();
       Object[] children = null;
-      Map<String,StringBuilder> childNamesByScope = new HashMap<String,StringBuilder>();
+      Map<String, StringBuilder> childNamesByScope = new HashMap<String, StringBuilder>();
       // TODO: performance.  Should refactor addChildNames to first gather children, then turn them into
       // names.  For the dynamic case, we avoid all of that string allocation.
       numChildren = addChildNames(childNames, childNamesByScope, null, componentsOnly, thisClassOnly, dynamicOnly, new TreeSet<String>(), null);
@@ -3512,7 +3628,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return null;
       Object[] typeObjs = new Object[objNames.length];
       int i = 0;
-      for (String name:objNames) {
+      for (String name : objNames) {
          typeObjs[i++] = getInnerType(name, null);
       }
       return typeObjs;
@@ -3531,7 +3647,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return null;
       Object[] children = new Object[childNames.length];
       int i = 0;
-      for (String childName:childNames) {
+      for (String childName : childNames) {
          // getProperty(int) version so we don't have so many methods.
          // Passing getField as true here so we just return an existing instance. If it's null, we need to check if the inner type
          // is a dynamic type. If we were to call the compiled getX, it would skip a type we override with a "modify inherited" scheme
@@ -3740,7 +3856,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   /** Let's callers initialize the properties one at a time to deal with dependencies between properties. */
+   /**
+    * Let's callers initialize the properties one at a time to deal with dependencies between properties.
+    */
    public void initDynamicProperty(Object inst, String propertyName) {
       Object field = definesMember(propertyName, MemberType.PropertyAssignmentSet, null, null);
       if (field instanceof Statement) {
@@ -3814,7 +3932,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
    */
 
-   /** This is called from code generated in the dynamic stub to complete the dynamic portion of the initialization on the instance provided */
+   /**
+    * This is called from code generated in the dynamic stub to complete the dynamic portion of the initialization on the instance provided
+    */
    public void buildDynamicInstance(Object inst, Object outerObj, String constrSig, Object... params) {
       ExecutionContext ctx = new ExecutionContext(getJavaModel());
       try {
@@ -3862,9 +3982,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          /*
-           * This needs to be done before we call init.  Before we were setting this after constructing the object manually and before we called initDynObject manually.
-           * But when you have a newX method you need to call, you do not get the ability to intercept the code.  anyway, this way, we do more work at runtime but
-           * identify this case and fill the slot in while doing the dynamic type initailization. */
+          * This needs to be done before we call init.  Before we were setting this after constructing the object manually and before we called initDynObject manually.
+          * But when you have a newX method you need to call, you do not get the ability to intercept the code.  anyway, this way, we do more work at runtime but
+          * identify this case and fill the slot in while doing the dynamic type initailization. */
          if (outerObj instanceof IDynObject && getDeclarationType() == DeclarationType.OBJECT && outerType instanceof TypeDeclaration) {
             TypeDeclaration outerTypeDecl = (TypeDeclaration) outerType;
             int index = outerTypeDecl.getDynInstPropertyIndex(typeName);
@@ -3994,7 +4114,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       List<Object> compilerSettingsList = ModelUtil.getAllInheritedAnnotations(sys, type, "sc.obj.CompilerSettings", false, refLayer, layerResolve);
       IDynChildManager res = null;
       if (compilerSettingsList != null) {
-         for (Object compilerSettings:compilerSettingsList) {
+         for (Object compilerSettings : compilerSettingsList) {
             String dynChildMgrClass = (String) ModelUtil.getAnnotationValue(compilerSettings, "dynChildManager");
             res = EMPTY_DYN_CHILD_MANAGER; // TODO: is this right?  what's the difference with returning null?
             if (dynChildMgrClass != null && dynChildMgrClass.length() > 0) {
@@ -4160,7 +4280,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void updateInstFromBody(Object inst, SyncManager.SyncContext syncCtx, ExecutionContext ctx, SemanticNodeList<Statement> toUpdate) {
       if (toUpdate == null)
          return;
-      for (Statement st:toUpdate) {
+      for (Statement st : toUpdate) {
          if (st instanceof OverrideAssignment) {
             // TODO: check if there is an @Sync annotation here?  The client sends down: "override @Sync propName;" to fetch a property.
             OverrideAssignment ost = (OverrideAssignment) st;
@@ -4341,7 +4461,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return false;
    }
 
-   /** Is there any IDynObject implementation, even if not the immediate super type this method returns true */
+   /**
+    * Is there any IDynObject implementation, even if not the immediate super type this method returns true
+    */
    public boolean getExtendsDynamicStub() {
       Object extType = getCompiledExtendsTypeDeclaration();
       return getSuperIsDynamicStub() || extType != null && ModelUtil.isAssignableFrom(IDynObject.class, extType);
@@ -4473,7 +4595,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Need to generate the inner stubs before we compile the outer one since it will depend on the inner ones.
       List<SrcEntry> innerStubs = doGen ? getInnerDynStubs(bd, lyr, true) : null;
       if (innerStubs != null) {
-         for (SrcEntry innerStub:innerStubs) {
+         for (SrcEntry innerStub : innerStubs) {
             lyr.addSrcFileIndex(innerStub.relFileName, innerStub.hash, innerStub.getExtension(), innerStub.absFileName);
          }
       }
@@ -4563,7 +4685,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return FileUtil.concat(getJavaModel().getPackagePrefixDir(), stubBaseName);
    }
 
-   /** Returns all standalone inner type stubs.  It will not return the stubs for inner types which are real inner types in the main class */
+   /**
+    * Returns all standalone inner type stubs.  It will not return the stubs for inner types which are real inner types in the main class
+    */
    List<SrcEntry> getInnerDynStubs(String buildDir, Layer buildLayer, boolean generate) {
       List<Object> myIts = getAllInnerTypes(null, true);
       if (myIts == null)
@@ -4622,9 +4746,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                            // Always doing this for now... would need to check all src files that were merged into this type
                            //if (srcFile.lastModified() < new File(model.getSrcFile().absFileName).lastModified()) {
-                              FileUtil.touchFile(newFile);
-                              if (touchClassFile)
-                                 FileUtil.touchFile(classFile.getPath());
+                           FileUtil.touchFile(newFile);
+                           if (touchClassFile)
+                              FileUtil.touchFile(classFile.getPath());
                            //}
                         }
                      }
@@ -4676,7 +4800,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return Collections.emptyList();
    }
 
-   /** Returns the subset of the compiledIFields which are implemented as dynamic fields in this type */
+   /**
+    * Returns the subset of the compiledIFields which are implemented as dynamic fields in this type
+    */
    public List<Object> getDynCompiledIFields() {
       List<Object> fields = getCompiledIFields();
 
@@ -4727,7 +4853,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      String[] paramTypeNames = constr.getParamTypeNames(); " +
            "      String[] paramNames = constr.getParamNames(); " +
            "      String[] superArgNames = constr.getSuperArgNames(); %>" +
-           "   <%= constrModifiers %><%= typeName%>(sc.lang.java.TypeDeclaration concreteType<%"  +
+           "   <%= constrModifiers %><%= typeName%>(sc.lang.java.TypeDeclaration concreteType<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %>, <%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n<%" +
            "        String superExpr = constr.superExpression;" +
@@ -4757,7 +4883,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "         String[] paramTypeNames = constr.getParamTypeNames(); " +
            "         String[] paramNames = constr.getParamNames(); " +
            "         String[] superArgNames = constr.getSuperArgNames(); %>" +
-           "   <%= constrModifiers %><%= typeName%>(<%"  +
+           "   <%= constrModifiers %><%= typeName%>(<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %><%= s != 0 ? \", \" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n<%" +
            "         if (constr.needsSuper) {" +
@@ -4790,7 +4916,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      for (DynConstructor constr:constrs) {" +
            "         String[] paramTypeNames = constr.getParamTypeNames(); " +
            "         String[] paramNames = constr.getParamNames(); %>" +
-           "   <%= typeModifiers %><%= dynInnerInstType ? \"\" : \"static \"%><%= typeName %> new<%= upperClassName%>(<%= dynInnerInstType || repeated ? \"Object _outerObj, \" : \"\" %>sc.lang.java.TypeDeclaration _type<%"  +
+           "   <%= typeModifiers %><%= dynInnerInstType ? \"\" : \"static \"%><%= typeName %> new<%= upperClassName%>(<%= dynInnerInstType || repeated ? \"Object _outerObj, \" : \"\" %>sc.lang.java.TypeDeclaration _type<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %>, <%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n" +
            "      <%= typeName %> _inst = new <%= typeName %>(_type<%" +
@@ -4817,7 +4943,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      for (DynConstructor constr:constrs) {\n" +
            "         String[] paramTypeNames = constr.getParamTypeNames(); " +
            "         String[] paramNames = constr.getParamNames(); %>" +
-           "   <%= dynInnerInstType ? \"\" : \"static \" %><%= typeModifiers %> <%= typeName %> new<%= upperClassName%>(<%"  +
+           "   <%= dynInnerInstType ? \"\" : \"static \" %><%= typeModifiers %> <%= typeName %> new<%= upperClassName%>(<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %><%= s != 0 ? \", \" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n" +
            "      sc.lang.java.TypeDeclaration _type = sc.lang.DynObject.getType(\"<%=fullTypeName%>\");\n" +
@@ -4832,7 +4958,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "   for (DynInnerConstructor constr:innerConstrs) {\n" +
            "       String[] paramTypeNames = constr.getParamTypeNames(); " +
            "       String[] paramNames = constr.getParamNames(); %>" +
-           "   <%= constr.innerTypeModifiers %> <%= constr.compiledInnerTypeName %> new<%= constr.upperInnerTypeName%>(<%"  +
+           "   <%= constr.innerTypeModifiers %> <%= constr.compiledInnerTypeName %> new<%= constr.upperInnerTypeName%>(<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %><%= s != 0 ? \", \" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n" +
            "      sc.lang.java.TypeDeclaration _type = sc.lang.DynObject.getType(\"<%=constr.fullInnerTypeName%>\");\n" +
@@ -4846,7 +4972,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "<% for (DynInnerConstructor constr:innerConstrs) {\n" +
            "       String[] paramTypeNames = constr.getParamTypeNames(); " +
            "       String[] paramNames = constr.getParamNames(); %>" +
-           "   <%= constr.innerTypeModifiers %> <%= constr.compiledInnerTypeName %> new<%= constr.upperInnerTypeName%>(sc.lang.java.TypeDeclaration _type<%"  +
+           "   <%= constr.innerTypeModifiers %> <%= constr.compiledInnerTypeName %> new<%= constr.upperInnerTypeName%>(sc.lang.java.TypeDeclaration _type<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %><%= s != 0 ? \", \" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= constr.throwsClause %> {\n" +
            "      <%= constr.compiledInnerTypeName %> _inst = new <%= constr.compiledInnerTypeName %>(_type<%" +
@@ -4860,7 +4986,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "   for (DynMethod meth:meths) {\n" +
            "      String[] paramTypeNames = meth.paramTypeNames; " +
            "      String[] paramNames = meth.paramNames; %>" +
-           "   <%= meth.modifiers %> <%= meth.returnType %> <%= meth.name%>(<%"  +
+           "   <%= meth.modifiers %> <%= meth.returnType %> <%= meth.name%>(<%" +
            "      for (int s = 0; s < paramNames.length; s++) { " +
            "           %><%= s != 0 ? \",\" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= meth.throwsClause %> {\n" +
            //"      if (!meth.isVoid()) { %>return <% if (meth.needsCast) { %>(<%= meth.returnType %>)<% } %> <% } %>invoke(\"<%= meth.name %>\", \"<%= meth.typeSignature %>\"<%" +
@@ -4872,7 +4998,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            "      if (meth.needsSuper) {" +
            "         String[] paramTypeNames = meth.paramTypeNames; " +
            "         String[] paramNames = meth.paramNames; %>" +
-           "   <%= meth.modifiers %> <%= meth.returnType %> _super_<%= meth.name%>(<%"  +
+           "   <%= meth.modifiers %> <%= meth.returnType %> _super_<%= meth.name%>(<%" +
            "         for (int s = 0; s < paramNames.length; s++) { " +
            "           %><%= s != 0 ? \",\" : \"\"%><%= paramTypeNames[s] %> <%= paramNames[s] %><% } %>) <%= meth.superThrowsClause %> {\n      <%" +
            "         if (!meth.isVoid()) { %>return <% if (meth.needsCast) { %>(<%= meth.returnType %>)<% } %> <% } %>super.<%= meth.name %>(<%" +
@@ -4960,7 +5086,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
            // When not using separate types for the inner types, we just suck them right here into the original definition (INNER STUBS)
            "<% for (sc.lang.java.BodyTypeDeclaration stub:innerDynStubs) {%>" +
            "<%= stub.generateDynamicStub() %>" +
-           "<% } %>"+
+           "<% } %>" +
 
            "\n   public boolean hasDynObject() { return true; }\n" +
 
@@ -4975,7 +5101,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    String generateDynamicStub(boolean batchCompile) {
       // TODO: could make this configurable via compiler settings
       if (dynStubTemplate == null)
-         dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr,  DynStubParameters.class, false, getLayeredSystem());
+         dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr, DynStubParameters.class, false, getLayeredSystem());
       return TransformUtil.evalTemplate(new DynStubParameters(getLayeredSystem(), getLayer(), this, batchCompile), dynStubTemplate);
    }
 
@@ -5064,11 +5190,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             replacedByType.updateBaseTypeLeaf(replacedByType);
          }
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration)this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType(this) : null;
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration origSubType = subTypes.next();
-               TypeDeclaration realSubType = (TypeDeclaration) origSubType.resolve(true);
+               BodyTypeDeclaration origSubType = subTypes.next();
+               BodyTypeDeclaration realSubType = origSubType.resolve(true);
                // Only do this for the immediate sub-type (extends only) of the one which is changing (checking old and new type)
                // If it's a modified type, do this only if this is the same type being modified and the new type does not already modify the sub-type
 
@@ -5105,11 +5231,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             replacedByType.addInstMemberToPropertyCacheLeaf(propName, fieldObj);
          }
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType(this);
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               subType = (TypeDeclaration) subType.resolve(true);
+               BodyTypeDeclaration subType = subTypes.next();
+               subType = subType.resolve(true);
                subType.addInstMemberToPropertyCacheLeaf(propName, fieldObj);
             }
          }
@@ -5131,7 +5257,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             String nextPart = innerType.typeName;
             int ix;
             while ((ix = nextPart.indexOf(".")) != -1 && enclType != null) {
-               nextPart = nextPart.substring(ix+1);
+               nextPart = nextPart.substring(ix + 1);
                enclType = ModelUtil.getEnclosingType(enclType);
             }
             if (enclType == null)
@@ -5155,7 +5281,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (innerType instanceof ModifyDeclaration) {
                // For hidden types, it's already in the hiddenBody
                if (innerType.getEnclosingType() != this)
-                   addBodyStatementIndent(innerType);
+                  addBodyStatementIndent(innerType);
                if (overridden instanceof BodyTypeDeclaration) {
                   ((BodyTypeDeclaration) overridden).updateType(innerType, ctx, TypeUpdateMode.Add, updateInstances, info);
                }
@@ -5252,7 +5378,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   /** As soon as one subclass needs to create a real dynamic type from a base type, we need to make the whole type hierarchy dynamic. */
+   /**
+    * As soon as one subclass needs to create a real dynamic type from a base type, we need to make the whole type hierarchy dynamic.
+    */
    public void clearDynamicNew() {
       if (dynamicNew) {
          dynamicNew = false;
@@ -5262,7 +5390,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (derivedType instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration derivedTD = (BodyTypeDeclaration) derivedType;
             if (derivedTD.dynamicNew)
-              derivedTD.clearDynamicNew();
+               derivedTD.clearDynamicNew();
          }
       }
    }
@@ -5578,11 +5706,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             replacedByType.addFieldToInstancesLeaf(varDef, ctx);
          }
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this);
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               subType = (TypeDeclaration) subType.resolve(true);
+               BodyTypeDeclaration subType = subTypes.next();
+               subType = subType.resolve(true);
                subType.addFieldToInstancesLeaf(varDef, ctx);
             }
          }
@@ -5621,11 +5749,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             replacedByType.addChildObjectToInstancesLeaf(innerType);
          }
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration)this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this);
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               subType = (TypeDeclaration) subType.resolve(true);
+               BodyTypeDeclaration subType = subTypes.next();
+               subType = subType.resolve(true);
                subType.addChildObjectToInstancesLeaf(innerType);
             }
          }
@@ -5674,7 +5802,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   private static void addFieldToIndex(CoalescedHashMap<String,List<Object>> fieldIndex, Object varDef) {
+   private static void addFieldToIndex(CoalescedHashMap<String, List<Object>> fieldIndex, Object varDef) {
       String name = ModelUtil.getPropertyName(varDef);
       List<Object> res = fieldIndex.get(name);
       if (res == null) {
@@ -5686,7 +5814,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private static class UpdateTypeCtx {
-      /** Copied from the old type before the update - when we stop the old type they are erased so need to use them here after that */
+      /**
+       * Copied from the old type before the update - when we stop the old type they are erased so need to use them here after that
+       */
       boolean dynamicType, dynamicNew, dynamicStub;
 
       List<Object> oldFields;
@@ -5695,17 +5825,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       int numNewFields;
       List<Object> newTypes;
-      CoalescedHashMap<String,List<Object>> oldFieldIndex;
+      CoalescedHashMap<String, List<Object>> oldFieldIndex;
 
       int newTypesSize;
-      CoalescedHashMap<String,Object> newTypeIndex;
+      CoalescedHashMap<String, Object> newTypeIndex;
 
       List<Object> oldTypes;
 
       int oldTypesSize;
-      CoalescedHashMap<String,Object> oldTypeIndex;
+      CoalescedHashMap<String, Object> oldTypeIndex;
 
-      CoalescedHashMap<String,List<Object>> newFieldIndex;
+      CoalescedHashMap<String, List<Object>> newFieldIndex;
 
       ArrayList<TypeDeclaration> toRemoveObjs = new ArrayList<TypeDeclaration>();
       ArrayList<TypeDeclaration> toAddObjs = new ArrayList<TypeDeclaration>();
@@ -5721,7 +5851,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       ArrayList<IVariableInitializer> toAddFields = new ArrayList<IVariableInitializer>();
       ArrayList<BlockStatement> toExecBlocks = new ArrayList<BlockStatement>();
 
-      /** Does this type change introduce new constructors?  For dynamic stubs this introduces a compile time change */
+      /**
+       * Does this type change introduce new constructors?  For dynamic stubs this introduces a compile time change
+       */
       boolean newConstructors = false;
 
       Object oldExtType;
@@ -5756,7 +5888,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       tctx.newFields = updateMode == TypeUpdateMode.Replace ? newType.getDeclaredFields(null, false, false, true, false, false) :
               newType.getAllFields(null, false, false, true, true, false);
       tctx.numNewFields = tctx.newFields == null ? 0 : tctx.newFields.size();
-      tctx.oldFieldIndex = new CoalescedHashMap<String,List<Object>>(tctx.numOldFields);
+      tctx.oldFieldIndex = new CoalescedHashMap<String, List<Object>>(tctx.numOldFields);
       // Keep a list of fields for each name to deal with reverse only bindings.  Those do not replace/override the previous definition.
       for (int i = 0; i < tctx.numOldFields; i++) {
          Object varDef = tctx.oldFields.get(i);
@@ -5764,7 +5896,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       tctx.newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
       tctx.newTypesSize = tctx.newTypes == null ? 0 : tctx.newTypes.size();
-      tctx.newTypeIndex = new CoalescedHashMap<String,Object>(tctx.newTypesSize);
+      tctx.newTypeIndex = new CoalescedHashMap<String, Object>(tctx.newTypesSize);
       for (int i = 0; i < tctx.newTypesSize; i++) {
          Object newInnerType = tctx.newTypes.get(i);
          tctx.newTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(newInnerType)), newInnerType);
@@ -5772,7 +5904,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       tctx.oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
       tctx.oldTypesSize = tctx.oldTypes == null ? 0 : tctx.oldTypes.size();
-      tctx.oldTypeIndex = new CoalescedHashMap<String,Object>(tctx.oldTypesSize);
+      tctx.oldTypeIndex = new CoalescedHashMap<String, Object>(tctx.oldTypesSize);
       for (int i = 0; i < tctx.oldTypesSize; i++) {
          Object oldInnerType = tctx.oldTypes.get(i);
          tctx.oldTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(oldInnerType)), oldInnerType);
@@ -5786,7 +5918,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
       }
-      tctx.newFieldIndex = new CoalescedHashMap<String,List<Object>>(tctx.numNewFields);
+      tctx.newFieldIndex = new CoalescedHashMap<String, List<Object>>(tctx.numNewFields);
       for (int i = 0; i < tctx.numNewFields; i++) {
          Object varDef = tctx.newFields.get(i);
          addFieldToIndex(tctx.newFieldIndex, varDef);
@@ -5807,7 +5939,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Object oldBodyDef = body.get(i);
             if (oldBodyDef instanceof FieldDefinition) {
                FieldDefinition oldFieldDef = (FieldDefinition) oldBodyDef;
-               for (VariableDefinition oldVarDef:oldFieldDef.variableDefinitions) {
+               for (VariableDefinition oldVarDef : oldFieldDef.variableDefinitions) {
                   List<Object> newDefObjs;
                   // Old field replaced
                   Object newDefObj = null;
@@ -5841,9 +5973,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             else if (oldBodyDef instanceof PropertyAssignment) {
                PropertyAssignment oldPA = (PropertyAssignment) oldBodyDef;
                List<Object> newFieldDefs = tctx.newFieldIndex.get(oldPA.propertyName);
-               if (newFieldDefs != null)  {
+               if (newFieldDefs != null) {
                   if (!newFieldDefs.contains(oldPA)) {
-                     for (Object newFieldDef:newFieldDefs) {
+                     for (Object newFieldDef : newFieldDefs) {
                         IVariableInitializer newFieldInit = (IVariableInitializer) newFieldDef;
                         if (!DynUtil.equalObjects(oldPA.getInitializerExpr(), newFieldInit.getInitializerExpr()) && !tctx.toUpdateFields.contains(newFieldInit))
                            tctx.toUpdateFields.add(newFieldInit);
@@ -5924,7 +6056,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (newBodyDef instanceof FieldDefinition) {
                FieldDefinition newFieldDef = (FieldDefinition) newBodyDef;
 
-               for (VariableDefinition newVarDef:newFieldDef.variableDefinitions) {
+               for (VariableDefinition newVarDef : newFieldDef.variableDefinitions) {
                   List<Object> oldVarDefListObj = tctx.oldFieldIndex.get(newVarDef.variableName);
                   if (oldVarDefListObj == null) {
                      tctx.toAddFields.add(newVarDef);
@@ -6271,7 +6403,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          // Don't warn for the stale class loader type until we have a new extends type which is incompatible.  That will avoid one restart warning...
          else if (hasInstances || classLoaded || (newExtType != null && sys.staleClassLoader)) {
-            sys.setStaleCompiledModel(true, "Recompile needed: " + " type: " + typeName + "'s " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType +  (hasInstances ? " to update active instances" : (classLoaded ? " to reload compiled class " : " layers have been removed making class loaders stale")));
+            sys.setStaleCompiledModel(true, "Recompile needed: " + " type: " + typeName + "'s " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType + (hasInstances ? " to update active instances" : (classLoaded ? " to reload compiled class " : " layers have been removed making class loaders stale")));
             skipAdd = true;
             skipUpdate = true;
          }
@@ -6284,11 +6416,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (updateMode != TypeUpdateMode.Remove && info != null) {
          info.typeChanged(this, newType);
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this);
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               subType = (TypeDeclaration) subType.resolve(true);
+               BodyTypeDeclaration subType = subTypes.next();
+               subType = subType.resolve(true);
                info.typeChanged(subType, subType);
             }
          }
@@ -6330,15 +6462,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // are changed we run those.  Note we're keeping the order the same as they appear in the body of this type.
          for (int i = 0; i < tctx.toAddFields.size(); i++) {
             IVariableInitializer varDef = tctx.toAddFields.get(i);
-            newType.updatePropertyForType((JavaSemanticNode)varDef, ctx, InitInstanceType.Init, updateInstances, info);
+            newType.updatePropertyForType((JavaSemanticNode) varDef, ctx, InitInstanceType.Init, updateInstances, info);
          }
          for (int i = 0; i < tctx.toUpdateFields.size(); i++) {
             IVariableInitializer varDef = tctx.toUpdateFields.get(i);
-            newType.updatePropertyForType((JavaSemanticNode)varDef, ctx, InitInstanceType.Init, updateInstances, info);
+            newType.updatePropertyForType((JavaSemanticNode) varDef, ctx, InitInstanceType.Init, updateInstances, info);
          }
          for (int i = 0; i < tctx.toRestoreFields.size(); i++) {
             IVariableInitializer varDef = tctx.toRestoreFields.get(i);
-            newType.updatePropertyForType((JavaSemanticNode)varDef, ctx, InitInstanceType.Init, updateInstances, info);
+            newType.updatePropertyForType((JavaSemanticNode) varDef, ctx, InitInstanceType.Init, updateInstances, info);
          }
          for (int i = 0; i < tctx.toUpdateObjs.size(); i++) {
             TypeDeclaration oldInnerType = tctx.toUpdateObjs.get(i);
@@ -6412,7 +6544,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private BlockStatement findBlockStatement(BlockStatement bs) {
       if (body == null)
          return null;
-      for (Statement st:body) {
+      for (Statement st : body) {
          if (st instanceof BlockStatement) {
             if (st.equals(bs))
                return (BlockStatement) st;
@@ -6450,11 +6582,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             replacedByType.updateInstBlockStatementLeaf(bs, ctx);
          }
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this);
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               subType = (TypeDeclaration) subType.resolve(true);
+               BodyTypeDeclaration subType = subTypes.next();
+               subType = subType.resolve(true);
                subType.updateInstBlockStatementLeaf(bs, ctx);
             }
          }
@@ -6575,15 +6707,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             // We are walking our way back up the type hierarchy.  If we encounter a modified type which replaces this property in a subsequent layer, it's an overridden property we don't apply it.
             if (replacedMember == null || replacedMember == overriddenAssign || replacedMember == STOP_SEARCHING_SENTINEL || assignLayer.getLayerPosition() >= replacedByType.getLayer().getLayerPosition())
                replacedByType.updatePropertyForTypeLeaf(overriddenAssign, ctx, iit, updateInstances, info);
-            else  if (sys.options.verbose)
+            else if (sys.options.verbose)
                System.out.println("Warning: not applying change: " + overriddenAssign + " in layer: " + assignLayer + " - overridden in layer " + replacedByType.getLayer() + " with: " + replacedMember);
          }
 
-         Iterator<TypeDeclaration> subTypes = this instanceof TypeDeclaration ? sys.getSubTypesOfType((TypeDeclaration) this) : null;
+         Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this);
          if (subTypes != null) {
             while (subTypes.hasNext()) {
-               TypeDeclaration subType = subTypes.next();
-               subType = (TypeDeclaration) subType.resolve(true);
+               BodyTypeDeclaration subType = subTypes.next();
+               subType = subType.resolve(true);
                // If this property has been overridden in a super-type do not set it again
                Object memb;
                if ((memb = subType.declaresMember(propName, MemberType.PropertyAssignmentSet, null, null)) == null)
@@ -6603,7 +6735,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void updateStaticProperty(JavaSemanticNode prop, ExecutionContext ctx) {
       if (prop instanceof FieldDefinition) {
          FieldDefinition fd = (FieldDefinition) prop;
-         for (VariableDefinition staticField:fd.variableDefinitions) {
+         for (VariableDefinition staticField : fd.variableDefinitions) {
             updateStaticProperty(staticField, ctx);
          }
       }
@@ -6706,7 +6838,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          switch (iit) {
             case Init:
                if (innerType.isDynObj(false) && currentObj instanceof IDynObject) {
-                  ((IDynObject)currentObj).setProperty(ix, DynObject.lazyInitSentinel, true);
+                  ((IDynObject) currentObj).setProperty(ix, DynObject.lazyInitSentinel, true);
                }
                break;
             case Add:
@@ -6714,7 +6846,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (innerType.isDynObj(false) && currentObj instanceof IDynObject) {
                   mgr = getDynChildManager();
                   if (mgr != null)
-                     mgr.addChild(currentObj, ((IDynObject)currentObj).getProperty(ix, false));
+                     mgr.addChild(currentObj, ((IDynObject) currentObj).getProperty(ix, false));
                }
                else {
                   JavaModel model = getJavaModel();
@@ -6724,7 +6856,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             case Remove:
                if (innerType.isDynObj(false) && currentObj instanceof IDynObject) {
                   mgr = getDynChildManager();
-                  Object toRemove = ((IDynObject)currentObj).getProperty(ix, false);
+                  Object toRemove = ((IDynObject) currentObj).getProperty(ix, false);
                   if (toRemove != null) {
                      if (mgr != null)
                         mgr.removeChild(currentObj, toRemove);
@@ -6782,7 +6914,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   /** Removes any instances lying around for this type */
+   /**
+    * Removes any instances lying around for this type
+    */
    public void removeTypeInstances() {
       LayeredSystem sys = getLayeredSystem();
       String typeName = getRuntimeFullTypeName();
@@ -6832,7 +6966,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                //outerObj = null;
                appendOuterObj = false;
                if (argValues.length > 0) {
-                  Object[] remOuterArgs = new Object[argValues.length-1];
+                  Object[] remOuterArgs = new Object[argValues.length - 1];
                   System.arraycopy(argValues, 1, remOuterArgs, 0, remOuterArgs.length);
                   argValues = remOuterArgs;
                }
@@ -6862,12 +6996,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private Object[] addObjectToArray(Object toAdd, Object[] argValues) {
       Object[] allValues;
       if (argValues != null && argValues.length > 0) {
-         allValues = new Object[argValues.length+1];
+         allValues = new Object[argValues.length + 1];
          System.arraycopy(argValues, 0, allValues, 1, argValues.length);
          allValues[0] = toAdd;
       }
       else {
-         allValues = new Object[] {toAdd};
+         allValues = new Object[]{toAdd};
       }
       return allValues;
    }
@@ -6880,12 +7014,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       /* Now add the TypeDeclaration if this is a DynObject type and has the right constructor.  In some cases we might implement the IDynObject interface but not define the constructor (like for a compiled template type) */
       if (IDynObject.class.isAssignableFrom(compClass) && (ModelUtil.needsTypeDeclarationParam(compClass))) {
          if (argValues != null && argValues.length > 0) {
-            allValues = new Object[argValues.length+1];
+            allValues = new Object[argValues.length + 1];
             System.arraycopy(argValues, 0, allValues, 1, argValues.length);
             allValues[0] = typeDecl;
          }
          else
-            allValues = new Object[] {typeDecl};
+            allValues = new Object[]{typeDecl};
       }
       else
          allValues = argValues;
@@ -7123,7 +7257,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
-   public int addChildNames(StringBuilder childNames, Map<String,StringBuilder> childNamesByScope, String prefix, boolean componentsOnly,
+   public int addChildNames(StringBuilder childNames, Map<String, StringBuilder> childNamesByScope, String prefix, boolean componentsOnly,
                             boolean thisClassOnly, boolean dynamicOnly, Set<String> nameSet, ArrayList<Object> objTypes) {
       Object extendsType = getDerivedTypeDeclaration();
       int ct = 0;
@@ -7141,7 +7275,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Object innerTypeObj;
             TypeDeclaration innerTypeDecl;
             IScopeProcessor typeScope;
-            for (Statement statement:theBody) {
+            for (Statement statement : theBody) {
                innerTypeObj = getInnerObjectType(statement);
 
                if (innerTypeObj != null) {
@@ -7244,7 +7378,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             if (innerType == null) {
                if (innerObjs != null) {
-                  for (Object io:innerObjs) {
+                  for (Object io : innerObjs) {
                      String ioName = ModelUtil.getTypeName(io);
                      if (innerTypeNameL.equals(ioName) || innerTypeNameU.equals(ioName)) {
                         innerType = io;
@@ -7262,7 +7396,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
-   /** Returns the name of the compiled class */
+   /**
+    * Returns the name of the compiled class
+    */
    public String getCompiledClassName() {
       // We are stale and are forced to use the actual compiled class name, not the one which would be computed for us now that the type has changed.
       if (staleClassName != null)
@@ -7309,7 +7445,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return ModelUtil.isDynamicType(extendsType) || ModelUtil.isDynamicNew(extendsType) || (ModelUtil.isAssignableFrom(IDynObject.class, extendsType) && ModelUtil.hasDynTypeConstructor(extendsType));
    }
 
-   /** Converts the supplied type arguments which would be used for the current class to those from the extends class */
+   /**
+    * Converts the supplied type arguments which would be used for the current class to those from the extends class
+    */
    public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
       if (isDynamicType()) {
          // If used in a class value expression or the framework requires one concrete Class for each type
@@ -7396,12 +7534,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return args;
    }
 
-   /** Is this a compiled dynamic stub constructor - which takes just the TypeDeclaration as the first parameter? */
+   /**
+    * Is this a compiled dynamic stub constructor - which takes just the TypeDeclaration as the first parameter?
+    */
    boolean usesDefaultConstructor() {
       Object[] constrs = getConstructors(null);
       if (constrs == null || constrs.length == 0)
          return true;
-      for (Object constr:constrs) {
+      for (Object constr : constrs) {
          if (constr instanceof ConstructorDefinition && !((ConstructorDefinition) constr).callsSuper(true))
             return true;
       }
@@ -7458,7 +7598,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       BodyTypeDeclaration currentType = this;
 
       // Skip Modify declarations and those class decls which don't need their own type
-      while (currentType != null && ((currentType instanceof ModifyDeclaration  && !currentType.needsOwnClass(false)) || (currentType instanceof ClassDeclaration && currentType.getEnclosingType() != null && !currentType.needsOwnClass(false)))) {
+      while (currentType != null && ((currentType instanceof ModifyDeclaration && !currentType.needsOwnClass(false)) || (currentType instanceof ClassDeclaration && currentType.getEnclosingType() != null && !currentType.needsOwnClass(false)))) {
          if (currentType instanceof ClassDeclaration && currentType.getDeclarationType() != DeclarationType.OBJECT)
             return currentType;
 
@@ -7521,7 +7661,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return;
       try {
          if (extendsModel != null && (extendsModel.layeredSystem == null || extendsModel.layeredSystem.options.verbose)) {
-            System.out.println(StringUtil.indent(++LayeredSystem.nestLevel) + (!extendsType.isStarted() ? "Starting: ": "Validating: ") + message + " type " + extendsModel.getSrcFile() + " runtime: " + getLayeredSystem().getRuntimeName());
+            System.out.println(StringUtil.indent(++LayeredSystem.nestLevel) + (!extendsType.isStarted() ? "Starting: " : "Validating: ") + message + " type " + extendsModel.getSrcFile() + " runtime: " + getLayeredSystem().getRuntimeName());
             incrNest = true;
          }
          // If this type is already validated, validate the extended type
@@ -7553,7 +7693,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (implTypes != null) {
          int ix = 0;
          Object[] implBoundTypes = getImplementsTypeDeclarations();
-         for (Object implObj:implTypes) {
+         for (Object implObj : implTypes) {
             if (implObj instanceof JavaType) {
                JavaType implType = (JavaType) implObj;
                boolean converted = implType.convertToSrcReference();
@@ -7571,7 +7711,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   /** Gets the extends type name without trying to resolve the type */
+   /**
+    * Gets the extends type name without trying to resolve the type
+    */
    /*
    public String getUnresolvedExtendsTypeName() {
       JavaType extType = getExtendsType();
@@ -7580,13 +7722,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return extType.getFullBaseTypeName();
    }
    */
-
    public String getExtendsTypeName() {
       JavaType extType = getExtendsType();
       if (extType == null)
          return null;
       return extType.getAbsoluteBaseTypeName();
    }
+
    // Only need this method so that this property appears writable so we can sync it on the client.  Easy to implement if we do ever need it.
    @Constant
    public void setExtendsTypeName(String str) {
@@ -7599,7 +7741,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public boolean bodyNeedsClass() {
       if (body != null) {
-         for (Statement s:body) {
+         for (Statement s : body) {
             //if (s instanceof AbstractMethodDefinition || s instanceof FieldDefinition || s instanceof TypeDeclaration || s instanceof BlockStatement)
             if (s.needsEnclosingClass())
                return true;
@@ -7615,7 +7757,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return bodyNeedsClass();
    }
 
-   /** We need to generate a class for an object definition if it is a top-level class or there is a method or field */
+   /**
+    * We need to generate a class for an object definition if it is a top-level class or there is a method or field
+    */
    public boolean needsOwnClass(boolean checkComponents) {
       if (needsOwnClass)
          return true;
@@ -7677,7 +7821,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (body == null)
          return null;
 
-      for (Statement s:body) {
+      for (Statement s : body) {
          if (s instanceof PropertyAssignment) {
             PropertyAssignment pa = (PropertyAssignment) s;
             if (pa.propertyName.equals(name))
@@ -7705,7 +7849,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   /** Returns true if this type modifies the supplied type either directly or indirectly */
+   /**
+    * Returns true if this type modifies the supplied type either directly or indirectly
+    */
    public boolean modifiesType(BodyTypeDeclaration other) {
       for (BodyTypeDeclaration modType = getModifiedType(); modType != null; modType = modType.getModifiedType())
          if (modType == other)
@@ -7717,7 +7863,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return false;
    }
 
-   /** Overridden by ModifyDeclaration.  For "a.b" types, returns the value of "a" which replaces this element */
+   /**
+    * Overridden by ModifyDeclaration.  For "a.b" types, returns the value of "a" which replaces this element
+    */
    public BodyTypeDeclaration replaceHiddenType(BodyTypeDeclaration parentType) {
       return null;
    }
@@ -7749,7 +7897,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                return tord;
          }
          if (body != null) {
-            for (Statement st:body) {
+            for (Statement st : body) {
                if (st == enumConst)
                   return ord;
                if (st instanceof EnumConstant)
@@ -7855,12 +8003,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (body != null) {
-         for (Statement s:body) {
+         for (Statement s : body) {
             s.addDependentTypes(types, mode);
          }
       }
       if (hiddenBody != null) {
-         for (Statement s:hiddenBody) {
+         for (Statement s : hiddenBody) {
             s.addDependentTypes(types, mode);
          }
       }
@@ -8007,7 +8155,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (isDynamicType() && replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
          ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors();
          if (defProcs != null) {
-            for (IDefinitionProcessor defProc:defProcs) {
+            for (IDefinitionProcessor defProc : defProcs) {
                String procStaticMixin = defProc.getStaticMixinTemplate();
                if (procStaticMixin != null) {
                   TransformUtil.applyTemplateToType((TypeDeclaration) this, procStaticMixin, "staticMixinTemplate", false);
@@ -9934,4 +10082,37 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
    }
+
+   String[] getPropagateParamNames(Object[] types) {
+      int sz = types.length;
+      String[] res = new String[sz];
+      for (int i = 0; i < sz; i++)
+         res[i] = "_p" + i;
+      return res;
+   }
+
+   String getDeclsFromTypes(Object[] types) {
+      StringBuilder sb = new StringBuilder();
+      String[] paramNames = getPropagateParamNames(types);
+      for (int i = 0; i < types.length; i++) {
+         if (i != 0)
+            sb.append(", ");
+         sb.append(ModelUtil.getTypeName(types[i]));
+         sb.append(" ");
+         sb.append(paramNames[i]);
+      }
+      return sb.toString();
+   }
+
+   String getParamsFromTypes(Object[] types) {
+      StringBuilder sb = new StringBuilder();
+      String[] paramNames = getPropagateParamNames(types);
+      for (int i = 0; i < types.length; i++) {
+         if (i != 0)
+            sb.append(", ");
+         sb.append(paramNames[i]);
+      }
+      return sb.toString();
+   }
+
 }

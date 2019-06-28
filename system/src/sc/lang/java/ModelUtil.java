@@ -9191,7 +9191,7 @@ public class ModelUtil {
    }
 
    /** The equals operator on TypeDeclaration is to compare the files so that's not a good test.  This prevents the same type-name/layer-name combo from being added to the list */
-   public static boolean addUniqueLayerType(LayeredSystem sys, List<TypeDeclaration> result, TypeDeclaration res) {
+   public static boolean addUniqueLayerType(LayeredSystem sys, List<BodyTypeDeclaration> result, BodyTypeDeclaration res) {
       for (int i = 0; i < result.size(); i++) {
          if (ModelUtil.sameTypesAndLayers(sys, result.get(i), res))
             return false;

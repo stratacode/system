@@ -444,7 +444,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          modifyTypeDecl.enableNeedsCompiledClass();
    }
 
-   private TypeDeclaration getModifyType() {
+   private BodyTypeDeclaration getModifyType() {
       JavaModel thisModel = getJavaModel();
       String fullTypeName = getFullTypeName();
       if (isLayerType || thisModel == null)
@@ -453,7 +453,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (temporaryType)
          res = thisModel.layeredSystem.getSrcTypeDeclaration(fullTypeName, null, true);
 
-      return res == null ? thisModel.getPreviousDeclaration(fullTypeName) : res;
+      TypeDeclaration enclType = getEnclosingType();
+
+      return res == null ? thisModel.getPreviousDeclaration(fullTypeName, enclType != null && enclType.isEnumeratedType()) : res;
    }
 
    void checkModify() {
@@ -517,7 +519,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       else {
          // This type is dependent on any files that make up the modified type.  This includes the modified type and
          // any types it is modifying.   Temporary types can include the current layer since they don't replace this def anyway
-         TypeDeclaration modifyType = getModifyType();
+         BodyTypeDeclaration modifyType = getModifyType();
          if (modifyType == this) // layer definitions might return the same def since we don't look at path names for them
             modifyType = null;
 
@@ -553,6 +555,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   }
                }
                else {
+                  // When in a modify type, we could either be adding a new enum, or modifying an existing one (where modifyTypeDecl != null)
                   if (enclType != null && enclType.isEnumeratedType()) {
                      enumConstant = true;
                   }
@@ -916,8 +919,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly) {
-      Object bt = super.getSimpleInnerType(name, ctx, checkBaseType, true, srcOnly);
+   public Object getSimpleInnerType(String name, TypeContext ctx, boolean checkBaseType, boolean redirected, boolean srcOnly, boolean includeEnums) {
+      Object bt = super.getSimpleInnerType(name, ctx, checkBaseType, true, srcOnly, includeEnums);
       if (bt != null)
          return bt;
 
@@ -926,7 +929,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             if (extBoundType instanceof BodyTypeDeclaration) {
                BodyTypeDeclaration base = ((BodyTypeDeclaration) extBoundType);
                // Do not pass the CTX down here.  Because this is not the same type, we are extending another type, we do need to check for types defined up in the stack.  There's no risk of getting the same type here.
-               bt = base.getSimpleInnerType(name, null, checkBaseType, true, srcOnly);
+               bt = base.getSimpleInnerType(name, null, checkBaseType, true, srcOnly, false);
                if (bt != null) {
                   if (ctx != null)
                      ctx.add(base, this);
@@ -1269,7 +1272,7 @@ public class ModifyDeclaration extends TypeDeclaration {
             subType = null;
             // CheckbaseType is true here - we'll need to create a modify if there's another type.  If it comes from
             // the extends type, that's the "modifyInherited" case.
-            Object innerTypeObj = nextParent.getInnerType(nextType, null, true, false, false);
+            Object innerTypeObj = nextParent.getInnerType(nextType, null, true, false, false, false);
             if (innerTypeObj != this && innerTypeObj instanceof BodyTypeDeclaration) {
                subType = (BodyTypeDeclaration) innerTypeObj;
             }
@@ -1546,7 +1549,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
 
          subType = null;
-         Object innerTypeObj = nextParent.getInnerType(nextType, null, false, false, false);
+         Object innerTypeObj = nextParent.getInnerType(nextType, null, false, false, false, false);
          if (innerTypeObj != this && innerTypeObj instanceof BodyTypeDeclaration) {
             subType = (BodyTypeDeclaration) innerTypeObj;
             if (theRoot == null)
@@ -1710,7 +1713,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (outer != null) {
          // If this modify is overriding a definition in the same type we need to replace it here
          // so both are not processed when processing the parent type.
-         Object toReplaceObj = base.getInnerType(typeName, null, true, false, false);
+         Object toReplaceObj = base.getInnerType(typeName, null, true, false, false, base.isEnumeratedType());
          if (toReplaceObj instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration toReplace = (BodyTypeDeclaration) toReplaceObj;
             if (toReplace.getEnclosingType() == base) {

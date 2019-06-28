@@ -113,12 +113,26 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
          return;
       initialized = true;
 
-      int sz = size();
-      for (int i = 0; i < sz; i++) {
-         Object val = get(i);
-         if (val instanceof ILifecycle)
-            ((ILifecycle) val).init();
+      try {
+         int sz = size();
+         for (int i = 0; i < sz; i++) {
+            Object val = get(i);
+            if (val instanceof ILifecycle)
+               ((ILifecycle) val).init();
+         }
       }
+      catch (RuntimeException exc) {
+         clearInitialized();
+         throw exc;
+      }
+   }
+
+   public void clearInitialized() {
+      initialized = false;
+      started = false;
+      validated = false;
+      if (parentNode != null && parentNode.isInitialized())
+         parentNode.clearInitialized();
    }
 
    public void start() {

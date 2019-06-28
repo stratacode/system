@@ -1,14 +1,10 @@
 package sc.lang;
 
+import sc.lang.java.*;
 import sc.layer.LayeredSystem;
 import sc.layer.BuildInfo;
 import sc.lang.DefaultAnnotationProcessor;
 import sc.lang.ILanguageModel;
-import sc.lang.java.Definition;
-import sc.lang.java.MethodDefinition;
-import sc.lang.java.TypeDeclaration;
-import sc.lang.java.Annotation;
-import sc.lang.java.ModelUtil;
 
 import java.util.Iterator;
 
@@ -31,17 +27,17 @@ public class TestAnnotationProcessor extends DefaultAnnotationProcessor {
       }
    }
 
-   private void addTestType(LayeredSystem sys, BuildInfo bi, TypeDeclaration td) {
+   private void addTestType(LayeredSystem sys, BuildInfo bi, BodyTypeDeclaration td) {
       if (!ModelUtil.isAbstractType(td)) {
          String typeName = ModelUtil.getTypeName(td);
 
          if (bi.getTestInstance(typeName) == null)
             bi.addTestInstance(new BuildInfo.TestInstance(typeName, testProcessorName));
       }
-      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(td);
+      Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType(td);
       if (subTypes != null) {
           while (subTypes.hasNext()) {
-              TypeDeclaration next = subTypes.next();
+              BodyTypeDeclaration next = subTypes.next();
               addTestType(sys, bi, next);
           }
       }

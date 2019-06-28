@@ -4551,7 +4551,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       String layerClasses = getBuildClassesDir();
-      if (appendBuildDir && !layerClasses.equals(useBuildDir) && isBuildLayer()) {
+      if (appendBuildDir && isBuildLayer() && !layerClasses.equals(useBuildDir)) {
          LayerUtil.addQuotedPath(sb, layerClasses);
          if (layerClasses.equals(layeredSystem.origBuildDir))
             addOrigBuild = false;

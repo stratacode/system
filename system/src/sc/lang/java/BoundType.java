@@ -161,6 +161,18 @@ public class BoundType extends JavaType {
       return true;
    }
 
+   public boolean needsInit() {
+      if (baseType != null && baseType.needsInit())
+         return true;
+
+      if (boundTypes != null) {
+         for (JavaType bt:boundTypes)
+            if (bt.needsInit())
+               return true;
+      }
+      return false;
+   }
+
    @Override
    void startWithType(Object type) {
    }

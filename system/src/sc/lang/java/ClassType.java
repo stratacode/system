@@ -1157,6 +1157,10 @@ public class ClassType extends JavaType {
       return type != null && type != FAILED_TO_INIT_SENTINEL;
    }
 
+   public boolean needsInit() {
+      return type == null;
+   }
+
    public Object definesTypeParameter(Object typeParam, ITypeParamContext ctx) {
       if (type == null)
          return null;

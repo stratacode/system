@@ -791,12 +791,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return false;
    }
 
-   private void addOverridingMethods(LayeredSystem sys, TypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes, HashSet<Object> visited) {
+   private void addOverridingMethods(LayeredSystem sys, BodyTypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes, HashSet<Object> visited) {
       if (name == null)
          return;
-      ArrayList<TypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, false);
+      ArrayList<BodyTypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, false);
       if (modTypes != null) {
-         for (TypeDeclaration modType:modTypes) {
+         for (BodyTypeDeclaration modType:modTypes) {
             if (visited.contains(modType))
                continue;
             visited.add(modType);
@@ -806,9 +806,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                res.add(overMeth);
          }
       }
-      Iterator<TypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, enclType.getLayer(), false, true, false, false);
+      Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType(enclType, enclType.getLayer(), false, true, false, false);
       while (subTypes.hasNext()) {
-         TypeDeclaration subType = subTypes.next();
+         BodyTypeDeclaration subType = subTypes.next();
          if (subType == enclType) {
             System.err.println("*** Loop in sub-type hierarchy");
             return;

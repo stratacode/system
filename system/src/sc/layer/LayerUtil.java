@@ -552,26 +552,31 @@ public class LayerUtil implements LayerConstants {
             resFiles.add((String) fileValue);
          else {
             String dirPath = FileUtil.concat(curPath, fileName);
-            resFiles.add(dirPath);
+            //resFiles.add(dirPath); do not include the directory itself
             Map<String,Object> dirEnt = (Map<String,Object>) fileValue;
             addFilesToSubList(resFiles, dirEnt, dirPath);
          }
       }
    }
 
+   /**
+    * Builds a jar file according to the arguments.
+    * buildDir is the main build dir (or null if all class jars/dirs are in the mergePath). Prefix is appended onto the buildDir to find the class files (e.g. java or js)
+    * The array of packages restricts the class files copied into the jar.
+    * The mergePath is an optional classPath of directories or jar files to include in the merge (last one wins).  The jarFilter restricts
+    * the files that are put into it (usually by suffix using ExtensionFilter).
+    */
    public static int buildJarFile(String buildDir, String prefix, String jarName, String mainTypeName, String[] pkgs, String classPath, String mergePath, FilenameFilter jarFilter, boolean verbose) {
       List<String> args = null;
       File manifestTmp = null;
 
-      // When there's a java or js prefix for the src/class files, we still need the files relative to that dir.  This means making
-      // the jar name be ../bin/...
-      if (prefix != null && prefix.length() > 0)
-         jarName = FileUtil.concat("..", jarName);
+      if (buildDir == null && mergePath == null)
+         throw new IllegalArgumentException("Must specify one main buildDir or mergePath argument");
 
-      String classDir = FileUtil.concat(buildDir, prefix);
+      String classDir = buildDir == null ? null : FileUtil.concat(buildDir, prefix);
 
       // First make directory the file goes in
-      String jarDir = FileUtil.getParentPath(FileUtil.concat(classDir,jarName));
+      String jarDir = FileUtil.getParentPath(jarName);
       File jarDirFile = new File(jarDir);
       jarDirFile.mkdirs();
       StringBuilder jarArgsDesc = new StringBuilder();
@@ -617,10 +622,10 @@ public class LayerUtil implements LayerConstants {
          // When we are merging from multiple sources we use a temp directory
          if (zipTemp != null) {
             // Make this absolute since we are now running this from a different directory
-            jarName = FileUtil.concat(classDir, jarName);
             String zipPath = zipTemp.getPath();
             try {
-               FileUtil.copyAllFiles(classDir, zipPath, true, jarFilter);
+               if (classDir != null)
+                  FileUtil.copyAllFiles(classDir, zipPath, true, jarFilter);
             }
             catch (RuntimeException exc) {
                System.err.println("*** Failed to copy classes while merging jars from: " + classDir + " with: " + zipPath + " due to : " + exc);
