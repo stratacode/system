@@ -1356,13 +1356,14 @@ public class ClassDeclaration extends TypeDeclaration {
    public void addFieldInitCalls(MethodDefinition initMethod, List<FieldDefinition> fieldsToInit, String methodName, boolean useAltComponent) {
       int i = 0;
       for (FieldDefinition field:fieldsToInit) {
+         JavaType fieldType = field.type;
+         Object fieldTypeDecl = fieldType.getTypeDeclaration();
          for (VariableDefinition v:field.variableDefinitions) {
             Statement initStatement;
-            JavaType fieldType = field.type;
-            if (fieldType.arrayDimensions == null && !ModelUtil.isAssignableFrom(Collection.class, fieldType.getTypeDeclaration())) {
+            if (fieldType.arrayDimensions == null && ModelUtil.isComponentType(fieldTypeDecl)) {
                initStatement = createCallToInitMethod(fieldType, v.variableName, methodName, useAltComponent);
             }
-            else {
+            else if (ModelUtil.isAssignableFrom(Collection.class, fieldTypeDecl)) {
                // for (fieldType _elem:variableName)
                //    _elem.methodName();
 
@@ -1382,6 +1383,10 @@ public class ClassDeclaration extends TypeDeclaration {
                      initStatement = ForVarStatement.create(elemType, "_nestedCollection" + d, loopVar,
                                                             initStatement);
                }
+            }
+            else {
+               System.err.println("*** Unrecognized init field type - should be components or collections of components only");
+               continue;
             }
 
             Expression ce = ConditionalExpression.create(IdentifierExpression.create(v.variableName),"!=", new NullLiteral());

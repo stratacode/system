@@ -314,11 +314,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             }
          }
 
-         if (m != null && !m.isLayerModel) {
-            // May add a new constructor and so needs to be done so methods like declaresConstructor works. It currently does not require that the model be started...
-            initPropagateConstructors();
-         }
-
          // Do any subclass type initialization before we apply the scope templates, so that we can get annotations, etc.
          // down the derived type hierarchy.
          completeInitTypeInfo();
@@ -346,6 +341,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    protected void completeInitTypeInfo() {
+      JavaModel m = getJavaModel();
+      if (m != null && !m.isLayerModel) {
+         // May add a new constructor and so needs to be done so methods like declaresConstructor works. It currently does not require that the model be started...
+         initPropagateConstructors();
+      }
    }
 
    public Object definesType(String name, TypeContext ctx) {

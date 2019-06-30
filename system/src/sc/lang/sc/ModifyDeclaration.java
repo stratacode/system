@@ -476,8 +476,6 @@ public class ModifyDeclaration extends TypeDeclaration {
    }
 
    protected void completeInitTypeInfo() {
-      super.completeInitTypeInfo();
-
       JavaModel thisModel = getJavaModel();
       if (thisModel == null) {
          // Fragment encountered during syntax parsing - nothing to initialize
@@ -602,6 +600,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
 
       initExtendsTypes();
+
+      // Wait till after the modifyTypeDecl and extends are defined before we lookup the propagate constructors
+      super.completeInitTypeInfo();
 
       int lix;
       if (typeName != null && (lix = typeName.lastIndexOf(".")) != -1 && !skipRoots && thisModel != null && !(thisModel instanceof CmdScriptModel)) {
