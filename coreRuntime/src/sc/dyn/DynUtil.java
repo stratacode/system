@@ -195,7 +195,7 @@ public class DynUtil {
 
    public static boolean instanceOf(Object obj, Object type) {
       if (obj == null)
-         return true;
+         return false;
 
       // Note: for the program editor, we use data binding expressions with TypeDeclaration... we can't have this returning 'obj' here as that will get confused as a type, not the instance we are actually using
       Object type1 = DynUtil.getSType(obj);
