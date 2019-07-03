@@ -694,7 +694,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
    public Object callVirtual(Object thisObj, Object... values) {
       if (propertyName != null) {
-         Object type = DynUtil.getType(thisObj);
+         Object type = thisObj == null ? getEnclosingType() : DynUtil.getType(thisObj);
 
          if (isGetIndexMethod() && values.length == 1 && values[0] instanceof Integer) {
             IBeanMapper indexMapper = DynUtil.getPropertyMapping(type, propertyName);
