@@ -4573,8 +4573,10 @@ public class ModelUtil {
 
    public static boolean typeIsInteger(Object type) {
       if (type instanceof JavaType) {
+         // Note: this does not get the absolute type name - we'd need to start it and get the type name on the type declaration
+         // but for now we're just testing against Integer without the package name.
          String typeName = ((JavaType) type).getFullTypeName();
-         return typeName != null && (typeName.equals("java.lang.Integer") || typeName.equals("int"));
+         return typeName != null && (typeName.equals("java.lang.Integer") || typeName.equals("int")) || typeName.equals("Integer");
       }
       return type == Integer.class || type == Integer.TYPE;
    }
