@@ -344,9 +344,10 @@ public class IdentifierExpression extends ArgumentsExpression {
                Object propObj = null;
                boolean isVariable;
                if (varObj == null) {
+                  boolean disableGetSet = inNamedPropertyMethod(firstIdentifier);
                   // Note: using PropertyAssignment set here so that we pick up any Bindable annotations on that property
                   // assignment.
-                  EnumSet<MemberType> toSearchFor = useExtensions ?
+                  EnumSet<MemberType> toSearchFor = useExtensions && !disableGetSet ?
                           (isAssignment ? MemberType.PropertySetSet : MemberType.PropertyAssignmentSet) : MemberType.FieldEnumSet;
                   propObj = varObj = findMember(firstIdentifier, toSearchFor, this, enclType, null, false);
                   typeObj = findType(firstIdentifier, enclType, null);
@@ -1573,10 +1574,19 @@ public class IdentifierExpression extends ArgumentsExpression {
                   boundTypes[i] = var;
                }
                else {
-                  EnumSet<MemberType> toFind = model != null && model.enableExtensions() ?
+                  Object methPropVar = null;
+                  boolean modelExtensions = model != null && model.enableExtensions();
+                  // Prefix with this.x will prefer the field over the getX/setX - we at least need to consider constructors and getX/setX methods but this seems like
+                  // a reasonable default as well. Sometimes we use this.x to refer to an 'x' that is not accessible or has no field though just to differentiate from a variable
+                  boolean fieldPriority = modelExtensions && i == 1 && idTypes[i-1] == IdentifierType.ThisExpression && expr instanceof IdentifierExpression;
+                  if (fieldPriority)
+                     methPropVar = currentTypeDecl.definesMember(nextName, MemberType.FieldEnumSet, enclosingType, null);
+                  EnumSet<MemberType> toFind = modelExtensions ?
                           (setLast ? MemberType.PropertySetSet : MemberType.PropertyAssignmentSet) :
                           MemberType.FieldEnumSet;
-                  Object methPropVar = currentTypeDecl.definesMember(nextName, toFind, enclosingType, null);
+                  if (methPropVar == null) {
+                     methPropVar = currentTypeDecl.definesMember(nextName, toFind, enclosingType, null);
+                  }
                   if (methPropVar != null) {
                      boundTypes[i] = methPropVar;
                      // If we are in an assignment, only look for the setX method.  If reading the value, look for a getX method
@@ -2349,12 +2359,14 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
 
       Object obj = evalRootValue(ctx);
-      String id = idents.get(sz-1).toString();
+      int parentIx = sz-1;
+      String id = idents.get(parentIx).toString();
+      IdentifierType parType = idTypes[parentIx];
       checkNull(obj, id);
       if (valueIsType(sz-2))
-         DynUtil.setStaticProperty(obj, id, valueToSet);
+         DynUtil.setStaticProperty(obj, id, valueToSet); // TODO: need setField parameter here?
       else
-         DynUtil.setPropertyValue(obj, id, valueToSet);
+         DynUtil.setProperty(obj, id, valueToSet, parType == IdentifierType.FieldName);
    }
 
    public ExecResult exec(ExecutionContext ctx) {
@@ -4336,7 +4348,7 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             switch (idTypes[i]) {
                case UnboundName:
-                  System.err.println("*** Data binding to dynamic types not yet implemented " + idents.get(i) + " not bound to a type for: " + toDefinitionString());
+                  System.err.println("*** Data binding to unbound types not implemented " + idents.get(i) + " not bound to a type for: " + toDefinitionString());
                   bindArgs.remove(srcObj);
                   return;
                case EnumName:
