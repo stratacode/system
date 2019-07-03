@@ -28,6 +28,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    public transient boolean suppressGeneration = false;
    public transient Object assignedProperty;   // Reference to the field or set method involved in the assignment
    public transient boolean needsCastOnConvert = false;
+   public transient boolean constructorProp = false;
 
    /** When a property assignment is created from an HTML attribute, this keeps the back pointer so we can re-propagate changes made in the editor to the property assignment */
    public transient Attr fromAttribute;
@@ -535,6 +536,9 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    /** Called during the transform from the enclosing class to find initialization statements for the constructor properties. */
    public void collectConstructorPropInit(ConstructorPropInfo cpi) {
+      // Skip reverse only bindings since they do not initialize the property anyway
+      if (operator == null || operator.equals(BindingDirection.REVERSE.getOperatorString()))
+         return;
       int ix = cpi.propNames.indexOf(propertyName);
       if (ix != -1) {
          // Create an assignment statement of the form:
@@ -545,9 +549,16 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          cpi.propJavaTypes.set(ix, propType);
          cpi.propTypes.set(ix, getTypeDeclaration());
 
-         VariableStatement varSt = VariableStatement.create(propType, propertyName, operator, init.deepCopy(ISemanticNode.CopyNormal, null));
+         // Always use "=" for the operator since we just want the initial value of the expression.
+         VariableStatement varSt = VariableStatement.create(propType, propertyName, "=", init.deepCopy(ISemanticNode.CopyNormal, null));
          cpi.initStatements.set(ix, varSt);
-         suppressGeneration = true;
+
+         // If this is a simple assignment, we can suppress the generation. If it's a data binding expression, we'll duplicate the initialization when we set up the
+         // binding so it's not optimal but should be ok given how data binding rules work since it's basically just refreshing the binding and adding the listeners
+         // at the same time.
+         if (operator != null && operator.equals("="))
+            suppressGeneration = true;
+         constructorProp = true; // Don't add this as an uncompiled property assignment either.
       }
    }
 
@@ -897,6 +908,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
       if ((options & CopyInitLevels) != 0) {
          res.suppressGeneration = suppressGeneration;
+         res.constructorProp = constructorProp;
          res.assignedProperty = assignedProperty;
          res.needsCastOnConvert = needsCastOnConvert;
          res.bindingDirection = bindingDirection;
