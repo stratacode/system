@@ -338,7 +338,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
 
    public Object getComponentType() {
       int numDims = getNumDims();
-      if (numDims == 1)
+      if (numDims <= 1)
          return componentType;
       else
          return ArrayTypeDeclaration.create(system, componentType, numDims - 1, definedInType);
