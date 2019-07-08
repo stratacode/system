@@ -224,4 +224,16 @@ public class QuestionMarkExpression extends Expression {
       if (falseChoice != null)
          falseChoice.addBreakpointNodes(res, srcStatement);
    }
+
+   /**
+    * If either one says it's HTML omit the escape.
+    * TODO: should we rewrite the expression if one does and the other does not to move the escape so it wraps only the trueChoice or the falseChoice not both?
+    */
+   public boolean producesHtml() {
+      if (trueChoice != null && trueChoice.producesHtml())
+         return true;
+      if (falseChoice != null && falseChoice.producesHtml())
+         return true;
+      return false;
+   }
 }
