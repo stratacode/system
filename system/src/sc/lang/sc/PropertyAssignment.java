@@ -410,8 +410,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       ctx.transformed = true;
       if ((var = base.definesMember(propertyName, MemberType.PropertyAnySet, null, ctx, false, inTransformed)) != null) {
 
-         // Reverse-only bindings do not replace the underlying assignment, they append to it.  So just add this statement to the base type.
-         if (bindingDirection == BindingDirection.REVERSE) {
+         // Reverse-only bindings do not replace the underlying assignment, they append to it so if either one is 'reverse only', just add this statement to the base type
+         if (bindingDirection == BindingDirection.REVERSE || ((var instanceof PropertyAssignment) && ((PropertyAssignment) var).bindingDirection == BindingDirection.REVERSE)) {
             base.addBodyStatementIndent(this);
             return this;
          }
