@@ -66,6 +66,14 @@ public class TypeExpression extends Statement {
          expression.addDependentTypes(types, mode);
    }
 
+   @Override
+   public void setAccessTimeForRefs(long time) {
+      if (type != null)
+         type.setAccessTimeForRefs(time);
+      if (expression != null)
+         expression.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       Statement res = null;
       if (type != null) {

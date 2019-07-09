@@ -164,6 +164,8 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {}
 
+   public void setAccessTimeForRefs(long time) {}
+
    public String toString() {
       if (value != null)
          return value;

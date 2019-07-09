@@ -171,6 +171,14 @@ public class SwitchStatement extends Statement implements IBlockStatement {
             st.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (expression != null)
+         expression.setAccessTimeForRefs(time);
+      if (statements != null)
+         for (Statement st:statements)
+            st.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (expression != null) {
          ParenExpression parExpr = (ParenExpression) expression;

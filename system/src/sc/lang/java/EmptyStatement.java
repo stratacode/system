@@ -10,5 +10,6 @@ import java.util.Set;
 public class EmptyStatement extends Statement {
    public void refreshBoundTypes(int flags) {}
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {}
+   public void setAccessTimeForRefs(long time) {}
    public Statement transformToJS() { return this; }
 }

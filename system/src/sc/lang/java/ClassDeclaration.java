@@ -1574,6 +1574,13 @@ public class ClassDeclaration extends TypeDeclaration {
          extendsType.addDependentTypes(types, ctx);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+
+      if (extendsType != null)
+         extendsType.setAccessTimeForRefs(time);
+   }
+
 
    public ClassDeclaration deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       ClassDeclaration res = (ClassDeclaration) super.deepCopy(options, oldNewMap);

@@ -1542,6 +1542,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+      if (implementsTypes != null)
+         for (JavaType t:implementsTypes)
+            t.setAccessTimeForRefs(time);
+   }
 
    private transient DynStubParameters dynamicParams;
 

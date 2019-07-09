@@ -181,6 +181,15 @@ public class BoundType extends JavaType {
       return true;
    }
 
+   public void setAccessTime(long time) {
+      if (baseType != null)
+         baseType.setAccessTime(time);
+      if (boundTypes != null) {
+         for (JavaType bt:boundTypes)
+            bt.setAccessTime(time);
+      }
+   }
+
    public Object definesTypeParameter(Object typeParam, ITypeParamContext ctx) {
       if (baseType == null)
          return null;

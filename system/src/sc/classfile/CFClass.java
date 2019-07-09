@@ -932,6 +932,10 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return null;
    }
 
+   @Override
+   public void setAccessTime(long time) {
+   }
+
    public void error(CharSequence... args) {
       reportMessage(MessageType.Error, args);
    }

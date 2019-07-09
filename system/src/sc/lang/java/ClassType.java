@@ -849,6 +849,11 @@ public class ClassType extends JavaType {
       return ModelUtil.isTypeVariable(type);
    }
 
+   public void setAccessTime(long time) {
+      if (type != null && type instanceof ITypeDeclaration)
+         ((ITypeDeclaration) type).setAccessTime(time);
+   }
+
    public boolean isParameterizedType() {
       if (isTypeParameter())
          return true;

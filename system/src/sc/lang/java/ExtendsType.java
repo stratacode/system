@@ -309,6 +309,12 @@ public class ExtendsType extends JavaType {
          typeArgument.refreshBoundType(flags);
    }
 
+   @Override
+   public void setAccessTime(long time) {
+      if (typeArgument != null)
+         typeArgument.setAccessTime(time);
+   }
+
    public String toGenerateString() {
       StringBuilder sb = new StringBuilder();
       if (questionMark)

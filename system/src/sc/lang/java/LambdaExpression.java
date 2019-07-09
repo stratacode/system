@@ -51,6 +51,13 @@ public class LambdaExpression extends BaseLambdaExpression implements IStatement
          lambdaBody.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (lambdaParams instanceof Parameter)
+         ((Parameter) lambdaParams).setAccessTimeForRefs(time);
+      if (lambdaBody != null)
+         lambdaBody.setAccessTimeForRefs(time);
+   }
+
    public String toGenerateString() {
       StringBuilder sb = new StringBuilder();
       String params = getParamString(lambdaParams);

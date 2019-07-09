@@ -682,6 +682,13 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          init.addDependentTypes(types, mode);
    }
 
+   @Override
+   public void setAccessTimeForRefs(long time) {
+      Expression init = getInitializerExpr();
+      if (init != null)
+         init.setAccessTimeForRefs(time);
+   }
+
    public boolean hasModifier(String modifier) {
       if (assignedProperty != null) {
          AccessLevel requestLevel, overrideLevel;

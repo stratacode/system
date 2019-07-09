@@ -245,6 +245,12 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return true;
    }
 
+   public void setAccessTimeForRefs(long time) {
+   }
+
+   public void setAccessTime(long time) {
+   }
+
    static class IncludeCommand {
       int commandIx; // Index in commands of the include
       CmdScriptModel includedModel;

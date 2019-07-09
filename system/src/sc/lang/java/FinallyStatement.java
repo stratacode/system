@@ -42,6 +42,12 @@ public class FinallyStatement extends NonIndentedStatement implements IBlockStat
             st.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (block != null && block.statements != null)
+         for (Statement st:block.statements)
+            st.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (block != null && block.statements != null)
          for (Statement st:block.statements)

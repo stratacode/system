@@ -166,4 +166,10 @@ public interface ITypeDeclaration {
 
    /** Does this type use the layer level modifier */
    boolean useDefaultModifier();
+
+   /** For source representations of a type, mark any references contains in this type as 'in use' with the specified access time so only unused types in the cache are removed */
+   void setAccessTimeForRefs(long time);
+
+   /** Mark the lastAccessTime for all of the models that define this type only (not the code inside of the type like the ForRefs version)  */
+   void setAccessTime(long time);
 }

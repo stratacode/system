@@ -702,6 +702,19 @@ public class BinaryExpression extends Expression {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (lhs != null)
+         lhs.setAccessTimeForRefs(time);
+      if (rhs instanceof JavaType) {
+         ((JavaType) rhs).setAccessTimeForRefs(time);
+      }
+      else {
+         Expression rhsExpr = getRhsExpr();
+         if (rhsExpr != null)
+            rhsExpr.setAccessTimeForRefs(time);
+      }
+   }
+
    public boolean isStaticTarget() {
       return lhs.isStaticTarget() && getRhsExpr().isStaticTarget();
    }

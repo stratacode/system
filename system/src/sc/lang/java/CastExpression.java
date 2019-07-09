@@ -92,6 +92,12 @@ public class CastExpression extends ChainedExpression {
          type.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+      if (type != null)
+         type.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       expression.transformToJS();
       Statement repl = ParenExpression.create(expression);

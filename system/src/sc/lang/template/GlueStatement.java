@@ -165,6 +165,13 @@ public class GlueStatement extends Statement implements ITemplateDeclWrapper {
                ((Statement) d).addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (declarations != null)
+         for (Object d:declarations)
+            if (d instanceof Statement)
+               ((Statement) d).setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (declarations != null)
          for (Object d:declarations)

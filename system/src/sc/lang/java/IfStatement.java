@@ -78,6 +78,15 @@ public class IfStatement extends NonIndentedStatement {
          falseStatement.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (expression != null)
+         expression.setAccessTimeForRefs(time);
+      if (trueStatement != null)
+         trueStatement.setAccessTimeForRefs(time);
+      if (falseStatement != null)
+         falseStatement.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (expression != null)
          expression.transformToJS();

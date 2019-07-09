@@ -608,6 +608,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          initializer.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (initializer != null)
+         initializer.setAccessTimeForRefs(time);
+   }
+
    public void transformToJS() {
       if (arrayDimensions != null)
          setProperty("arrayDimensions", null);
@@ -898,5 +903,6 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
       return false;
    }
+
 }
 

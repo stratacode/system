@@ -83,6 +83,13 @@ public class VariableStatement extends TypedDefinition implements IClassBodyStat
             v.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+      if (definitions != null)
+         for (VariableDefinition v:definitions)
+            v.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       // Before we erase the type, tell the variable def to freeze it
       if (definitions != null)

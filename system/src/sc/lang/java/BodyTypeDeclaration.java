@@ -118,6 +118,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    protected transient boolean typeInfoCompleted = false;
 
+   private transient long lastAccessTime;
+
    /**
     * Stores the current (and old/previous) mapping from slot to field+obj defs managed in the dynamic model
     */
@@ -8065,6 +8067,30 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (scopeProcessor != null) {
          scopeProcessor.addDependentTypes(this, types, mode);
       }
+   }
+
+   public void setAccessTimeForRefs(long time) {
+      if (lastAccessTime == time)
+         return;
+      lastAccessTime = time;
+      if (body != null) {
+         for (Statement s : body) {
+            s.setAccessTimeForRefs(time);
+         }
+      }
+      if (hiddenBody != null) {
+         for (Statement s : hiddenBody) {
+            s.setAccessTimeForRefs(time);
+         }
+      }
+   }
+
+   public void setAccessTime(long time) {
+      if (lastAccessTime == time)
+         return;
+      lastAccessTime = time;
+      JavaModel m = getJavaModel();
+      m.setLastAccessTime(time);
    }
 
    public ConstructorDefinition getDefaultConstructor() {

@@ -5048,6 +5048,15 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (boundTypes != null) {
+         for (Object boundType:boundTypes) {
+            if (boundType instanceof ITypeDeclaration)
+               ((ITypeDeclaration) boundType).setAccessTime(time);
+         }
+      }
+   }
+
 
    private boolean needsClassInitConversion(Object srcType, boolean methodsType) {
       // The children of AssignmentExpressions used to be excluded here as well but for an enum variable reference

@@ -180,6 +180,13 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
             v.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+      if (variableDefinitions != null)
+         for (VariableDefinition v:variableDefinitions)
+            v.setAccessTimeForRefs(time);
+   }
+
    public void initDynStatement(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean inherit) {
       if (hasModifier("static"))
          return;

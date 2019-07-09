@@ -64,6 +64,11 @@ public abstract class ChainedExpression extends Expression {
          expression.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (expression != null)
+         expression.setAccessTimeForRefs(time);
+   }
+
    @Override
    public boolean isStaticTarget() {
       return expression.isStaticTarget();

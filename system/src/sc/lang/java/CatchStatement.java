@@ -71,6 +71,13 @@ public class CatchStatement extends NonIndentedStatement implements IBlockStatem
          statements.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (parameters != null)
+         parameters.setAccessTimeForRefs(time);
+      if (statements != null)
+         statements.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (statements != null)
          statements.transformToJS();

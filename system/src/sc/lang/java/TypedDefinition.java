@@ -27,5 +27,10 @@ public abstract class TypedDefinition extends Statement {
          type.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (type != null)
+         type.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() { return this; }
 }

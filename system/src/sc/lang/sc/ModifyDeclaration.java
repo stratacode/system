@@ -2531,6 +2531,26 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+      if (modifyTypeDecl != null)
+         modifyTypeDecl.setAccessTimeForRefs(time);
+      if (extendsTypes != null) {
+         for (JavaType t:extendsTypes)
+            t.setAccessTimeForRefs(time);
+      }
+   }
+
+   public void setAccessTime(long time) {
+      super.setAccessTime(time);
+      if (modifyTypeDecl != null)
+         modifyTypeDecl.setAccessTime(time);
+      if (extendsTypes != null) {
+         for (JavaType t:extendsTypes)
+            t.setAccessTime(time);
+      }
+   }
+
    public String getCompiledClassName() {
       if (staleClassName != null)
          return staleClassName;

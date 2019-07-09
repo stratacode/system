@@ -93,6 +93,14 @@ public class MethodReference extends BaseLambdaExpression {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      Object ref = resolveReference();
+      if (ref instanceof JavaType)
+         ((JavaType) ref).setAccessTime(time);
+      else if (ref instanceof Expression)
+         ((Expression) ref).setAccessTimeForRefs(time);
+   }
+
    @Override
    Object getLambdaParameters(Object methObj, ITypeParamContext ctx) {
       Object[] ptypes = ModelUtil.getParameterTypes(methObj, true);

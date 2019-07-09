@@ -82,6 +82,14 @@ public class GlueExpression extends Expression {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (expressions != null) {
+         for (Object expr:expressions)
+            if (expr instanceof Expression)
+               ((Expression) expr).setAccessTimeForRefs(time);
+      }
+   }
+
    public Statement transformToJS() {
       if (expressions != null) {
          for (Object expr:expressions)

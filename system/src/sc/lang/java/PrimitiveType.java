@@ -127,6 +127,8 @@ public class PrimitiveType extends JavaType {
 
    public void refreshBoundType(int flags) {}
 
+   public void setAccessTime(long time) {}
+
    public void transformToJS() {
       parentNode.replaceChild(this, ClassType.createStarted(Object.class, "var"));
    }

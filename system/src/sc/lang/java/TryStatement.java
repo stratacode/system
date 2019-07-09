@@ -94,6 +94,17 @@ public class TryStatement extends Statement implements IBlockStatement {
          finallyStatement.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (block != null && block.statements != null)
+         for (Statement st : block.statements)
+            st.setAccessTimeForRefs(time);
+      if (catchStatements != null)
+         for (CatchStatement cs : catchStatements)
+            cs.setAccessTimeForRefs(time);
+      if (finallyStatement != null)
+         finallyStatement.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (block != null && block.statements != null)
          for (Statement st : block.statements)

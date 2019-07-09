@@ -74,6 +74,13 @@ public abstract class TwoOperatorExpression extends Expression {
          rhs.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (lhs != null)
+         lhs.setAccessTimeForRefs(time);
+      if (rhs != null)
+         rhs.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (lhs != null)
          lhs.transformToJS();

@@ -230,4 +230,11 @@ public class Parameter extends AbstractVariable implements IVariable, IObjectId 
    public String getObjectId() {
       return DynUtil.getObjectId(this, null, "PMD_" + getParameterTypeName()  + "_" + variableName);
    }
+
+   public void setAccessTimeForRefs(long time) {
+      if (type != null)
+         type.setAccessTimeForRefs(time);
+      if (nextParameter != null)
+         nextParameter.setAccessTimeForRefs(time);
+   }
 }

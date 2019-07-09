@@ -361,6 +361,16 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return baseType instanceof ITypeDeclaration ? ((ITypeDeclaration) baseType).useDefaultModifier() : false;
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (baseType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) baseType).setAccessTimeForRefs(time);
+   }
+
+   public void setAccessTime(long time) {
+      if (baseType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) baseType).setAccessTime(time);
+   }
+
    public boolean isLayerType() {
       return false;
    }

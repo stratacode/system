@@ -23,6 +23,11 @@ public class LabelStatement extends Statement implements IStatementWrapper {
          statement.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (statement != null)
+         statement.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (statement != null)
          statement.transformToJS();

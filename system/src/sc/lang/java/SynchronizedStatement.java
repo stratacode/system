@@ -37,6 +37,13 @@ public class SynchronizedStatement extends Statement implements IStatementWrappe
          statement.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (expression != null)
+         expression.setAccessTimeForRefs(time);
+      if (statement != null)
+         statement.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (expression != null)
          expression.transformToJS();

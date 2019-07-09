@@ -486,6 +486,15 @@ public class InterfaceDeclaration extends TypeDeclaration {
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+
+      if (extendsTypes != null) {
+         for (JavaType extendsType:extendsTypes)
+            extendsType.setAccessTimeForRefs(time);
+      }
+   }
+
    public InterfaceDeclaration deepCopy(int options, IdentityHashMap<Object, Object> oldNewMap) {
       InterfaceDeclaration res = (InterfaceDeclaration) super.deepCopy(options, oldNewMap);
 

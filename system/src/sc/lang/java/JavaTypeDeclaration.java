@@ -142,6 +142,12 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
       return false;
    }
 
+   public void setAccessTimeForRefs(long time) {
+   }
+
+   public void setAccessTime(long time) {
+   }
+
    public List<JavaType> getCompiledTypeArgs(List<JavaType> typeArgs) {
       return typeArgs;
    }

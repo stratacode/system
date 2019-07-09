@@ -174,6 +174,15 @@ public class QuestionMarkExpression extends Expression {
          falseChoice.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (condition != null)
+         condition.setAccessTimeForRefs(time);
+      if (trueChoice != null)
+         trueChoice.setAccessTimeForRefs(time);
+      if (falseChoice != null)
+         falseChoice.setAccessTimeForRefs(time);
+   }
+
    public Statement transformToJS() {
       if (condition != null)
          condition.transformToJS();

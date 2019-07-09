@@ -7126,6 +7126,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       try {
          long cleanTime = System.currentTimeMillis();
          acquireDynLock(false);
+         String processIdent = getProcessIdent();
          ArrayList<String> toCullList = new ArrayList<String>();
          for (Map.Entry<String, ILanguageModel> cacheEnt: inactiveModelIndex.entrySet()) {
             ILanguageModel model = cacheEnt.getValue();
@@ -7133,6 +7134,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // Don't cull layer models since they are needed more often and tend to be small
             if (model instanceof JavaModel && ((JavaModel) model).isLayerModel)
                continue;
+            if (model.getLastAccessTime() == 0) {
+               System.out.println("*** Error - clean inactive cache - last access time not set for model"); // TODO: maybe restored models?
+               model.setLastAccessTime(System.currentTimeMillis());
+               continue;
+            }
 
             if (cleanTime - model.getLastAccessTime() > INACTIVE_MODEL_CACHE_EXPIRE_TIME_MILLIS) {
                if (externalModelIndex == null || !externalModelIndex.isInUse(model)) {
@@ -7141,14 +7147,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
             else {
                if (options.verbose)
-                  verbose("Not removing inactive model: " + model + " (accessed " + (cleanTime - model.getLastAccessTime()) + "millis ago)");
+                  verbose("Not removing inactive model: " + model.getSrcFile() + " (accessed " + (cleanTime - model.getLastAccessTime()) + " millis ago) " + processIdent);
             }
          }
          for (String toCull:toCullList) {
             ILanguageModel removed = inactiveModelIndex.remove(toCull);
             if (removed != null) {
                if (options.verbose)
-                  verbose("Removing inactive model: " + toCull + " (accessed " + (cleanTime - removed.getLastAccessTime()) + " millis ago)");
+                  verbose("Removing inactive model: " + removed.getSrcFile() + " (accessed " + (cleanTime - removed.getLastAccessTime()) + " millis ago) " + processIdent);
                Layer layer = removed.getLayer();
                if (layer != null) {
                   layer.layerModels.remove(new IdentityWrapper(removed));
@@ -10431,7 +10437,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          model.setLayer(srcEntLayer);
       model.setLastModifiedTime(modTimeStart);
-      model.setLastAccessTime(modTimeStart);
+      model.setLastAccessTime(System.currentTimeMillis());
 
       if (isLayer && model instanceof JavaModel)
          ((JavaModel) model).isLayerModel = true;
@@ -15410,12 +15416,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    public StringBuilder dumpCacheStats() {
       StringBuilder sb = new StringBuilder();
-      sb.append("LayeredSystem: ");
-      sb.append(getProcessIdent());
-      sb.append("\n   numActiveLayers: ");
-      sb.append(layers.size());
-      sb.append(" numInactiveLayers: ");
-      sb.append(inactiveLayers.size());
+      dumpCacheSummary(sb, false);
       sb.append(" numActiveFiles: ");
       sb.append(processedFileIndex.size());
       sb.append("\n");
@@ -15469,6 +15470,30 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       return sb;
+   }
+
+   public void dumpCacheSummary(StringBuilder sb, boolean includePeers) {
+      sb.append("LayeredSystem: ");
+      sb.append(getProcessIdent());
+      if (!peerMode)
+         sb.append(" (master)");
+      sb.append("\n   active layers: " + layers.size() + " files: " + modelIndex.size());
+      sb.append("\n   inactive layers: " + inactiveLayers.size() + " files: " + inactiveModelIndex.size() + "\n\n");
+      if (includePeers && !peerMode && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems) {
+            dumpCacheSummary(sb, false);
+         }
+      }
+   }
+
+   /** Returns the total number of models currently in the cache - as an estimate to determine when to clean the cache */
+   public int getNumModelsInCache() {
+      int res = layers.size() + inactiveLayers.size() + inactiveModelIndex.size() + modelIndex.size();
+      if (!peerMode && peerSystems != null) {
+         for (LayeredSystem peerSys:peerSystems)
+            res += peerSys.getNumModelsInCache();
+      }
+      return res;
    }
 
    /** Returns the prefix to prepend onto files generated for the given srcPathType (e.g. 'web', 'config', etc.) */
@@ -15617,6 +15642,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // client-only mode when there's only a client.
       return runtimes.indexOf(proc) == 0;
    }
+
 }
 
 

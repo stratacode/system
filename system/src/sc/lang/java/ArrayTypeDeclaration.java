@@ -481,4 +481,14 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public boolean useDefaultModifier() {
       return componentType instanceof ITypeDeclaration && ((ITypeDeclaration) componentType).useDefaultModifier();
    }
+
+   public void setAccessTimeForRefs(long time) {
+      if (componentType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) componentType).setAccessTimeForRefs(time);
+   }
+
+   public void setAccessTime(long time) {
+      if (componentType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) componentType).setAccessTime(time);
+   }
 }

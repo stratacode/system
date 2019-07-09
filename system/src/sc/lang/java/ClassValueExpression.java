@@ -229,6 +229,11 @@ public class ClassValueExpression extends Expression {
          addDependentType(types, boundType, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (boundType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) boundType).setAccessTime(time);
+   }
+
    public Statement transformToJS() {
       Statement repl = IdentifierExpression.create(getLayeredSystem().runtimeProcessor.getStaticPrefix(boundType, this));
       parentNode.replaceChild(this, repl);

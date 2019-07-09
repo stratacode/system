@@ -21,6 +21,9 @@ public class BreakContinueStatement extends Statement {
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
    }
 
+   public void setAccessTimeForRefs(long time) {
+   }
+
    public Statement transformToJS() { return this; }
 
    public String toString() {

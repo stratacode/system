@@ -334,6 +334,29 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
+   public void updateAccessTimeForRefs(boolean updatePeers) {
+      long now = System.currentTimeMillis();
+      setLastAccessTime(now);
+      if (types != null) {
+         for (TypeDeclaration type:types) {
+            // clear out the member cache after any changes made during reparse
+            type.setAccessTimeForRefs(now);
+         }
+      }
+
+      SrcEntry srcFile = getSrcFile();
+      if (updatePeers && srcFile != null) {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys.peerSystems != null) {
+            for (LayeredSystem peerSys:sys.peerSystems) {
+               ILanguageModel peerModel = peerSys.getCachedModelByPath(srcFile.absFileName, false);
+               if (peerModel instanceof JavaModel)
+                  ((JavaModel) peerModel).updateAccessTimeForRefs(false);
+            }
+         }
+      }
+   }
+
    private static class WildcardImport {
       public String typeName;
       public WildcardImport(String tn) {

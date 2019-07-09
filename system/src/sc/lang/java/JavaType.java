@@ -374,6 +374,12 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      setAccessTime(time);
+   }
+
+   public abstract void setAccessTime(long time);
+
    // Returns true if this is a type parameter (e.g. T)
    public boolean isTypeParameter() {
       return false;

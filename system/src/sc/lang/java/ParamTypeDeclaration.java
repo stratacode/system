@@ -636,6 +636,16 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return baseType instanceof ITypeDeclaration && ((ITypeDeclaration) baseType).useDefaultModifier();
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (baseType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) baseType).setAccessTimeForRefs(time);
+   }
+
+   public void setAccessTime(long time) {
+      if (baseType instanceof ITypeDeclaration)
+         ((ITypeDeclaration) baseType).setAccessTime(time);
+   }
+
    public String toString() {
       StringBuilder sb = new StringBuilder();
       if (baseType != null)

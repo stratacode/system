@@ -201,6 +201,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public abstract void addDependentTypes(Set<Object> types, DepTypeCtx mode);
 
+   public abstract void setAccessTimeForRefs(long time);
+
    public abstract Statement transformToJS();
 
    public CharSequence formatToJS(JSFormatMode mode, JSTypeParameters params, int extraLines) {

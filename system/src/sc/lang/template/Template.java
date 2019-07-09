@@ -419,6 +419,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return true;
    }
 
+   public void setAccessTimeForRefs(long time) {
+      setLastAccessTime(time);
+   }
+
+   public void setAccessTime(long time) {
+      setLastAccessTime(time);
+   }
+
    public DeclarationType getDeclarationType() {
       if (rootType == null)
          return DeclarationType.OBJECT;

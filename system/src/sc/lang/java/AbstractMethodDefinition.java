@@ -792,6 +792,19 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      super.setAccessTimeForRefs(time);
+      if (parameters != null) {
+         parameters.setAccessTimeForRefs(time);
+      }
+      if (throwsTypes != null)
+         for (JavaType t:throwsTypes)
+            t.setAccessTimeForRefs(time);
+
+      if (body != null)
+         body.setAccessTimeForRefs(time);
+   }
+
    public JavaType[] getParameterJavaTypes(boolean convertRepeating) {
       return parameters == null ? null : parameters.getParameterJavaTypes(convertRepeating);
    }

@@ -253,6 +253,12 @@ public class ArrayInitializer extends Expression {
             ex.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (initializers != null)
+         for (Expression ex:initializers)
+            ex.setAccessTimeForRefs(time);
+   }
+
    public String getBindingTypeName() {
       return nestedBinding ? "newArrayP" : "newArray";
    }

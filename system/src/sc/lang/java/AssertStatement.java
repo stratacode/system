@@ -46,6 +46,13 @@ public class AssertStatement extends Statement {
          otherExpression.addDependentTypes(types, mode);
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (expression != null)
+         expression.setAccessTimeForRefs(time);
+      if (otherExpression != null)
+         otherExpression.setAccessTimeForRefs(time);
+   }
+
    public void start() {
       super.start();
    }

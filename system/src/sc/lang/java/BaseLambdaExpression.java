@@ -972,6 +972,11 @@ public abstract class BaseLambdaExpression extends Expression {
       public boolean useDefaultModifier() {
          return false;
       }
+
+      public void setAccessTimeForRefs(long time) {}
+
+      public void setAccessTime(long time) {}
+
    }
 
    /**
@@ -1304,5 +1309,9 @@ public abstract class BaseLambdaExpression extends Expression {
       public boolean useDefaultModifier() {
          return false;
       }
+
+      public void setAccessTimeForRefs(long time) {}
+
+      public void setAccessTime(long time) {}
    }
 }

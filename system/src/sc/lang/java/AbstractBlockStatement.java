@@ -267,6 +267,13 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       }
    }
 
+   public void setAccessTimeForRefs(long time) {
+      if (statements != null) {
+         for (Statement st:statements)
+            st.setAccessTimeForRefs(time);
+      }
+   }
+
    public void addChildBodyStatements(List<Object> types) {
       if (statements != null) {
          for (Statement st:statements)
