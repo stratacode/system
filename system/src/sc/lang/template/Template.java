@@ -1459,7 +1459,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       // create a JavaModel from the state of the Template and transform that.
       IParseNode node = getParseNode();
       if (node != null)
-         node.setSemanticValue(null, true);
+         node.setSemanticValue(null, true, false);
       parseTreeCleared = true;
    }
 

@@ -259,6 +259,10 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       parseNode = pn;
    }
 
+   public void restoreParseNode(IParseNode pn) {
+      setParseNode(pn);
+   }
+
    public void setParseletId(int id) {
       parseletId = id;
    }
@@ -885,7 +889,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
                // Create a dummy parse node to preserve the parselet mapping for this clone.  We can use this to regenerate
                // the node more easily after the copy.  Otherwise we need to start at a node with a known parselet.
                copy.parseNode = newPP = new ParentParseNode(p);
-               copy.parseNode.setSemanticValue(copy, true);
+               copy.parseNode.setSemanticValue(copy, true, false);
                newPP.setStartIndex(oldP.getStartIndex());
                copy.parseNodeInvalid = true;
             }
@@ -924,7 +928,7 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public void setParselet(Parselet p) {
       if (parseNode == null) {
          parseNode = new ParentParseNode(p);
-         parseNode.setSemanticValue(this, true);
+         parseNode.setSemanticValue(this, true, false);
          parseNodeInvalid = true;
       }
    }

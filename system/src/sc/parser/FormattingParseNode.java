@@ -47,7 +47,7 @@ public abstract class FormattingParseNode extends AbstractParseNode {
       return null;
    }
 
-   public void setSemanticValue(Object obj, boolean clearOld) {
+   public void setSemanticValue(Object obj, boolean clearOld, boolean restore) {
       if (obj == null)
          return;
       throw new UnsupportedOperationException();

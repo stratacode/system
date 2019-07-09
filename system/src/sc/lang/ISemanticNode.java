@@ -30,6 +30,9 @@ public interface ISemanticNode {
    public void setParseNode(IParseNode pn);
    public IParseNode getParseNode();
 
+   /** Like setParseNode but called from the restore method */
+   public void restoreParseNode(IParseNode pn);
+
    public void setParseletId(int id);
    public int getParseletId();
 

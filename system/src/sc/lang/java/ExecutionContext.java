@@ -83,8 +83,14 @@ public class ExecutionContext {
    }
 
    public void popStaticFrame() {
-      currentObjects.pop();
-      frames.pop();
+      if (currentObjects.size() == 0)
+         System.err.println("*** No current objects to pop!");
+      else
+         currentObjects.pop();
+      if (frames.size() == 0)
+         System.err.println("*** No frames to pop!");
+      else
+         frames.pop();
    }
 
    public Object getCurrentStaticType() {

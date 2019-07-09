@@ -391,28 +391,32 @@ public class EditorContext extends ClientEditorContext {
       Object type;
       Statement newStatement;
       Statement oldStatement;
+      boolean addBefore;
+      String relPropertyName;
 
-      public AddStatementOp (Object type, Statement newSt, Statement repl) {
+      public AddStatementOp (Object type, Statement newSt, Statement repl, boolean ab, String relp) {
          this.type = type;
          this.newStatement = newSt;
          this.oldStatement = repl;
+         this.addBefore = ab;
+         this.relPropertyName = relp;
       }
 
       public void undo() {
          if (oldStatement == null)
             removeStatement(type, newStatement);
          else
-            addStatement(type, oldStatement, false);
+            addStatement(type, oldStatement, false, addBefore, relPropertyName);
       }
 
       public void redo() {
-         addStatement(type, newStatement, false);
+         addStatement(type, newStatement, false, addBefore, relPropertyName);
       }
    }
 
    class RemoveStatementOp extends AddStatementOp {
       public RemoveStatementOp(Object type, Statement toRem) {
-         super(type, toRem, null);
+         super(type, toRem, null, false, null);
       }
 
       // Switch these up so undo does the add and redo does the remove
@@ -611,7 +615,7 @@ public class EditorContext extends ClientEditorContext {
       return setElementValueOnPeers(type, inst, elem, text, updateType, updateInstances, valueIsExpr, true);
    }
 
-   public String addProperty(Object currentType, String propType, String propName, String op, String propValue) {
+   public String addProperty(Object currentType, String propType, String propName, String op, String propValue, boolean addBefore, String relPropertyName) {
       if (!(currentType instanceof BodyTypeDeclaration)) {
          return "Unable to add properties to compiled types";
       }
@@ -622,7 +626,7 @@ public class EditorContext extends ClientEditorContext {
             return "Object named: " + propName + " already exists in type: " + currentType;
 
          // Lazily create a modify object even from add property since it's a pain to switch modes
-         return addInnerType("Object", currentType, propName, null);
+         return addInnerType("Object", currentType, propName, null, addBefore, relPropertyName);
       }
 
       SCLanguage lang = SCLanguage.getSCLanguage();
@@ -650,18 +654,18 @@ public class EditorContext extends ClientEditorContext {
 
          FieldDefinition field = FieldDefinition.createFromJavaType(propertyType, propName, op, initializer);
 
-         return addStatement(currentType, field, true);
+         return addStatement(currentType, field, true, addBefore, relPropertyName);
       }
       else if (ModelUtil.definesMember(currentType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, null) != null) {
          PropertyAssignment pa = initializer == null ? OverrideAssignment.create(propName) : PropertyAssignment.create(propName, initializer, op);
-         return addStatement(currentType, pa, true);
+         return addStatement(currentType, pa, true, addBefore, relPropertyName);
       }
       else {
          return "No property named: " + propName + " in type: " + currentType + "  To create a new property, provide a type";
       }
    }
 
-   public String addInnerType(String mode, Object currentType, String name, String extType) {
+   public String addInnerType(String mode, Object currentType, String name, String extType, boolean addBefore, String relPropertyName) {
       Object existingType = ModelUtil.getInnerType(currentType, name, null);
 
       // Turn this into a modify type
@@ -672,7 +676,7 @@ public class EditorContext extends ClientEditorContext {
       if (cdObj instanceof String)
          return (String) cdObj;
       TypeDeclaration cd = (TypeDeclaration) cdObj;
-      String err = addStatement(currentType, cd, true);
+      String err = addStatement(currentType, cd, true, addBefore, relPropertyName);
       if (err == null) {
          Layer currentLayer = ModelUtil.getLayerForType(system, currentType);
          system.addTypeByName(currentLayer, cd.getFullTypeName(), cd, currentLayer.getNextLayer());
@@ -820,7 +824,7 @@ public class EditorContext extends ClientEditorContext {
       return null;
    }
 
-   public String addStatement(Object currentType, Statement st, boolean addOp) {
+   public String addStatement(Object currentType, Statement st, boolean addOp, boolean addBefore, String relPropertyName) {
       BodyTypeDeclaration currentTD = (BodyTypeDeclaration) currentType;
       JavaModel model = currentTD.getJavaModel();
 
@@ -840,7 +844,7 @@ public class EditorContext extends ClientEditorContext {
                replaced = (Statement) replacedObj;
          }
          else
-            replaced = currentTD.updateBodyStatement(st, ctx, true, null);
+            replaced = currentTD.updateBodyStatement(st, ctx, true, null, addBefore, relPropertyName);
          if (handler.err != null)
             return handler.err;
       }
@@ -852,7 +856,7 @@ public class EditorContext extends ClientEditorContext {
       typeChanged(currentType);
 
       if (addOp)
-         addOp(new AddStatementOp(currentType, replaced, st));
+         addOp(new AddStatementOp(currentType, replaced, st, addBefore, relPropertyName));
 
       return null;
    }

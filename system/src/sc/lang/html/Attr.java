@@ -222,8 +222,7 @@ public class Attr extends Node implements ISrcStatement {
                if (exprRes instanceof IParseNode) {
                   if (parseNode != null && parseNode.getStartIndex() != -1)
                      ((IParseNode) exprRes).advanceStartIndex(parseNode.getStartIndex());
-                  else
-                     System.err.println("*** Warning - not updating index for schtml attribute");
+                  // the parseNode may not have been restored yet. See the overridden setParseNode to handle this logic in that case.
                }
             }
          }
@@ -438,5 +437,19 @@ public class Attr extends Node implements ISrcStatement {
       if (parseNode != null && quoteType == 0)
          initQuoteType();
       return super.deepEquals(other);
+   }
+
+   public void restoreParseNode(IParseNode pn) {
+      boolean wasNull = parseNode == null;
+      super.restoreParseNode(pn);
+
+      // When parsed, valueExpr will always be null but after restoring the parse node, we need to update the start index for the expression
+      if (wasNull && valueExpr != null) {
+         IParseNode valuePN = valueExpr.getParseNode();
+         if (valuePN != null && pn != null && pn.getStartIndex() != -1)
+            if (valuePN.getStartIndex() == 0) {
+               valuePN.advanceStartIndex(pn.getStartIndex());
+            }
+      }
    }
 }

@@ -1440,7 +1440,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                // If we are propagating a value and have a result class specified, we wait to create this until
                // we see if the propagated value is null or not.  It only gets created if it is null.
                if (propagatedValueIndex == -1)
-                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()), !reparse);
+                  parent.setSemanticValue(createInstance(parser, getSemanticValueSlotClass()), !reparse, false);
             }
 
             // If this is a repeating sequence which produces an object for each element, we create that first element here when setting the first slot (e.g. maybe the '.' in a ClassType)
@@ -1481,7 +1481,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   // If we are reparsing, do not clear the semantic value - That ends up clearing all properties and
                   // for example when we are propagating slot mappings, we'll clear out properties we need to reset them
                   // on the new value.
-                  parent.setSemanticValue(sval, !reparse);
+                  parent.setSemanticValue(sval, !reparse, false);
 
                   // We are propagating the node's value - override the node we store for 
                   // this semantic node's parse node.
@@ -1532,7 +1532,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      Object sv = childNode.getSemanticValue();
                      if (sv instanceof List) {
                         if (parent.value == null) {
-                           parent.setSemanticValue(sv, !reparse);
+                           parent.setSemanticValue(sv, !reparse, false);
                            valueCount = childNode.getNumSemanticValues();
                         }
                         else if (replaceValue) {
@@ -1585,7 +1585,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                         SemanticNodeList snl;
                         if (!parser.restore) {
                            if (parent.value == null)
-                              parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                              parent.setSemanticValue(snl = new SemanticNodeList(), !reparse, false);
                            else
                               snl = (SemanticNodeList) parent.value;
                            if (childIndex == -1 || snl.size() <= childIndex)
@@ -1601,7 +1601,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   else if (node != null) {
                      SemanticNodeList snl;
                      if (parent.value == null)
-                        parent.setSemanticValue(snl = new SemanticNodeList(), !reparse);
+                        parent.setSemanticValue(snl = new SemanticNodeList(), !reparse, false);
                      else
                         snl = (SemanticNodeList) parent.value;
                      if (childIndex == -1 || snl.size() <= childIndex)
@@ -1615,7 +1615,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      SemanticNodeList values = (SemanticNodeList) parent.getSemanticValue();
                      if (values == null) {
                         values = new SemanticNodeList(0);
-                        parent.setSemanticValue(values, !reparse);
+                        parent.setSemanticValue(values, !reparse, false);
                      }
                      if (childIndex == -1 || values.size() <= childIndex) {
                         // If we are just propagating the array value of one of our children and that value has a null we clear the value we are propagating.
@@ -1748,7 +1748,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
                /* Create the new parse node which will hold this result */
                Object newValue = createInstance(parser, getSemanticValueClass());
-               newParent.setSemanticValue(newValue, !reparse);
+               newParent.setSemanticValue(newValue, !reparse, false);
 
                Object lastParent = parent.getSemanticValue();
                Object lastNode = TypeUtil.getPropertyValue(lastParent, chainedPropertyMappings[1]);
@@ -2337,7 +2337,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       IParseNode pnode = newParseNode();
 
       // associate the new parse node in both directions with the semantic value.
-      pnode.setSemanticValue(value, true);
+      pnode.setSemanticValue(value, true, false);
       //if (value instanceof ISemanticNode)
       //   ((ISemanticNode) value).setParseNode(pnode);
 

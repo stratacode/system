@@ -30,8 +30,10 @@ public class LayerSyncHandler extends SyncHandler {
       if (inst instanceof VariableDefinition) {
          VariableDefinition varDef = (VariableDefinition) inst;
          Definition def = varDef.getDefinition();
-         if (def != null)
+         if (def != null) {
             varDef.annotations = def.getAnnotations();
+            varDef.modifierFlags = def.getModifierFlags();
+         }
       }
 
       if (inst instanceof Field) {
@@ -52,6 +54,7 @@ public class LayerSyncHandler extends SyncHandler {
          varDef.frozenTypeDecl = ModelUtil.getPropertyType(inst);
          varDef.indexedProperty = ModelUtil.isGetIndexMethod(inst);
          varDef.annotations = ModelUtil.getAnnotations(inst);
+         varDef.modifierFlags = ModelUtil.getModifiers(inst);
          return varDef;
       }
 

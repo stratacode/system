@@ -7413,6 +7413,8 @@ public class ModelUtil {
          return ((Class) def).getModifiers();
       else if (def instanceof ParamTypedMethod)
          return getModifiers(((ParamTypedMethod) def).method);
+      else if (def instanceof Definition)
+         return ((Definition) def).getModifierFlags();
       throw new UnsupportedOperationException();
    }
 

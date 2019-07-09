@@ -345,7 +345,7 @@ public class ClassDeclaration extends TypeDeclaration {
             if (s instanceof PropertyAssignment) {
                PropertyAssignment assign = (PropertyAssignment) s;
                // this is a constructor property which will have already been initialized before the object is created so don't do this twice
-               if (assign.suppressGeneration)
+               if (assign.constructorProp)
                   continue;
                Expression newAssign = assign.convertToAssignmentExpression(varName, true, assign.operator, false);
                newAssign.parentNode = assign.parentNode;
@@ -593,7 +593,6 @@ public class ClassDeclaration extends TypeDeclaration {
          ClassDeclaration accessClass;
          String newModifiers;
          Object compiledClass;
-
 
          if (outer != null) {
             if (!(outer instanceof ClassDeclaration)) {

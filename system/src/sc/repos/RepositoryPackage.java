@@ -78,7 +78,13 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    transient public IRepositoryManager mgr;
    transient String computedClassPath;
+
+   /** When replaced by another package, that parent package */
    transient RepositoryPackage replacedByPkg;
+
+   /** A list of RepositoryPackage objects that were replaced by this package */
+   transient List<RepositoryPackage> replacedPkgs = null;
+
    public transient boolean packageInited = false;
    public transient String rebuildReason = null;
    /** Set to true when this package and it's dependencies have been successfully restored from the .ser file */
@@ -174,6 +180,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
             pkg = sys.addRepositoryPackage(this);
             if (pkg != this) {
                replacedByPkg = pkg;
+               pkg.addReplacedPackage(this);
             }
          }
          if (parentPkg != null) {
@@ -199,6 +206,12 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       subPackages.add(pkg);
    }
 
+   void addReplacedPackage(RepositoryPackage pkg) {
+      if (replacedPkgs == null)
+         replacedPkgs = new ArrayList<RepositoryPackage>();
+      replacedPkgs.add(pkg);
+   }
+
    public Layer getDefinedInLayer() {
       if (definedInLayer != null)
          return definedInLayer;
@@ -209,8 +222,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
 
    public RepositorySystem getRepositorySystem() {
       Layer layer = getDefinedInLayer();
-      if (layer != null)
+      if (layer != null) {
+         if (layer.layeredSystem == null)
+            return null;
          return layer.layeredSystem.repositorySystem;
+      }
       if (mgr != null)
          return mgr.getRepositorySystem();
       return null;
@@ -615,7 +631,11 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
       }
       // The current source changed
       else if (!currentSource.equals(oldPkg.currentSource)) {
-         MessageHandler.info(getRepositorySystem().msg, "Package ", packageName, " - source changed from: " + oldPkg.currentSource + " to: " + currentSource);
+         RepositorySystem reposSys = getRepositorySystem();
+         if (reposSys == null)
+            return false;
+
+         MessageHandler.info(reposSys.msg, "Package ", packageName, " - source changed from: " + oldPkg.currentSource + " to: " + currentSource);
          return false;
       }
 

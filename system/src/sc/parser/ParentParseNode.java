@@ -40,7 +40,7 @@ public class ParentParseNode extends AbstractParseNode {
       return value;
    }
 
-   public void setSemanticValue(Object val, boolean clearOld) {
+   public void setSemanticValue(Object val, boolean clearOld, boolean restore) {
       if (val == value)
          return;
       // First clear out the old value
@@ -54,8 +54,13 @@ public class ParentParseNode extends AbstractParseNode {
          }
       }
       value = val;
-      if (value instanceof ISemanticNode)
-         ((ISemanticNode) value).setParseNode(this);
+      if (value instanceof ISemanticNode) {
+         ISemanticNode semNode = (ISemanticNode) value;
+         if (restore)
+            semNode.restoreParseNode(this);
+         else
+            semNode.setParseNode(this);
+      }
    }
 
    public int addForReparse(Object node, Parselet p, int svIndex, int childIndex, int slotIndex, boolean skipSemanticValue, Parser parser, Object oldChildParseNode, DiffContext dctx,

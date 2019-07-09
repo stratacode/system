@@ -107,8 +107,7 @@ public class Parser implements IString {
    }
 
    private void fillBuffer() {
-      if (numAccepted > currentBufferPos)
-      {
+      if (numAccepted > currentBufferPos) {
          int numToShift = numAccepted - currentBufferPos;
          if (bufSize > numToShift)
             System.arraycopy(inputBuffer, numToShift, inputBuffer, 0, bufSize - numToShift);
@@ -117,17 +116,17 @@ public class Parser implements IString {
       }
       if (inputBuffer.length == bufSize || eof)
          return;
-      try
-      {
+      try {
          int numRead = inputReader.read(inputBuffer, bufSize, inputBuffer.length - bufSize);
          if (numRead == -1)
             eof = true;
          else 
             bufSize += numRead;
       }
-      catch (IOException exc)
-      {
-         parseError(currentParselet, null, null, "IO Error: {0}", currentIndex,currentIndex+bufSize, exc.toString());
+      catch (IOException exc) {
+         if (currentParselet != null) {
+            parseError(currentParselet, null, null, "IO Error: {0}", currentIndex,currentIndex+bufSize, exc.toString());
+         }
          eof = true;
       }
    }
@@ -153,8 +152,7 @@ public class Parser implements IString {
 
       if (relIx < bufSize)
          return inputBuffer[relIx];
-      else
-      {
+      else {
          if (!eof) {
             while (relIx >= inputBuffer.length)
                growBuffer();
@@ -592,6 +590,11 @@ public class Parser implements IString {
       int saveLastStartIndex = -1;
       Object value;
 
+      if (parselet == null) {
+         System.err.println("*** Error restoring parse node: " + oldModel);
+         throw new IllegalArgumentException("Error restoring parse node - null parselet");
+      }
+
       if (!enablePartialValues && parselet.partialValuesOnly)
          return PARSELET_DISABLED;
 
@@ -813,7 +816,7 @@ public class Parser implements IString {
       node.value = value;
       node.startIndex = lastStartIndex;
       if (!skipSemanticValue)
-         node.setSemanticValue(ParseUtil.nodeToSemanticValue(value), true);
+         node.setSemanticValue(ParseUtil.nodeToSemanticValue(value), true, false);
       return node;
    }
 

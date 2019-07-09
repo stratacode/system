@@ -40,4 +40,7 @@ public interface IExternalModelIndex {
 
    /** Returns true for when the IDE aborts a type lookup - the layered system needs to treat these exceptions differently than those that occur from running dynamic code */
    public boolean isCancelledException(RuntimeException exc);
+
+   /** Throws a cancelled exception if this operation has been aborted - due to the need for user responsiveness */
+   public void checkForCancelledOperation();
 }

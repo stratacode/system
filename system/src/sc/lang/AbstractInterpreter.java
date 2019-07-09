@@ -872,7 +872,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          def.parentNode = current;
          ParseUtil.initAndStartComponent(statement);
          if (!def.hasErrors()) {
-            current.updateBodyStatement(def, execContext, true, null);
+            current.updateBodyStatement(def, execContext, true, null, false, null);
          }
          else
             System.err.println("*** Errors resolving: " + def.getNodeErrorText());

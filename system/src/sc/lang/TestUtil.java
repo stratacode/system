@@ -886,7 +886,7 @@ public class TestUtil {
                //System.out.println("Bindable result: " + result);
 
                // Clear out the old parse-tree
-               node.setSemanticValue(null, true);
+               node.setSemanticValue(null, true, false);
 
                // For debugging the generation rpocess only
                lang.debug = false;

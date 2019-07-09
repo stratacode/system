@@ -1068,7 +1068,7 @@ public class Sequence extends NestedParselet  {
                nestedValue = pIn.readChild(parser, childParselet, rctx);
                // Because we do not call ParentParseNode.add (which calls setSemanticValue, need to restore the old value here
                if (nestedValue instanceof IParseNode && oldChildObj != null)
-                  ((IParseNode) nestedValue).setSemanticValue(oldChildObj, false);
+                  ((IParseNode) nestedValue).setSemanticValue(oldChildObj, false, true);
                skipRestore = true;
             }
             oldChildNode = null;
@@ -2578,7 +2578,7 @@ public class Sequence extends NestedParselet  {
                   if (newVal instanceof GenerateError) {
                      if (optional)
                         break;
-                     pnode.setSemanticValue(null, true);
+                     pnode.setSemanticValue(null, true, false);
                      return newVal;
                   }
                   else if (newVal == null)
@@ -2599,7 +2599,7 @@ public class Sequence extends NestedParselet  {
             for (int i = 0; i < nodeListSize; i++) {
                Object arrVal = generateOne(ctx, pnode, nodeList.get(i));
                if (arrVal instanceof GenerateError) {
-                  pnode.setSemanticValue(null, true);
+                  pnode.setSemanticValue(null, true, false);
                   ((GenerateError)arrVal).progress += progress;
                   return arrVal;
                }
@@ -2624,7 +2624,7 @@ public class Sequence extends NestedParselet  {
                   if (numProcessed != 0)
                      return new PartialArrayResult(numProcessed, pnode, (GenerateError)arrVal);
                   else {
-                     pnode.setSemanticValue(null, true);
+                     pnode.setSemanticValue(null, true, false);
                      ((GenerateError)arrVal).progress += progress;
                      return arrVal;
                   }
@@ -2651,7 +2651,7 @@ public class Sequence extends NestedParselet  {
             if (nextValue != null &&
                     !getSemanticValueClass().isInstance(nextValue)) {
                if (pnode != null)
-                  pnode.setSemanticValue(null, true);
+                  pnode.setSemanticValue(null, true, false);
 
                return ctx.error(this, INVALID_TYPE_IN_CHAIN, nextValue, progress);
             }
@@ -2680,7 +2680,7 @@ public class Sequence extends NestedParselet  {
             ctx.unmaskProperty(nextValue, chainedPropertyMappings[0]);
 
             if (res instanceof GenerateError) {
-               pnode.setSemanticValue(null, true);
+               pnode.setSemanticValue(null, true, false);
                if (optional && emptyValue(ctx, value)) {
                   return generateResult(ctx, null);
                }
@@ -2702,7 +2702,7 @@ public class Sequence extends NestedParselet  {
             return generateResult(ctx, origParseNode);
 
          if (pnode != null)
-            pnode.setSemanticValue(null, true);
+            pnode.setSemanticValue(null, true, false);
 
          return ctx.error(this, NO_OBJECT_FOR_SLOT, value, progress);
       }
@@ -2712,7 +2712,7 @@ public class Sequence extends NestedParselet  {
 
          Object res = generateOne(ctx, pnode, value);
          if (res instanceof GenerateError) {
-            pnode.setSemanticValue(null, true);
+            pnode.setSemanticValue(null, true, false);
             if (optional && emptyValue(ctx, value))
                return generateResult(ctx, null);
             return res;
@@ -2722,7 +2722,7 @@ public class Sequence extends NestedParselet  {
          // If we did not matching anything, do not associate this parse node with the semantic value.  This
          // acts as a signal to the caller that the value was not consumed, so it won't advance the array.
          else if (res == null)
-            pnode.setSemanticValue(null, true);
+            pnode.setSemanticValue(null, true, false);
       }
       return generateResult(ctx, pnode);
    }

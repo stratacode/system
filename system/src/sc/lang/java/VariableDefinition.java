@@ -50,6 +50,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    // Used for serializing VariableDefinition metadata
    public transient Map<String,Object> annotations = null;
+   public transient int modifierFlags = 0;
 
    private static boolean wasBound = false;
 
@@ -721,6 +722,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       varDef.variableName = field.getName();
       varDef.frozenTypeDecl = field.getType();
       varDef.annotations = ModelUtil.createAnnotationsMap(field.getAnnotations());
+      varDef.modifierFlags = field.getModifiers();
       return varDef;
    }
 
@@ -859,10 +861,13 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    // Here only for meta-data serialization purposes
    public int getModifierFlags() {
+      Definition def = getDefinition();
+      if (def == null)
+         return modifierFlags;
       return getDefinition().getModifierFlags();
    }
-   public void setModifierFlags() {
-      throw new UnsupportedOperationException();
+   public void setModifierFlags(int flags) {
+      this.modifierFlags = flags;
    }
 
    public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {

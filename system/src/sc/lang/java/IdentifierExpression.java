@@ -795,6 +795,10 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (replacedByStatement != null)
          return;
 
+      TypeDeclaration enclType = getEnclosingType();
+      if (enclType != null && enclType.excluded)
+         return;
+
       int sz = idents.size();
 
       for (int i = 0; i < sz; i++) {

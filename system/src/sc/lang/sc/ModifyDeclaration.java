@@ -582,6 +582,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                // Bind this here so that we use the pre-transformed value even after
                // this declaration has been moved.
                modifyTypeDecl = modifyType;
+
+               enumConstant = modifyTypeDecl.isEnumConstant();
                checkModify();
             }
 
@@ -1356,7 +1358,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (!processed)
          process();
 
-      if (enumConstant) {
+      // If we are an enumConstant that's modifying another type, treat this like a modify not an enum
+      if (enumConstant && modifyTypeDecl == null) {
          transformEnum(runtime);
          return true;
       }
@@ -1923,8 +1926,10 @@ public class ModifyDeclaration extends TypeDeclaration {
          System.err.println("*** Modify type for: " + typeName + " points to this!");
          return null;
       }
-      if (enumConstant)
-         return getEnclosingType();
+      if (enumConstant) {
+         if (modifyTypeDecl == null)
+            return getEnclosingType();
+      }
       return modifyTypeDecl == null ? modifyClass : modifyTypeDecl.resolve(false);
    }
 

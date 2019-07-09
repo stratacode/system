@@ -451,7 +451,7 @@ public class ParseUtil  {
           return;
       
       if (value instanceof IParseNode)
-         ((IParseNode) value).setSemanticValue(null, true);
+         ((IParseNode) value).setSemanticValue(null, true, false);
       else if (value instanceof SemanticNode) {
          SemanticNode node = (SemanticNode) value;
          // many parse nodes may point to a value but we only need to clear if we
@@ -459,7 +459,7 @@ public class ParseUtil  {
          node.setParseNode(null);
       }
       else if (value instanceof IParseNode)
-           ((IParseNode) value).setSemanticValue(null, true);
+           ((IParseNode) value).setSemanticValue(null, true, false);
       else if (value instanceof SemanticNodeList) {
          SemanticNodeList nodeList = (SemanticNodeList) value;
          nodeList.setParseNode(null);

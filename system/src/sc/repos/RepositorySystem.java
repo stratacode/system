@@ -142,6 +142,39 @@ public class RepositorySystem {
       }
    }
 
+   public void removeRepositoryPackage(RepositoryPackage pkg) {
+      RepositoryPackage current = store.packages.get(pkg.packageName);
+      if (current == pkg) {
+         store.packages.remove(pkg.packageName);
+         if (current.replacedPkgs != null && current.replacedPkgs.size() > 0) {
+            RepositoryPackage next = current.replacedPkgs.get(0);
+            next.replacedByPkg = null; // Pick a new version of the package to register
+            store.packages.put(pkg.packageName, next);
+            if (next.currentSource != null)
+               next.currentSource.pkg = next;
+            if (next.sources != null) {
+               for (RepositorySource src:next.sources)  {
+                  src.pkg = next;
+               }
+            }
+            if (current.replacedPkgs.size() > 1) {
+               next.replacedPkgs = current.replacedPkgs.subList(1, current.replacedPkgs.size());
+               for (RepositoryPackage replaced:next.replacedPkgs) {
+                  replaced.replacedByPkg = next;
+                  if (replaced.currentSource != null)
+                     replaced.currentSource.pkg = next;
+               }
+            }
+         }
+      }
+      else {
+         int ix = current.replacedPkgs == null ? -1 : current.replacedPkgs.indexOf(pkg);
+         if (ix == -1) {
+            System.err.println("*** Remove of repository package - not found");
+         }
+      }
+   }
+
    public RepositoryPackage registerAlternateName(RepositoryPackage pkg, String altName) {
       if (!StringUtil.equalStrings(altName, pkg.packageAlias) && pkg.packageAlias != null)
          System.err.println("*** Warning - replacing existing package alias: " + pkg.packageAlias + altName);

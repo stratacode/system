@@ -75,6 +75,10 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return parseNode;
    }
 
+   public void restoreParseNode(IParseNode pn) {
+      setParseNode(pn);
+   }
+
    public void setParseletId(int id) {
       parseletId = id;
    }
@@ -550,7 +554,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
             if ((options & CopyParseNode) == 0) {
                newList.parseNode = newPP = new ParentParseNode(p);
-               newList.parseNode.setSemanticValue(newList, true);
+               newList.parseNode.setSemanticValue(newList, true, false);
                newPP.setStartIndex(parseNode.getStartIndex());
                newList.parseNodeInvalid = true;
             }

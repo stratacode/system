@@ -1716,6 +1716,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public Element getDerivedElement() {
       if (modifyType != null && modifyType instanceof TypeDeclaration) {
          TypeDeclaration modifyTD = (TypeDeclaration) modifyType;
+         if (modifyTD.element == this) {
+            System.err.println("*** Error recursive element definition!");
+            return null;
+         }
          if (modifyTD.element != null)
             return modifyTD.element;
       }
@@ -1728,7 +1732,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                if (enclTemplate != null) {
                   if (!enclTemplate.isInitialized())
                      enclTemplate.init();
-                  return ((TypeDeclaration) derivedType).element;
+                  Element res = ((TypeDeclaration) derivedType).element;
+                  if (res == this) {
+                     System.err.println("*** Error recursive tagObject definition!");
+                     return null;
+                  }
+                  return res;
                }
                else {
                   derivedType = derivedTD.getDerivedTypeDeclaration();
@@ -3815,10 +3824,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       invalidateBody();
    }
 
+   @HTMLSettings(returnsHTML=true)
    public StringBuilder output() {
       return output(null);
    }
 
+   @HTMLSettings(returnsHTML=true)
    public StringBuilder output(OutputCtx ctx) {
       StringBuilder sb = new StringBuilder();
       outputTag(sb, ctx);
@@ -3826,9 +3837,21 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    /** Just like output but when invoked on the server, evaluates the output on the client as a remote method call */
+   @HTMLSettings(returnsHTML=true)
    @sc.obj.Exec(clientOnly=true)
    public StringBuilder output_c() {
       return output();
+   }
+
+   private int repeatTagIndexOf(int startIx, Object repeatVar) {
+      int sz = repeatTags.size();
+      for (int i = startIx; i < sz; i++) {
+         Element arrayVal = repeatTags.get(i);
+         Object arrRepeatVar = arrayVal.repeatVar;
+         if (arrRepeatVar == repeatVar || (arrRepeatVar != null && arrRepeatVar.equals(repeatVar)))
+            return i;
+      }
+      return -1;
    }
 
    private int repeatElementIndexOf(Object repeat, int startIx, Object repeatVar) {
@@ -3901,7 +3924,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   System.err.println("Null value for repeat element: " + i + " for: " + this);
                   continue;
                }
-               int curIx = repeatElementIndexOf(repeatTags, 0, arrayVal);
+               int curIx = repeatTagIndexOf(0, arrayVal);
 
                if (curIx == i) // It's at the right spot in repeatTags for the new value of repeat.
                   continue;
@@ -3955,8 +3978,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            Object delArrayVal = delElem.repeatVar;
                            int curNewIx = repeatElementIndexOf(repeatVal, i, delArrayVal);
                            if (curNewIx == -1) {
-                              Element toRem = tags.remove(delIx);
-                              removeElement(toRem, delIx);
+                              Element toRem = tags.remove(i);
+                              removeElement(toRem, i);
                               if (renumberIx == -1)
                                  renumberIx = delIx;
                            }
@@ -4000,7 +4023,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             // We removed one or more elements so make sure the repeatIndex is correct now
             if (renumberIx != -1) {
                int tagSz = tags.size();
-               for (int r = renumberIx; renumberIx < tagSz; r++) {
+               for (int r = renumberIx; r < tagSz; r++) {
                   Element tagElem = tags.get(r);
                   if (tagElem.getRepeatIndex() != r)
                      tagElem.setRepeatIndex(r);

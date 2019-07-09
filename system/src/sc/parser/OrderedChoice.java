@@ -1392,7 +1392,7 @@ public class OrderedChoice extends NestedParselet  {
                         if (matchedAny)
                            return generateResult(ctx, pnode);
 
-                        pnode.setSemanticValue(null, true);
+                        pnode.setSemanticValue(null, true, false);
                         if (optional && emptyValue(ctx, value)) {
                            return generateResult(ctx, null);
                         }
@@ -1440,7 +1440,7 @@ public class OrderedChoice extends NestedParselet  {
                      while (strValue != null && strValue.length() > 0) {
                         Object childNode = generateElement(ctx, strValue, true);
                         if (childNode instanceof GenerateError) {
-                           pnode.setSemanticValue(null, true);
+                           pnode.setSemanticValue(null, true, false);
                            if (optional && emptyValue(ctx, value)) {
                               return generateResult(ctx, null);
                            }
@@ -1480,7 +1480,7 @@ public class OrderedChoice extends NestedParselet  {
                            return new PartialArrayResult(i, pnode, (GenerateError) childNode);
 
                         if (optional && emptyValue(ctx, value)) {
-                           pnode.setSemanticValue(null, true);
+                           pnode.setSemanticValue(null, true, false);
                            return generateResult(ctx, null);
                         }
                         ((GenerateError) childNode).progress += progress;
@@ -1510,7 +1510,7 @@ public class OrderedChoice extends NestedParselet  {
                      if (numProcessed != 0)
                         return new PartialArrayResult(numProcessed, pnode, (GenerateError) arrVal);
                      else {
-                        pnode.setSemanticValue(null, true);
+                        pnode.setSemanticValue(null, true, false);
                         ((GenerateError) arrVal).progress += progress;
                         return arrVal;
                      }

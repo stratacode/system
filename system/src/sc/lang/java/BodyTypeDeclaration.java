@@ -4180,6 +4180,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // If there's a chained super call, delegate the construction till that
          if (superConDef.callsSuper(true)) {
             Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, null);
+            if (superType instanceof ParamTypeDeclaration)
+               superType = ((ParamTypeDeclaration) superType).baseType;
             if (superType instanceof BodyTypeDeclaration)
                ctx.setPendingConstructor((BodyTypeDeclaration) superType);
             return superConDef.invoke(ctx, Arrays.asList(argValues));
@@ -5395,7 +5397,29 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public Statement updateBodyStatement(Statement def, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
+   int getPropertyStatementIndex(String propName) {
+      if (body != null) {
+         for (int i = 0; i < body.size(); i++) {
+            Statement st = body.get(i);
+            if (st instanceof FieldDefinition) {
+               FieldDefinition field = (FieldDefinition) st;
+               if (field.variableDefinitions != null) {
+                  for (VariableDefinition varDef:field.variableDefinitions)
+                     if (StringUtil.equalStrings(varDef.variableName, propName))
+                        return i;
+               }
+            }
+            else if (ModelUtil.isProperty(st)) {
+               String stPropName = ModelUtil.getPropertyName(st);
+               if (stPropName.equals(propName))
+                  return i;
+            }
+         }
+      }
+      return -1;
+   }
+
+   public Statement updateBodyStatement(Statement def, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info, boolean addBefore, String relPropertyName) {
       needsDynamicType();
 
       boolean lockAcquired = false;
@@ -5407,6 +5431,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       try {
          sys.acquireDynLock(false);
          lockAcquired = true;
+         int insertIx = -1;
+         if (relPropertyName == null) {
+            if (addBefore)
+               insertIx = 0;
+         }
+         else {
+            insertIx = getPropertyStatementIndex(relPropertyName);
+            if (!addBefore)
+               insertIx++;
+         }
          if (def instanceof AbstractMethodDefinition) {
             AbstractMethodDefinition newDef = (AbstractMethodDefinition) def;
             if (!isDynamicType())
@@ -5435,7 +5469,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if ((newDef instanceof MethodDefinition) && (newMethod = (MethodDefinition) newDef).overridesCompiled) {
                model.layeredSystem.setStaleCompiledModel(true, "Overriding compiled method: ", newMethod.name, " in type: ", typeName);
             }
-            addBodyStatementIndent(def);
+            if (insertIx == -1)
+              addBodyStatementIndent(def);
+            else
+               addBodyStatementAtIndent(insertIx, def);
          }
          else if (def instanceof FieldDefinition) {
             FieldDefinition newDef = (FieldDefinition) def;
@@ -5494,7 +5531,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      return replacedField;
                   }
                   else {
-                     addBodyStatementIndent(def);
+                     if (insertIx == -1)
+                        addBodyStatementIndent(def);
+                     else
+                        addBodyStatementAtIndent(insertIx, def);
 
                      addStaticOrInstField(varDef, ctx);
                   }
@@ -7679,6 +7719,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public void convertToSrcReference() {
+      ModelUtil.ensureStarted(this, false);
       JavaType extType = getExtendsType();
       if (extType != null) {
          boolean converted = extType.convertToSrcReference();

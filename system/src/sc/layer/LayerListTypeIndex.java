@@ -57,7 +57,10 @@ public class LayerListTypeIndex {
    private void clearAllNames() {
       if (sys == null)
          return;
-      sys.getMainLayeredSystem().allNames = null;
+      LayeredSystem msys = sys.getMainLayeredSystem();
+      if (msys.allNames != null)
+         System.out.println("*** Clearing all names");
+      msys.allNames = null;
    }
 
    public void clearTypeIndex() {

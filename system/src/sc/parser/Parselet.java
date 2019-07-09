@@ -288,16 +288,16 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       if (res instanceof IParseNode) {
          if (oldModel != null) {
             if (updateModelParseNode)
-               oldModel.setParseNode((IParseNode) res);
-            ((IParseNode) res).setSemanticValue(oldModel, false);
+               oldModel.restoreParseNode((IParseNode) res);
+            ((IParseNode) res).setSemanticValue(oldModel, false, true);
          }
       }
       return res;
    }
 
    public void restoreOldNode(IParseNode pn, ISemanticNode oldModel) {
-      oldModel.setParseNode(pn);
-      pn.setSemanticValue(oldModel, false);
+      oldModel.restoreParseNode(pn);
+      pn.setSemanticValue(oldModel, false, true);
    }
 
    public boolean addResultToParent(Object node, ParentParseNode parent, int index, Parser parser) {

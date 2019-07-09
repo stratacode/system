@@ -442,6 +442,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       try {
          acquireDynLock(false);
+         if (externalModelIndex != null)
+            externalModelIndex.checkForCancelledOperation();
          if (allNames != null)
             return allNames;
          allNames = new HashSet<String>();
@@ -799,12 +801,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getProcessIdent();
    }
 
-   /** For the IDE specifically find or create any TypeDeclaration for the type specified. */
-   public void addAllTypeDeclarations(String typeName, ArrayList<Object> res, boolean openAllLayers) {
-      Object typeObj = getSrcTypeDeclaration(typeName, null, true, false, true, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
+   /**
+    * For the IDE specifically. when open types is true, returns TypeDeclaration or TypeIndexEntry instances. When openTypes is false,
+    * rather than reading the file, it will return the SrcEntry if the file is not already in the cache.
+    */
+   public void addAllTypeDeclarations(String typeName, ArrayList<Object> res, boolean openAllLayers, boolean openTypes) {
+      Object typeObj;
+      if (openTypes)
+         typeObj = getSrcTypeDeclaration(typeName, null, true, false, true, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
+      else
+         typeObj = getCachedTypeDeclaration(typeName, null, null, false, false, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
       if (typeObj != null)
          res.add(typeObj);
       else {
+         if (!openTypes) {
+            SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null);
+            if (srcEnt != null)
+               res.add(srcEnt);
+         }
+
          Layer layer = getLayerByDirName(typeName);
          if (layer != null)
              res.add(layer.model.getModelTypeDeclaration());
@@ -11585,6 +11600,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return types;
    }
 
+   public void addTypeDeclaration(String fullTypeName, BodyTypeDeclaration toAdd) {
+      addTypeByName(toAdd.getLayer(), fullTypeName, (TypeDeclaration)toAdd, null);
+   }
+
    public void addTypeByName(Layer layer, String fullTypeName, TypeDeclaration toAdd, Layer fromLayer) {
       if (toAdd.isTransformed())
          warning("*** Adding transformed type to type system");
@@ -12814,6 +12833,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (includeInactiveLayerInSearch(inactiveLayer, refLayer)) {
                SrcEntry ent = inactiveLayer.getSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, layerResolve);
                if (ent != null) {
+                  if (ent.layer.closed)
+                     ent.layer.markClosed(false, false);
                   return ent;
                }
             }
@@ -12830,7 +12851,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return true;
       if (refLayer.layeredSystem != inactiveLayer.layeredSystem)
          System.err.println("*** Mismatching runtimes for type lookup!");
-      return !inactiveLayer.closed;
+      return true; // Need to include closed layers here - might need to open it to resolve the right reference
    }
 
    /**
@@ -12857,6 +12878,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (includeInactiveLayerInSearch(inactiveLayer, refLayer)) {
                   SrcEntry ent = inactiveLayer.getSrcFileFromRelativeTypeName(relDir, subPath, packagePrefix, srcOnly, false, layerResolve);
                   if (ent != null) {
+                     if (ent.layer.closed)
+                        ent.layer.markClosed(false, false);
                      return ent;
                   }
                }
@@ -13841,7 +13864,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return urls.toArray(new URL[urls.size()]);
    }
 
-   public static int readLocked, writeLocked;
+   public volatile static int readLocked, writeLocked;
+   public volatile static String debugLockStack;
+   public volatile static String currentLockThreadName;
 
    public void acquireDynLock(boolean readOnly) {
       long startTime = 0;
@@ -13849,24 +13874,34 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          startTime = System.currentTimeMillis();
 
       Lock lock = (!readOnly ? globalDynLock.writeLock() : globalDynLock.readLock());
-      if (options.verboseLocks) {
-         if ((!readOnly && globalDynLock.getWriteHoldCount() == 0) || (readOnly && globalDynLock.getReadHoldCount() == 0))
-            System.out.println("Acquiring system dyn lock" + (readOnly ? " (readOnly)" : "") + " thread: " + DynUtil.getCurrentThreadString());
+      if (options.superVerboseLocks) {
+         System.out.println("Acquiring system dyn lock" + (readOnly ? " (readOnly)" : "") + " thread: " + Thread.currentThread().getName());
       }
 
       lock.lock();
+
+      if (options.superVerboseLocks) {
+         System.out.println("Acquired system dyn lock" + (readOnly ? " (readOnly)" : "") + " thread: " + Thread.currentThread().getName());
+      }
 
       if (!readOnly)
          writeLocked++;
       else
          readLocked++;
 
+      if (options.verboseLocks && writeLocked == 1)
+         debugLockStack = PTypeUtil.getStackTrace(new Throwable());
+
+      currentLockThreadName = Thread.currentThread().getName();
+
       if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
          if (duration > 1000) {
             System.err.println("Warning: waited: " + duration + " millis for lock on thread: " + DynUtil.getCurrentThreadString());
+            if (debugLockStack != null)
+               System.err.println(" Stack trace of thread that acquired lock: " + debugLockStack);
             if (duration > 2000 && Thread.currentThread().getName().contains("AWT-Event")) {
-               System.err.println("*** stack of waiting thread: ");
+               System.err.println("*** Stack of waiting thread: ");
                new Throwable().printStackTrace(System.err);
             }
          }
@@ -13878,15 +13913,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void releaseDynLock(boolean readOnly) {
       Lock lock = (!readOnly ? globalDynLock.writeLock() : globalDynLock.readLock());
 
-      if (options.verboseLocks) {
-         if (!readOnly && globalDynLock.getWriteHoldCount() == 1 || (readOnly && globalDynLock.getReadHoldCount() == 1)) {
-            System.out.println("Releasing system dyn lock" + (readOnly ? "(readOnly)" : "") + " thread: " + DynUtil.getCurrentThreadString());
-         }
+      if (options.superVerboseLocks) {
+         System.out.println("Releasing system dyn lock" + (readOnly ? "(readOnly)" : "") + " thread: " + Thread.currentThread());
       }
       if (!readOnly)
          writeLocked--;
       else
          readLocked--;
+
+      if (writeLocked == 0)
+         currentLockThreadName = null;
 
       lock.unlock();
    }
@@ -15048,9 +15084,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public SrcEntry getSrcEntryForPath(String pathName, boolean activeLayers, boolean openLayer) {
-      acquireDynLock(false);
-
       pathName = FileUtil.makeAbsolute(pathName);
+
+      acquireDynLock(false);
 
       try {
          List<Layer> layersList = activeLayers ? layers : inactiveLayers;

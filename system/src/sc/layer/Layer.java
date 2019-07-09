@@ -583,7 +583,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public SrcEntry getBaseLayerSrcFileFromTypeName(String typeName, boolean srcOnly, boolean prependPackage, String subPath, IProcessDefinition proc, boolean layerResolve) {
       SrcEntry res = null;
       if (baseLayers != null) {
-         for (Layer base:baseLayers) {
+         ArrayList<Layer> sortedBaseLayers = new ArrayList<Layer>(baseLayers);
+         // Sort the base layers based on the reverse of their position in the layers list in case they were extended in the wrong order
+         Collections.sort(sortedBaseLayers, new Comparator<Layer>() {
+            @Override
+            public int compare(Layer o1, Layer o2) {
+               return -Integer.compare(o1.layerPosition, o2.layerPosition);
+            }
+         });
+         for (Layer base:sortedBaseLayers) {
             res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, proc, layerResolve);
             if (res != null)
                return res;
@@ -2724,6 +2732,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       externalZipFiles = null;
       closeZips(zipFiles);
       zipFiles = null;
+      if (repositoryPackages != null) {
+         for (RepositoryPackage pkg:repositoryPackages) {
+            RepositorySystem reposSys = layeredSystem.repositorySystem;
+            reposSys.removeRepositoryPackage(pkg);
+         }
+         repositoryPackages = null;
+      }
    }
 
    public String getLayerPathName() {

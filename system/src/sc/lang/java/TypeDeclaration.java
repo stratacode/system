@@ -39,6 +39,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public transient Object[] implementsBoundTypes;
 
    public transient boolean typeInfoInitialized = false;
+   public transient boolean constructorsInited = false;
    public transient String skippedClassVarName;   // If we omitted the real class for this type, this is the var name to replace it with
 
 
@@ -134,6 +135,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          return;
 
       initTypeInfo();
+      initPropagateConstructors();
       if (implementsBoundTypes != null) {
          JavaModel m = getJavaModel();
          for (Object implTypeObj:implementsBoundTypes) {
@@ -246,6 +248,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       typeInfoInitialized = false;
       implementsBoundTypes = null;
+      constructorsInited = false;
    }
 
    public boolean isAutoComponent() {
@@ -336,16 +339,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public Object declaresConstructor(List<?> types, ITypeParamContext ctx) {
-      initTypeInfo(); // Need this for propagateConstructor
+      // We are lazily doing this, the first time an attempt is made to look up a constructor.
+      initTypeInfo();
+      initPropagateConstructors();
       return super.declaresConstructor(types, ctx);
    }
 
    protected void completeInitTypeInfo() {
-      JavaModel m = getJavaModel();
-      if (m != null && !m.isLayerModel) {
-         // May add a new constructor and so needs to be done so methods like declaresConstructor works. It currently does not require that the model be started...
-         initPropagateConstructors();
-      }
+      // When building templates, the findTypeDeclaration in this call can force access to the very types we are in the midst of building
+      // higher up in the element chain.
+      //JavaModel m = getJavaModel();
+      //if (m != null && !m.isLayerModel) {
+         //initPropagateConstructors();
+      //}
    }
 
    public Object definesType(String name, TypeContext ctx) {
@@ -1782,6 +1788,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if ((options & CopyInitLevels) != 0) {
          res.implementsBoundTypes = implementsBoundTypes == null ? null : implementsBoundTypes.clone();
          res.typeInfoInitialized = typeInfoInitialized;
+         res.constructorsInited = constructorsInited;
          res.skippedClassVarName = skippedClassVarName;
          res.useNewTemplate = useNewTemplate;
          res.modelType = modelType;
@@ -1928,48 +1935,65 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    void initPropagateConstructors() {
-      BodyTypeDeclaration modType = resolve(true);
+      if (constructorsInited)
+         return;
+      try {
+         constructorsInited = true;
 
-      Object[] propagateConstructorArgs = modType.getPropagateConstructorArgs();
-      if (propagateConstructorArgs != null) {
-         int sz = propagateConstructorArgs.length;
-         List<?> paramTypes = Arrays.asList(propagateConstructorArgs);
-         Object constrObj = modType.declaresConstructor(paramTypes, null);
-         String[] propNames = getPropagateParamNames(propagateConstructorArgs);
-         if (constrObj == null) {
-            Object extType = modType.getExtendsTypeDeclaration();
-            if (extType == null) {
-               displayError("propagateConstructor on type with no extends type - no constructor to propagate for: ");
-               return;
-            }
-            Object extConstr = ModelUtil.definesConstructor(getLayeredSystem(), extType, paramTypes, null);
-            if (extConstr == null) {
-               StringBuilder sb = new StringBuilder();
-               for (int i = 0; i < propagateConstructorArgs.length; i++) {
-                  if (i != 0)
-                     sb.append(", ");
-                  sb.append(CTypeUtil.getClassName(ModelUtil.getTypeName(propagateConstructorArgs[i])));
+         // TODO: do we need this constructor for dynamic types?  We have code when constructing the instance that deals with the propagated constructor through dynamic types.
+         //  For some reason, this the generated constructor here messes up that logic when initializing a layer component (see the ticketmonster.core test) so for now skip generating
+         //  this dummy constructor in that case. It's possible though that we will need this to resolve code references to this constructor.
+         if (isDynamicType() || isDynamicNew())
+            return;
+
+         BodyTypeDeclaration modType = resolve(true);
+
+         Object[] propagateConstructorArgs = modType.getPropagateConstructorArgs();
+         if (propagateConstructorArgs != null) {
+            int sz = propagateConstructorArgs.length;
+            List<?> paramTypes = Arrays.asList(propagateConstructorArgs);
+            Object constrObj = modType.declaresConstructor(paramTypes, null);
+            String[] propNames = getPropagateParamNames(propagateConstructorArgs);
+            if (constrObj == null) {
+               Object extType = modType.getExtendsTypeDeclaration();
+               if (extType == null) {
+                  displayError("propagateConstructor on type with no extends type - no constructor to propagate for: ");
+                  return;
                }
-               displayError("propagateConstructor - no matching constructor for parameters: " + sb.toString() + " on type: " + extType + " for: ");
-               extConstr = ModelUtil.definesConstructor(getLayeredSystem(), extType, paramTypes, null);
-               return;
-            }
-            ConstructorDefinition constr = ConstructorDefinition.create(this,
-                    propagateConstructorArgs,
-                    propNames);
-            constr.addModifier("public");
-            constr.parentNode = this;
-            constr.propagatedFrom = extConstr;
-            int start = 0; // start = 1 if we add super
-            SemanticNodeList<Expression> superArgs = new SemanticNodeList<Expression>();
-            for (int i = 0; i < sz; i++)
-               superArgs.add(IdentifierExpression.create(propNames[i]));
-            constr.addBodyStatementAt(0, IdentifierExpression.createMethodCall(superArgs, "super"));
+               Object extConstr = ModelUtil.definesConstructor(getLayeredSystem(), extType, paramTypes, null);
+               if (extConstr == null) {
+                  StringBuilder sb = new StringBuilder();
+                  for (int i = 0; i < propagateConstructorArgs.length; i++) {
+                     if (i != 0)
+                        sb.append(", ");
+                     sb.append(CTypeUtil.getClassName(ModelUtil.getTypeName(propagateConstructorArgs[i])));
+                  }
+                  displayError("propagateConstructor - no matching constructor for parameters: " + sb.toString() + " on type: " + extType + " for: ");
+                  extConstr = ModelUtil.definesConstructor(getLayeredSystem(), extType, paramTypes, null);
+                  return;
+               }
+               ConstructorDefinition constr = ConstructorDefinition.create(this,
+                       propagateConstructorArgs,
+                       propNames);
+               constr.addModifier("public");
+               constr.parentNode = this;
+               constr.propagatedFrom = extConstr;
+               int start = 0; // start = 1 if we add super
+               SemanticNodeList<Expression> superArgs = new SemanticNodeList<Expression>();
+               for (int i = 0; i < sz; i++)
+                  superArgs.add(IdentifierExpression.create(propNames[i]));
+               constr.addBodyStatementAt(0, IdentifierExpression.createMethodCall(superArgs, "super"));
 
-            // Adding this to the hidden body so references resolve properly to this constructor
-            addToHiddenBody(constr, false);
+               // Adding this to the hidden body so references resolve properly to this constructor
+               addToHiddenBody(constr, false);
+            }
          }
       }
+      catch (RuntimeException exc) {
+         constructorsInited = false;
+         throw exc;
+      }
    }
+
 
 }

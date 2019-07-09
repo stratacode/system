@@ -40,7 +40,10 @@ public class Options {
    @Constant public boolean verboseLayerTypes = false;
    /** Diagnose issues finding classes (e.g. to trace adding entries to the package index) */
    @Constant public boolean verboseClasses = false;
+   /** Show detail on locking issues, save stack trace of locking thread */
    @Constant public boolean verboseLocks = false;
+   /* Shows every lock/release call */
+   @Constant public boolean superVerboseLocks = false;
    /** Turns on debug messages specific to the @Exec annotation - see which types are excluded from a given runtime */
    @Constant public boolean verboseExec = false;
    @Constant public boolean verboseModelCache = false;

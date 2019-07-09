@@ -25,7 +25,7 @@ public interface IParseNode extends CharSequence, IParseResult {
 
    Object getSemanticValue();
 
-   void setSemanticValue(Object value, boolean clearOld);
+   void setSemanticValue(Object value, boolean clearOld, boolean restore);
 
    String toDebugString();
 
