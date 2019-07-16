@@ -22,7 +22,7 @@ public class CastBinding extends AbstractMethodBinding {
       return false;
    }
 
-   protected Object invokeMethod(Object obj) {
+   protected Object invokeMethod(Object obj, boolean pendingChild) {
       Object val = boundParams[0].getPropertyValue(obj, false);
       if (val == UNSET_VALUE_SENTINEL)
          return UNSET_VALUE_SENTINEL;

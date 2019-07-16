@@ -1433,7 +1433,7 @@ public class Bind {
 
    public static void applyBinding(Object obj, Object prop, Object value, IBinding src) {
       if (prop instanceof IBinding)
-         ((IBinding) prop).applyBinding(obj, value, src);
+         ((IBinding) prop).applyBinding(obj, value, src, false, false);
       else
          DynUtil.setPropertyValue(obj, (String) prop, value);
    }

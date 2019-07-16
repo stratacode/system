@@ -132,7 +132,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
       return !methodIsStatic;
    }
 
-   protected Object invokeMethod(Object obj) {
+   protected Object invokeMethod(Object obj, boolean pendingChild) {
       if (obj == null && !methodIsStatic) {
          System.err.println("*** Attempt to invoke method: " + this + " with a null value");
          return null;
@@ -143,8 +143,13 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
          return null;
       }
 
+      // If pendingChild is set, this invoke comes from a child binding that was an async operation that now has a result
+      // We don't want to evaluate the parameters in this case... just wait for the last one to become valid and then
+      // call the method.
+      if (pendingChild && hasPendingParams())
+         return PENDING_VALUE_SENTINEL;
       // If we weren't able to evaluate one of our parameters, this value is unset
-      if (!updateParams(obj) && (flags & Bind.SKIP_NULL) != 0) {
+      if (!pendingChild && !updateParams(obj) && (flags & Bind.SKIP_NULL) != 0) {
          if (hasPendingParams())
             return PENDING_VALUE_SENTINEL;
          return UNSET_VALUE_SENTINEL;
@@ -204,7 +209,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
       // This is the case where we have only a reverse binding and no inverse method.  We treat
       // this case differently - it means invoke the method only on the reverse direction.
       else if (!direction.doForward())
-         return invokeMethod(obj);
+         return invokeMethod(obj, false);
       else
          System.err.println("*** Reverse binding not firing - no reverse method: " + this);
       return null;

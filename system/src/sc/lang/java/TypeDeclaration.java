@@ -1940,11 +1940,16 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
+   void initConstructorPropInfo() {
+   }
+
    void initPropagateConstructors() {
       if (constructorsInited)
          return;
       try {
          constructorsInited = true;
+
+         initConstructorPropInfo();
 
          // TODO: do we need this constructor for dynamic types?  We have code when constructing the instance that deals with the propagated constructor through dynamic types.
          //  For some reason, this the generated constructor here messes up that logic when initializing a layer component (see the ticketmonster.core test) so for now skip generating

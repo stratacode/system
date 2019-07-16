@@ -1704,7 +1704,7 @@ public class EditorContext extends ClientEditorContext {
       syncInited = true;
       // Manually adding these (roughly based on the generated code from js/layer/lang/EditorContext.java - so we sync the same properties
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
+      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo", "createInstTypeNames"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
       SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncInst(this, true, true, null, null);

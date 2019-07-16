@@ -29,7 +29,7 @@ public abstract class AbstractBeanMapper implements IBeanMapper, IBinding, Clone
          Bind.sendEvent(IListener.VALUE_CHANGED, obj, this);
    }
 
-   public boolean applyBinding(Object obj, Object val, IBinding src) {
+   public boolean applyBinding(Object obj, Object val, IBinding src, boolean refresh, boolean pendingChild0) {
       Object type;
       Class cl;
       // Do unwrapping for primitive integer, float, etc. types

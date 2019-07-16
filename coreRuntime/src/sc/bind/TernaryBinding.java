@@ -32,7 +32,7 @@ public class TernaryBinding extends AbstractMethodBinding {
       return false;
    }
 
-   protected Object invokeMethod(Object obj) {
+   protected Object invokeMethod(Object obj, boolean pendingChild) {
       Object val = boundParams[0].getPropertyValue(obj, false);
       if (val == null || val == UNSET_VALUE_SENTINEL) {
          if (Bind.trace || (flags & Bind.TRACE) != 0)

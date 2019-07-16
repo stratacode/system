@@ -22,7 +22,7 @@ public class NewArrayBinding extends AbstractMethodBinding {
       this.compClass = compClass;
    }
 
-   protected Object invokeMethod(Object obj) {
+   protected Object invokeMethod(Object obj, boolean pendingChild) {
       boolean valid = true;
       for (int i = 0; i < paramValues.length; i++) {
          paramValues[i] = boundParams[i].getPropertyValue(obj, false);
@@ -58,7 +58,7 @@ public class NewArrayBinding extends AbstractMethodBinding {
    /** Called when reverse bindings fire */
    protected Object invokeReverseMethod(Object obj, Object value) {
       if (!direction.doForward())
-         return invokeMethod(obj);
+         return invokeMethod(obj, false);
       System.err.println("*** reverse binding not supported on new expressions");
       return null;
    }

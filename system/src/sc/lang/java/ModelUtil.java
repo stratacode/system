@@ -9322,6 +9322,9 @@ public class ModelUtil {
       else if (def instanceof TypeDeclaration) {
          return JavaType.createJavaTypeFromName(((TypeDeclaration) def).getFullTypeName());
       }
+      else if (def instanceof IBeanMapper) {
+         return JavaType.createJavaTypeFromName(ModelUtil.getTypeName(((IBeanMapper) def).getPropertyType()));
+      }
       else
          throw new UnsupportedOperationException();
    }

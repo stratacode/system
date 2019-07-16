@@ -94,6 +94,7 @@ public class SyncHandler {
       }
 
       Class cl = changedObj.getClass();
+
       if (PTypeUtil.isArray(cl) || changedObj instanceof Collection) {
          StringBuilder sb = new StringBuilder();
          // We already have registered a global id for this object so we can just use that id.

@@ -251,8 +251,8 @@ public class PTypeUtil {
       if (arrVal instanceof int[]) {
          return ((int[]) arrVal).length;
       }
-      if (arrVal instanceof String[]) {
-         return ((String[]) arrVal).length;
+      if (arrVal instanceof double[]) {
+         return ((double[]) arrVal).length;
       }
       throw new UnsupportedOperationException();
       // TODO: more types
@@ -267,8 +267,22 @@ public class PTypeUtil {
       if (arrVal instanceof int[]) {
          return ((int[]) arrVal)[dim];
       }
+      if (arrVal instanceof double[]) {
+         return ((double[]) arrVal)[dim];
+      }
+      if (arrVal instanceof float[]) {
+         return ((float[]) arrVal)[dim];
+      }
+      if (arrVal instanceof char[]) {
+         return ((char[]) arrVal)[dim];
+      }
+      if (arrVal instanceof byte[]) {
+         return ((byte[]) arrVal)[dim];
+      }
+      if (arrVal instanceof boolean[]) {
+         return ((boolean[]) arrVal)[dim];
+      }
       throw new UnsupportedOperationException();
-      // TODO: more types
    }
 
    public static void setArrayElement(Object arrVal, int dim, Object value) {
@@ -280,8 +294,22 @@ public class PTypeUtil {
       else if (arrVal instanceof int[]) {
          ((int[]) arrVal)[dim] = (Integer) value;
       }
+      else if (arrVal instanceof double[]) {
+         ((double[]) arrVal)[dim] = (Double) value;
+      }
+      else if (arrVal instanceof float[]) {
+         ((float[]) arrVal)[dim] = (Float) value;
+      }
+      else if (arrVal instanceof char[]) {
+         ((char[]) arrVal)[dim] = (Character) value;
+      }
+      else if (arrVal instanceof byte[]) {
+         ((byte[]) arrVal)[dim] = (Byte) value;
+      }
+      else if (arrVal instanceof boolean[]) {
+         ((boolean[]) arrVal)[dim] = (Boolean) value;
+      }
       throw new UnsupportedOperationException();
-      // TODO: more types
    }
 
    public static String getPropertyName(Object mapper) {

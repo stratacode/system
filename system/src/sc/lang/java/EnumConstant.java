@@ -155,6 +155,8 @@ public class EnumConstant extends BodyTypeDeclaration {
       // For enums that have body definitions we need to declare
       if (body != null) {
          enumTD = ClassDeclaration.create("class", typeName, ClassType.create(enclType.typeName));
+         // Enum constant classes are static so they don't have outer objects
+         enumTD.addModifier("static");
          // Making a copy here so we are not adding methods to an already started object when the parent type is not started.
          enumTD.setProperty("body", body.deepCopy(ISemanticNode.CopyNormal, null));
 

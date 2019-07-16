@@ -4159,7 +4159,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncType(Layer.class,
                  new SyncProperties(null, null,
                          new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
-                                 "baseLayerNames", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
+                                 "baseLayerNames", "layerName", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
                                  "layerPosition", "codeType", "dependentLayers"},
                          null, SyncPropOptions.SYNC_INIT,  globalScopeId));
          for (Layer l:layers)
@@ -15481,7 +15481,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       sb.append("\n   inactive layers: " + inactiveLayers.size() + " files: " + inactiveModelIndex.size() + "\n\n");
       if (includePeers && !peerMode && peerSystems != null) {
          for (LayeredSystem peerSys:peerSystems) {
-            dumpCacheSummary(sb, false);
+            peerSys.dumpCacheSummary(sb, false);
          }
       }
    }

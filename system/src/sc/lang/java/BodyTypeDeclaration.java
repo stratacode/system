@@ -1586,8 +1586,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (srcOnly && layer != null && !layer.annotationLayer && !isLayerType) {
                Object srcType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extendsType, false, true, getLayer());
                if (srcType instanceof BodyTypeDeclaration) {
-                  updateBoundExtendsType(srcType, extendsType);
-                  return getSimpleInnerTypeFromExtends(srcType, name, ctx, redirected, true, includeEnums);
+                  if (srcType != extendsType) {
+                     updateBoundExtendsType(srcType, extendsType);
+                     return getSimpleInnerTypeFromExtends(srcType, name, ctx, redirected, true, includeEnums);
+                  }
+                  else {
+                     System.err.println("*** Extends loop!");
+                     return null;
+                  }
                }
             }
             return ModelUtil.getInnerType(extendsType, name, ctx);
@@ -2532,8 +2538,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     */
    public boolean isStaticType() {
       // Don't inherit the JavaSemanticNode's definition.  For a type, we're static only if the static keyword
-      // is set on that type.
-      return hasModifier("static");
+      // is set on that type, or an enum type or constant
+      return hasModifier("static") || isEnumConstant() || isEnumeratedType();
    }
 
    public void addStaticFields(List<Object> fields) {

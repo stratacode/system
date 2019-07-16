@@ -18,7 +18,7 @@ public interface IBinding {
 
    void invalidateBinding(Object object, boolean sendEvent, boolean invalidateParams);
 
-   boolean applyBinding(Object obj, Object value, IBinding src);
+   boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild);
 
    Object performCast(Object value);
 

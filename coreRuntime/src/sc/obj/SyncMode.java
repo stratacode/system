@@ -33,5 +33,17 @@ import sc.js.JSSettings;
  */
 @JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public enum SyncMode {
-   Enabled, Disabled, Automatic, ClientToServer, ServerToClient, Default
+   /** Sync mode is on for this type or property */
+   Enabled,
+   /** Sync mode is off for this type or property */
+   Disabled,
+   /** Sync on only for overlapping types/properties in the client and server runtimes - i.e. where the definition exists in layers included in both runtimes. */
+   Automatic,
+   /** Send changes from client to server only or server to client only */
+   ClientToServer, ServerToClient,
+   /**
+    * Use the sync mode from the layer definition file of the type or property. Allows framework classes to define sync
+    * behavior in base classes, then revert to the layer's sync mode for any subclass sync behavior.
+    */
+   Default
 }

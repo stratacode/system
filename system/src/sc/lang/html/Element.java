@@ -343,27 +343,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (res != null) {
          res.setParentNode(this);
          //res.initUniqueId();
-         registerSyncInstAndChildren(res);
+         SyncManager.registerSyncTree(res);
          if (wrap)
             res.bodyOnly = true;
       }
       if (flush)
          SyncManager.flushSyncQueue();
       return res;
-   }
-
-   // This method is used to register an instance and it's children with the sync system so the changes are not
-   // synchronized to the remote side. It's used for example for the repeat element's identity, which is automatically
-   // kept in sync.   We mark these instances here as "not new" so changes are not sent.
-   private void registerSyncInstAndChildren(Object res) {
-      SyncManager.registerSyncInst(res);
-      // Need to register this entire tree with the sync system, at least as far as it is sync'd.
-      Object[] children = DynUtil.getObjChildren(res, null, true);
-      if (children != null) {
-         for (Object child:children) {
-            registerSyncInstAndChildren(child);
-         }
-      }
    }
 
    public final static int ExecProcess = 1;

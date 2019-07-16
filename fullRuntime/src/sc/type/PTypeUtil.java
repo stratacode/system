@@ -491,7 +491,7 @@ public class PTypeUtil {
       else
          ctor = RTypeUtil.getConstructorFromTypeSignature(resultClass, paramSig);
       if (ctor == null) {
-         String message = "*** No constructor: " + resultClass + "(" + Arrays.asList(params) + ")";
+         String message = "*** No constructor: " + resultClass + "(" + (params == null ? "" : Arrays.asList(params)) + ")";
          System.err.println(message);
          throw new IllegalArgumentException(message);
       }

@@ -30,7 +30,7 @@ public class ArithmeticBinding extends AbstractMethodBinding {
       return false;
    }
 
-   protected Object invokeMethod(Object obj) {
+   protected Object invokeMethod(Object obj, boolean pendingChild) {
       Object lhsVal = boundParams[0].getPropertyValue(obj, false);
       paramValues[0] = lhsVal;
       boolean isString = lhsVal instanceof String;

@@ -173,8 +173,6 @@ public class ClassDeclaration extends TypeDeclaration {
          }
       }
 
-      initConstructorPropInfo();
-
       super.validate();
    }
 
@@ -954,7 +952,8 @@ public class ClassDeclaration extends TypeDeclaration {
       }
 
       if (constructorPropInfo != null && constructorPropInfo.constr != null && !classRemoved) {
-         ConstructorDefinition constrCopy = (ConstructorDefinition) constructorPropInfo.constr.deepCopy(ISemanticNode.CopyNormal, null);
+         ConstructorDefinition constrCopy = constructorPropInfo.constr.deepCopy(ISemanticNode.CopyNormal, null);
+         constrCopy.parentNode = this;
          constrCopy.fromStatement = null;
          addBodyStatementIndent(constrCopy);
       }
@@ -1206,7 +1205,7 @@ public class ClassDeclaration extends TypeDeclaration {
       return null;
    }
 
-   private void initConstructorPropInfo() {
+   void initConstructorPropInfo() {
       BodyTypeDeclaration modType = resolve(true);
 
       List<Object> compilerSettingsList = modType.getCompilerSettingsList();
@@ -1587,8 +1586,14 @@ public class ClassDeclaration extends TypeDeclaration {
 
       if ((options & CopyInitLevels) != 0) {
          res.declarationType = declarationType;
-         if (constructorPropInfo != null)
+         if (constructorPropInfo != null) {
             res.constructorPropInfo = constructorPropInfo.copy();
+            ConstructorDefinition propConstr = res.constructorPropInfo.constr;
+            if (propConstr != null) {
+               propConstr.parentNode = this;
+               addToHiddenBody(propConstr, true);
+            }
+         }
       }
       return res;
    }

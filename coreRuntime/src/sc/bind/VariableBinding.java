@@ -584,7 +584,7 @@ public class VariableBinding extends DestinationListener {
 
       if (!onlyIfChanged || changed) {
          if (dstProp instanceof IBinding) {
-            ((IBinding) dstProp).applyBinding(dstProp == dstObj ? null : dstObj, newValue, this);
+            ((IBinding) dstProp).applyBinding(dstProp == dstObj ? null : dstObj, newValue, this, false, false);
          }
          else {
             if (dstObj != dstProp && newValue != PENDING_VALUE_SENTINEL)
@@ -693,7 +693,7 @@ public class VariableBinding extends DestinationListener {
       invalidate(sendEvent);
    }
 
-   public boolean applyBinding(Object obj, Object value, IBinding src) {
+   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
       int last = boundValues.length-1;
       boolean changed = false;
       if (!DynUtil.equalObjects(boundValues[last], value)) {
@@ -877,8 +877,14 @@ public class VariableBinding extends DestinationListener {
             else {
                // If we are a binding in the chain, propagate the pending value up the chain
                if (dstProp == dstObj) {
-                  if (dstObj instanceof DestinationListener)
+                  if (dstObj instanceof DestinationListener) {
+                     // Need to cache the bound value so that our parent binding can retrieve it
+                     // without having to eval the binding again (and call the remote method over again)
+                     if (boundValues == null)
+                        boundValues = new Object[boundProps.length];
+                     boundValues[i] = val;
                      ((DestinationListener) dstObj).applyPendingChildValue(val, this);
+                  }
                }
                // If we're a top-level binding and is a := we need to apply the binding
                else if (direction.doForward()) {

@@ -889,8 +889,15 @@ public class DynUtil {
 
          Object type = DynUtil.getType(obj);
 
-         if (DynUtil.isEnumConstant(obj))
+         if (DynUtil.isEnumConstant(obj)) {
+            // For Java classes, if there's a class for the enum instance it will be anonymous and like: EnumClass$1
+            if (type instanceof Class) {
+               Class cl = (Class) type;
+               if (cl.isAnonymousClass())
+                  type = cl.getEnclosingClass();
+            }
             return DynUtil.getTypeName(type, false) + "." + obj.toString();
+         }
 
          return getObjectId(obj, type, null);
       }

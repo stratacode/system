@@ -23,7 +23,7 @@ public class ConditionalBinding extends AbstractMethodBinding {
       return false;
    }
 
-   protected Object invokeMethod(Object obj) {
+   protected Object invokeMethod(Object obj, boolean pendingChild) {
       Object lhsVal = boundParams[0].getPropertyValue(obj, false);
       Object res = lhsVal;
       paramValues[0] = lhsVal;

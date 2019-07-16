@@ -84,7 +84,7 @@ public class AssignmentBinding extends DestinationListener {
       invalidate(sendEvent);
    }
 
-   public boolean applyBinding(Object obj, Object value, IBinding src) {
+   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
       if (!DynUtil.equalObjects(boundValue, value)) {
          boundValue = value;
          applyBinding();
@@ -112,7 +112,7 @@ public class AssignmentBinding extends DestinationListener {
       }
 
       if (dstProp == dstObj || dstProp instanceof IBinding)
-         ((IBinding) dstProp).applyBinding(dstObj == dstProp ? null : dstObj, newValue, this);
+         ((IBinding) dstProp).applyBinding(dstObj == dstProp ? null : dstObj, newValue, this, false, false);
       else if (newValue != PENDING_VALUE_SENTINEL)
          PBindUtil.setPropertyValue(dstObj, dstProp, newValue);
    }

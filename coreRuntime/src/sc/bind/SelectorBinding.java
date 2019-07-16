@@ -354,7 +354,7 @@ public class SelectorBinding extends DestinationListener {
 
       // TODO: Need to replace nulls with 0 for primitives?
       if (dstProp instanceof IBinding)
-         ((IBinding) dstProp).applyBinding(dstObj == dstProp ? null : dstObj, getBoundValue(), this);
+         ((IBinding) dstProp).applyBinding(dstObj == dstProp ? null : dstObj, getBoundValue(), this, false, false);
       else if (dstProp instanceof String)
          PBindUtil.setPropertyValue(dstObj, dstProp, getBoundValue());
 
@@ -430,7 +430,7 @@ public class SelectorBinding extends DestinationListener {
     * If the value changed, we need to re-evaluate all subsequent binding expressions after the one that
     * changed.
     */
-   public boolean applyBinding(Object obj, Object value, IBinding src) {
+   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
       int i;
       boolean bound = false;
       Object bindingParent = null;

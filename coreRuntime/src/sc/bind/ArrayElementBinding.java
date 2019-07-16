@@ -95,7 +95,7 @@ public class ArrayElementBinding extends VariableBinding {
       return true;
    }
 
-   public boolean applyBinding(Object obj, Object value, IBinding src) {
+   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
       // If one of our dimensions changed, we just need to re-execute the binding
       boolean changed = false;
       for (IBinding arrayBinding:arrayBindings) {

@@ -63,11 +63,11 @@ public class ArraySelectorBinding extends AbstractListener implements IBinding {
       valid = false;
    }
 
-   public boolean applyBinding(Object obj, Object value, IBinding src) {
+   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
       if (src == arrayBinding) {
          valid = false;
          if (direction.doForward()) {
-            return dstBinding.applyBinding(null, getBoundValue(), this);
+            return dstBinding.applyBinding(null, getBoundValue(), this, refresh, pendingChild);
          }
       }
       return true;

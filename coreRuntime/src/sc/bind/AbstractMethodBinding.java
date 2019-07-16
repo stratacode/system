@@ -34,7 +34,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       initFlags(flags, opts);
    }
 
-   abstract protected Object invokeMethod(Object obj);
+   abstract protected Object invokeMethod(Object obj, boolean pendingChild);
 
    abstract protected Object invokeReverseMethod(Object obj, Object value);
 
@@ -81,7 +81,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          if (!activated)
             result = null;
          else {
-            result = invokeMethod(methObj);
+            result = invokeMethod(methObj, false);
             if (isDefinedObject(result))
                valid = true;
          }
@@ -125,7 +125,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          if (methObj == null)
             boundValue = null;
          else
-            boundValue = invokeMethod(methObj);
+            boundValue = invokeMethod(methObj, false);
       }
       else if (direction.doReverse()) {
          Object newValue;
@@ -160,7 +160,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
             boundValue = null;
          }
          else {
-            boundValue = invokeMethod(object);
+            boundValue = invokeMethod(object, false);
             if (isDefinedObject(boundValue))
                valid = true;
          }
@@ -237,11 +237,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       valid = false;
    }
 
-   public boolean applyBinding(Object obj, Object value, IBinding src) {
-      return applyBinding(obj, value, src, false);
-   }
-
-   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh) {
+   public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
       Object newBoundValue = null;
 
       if (activated) {
@@ -258,7 +254,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
                newBoundValue = UNSET_VALUE_SENTINEL;
             }
             else
-               newBoundValue = invokeMethod(obj == null ? methObj : obj);
+               newBoundValue = invokeMethod(obj == null ? methObj : obj, false);
          }
          catch (Throwable exc) {
             System.err.println("*** Error applying binding: " + this + " with value: " + value + " :" + exc.toString());
@@ -340,7 +336,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       if (direction.doForward() && !direction.doReverse()) {
          if (srcProp == null) {
             if (apply)
-               applyBinding(null, null, null);
+               applyBinding(null, null, null, false, false);
          }
          return true;
       }
@@ -373,7 +369,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          else if (srcProp == null) {
             if (apply) {
                if (direction.doForward())
-                  applyBinding(null, null, null);
+                  applyBinding(null, null, null, false, false);
                applyReverseBinding(methObj, boundValue, srcProp);
             }
             return true;
@@ -467,7 +463,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
 
       if (direction.doForward() && !direction.doReverse() && !isRefreshDisabled()) {
          invalidateBinding(null, false, true);
-         if (applyBinding(null, null, null, true))
+         if (applyBinding(null, null, null, true, false))
             return 1;
          return 0;
       }
@@ -530,7 +526,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
             // assert paramValues[i] == PENDING_VALUE_SENTINEL
             paramValues[i] = pendingResult;
             if (!hasPendingParams())
-               applyBinding(null, null, null);
+               applyBinding(null, null, null, false, true);
             break;
          }
       }

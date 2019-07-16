@@ -116,7 +116,8 @@ public class SyncManager {
    /** Specify to sync calls for the sync group name which synchronizes all sync groups. */
    public final static String SYNC_ALL = "syncAll";
 
-   /** This is the primary sync data structure we use for storing data for each synchronized object instance, for each client.
+   /**
+    * This is the primary sync data structure we use for storing data for each synchronized object instance, for each client.
     * An InstInfo will be created both for the original SyncContext the object is created in as well as an 'inherited' InstInfo
     * for each context in which that instance is used.  This stores the buffer of changes - the change state - for propagating
     * the object's changes to listeners of the child context.
@@ -146,7 +147,6 @@ public class SyncManager {
       SyncHandler syncHandler; // Caching the sync handler for this instance so we don't create them over and over again
 
       SyncContext parContext;
-      int childCt;
 
       InstInfo(SyncContext syncCtx, Object[] args, boolean initDef, boolean onDemand) {
          this.syncContext = syncCtx;
@@ -2727,6 +2727,25 @@ public class SyncManager {
             System.err.println("*** No sync context for scope: " + scopeName + " available to register instance: " + DynUtil.getInstanceName(inst));
       }
       return false;
+   }
+
+   /**
+    * This method is used to register an instance and it's children with the sync system so the new object requests are not
+    * sent to the remote side. For example, a repeat tag or other UI component created on both client and server might have
+    * synchronized sub-objects somewhere in the tree.
+    * Calling this method marks the tree of declarative instances as "not new". If you see these 'new' operations coming across
+    * for child components, either the object needs to be synchronized or registered as available either directly or through
+    * it's parent using this method.
+    */
+   public static void registerSyncTree(Object res) {
+      SyncManager.registerSyncInst(res);
+      // Need to register this entire tree with the sync system, at least as far as it is sync'd.
+      Object[] children = DynUtil.getObjChildren(res, null, true);
+      if (children != null) {
+         for (Object child:children) {
+            registerSyncTree(child);
+         }
+      }
    }
 
    public static boolean accessSyncInst(Object inst, String scopeName) {

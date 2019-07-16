@@ -244,6 +244,56 @@ public class ParseUtil  {
    }
 
    /**
+    * Given a CharSequence retrieved from a semantic value parsed from a child of the parse node supplied, return the start index.
+    * When the CharSequence is a StringToken, just return that start index. Otherwise, need to find the
+    * */
+   public static int findCharSequenceStartIndex(IParseNode pn, CharSequence seq) {
+      /* This optimization doesn't work because of the reparse... StringToken will still point to the
+       offset of the original string from when that parse node was originally parsed, not necessarily the current one.
+      if (seq instanceof StringToken)
+         return ((StringToken) seq).startIndex;
+       */
+      if (pn instanceof ParentParseNode) {
+         ParentParseNode p = (ParentParseNode) pn;
+         if (p.children != null) {
+            int curChildIndex = p.getStartIndex();
+            for (int i = 0; i < p.children.size(); i++) {
+               Object child = p.children.get(i);
+               if (child == seq)
+                  return curChildIndex;
+               if (child instanceof IParseNode) {
+                  IParseNode childPN = (IParseNode) child;
+                  int childResIx = findCharSequenceStartIndex(childPN, seq);
+                  if (childResIx != -1)
+                     return childResIx;
+                  curChildIndex += childPN.length();
+               }
+               else if (child instanceof CharSequence)
+                  curChildIndex += ((CharSequence) child).length();
+               else if (child != null)
+                  System.out.println("*** Error - unrecognized child type in findCharSequenceStartIndex");
+            }
+         }
+      }
+      else if (pn instanceof ParseNode) {
+         ParseNode p = (ParseNode) pn;
+         Object child = p.value;
+         if (child == seq)
+            return p.startIndex;
+         if (child instanceof IParseNode) {
+            int childRes = findCharSequenceStartIndex((IParseNode) child, seq);
+            if (childRes != -1)
+               return childRes;
+         }
+      }
+      else if (pn instanceof ErrorParseNode)
+         return -1;
+      else
+         System.out.println("*** Error - unrecognized parse node type in findCharSequenceStartIndex");
+      return -1;
+   }
+
+   /**
     * Utility method to find a single contiguous error inside of a specified region of a parse node.
     * If there are multiple errors, the 'error region' inside of the specified startIx and endIx params
     * is returned.  This is used for identifying unparsed regions in building a formatting code model
@@ -256,7 +306,7 @@ public class ParseUtil  {
       int pnLen = pn.length();
       int pnEnd = pnStart + pnLen;
 
-      if (pnStart > endIx || pnEnd < startIx) // TODO: shouldn't both these tests be >= and <=?
+      if (pnStart > endIx || pnEnd < startIx)
          return null;
 
       // NOTE: pn.isErrorNode() does not work here - we set the error node flag on the parent if any child has an error but the entire node is not an error node
