@@ -262,6 +262,9 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          }
       }
 
+      if (!direction.doForward())
+         return false;
+
       // If we are not activated, we need to call applyBinding on the parent.  When it activates us, we'll be re-validated.
       boolean valueChanged = !activated || !equalObjects(newBoundValue, boundValue);
       if (refresh || !valid || valueChanged) {
@@ -497,7 +500,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
                         if (boundParam instanceof DestinationListener)
                            ((DestinationListener) boundParam).accessBinding();
                         Object paramValue = paramValues[i];
-                        if (paramValue != null) {
+                        if (paramValue != null && paramValue != PENDING_VALUE_SENTINEL && paramValue != UNSET_VALUE_SENTINEL) {
                            accessObj(paramValue);
                         }
                      }
@@ -536,9 +539,38 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       return UNSET_VALUE_SENTINEL;  // In this case, the methObj in the child should have been set to the this object when it was created.
    }
 
+   protected Object[] cleanParamValues() {
+      Object[] pvs = paramValues;
+      if (hasUnsetParams()) { // Need to convert any unset parameters to null here because we are calling the method anyway
+         pvs = new Object[pvs.length];
+         for (int p = 0; p < pvs.length; p++) {
+            pvs[p] = paramValues[p];
+            if (pvs[p] == UNSET_VALUE_SENTINEL)
+               pvs[p] = null;
+         }
+      }
+      return pvs;
+   }
+
    protected boolean hasPendingParams() {
       for (int i = 0; i < paramValues.length; i++) {
          if (paramValues[i] == PENDING_VALUE_SENTINEL)
+            return true;
+      }
+      return false;
+   }
+
+   protected boolean hasUnsetParams() {
+      for (int i = 0; i < paramValues.length; i++) {
+         if (paramValues[i] == UNSET_VALUE_SENTINEL)
+            return true;
+      }
+      return false;
+   }
+
+   protected boolean hasNullParams() {
+      for (int i = 0; i < paramValues.length; i++) {
+         if (paramValues[i] == UNSET_VALUE_SENTINEL || paramValues[i] == null)
             return true;
       }
       return false;
