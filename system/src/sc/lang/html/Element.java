@@ -130,6 +130,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Object repeat;
 
+   private transient Element replaceWith;
+
    // TODO: we probably should support wrap or probably bodyOnly for normal tags - i.e. when it's set to false, we render just the body, without the start/end tag.
    /**
     * For repeat tags, with wrap=true, the body repeats without a wrapper tag.  Instead a wrapper tag based using this element's tag name wraps all of the repeated content without
@@ -233,6 +235,21 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    /** Is this tag visible.  Note: using isVisible here to match swing's isVisible */
    public boolean isVisible() {
       return visible;
+   }
+
+   public void setReplaceWith(Element replTag) {
+      Element oldTag = replaceWith;
+      if (oldTag == replTag)
+         return;
+      if (oldTag == null)
+         oldTag = this;
+      replaceWith = replTag;
+      Bind.sendChangedEvent(this, "replaceWith");
+      invalidate();
+   }
+
+   public Element getReplaceWith() {
+      return replaceWith;
    }
 
    /**
@@ -2304,6 +2321,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public Object[] getObjChildren(boolean create) {
       if (repeatTags != null)
          return repeatTags.toArray(new Object[repeatTags.size()]);
+      if (replaceWith != null)
+         return replaceWith.getObjChildren(create);
       if (dynObj != null) {
          return DynUtil.getObjChildren(dynObj, null, create);
       }
@@ -3670,6 +3689,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("implements");
       behaviorAttributes.add("tagMerge");
       behaviorAttributes.add("bodyMerge");
+      behaviorAttributes.add("replaceWith");
       behaviorAttributes.add("repeat");
       behaviorAttributes.add("repeatWrapper");
       behaviorAttributes.add("repeatVarName");
@@ -4068,11 +4088,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public boolean isRepeatTag() {
+      if (replaceWith != null)
+         return replaceWith.isRepeatTag();
       Object repeatVal = getCurrentRepeatVal();
       return repeatVal != null || this instanceof IRepeatWrapper;
    }
 
    public void outputTag(StringBuilder sb, OutputCtx ctx) {
+      if (replaceWith != null) {
+         replaceWith.outputTag(sb, ctx);
+         return;
+      }
+
       if (!visible) {
          if (invisTags == null) {
             invisTags = getChildrenById(getElementId() + "_" + ALT_ID);
@@ -4252,6 +4279,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * This is read-only by default on the server but used for serverTags to transfer a change of body to the client.
     */
    public String getInnerHTML() {
+      if (replaceWith != null)
+         return replaceWith.getInnerHTML();
+
       Object repeatVal = getCurrentRepeatVal();
       boolean cacheEnabled = isCacheEnabled();
       if (cacheEnabled) {
@@ -4286,6 +4316,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    /** Returns the current contents of the startTagTxt, composed of the tag name and attributes - e.g. <input id="foo"> */
    public String getStartTagTxt() {
+      if (replaceWith != null)
+         return replaceWith.getStartTagTxt();
+
       if (this instanceof IRepeatWrapper)
          return "";
       boolean cacheEnabled = isCacheEnabled();

@@ -14,6 +14,7 @@ import java.util.TreeMap;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Option<T> extends HTMLElement {
    public final static sc.type.IBeanMapper _selectedProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Option.class, "selected");
+   private final static sc.type.IBeanMapper _disabledProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Option.class, "disabled");
    public final static sc.type.IBeanMapper _optionDataProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Option.class, "optionData");
    private final static TreeMap<String,IBeanMapper> optionServerTagProps = new TreeMap<String,IBeanMapper>();
    static {
@@ -29,8 +30,6 @@ public class Option<T> extends HTMLElement {
    public Option(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-
-   public boolean disabled;
 
    private boolean selected;
    @Bindable(manual=true) public boolean getSelected() {
@@ -58,5 +57,14 @@ public class Option<T> extends HTMLElement {
 
    public boolean isEventSource() {
       return true;
+   }
+
+   private boolean disabled;
+   @Bindable(manual=true) public boolean getDisabled() {
+      return disabled;
+   }
+   @Bindable(manual=true) public void setDisabled(boolean _disabled) {
+      disabled = _disabled;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _disabledProp, _disabled);
    }
 }

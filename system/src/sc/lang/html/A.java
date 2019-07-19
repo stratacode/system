@@ -19,6 +19,7 @@ import java.util.TreeMap;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class A extends HTMLElement {
    public final static sc.type.IBeanMapper _clickCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.A.class, "clickCount");
+   private final static sc.type.IBeanMapper _disabledProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.A.class, "disabled");
    private final static TreeMap<String,IBeanMapper> aServerTagProps = new TreeMap<String,IBeanMapper>();
    static {
       aServerTagProps.put("clickCount", _clickCountProp);
@@ -52,5 +53,14 @@ public class A extends HTMLElement {
 
    public Map<String,IBeanMapper> getCustomServerTagProps() {
       return aServerTagProps;
+   }
+
+   private boolean disabled;
+   @Bindable(manual=true) public boolean getDisabled() {
+      return disabled;
+   }
+   @Bindable(manual=true) public void setDisabled(boolean _disabled) {
+      disabled = _disabled;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _disabledProp, _disabled);
    }
 }
