@@ -1275,6 +1275,14 @@ public class DynUtil {
       scopeNames.remove(obj);
    }
 
+   public static void disposeLater(Object component, boolean disposeChildren) {
+      invokeLater(new Runnable() {
+         public void run() {
+            DynUtil.dispose(component, disposeChildren);
+         }
+      }, 0);
+   }
+
    public static void initComponent(Object comp) {
       if (comp instanceof IComponent)
          ((IComponent) comp).init();
