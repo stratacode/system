@@ -190,7 +190,9 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
    /** Called when reverse bindings fire */
    protected Object invokeReverseMethod(Object obj, Object value) {
       // If we fire the reverse method before the forward one is valid, need to try at least to init the params
+      boolean skipParamUpdate = false;
       if (!valid) {
+         skipParamUpdate = true;
          if (!updateParams(null)) {
             if (hasPendingParams())
                return PENDING_VALUE_SENTINEL;
@@ -214,7 +216,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
       else if (!direction.doForward()) {
          if (hasPendingParams())
             return PENDING_VALUE_SENTINEL;
-         return invokeMethod(obj, false);
+         return invokeMethod(obj, skipParamUpdate);
       }
       else
          System.err.println("*** Reverse binding not firing - no reverse method: " + this);
