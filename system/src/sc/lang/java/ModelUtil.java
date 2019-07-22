@@ -6305,6 +6305,8 @@ public class ModelUtil {
          List<Object> props = ((ITypeDeclaration) typeObj).getAllProperties(modifier, includeAssigns);
          return props == null ? null : props.toArray(new Object[props.size()]);
       }
+      else if (typeObj instanceof TypeParameter)
+         return null;
       throw new UnsupportedOperationException();
    }
 

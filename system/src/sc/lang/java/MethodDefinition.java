@@ -713,7 +713,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             if (isGet) {
                if (mapper == null || mapper.getGetSelector() == this)
                   return call(thisObj, values);
-               return mapper.getPropertyValue(thisObj, false);
+               return mapper.getPropertyValue(thisObj, false, false);
             }
             else if (isSetMethod()) {
                if (values.length != 1)

@@ -125,22 +125,22 @@ public class SyncLayer {
    }
 
    public static class SyncNewObj extends SyncChange {
-      Object[] args;
-      SyncNewObj(Object obj, Object...args) {
+      SyncManager.InstInfo instInfo;
+      SyncNewObj(Object obj, SyncManager.InstInfo instInfo) {
          super(obj);
 
-         this.args = args;
+         this.instInfo = instInfo;
       }
 
       public int hashCode() {
-         return super.hashCode() + (args == null ? 0 : args.hashCode());
+         return super.hashCode() + (instInfo.args == null ? 0 : Arrays.hashCode(instInfo.args));
       }
 
       public boolean equals(Object other) {
          if (!super.equals(other))
             return false;
          if (other instanceof SyncNewObj)
-            return DynUtil.equalObjects(args, ((SyncNewObj)other).args);
+            return DynUtil.equalArrays(instInfo.args, ((SyncNewObj)other).instInfo.args);
          return false;
       }
 
@@ -152,6 +152,7 @@ public class SyncLayer {
          sb.append(annot);
          sb.append("new ");
          sb.append(DynUtil.getInstanceName(obj));
+         Object[] args = instInfo.args;
          if (args != null) {
             sb.append("(");
             for (int i = 0; i < args.length; i++) {
@@ -330,13 +331,13 @@ public class SyncLayer {
    }
 
    /** Records a 'new object' sync change, including the optional parameters passed to the new object. */
-   public void addNewObj(Object obj, Object...args) {
-      SyncNewObj change = new SyncNewObj(obj, args);
+   public void addNewObj(Object obj, SyncManager.InstInfo instInfo) {
+      SyncNewObj change = new SyncNewObj(obj, instInfo);
       addSyncChange(change);
    }
 
-   public static void addDepNewObj(List<SyncChange> depChanges, Object obj, Object...args) {
-      depChanges.add(new SyncNewObj(obj, args));
+   public static void addDepNewObj(List<SyncChange> depChanges, Object obj, SyncManager.InstInfo instInfo) {
+      depChanges.add(new SyncNewObj(obj, instInfo));
    }
 
    public void addFetchProperty(Object obj, String prop) {
@@ -662,7 +663,7 @@ public class SyncLayer {
          isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) &&
                   (!currentObjNames.contains(changedObjName) || !equalStrings(changedObjPkg, changeCtx.lastPackageName)) &&
                   createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
-         newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).args : isNew ? parentContext.getNewArgs(changedObj) : null;
+         newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).instInfo.args : isNew ? parentContext.getNewArgs(changedObj) : null;
          Object changedObjType = syncHandler.getObjectType(changedObj);
          objTypeName = DynUtil.getTypeName(changedObjType, false);
 
@@ -773,6 +774,7 @@ public class SyncLayer {
       String newPackageName = useObjNameForPackage ? changedObjPkg : CTypeUtil.getPackageName(objTypeName);
       boolean packagesMatch = !(changeCtx.lastPackageName != newPackageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(newPackageName)));
 
+      boolean switchedPackage = false;
       boolean pushName = true;
       boolean topLevel = false;
       int ix;
@@ -865,6 +867,8 @@ public class SyncLayer {
                System.err.println("*** Mismatching packages with somehow matching types");
             if (switchSB == null)
                switchSB = ser.createTempSerializer(false, newObjNames.size());
+
+            switchedPackage = true;
             switchSB.changePackage(packageName);
             newLastPackageName = packageName;
          }
@@ -984,6 +988,12 @@ public class SyncLayer {
             else {
                // Cancel the 'close' brace we would have needed since this was done already but we do need to switch the package part
                switchObjStart = -1;
+               // If the package matched before the dependencies we won't have a package statement here and yet now need one
+               if (!switchedPackage) {
+                  if (switchSB == null)
+                     switchSB = ser.createTempSerializer(false, newObjNames.size());
+                  switchSB.changePackage(newPackageName);
+               }
             }
          }
       }

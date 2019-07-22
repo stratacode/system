@@ -143,7 +143,7 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
                if (cs != null) {
                   SemanticNodeList<Expression> args = new SemanticNodeList<Expression>(props.length);
                   for (int i = 0; i < props.length; i++) {
-                     args.add(Expression.createFromValue(props[i].getPropertyValue(literalValue, false), false));
+                     args.add(Expression.createFromValue(props[i].getPropertyValue(literalValue, false, false), false));
                   }
                   return NewExpression.create(TypeUtil.getTypeName(literalClass, false), args);
                }

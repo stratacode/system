@@ -65,7 +65,7 @@ public class ArrayElementExpression extends IdentifierExpression {
                Object rootObj = evalRootValue(ctx);
                checkNull(rootObj, arrDef.variableName);
                IBeanMapper prop = DynUtil.getPropertyMapping(DynUtil.getType(rootObj), arrDef.variableName);
-               arrVal = prop.getPropertyValue(rootObj, false);
+               arrVal = prop.getPropertyValue(rootObj, false, false);
                arrVal = evalDimObj(arrVal, ctx);
                int dim = getLastDim(ctx);
                DynUtil.setArrayElement(arrVal, dim, value);

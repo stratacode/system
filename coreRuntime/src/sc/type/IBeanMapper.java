@@ -22,7 +22,7 @@ public interface IBeanMapper extends IBinding, Comparable<IBeanMapper> {
    /** Sets a specific property on the specified object */
    void setPropertyValue(Object object, Object value);
 
-   Object getPropertyValue(Object parent, boolean getField);
+   Object getPropertyValue(Object parent, boolean getField, boolean pendingChild);
 
    String getPropertyName();
 

@@ -30,6 +30,8 @@ public class AssignmentExpression extends TwoOperatorExpression {
 
    // public SymbolChoiceSpace assignmentOperator = new SemanticTokenChoice("=", "+=", "-=", "*=", "/=", "%=", "^=", "|=", "&=", "<<=", ">>=", ">>>=");
    public void init() {
+      if (initialized)
+         return;
       if (lhs != null)
          lhs.setAssignment(true);
       super.init();

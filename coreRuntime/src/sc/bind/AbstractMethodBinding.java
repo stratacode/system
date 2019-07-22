@@ -101,7 +101,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          if (!direction.doForward()) {
             if (dstProp == null)
                System.out.println("*** Null property in binding");
-            boundValue = PBindUtil.getPropertyValue(dstObj, dstProp);
+            boundValue = PBindUtil.getPropertyValue(dstObj, dstProp, false, false);
 
             if (useReverseListener()) {
                if (boundValue instanceof IChangeable)
@@ -130,9 +130,9 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       else if (direction.doReverse()) {
          Object newValue;
          if (dstProp instanceof IBinding)
-             newValue = ((IBinding) dstProp).getPropertyValue(dstObj, false);
+             newValue = ((IBinding) dstProp).getPropertyValue(dstObj, false, false);
           else
-             newValue = PBindUtil.getPropertyValue(dstObj, dstProp);
+             newValue = PBindUtil.getPropertyValue(dstObj, dstProp, false, false);
 
          if (!equalObjects(newValue, boundValue)) {
             if (useReverseListener()) {
@@ -152,7 +152,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       return direction.doReverse() && !direction.doForward() && dstObj != dstProp;
    }
 
-   public Object getPropertyValue(Object object, boolean getField) {
+   public Object getPropertyValue(Object object, boolean getField, boolean pendingChild) {
       // Do not cache results when it's a reverse only binding.  We're not listening on our parameters in
       // that case so we can't rely on being notified.
       if (!valid || !direction.doForward()) {
@@ -160,7 +160,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
             boundValue = null;
          }
          else {
-            boundValue = invokeMethod(object, false);
+            boundValue = invokeMethod(object, pendingChild);
             if (isDefinedObject(boundValue))
                valid = true;
          }
@@ -346,7 +346,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       // If either the default event on the IChangeable, or it's the dest property changing
       else if (direction.doReverse()) {
          if ((dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp))) {
-            Object currentValue = PBindUtil.getPropertyValue(srcObject, dstProp);
+            Object currentValue = PBindUtil.getPropertyValue(srcObject, dstProp, false, false);
 
             boolean isChangeable = boundValue instanceof IChangeable;
 
@@ -394,7 +394,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       }
       else if (direction.doReverse()) {
          if ((dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp))) {
-            Object currentValue = PBindUtil.getPropertyValue(srcObject, srcProp);
+            Object currentValue = PBindUtil.getPropertyValue(srcObject, srcProp, false, false);
 
             if (!equalObjects(currentValue, boundValue) || boundValue instanceof IChangeable) {
                return true;

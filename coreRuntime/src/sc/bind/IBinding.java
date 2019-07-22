@@ -8,9 +8,14 @@ import sc.js.JSSettings;
 
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
 public interface IBinding {
-   /** Retrieves the current value of the binding given the current object. */
-
-   Object getPropertyValue(Object parent, boolean getField);
+   /**
+    * Retrieves the current value of the binding given the current object.
+    * Use getField = true to force use of the field, rather than the getX method if one exists.
+    * Use pendingChild = true for a special case where we are getting the property value of a
+    * binding that is part of a reverse binding but where the cached value is up-to-update because
+    * we are updating a child remote property.
+    */
+   Object getPropertyValue(Object parent, boolean getField, boolean pendingChild);
 
    void addBindingListener(Object eventObject, IListener listener, int event);
 

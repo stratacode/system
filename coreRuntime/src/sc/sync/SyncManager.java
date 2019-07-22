@@ -419,7 +419,7 @@ public class SyncManager {
          return changeMap.remove(propName);
       }
 
-      public void addNewObj(Object obj, String syncGroup, Object...args) {
+      public void addNewObj(Object obj, String syncGroup, InstInfo instInfo) {
          SyncState state = getSyncState();
          if (state == SyncState.CopyingPrevious)
             return;
@@ -429,10 +429,10 @@ public class SyncManager {
                // When we are in the initial sync, we are not recording these as changes - just putting them in the
                // initial layer.
                if (!initialSync)
-                  changedLayer.addNewObj(obj, args);
+                  changedLayer.addNewObj(obj, instInfo);
             }
             if (recordInitial || state != SyncState.Initializing)
-               initialSyncLayer.addNewObj(obj, args);
+               initialSyncLayer.addNewObj(obj, instInfo);
          }
       }
 
@@ -1181,8 +1181,12 @@ public class SyncManager {
             putInstInfo(inst, ii);
          }
          else {
-            if (ii.args == null && args != null && args.length > 0)
+            // Note: we might be updating the args here to a new value.  First the base class addSyncInst is called with it's args, and the last
+            // addSyncInst call should be in the constructor used for the concrete class. We pass the InstInfo into the NewObj so it will see the
+            // updated args we set here.
+            if (args != null && args.length > 0) {
                ii.args = args;
+            }
             ii.initDefault = ii.initDefault || initDefault;
             ii.onDemand = ii.onDemand || onDemand;
             ii.inherited = false;
@@ -1278,7 +1282,7 @@ public class SyncManager {
                   SyncLayer.addDepNewObj(depChanges, inst, syncProps.syncGroup, ii.args);
                else
                */
-                  addNewObj(inst, syncProps.syncGroup, ii.args);
+                  addNewObj(inst, syncProps.syncGroup, ii);
                ii.nameQueued = true;
             }
          }
@@ -1692,7 +1696,7 @@ public class SyncManager {
       public void addDepNewObj(List<SyncLayer.SyncChange> depChanges, Object changedObj, InstInfo instInfo, boolean inherited, boolean queueObj, boolean newRemote, SyncLayer syncLayer) {
          if (!instInfo.fixedObject) {
             if (queueObj)
-               SyncLayer.addDepNewObj(depChanges, changedObj, instInfo.args);
+               SyncLayer.addDepNewObj(depChanges, changedObj, instInfo);
          }
          initOnDemandInst(depChanges, changedObj, instInfo, inherited, newRemote, syncLayer);
       }
@@ -1881,7 +1885,7 @@ public class SyncManager {
                   ii = getInheritedInstInfo(changedObj);
                   ii.nameQueued = true;
                   if (!ii.fixedObject)
-                     SyncLayer.addDepNewObj(depChanges, changedObj, ii.args);
+                     SyncLayer.addDepNewObj(depChanges, changedObj, ii);
                }
                return getObjectName(changedObj, varName, false, false, null, syncLayer);
             }
@@ -2260,6 +2264,7 @@ public class SyncManager {
       public Object resolveOrCreateObject(String currentPackage, Object outerObj, String name, String typeName, boolean unwrap, String sig, Object...args) {
          Object inst = null;
          boolean flushSyncQueue = beginSyncQueue();
+
          try {
             // For TodoList.TodoItem we do want the prefix here but for UIIcon - the type which contains static UIIcons we don't want UIIcon.UIIcon__0
             if (outerObj != null && !DynUtil.isType(outerObj)) {
@@ -2438,7 +2443,7 @@ public class SyncManager {
    }
 
    public static void addSyncType(Object type, SyncProperties props) {
-      Object old = null;
+      SyncProperties old = null;
       // If no specific destination is given, register it for all destinations
       if (props.destName == null) {
          for (SyncManager mgr:syncManagers) {
@@ -2457,6 +2462,13 @@ public class SyncManager {
 
       if (verbose && old == null) {
          System.out.println("New synchronized type: " + DynUtil.getInstanceName(type) + " properties: " + props);
+      }
+
+      // TODO: do we need to support static synchronized properties? We could basically call addSyncInst here with the type
+      // but there's the issue of how to support sharing and synchronization. Using a separate instance to hold the
+      // static properties lets you put that object into different scopes etc.
+      if (props.staticProps != null && old == null) {
+         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + props);
       }
    }
 

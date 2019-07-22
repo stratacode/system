@@ -44,6 +44,7 @@ public class ParenExpression extends ChainedExpression {
     * Propagates the binding information to nested expressions
     */
    public void setBindingInfo(BindingDirection dir, Statement dest, boolean nested) {
+      super.setBindingInfo(dir, dest, nested);
       expression.setBindingInfo(dir, dest, nested);
    }
 

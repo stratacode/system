@@ -274,7 +274,7 @@ public class TypeUtil  {
       }
 
       if (mapping instanceof IBeanMapper)
-         return ((IBeanMapper) mapping).getPropertyValue(null, false);
+         return ((IBeanMapper) mapping).getPropertyValue(null, false, false);
       else
          return PTypeUtil.getProperty(null, mapping, false);
    }
@@ -312,7 +312,7 @@ public class TypeUtil  {
 
    public static Object getPropertyValue(Object parent, Object mapping, boolean getField) {
       if (mapping instanceof IBeanMapper)
-         return ((IBeanMapper) mapping).getPropertyValue(parent, getField);
+         return ((IBeanMapper) mapping).getPropertyValue(parent, getField, false);
       else if (parent instanceof IDynObject && mapping instanceof String)
          return ((IDynObject) parent).getProperty((String) mapping, getField);
       else if (mapping instanceof String) {

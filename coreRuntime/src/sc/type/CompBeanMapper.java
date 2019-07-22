@@ -46,7 +46,7 @@ public class CompBeanMapper extends AbstractBeanMapper {
          throw new UnsupportedOperationException();
    }
 
-   public Object getPropertyValue(Object obj, boolean getField) {
+   public Object getPropertyValue(Object obj, boolean getField, boolean pendingChild) {
       if (obj instanceof IDynObject) {
          IDynObject dobj = (IDynObject) obj;
          if (!isStatic)

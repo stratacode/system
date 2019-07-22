@@ -354,6 +354,7 @@ public class JSONDeserializer {
       CharSequence callIdVal = parser.parseString(false);
       parser.expectNextName(JSONFormat.MethodArgs.args.name());
       List args = parser.parseArray();
+      boolean restartSyncQueue = false;
       if (methName != null && callIdVal != null) {
          // Make sure the state is set up before the remote method call.  While queuing is probably the most efficient way to
          // send a batch of property changes, it breaks when used with RPC so this is a compromise but I think the right one.
@@ -361,7 +362,7 @@ public class JSONDeserializer {
          if (bindCtx != null) {
             // Before we switch to immediate mode, need to first flush out all of the 'addSyncInst' calls so new items are created,
             // then flush out property change events that might refer to the new instances.
-            SyncManager.flushSyncQueue();
+            restartSyncQueue = SyncManager.flushSyncQueue();
             bindCtx.dispatchEvents(null);
             oldSyncType = bindCtx.getDefaultSyncType();
             bindCtx.setDefaultSyncType(IListener.SyncType.IMMEDIATE);
@@ -376,7 +377,9 @@ public class JSONDeserializer {
          finally {
             SyncManager.setSyncState(oldState);
             if (bindCtx != null) {
-               SyncManager.beginSyncQueue();
+               // If the caller was queueing sync events re-enable the sync queue
+               if (restartSyncQueue)
+                  SyncManager.beginSyncQueue();
                bindCtx.dispatchEvents(null);
                bindCtx.setDefaultSyncType(oldSyncType);
             }

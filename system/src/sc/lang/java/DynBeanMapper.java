@@ -115,7 +115,7 @@ public class DynBeanMapper extends AbstractBeanMapper {
       }
    }
 
-   public Object getPropertyValue(Object parent, boolean getField) {
+   public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
       try {
          if ((attMask & IS_STATIC) == 0) {
             if ((attMask & GET_IS_FIELD) != 0) {

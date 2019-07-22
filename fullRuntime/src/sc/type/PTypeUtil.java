@@ -74,7 +74,7 @@ public class PTypeUtil {
          /* If this is an array we perform the array to value mapping */
          if (valueClass.isArray()) {
             return new BeanMapper(mapper) {
-               public Object getPropertyValue(Object parent, boolean getField) {
+               public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
                   List<?> lval = (List<?>) TypeUtil.getPropertyValue(parent, getSelector, getField);
                   return lval.toArray((Object[]) Array.newInstance(mapper.getComponentType(), lval.size()));
                }
@@ -94,7 +94,7 @@ public class PTypeUtil {
          else {
             /* Allow a list of length 1 to be treated as a scalar */
             return new BeanMapper(mapper) {
-               public Object getPropertyValue(Object parent, boolean getField) {
+               public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
                   // Undo the conversion here.  If we use a slot mapping to wrap a list on the way in
                   // we need to undo it on the way out so that we get the right data type for generation
                   // purposes.
@@ -126,7 +126,7 @@ public class PTypeUtil {
          /* If this is an array we perform the array to value mapping */
          if (valueClass.isArray()) {
             return new BeanMapper(mapper) {
-               public Object getPropertyValue(Object parent, boolean getField) {
+               public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
                   Set<?> lval = (Set<?>) TypeUtil.getPropertyValue(parent, getSelector, getField);
                   return lval.toArray((Object[])Array.newInstance(mapper.getComponentType(), lval.size()));
                }
@@ -181,8 +181,8 @@ public class PTypeUtil {
       if (IValueConverter.class.isAssignableFrom(valueClass)) {
          return new BeanMapper() {
             BeanMapper superMapper = mapper;
-            public Object getPropertyValue(Object parent, boolean getField) {
-               Object propVal = superMapper.getPropertyValue(parent, getField);
+            public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
+               Object propVal = superMapper.getPropertyValue(parent, getField, false);
                // TODO: create an AbstractLiteral here somehow from the value.
                return propVal;
             }
@@ -292,7 +292,7 @@ public class PTypeUtil {
       if (meth instanceof Method) {
          // Handle Java8 dependency using reflection so we can run on Java6 as well
          if (methodDefaultMapper != null) {
-            return (Boolean) methodDefaultMapper.getPropertyValue(meth, false);
+            return (Boolean) methodDefaultMapper.getPropertyValue(meth, false, false);
          }
          return false;
       }

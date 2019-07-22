@@ -36,10 +36,10 @@ public class ArrayElementBinding extends VariableBinding {
    }
 
    private Object getArrayValue() {
-      return super.getBoundValue();
+      return super.getBoundValue(false);
    }
 
-   protected Object getBoundValue() {
+   protected Object getBoundValue(boolean pendingChild) {
       if (valid || !activated)
          return boundValue;
       return revalidateArrayElement();
@@ -84,7 +84,7 @@ public class ArrayElementBinding extends VariableBinding {
    private boolean validateDims() {
       for (int i = 0; i < arrayBindings.length; i++) {
          IBinding arrayBinding = arrayBindings[i];
-         Object value = arrayBinding.getPropertyValue(null, false);
+         Object value = arrayBinding.getPropertyValue(null, false, false);
          if (!isValidObject(value))
             return false;
 
@@ -233,7 +233,7 @@ public class ArrayElementBinding extends VariableBinding {
       }
 
       valid = true;
-      Object newValue = PBindUtil.getPropertyValue(dstObj, dstProp);
+      Object newValue = PBindUtil.getPropertyValue(dstObj, dstProp, false, false);
 
 
       int last = lastDim.length-1;

@@ -978,7 +978,7 @@ public class Bind {
       // not be calling app code like this.
       if (val == NO_VALUE_EVENT_DETAIL) {
          if (prop != null)
-            val = prop.getPropertyValue(obj, true); // using 'true' here to avoid creating objects just to log
+            val = prop.getPropertyValue(obj, true, false); // using 'true' here to avoid creating objects just to log
          else
             val = null;
       }
@@ -1018,7 +1018,7 @@ public class Bind {
    }
 
    private static String getPrintableValue(Object val, Object obj, IBeanMapper prop) {
-       return DynUtil.getInstanceName(val == IListener.UNSET_VALUE_SENTINEL ? prop.getPropertyValue(obj, true) : val);
+       return DynUtil.getInstanceName(val == IListener.UNSET_VALUE_SENTINEL ? prop.getPropertyValue(obj, true, false) : val);
    }
 
    public static void endPropMessage() {

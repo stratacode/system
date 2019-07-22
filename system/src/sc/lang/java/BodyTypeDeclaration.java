@@ -1565,8 +1565,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
+   static int nestCount = 0;
+   static Object nestCountLock = new Object();
+
    protected Object getSimpleInnerTypeFromExtends(Object extendsType, String name, TypeContext ctx, boolean redirected, boolean srcOnly, boolean includeEnums) {
       Object res;
+      synchronized (nestCountLock) {
+         if (nestCount > 100) {
+            System.out.println("*** simple extends loop on type: " + typeName + " for: " + name);
+            return null;
+         }
+         nestCount++;
+      }
+      try {
+
       if (extendsType != null) {
          if (extendsType instanceof TypeDeclaration) {
             BodyTypeDeclaration ext = (TypeDeclaration) extendsType;
@@ -1597,6 +1609,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                }
             }
             return ModelUtil.getInnerType(extendsType, name, ctx);
+         }
+      }
+      }
+      finally {
+         synchronized (nestCountLock) {
+            nestCount--;
          }
       }
       return null;
@@ -3054,7 +3072,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public Object getStaticProperty(String propName) {
       IBeanMapper mapper = getPropertyMapping(propName);
       if (mapper != null)
-         return mapper.getPropertyValue(this, false);
+         return mapper.getPropertyValue(this, false, false);
       else
          throw new IllegalArgumentException("No static property: " + propName + " for type: " + this);
    }
@@ -9168,6 +9186,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   propConstant = constDefaultObj != null && constDefaultObj;
                   if (propConstant)
                      propFlags |= SyncPropOptions.SYNC_CONSTANT;
+
+                  if (ModelUtil.hasModifier(prop, "static")) {
+                     propFlags |= SyncPropOptions.SYNC_STATIC;
+                  }
                }
                else {
                   propSyncMode = null;

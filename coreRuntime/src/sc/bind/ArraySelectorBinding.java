@@ -33,18 +33,18 @@ public class ArraySelectorBinding extends AbstractListener implements IBinding {
       return false;
    }
 
-   public Object getPropertyValue(Object parent, boolean getField) {
+   public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
       boundParent = parent;
-      return getBoundValue();
+      return getBoundValue(pendingChild);
 
    }
-   public Object getBoundValue() {
+   public Object getBoundValue(boolean pendingChild) {
       if (valid)
          return boundValue;
       if (boundParent == null || boundParent == UNSET_VALUE_SENTINEL) {
          return UNSET_VALUE_SENTINEL;
       }
-      Object dimObj = arrayBinding.getPropertyValue(null, false);
+      Object dimObj = arrayBinding.getPropertyValue(null, false, pendingChild);
       if (dimObj == null || dimObj == UNSET_VALUE_SENTINEL)
          return UNSET_VALUE_SENTINEL;
       int dim = ((Number) dimObj).intValue();
@@ -67,7 +67,7 @@ public class ArraySelectorBinding extends AbstractListener implements IBinding {
       if (src == arrayBinding) {
          valid = false;
          if (direction.doForward()) {
-            return dstBinding.applyBinding(null, getBoundValue(), this, refresh, pendingChild);
+            return dstBinding.applyBinding(null, getBoundValue(pendingChild), this, refresh, pendingChild);
          }
       }
       return true;

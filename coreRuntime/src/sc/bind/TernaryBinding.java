@@ -33,7 +33,7 @@ public class TernaryBinding extends AbstractMethodBinding {
    }
 
    protected Object invokeMethod(Object obj, boolean pendingChild) {
-      Object val = boundParams[0].getPropertyValue(obj, false);
+      Object val = boundParams[0].getPropertyValue(obj, false, pendingChild);
       if (val == null || val == UNSET_VALUE_SENTINEL) {
          if (Bind.trace || (flags & Bind.TRACE) != 0)
             System.out.println("Unset condition: " + this);
@@ -48,20 +48,20 @@ public class TernaryBinding extends AbstractMethodBinding {
             boundParams[1].activate(true, obj, false);
             boundParams[2].activate(false, obj, false);
          }
-         return boundParams[1].getPropertyValue(obj, false);
+         return boundParams[1].getPropertyValue(obj, false, pendingChild);
       }
       else {
          if (direction.doForward()) {
             boundParams[2].activate(true, obj, false);
             boundParams[1].activate(false, obj, false);
          }
-         return boundParams[2].getPropertyValue(obj, false);
+         return boundParams[2].getPropertyValue(obj, false, pendingChild);
       }
    }
 
    /** Called when reverse bindings fire */
    protected Object invokeReverseMethod(Object obj, Object value) {
-      Object val = boundParams[0].getPropertyValue(obj, false);
+      Object val = boundParams[0].getPropertyValue(obj, false, false);
       if (val == null || val == UNSET_VALUE_SENTINEL)
          return UNSET_VALUE_SENTINEL;
       if (val == PENDING_VALUE_SENTINEL)

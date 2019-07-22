@@ -44,6 +44,10 @@ public class SyncProperties {
 
    Object[] allProps;
 
+   IntCoalescedHashMap staticPropIndex;
+
+   Object[] staticProps;
+
    public SyncProperties(String destName, String syncGroup, Object[] props, int defaultPropOptions) {
       this(destName, syncGroup, props, null, defaultPropOptions, -1);
    }
@@ -63,12 +67,13 @@ public class SyncProperties {
       this.defaultScopeId = scopeId;
       this.defaultPropOptions = defaultPropOptions;
       classProps = props;
-      // TODO: this assumes the sync type, the base type has already run.  Since we are doing this as part of the
-      // static initialization of our class, doesn't that mean the static init of the base class has already been done?
+      // TODO: this assumes addSyncType has been called on the base type already.  Counting on the fact that Java initializes
+      // the base class before we initializes this class.
       chainedProps = chainedType == null ? null : SyncManager.getSyncProperties(chainedType, destName);
-      propIndex = new IntCoalescedHashMap(classProps == null ? 0 : classProps.length + (chainedProps == null ? 0 : chainedProps.getNumProperties()));
-      this.defaultPropOptions = defaultPropOptions;
+      int numProps = classProps == null ? 0 : classProps.length + (chainedProps == null ? 0 : chainedProps.getNumProperties());
+      propIndex = new IntCoalescedHashMap(numProps);
       ArrayList<Object> newProps = null;
+      ArrayList<Object> newStaticProps = null;
       if (props != null) {
          if (chainedProps != null)
             propIndex.putAll(chainedProps.propIndex);
@@ -87,7 +92,15 @@ public class SyncProperties {
                options = defaultPropOptions;
                propName = (String) prop;
             }
-            if (propIndex.put(propName, options) == -1 && chainedProps != null) {
+            if ((options & SyncPropOptions.SYNC_STATIC) != 0) {
+               if (staticPropIndex == null) {
+                  staticPropIndex = new IntCoalescedHashMap(numProps);
+                  newStaticProps = new ArrayList<Object>();
+               }
+               staticPropIndex.put(propName, options);
+               newStaticProps.add(propName);
+            }
+            else if (propIndex.put(propName, options) == -1 && chainedProps != null) {
                // when we are combining two property lists, keep track of only the new ones so the order of properties
                // in the list remains consistent just like we do elsewhere
                if (newProps == null)
@@ -108,6 +121,7 @@ public class SyncProperties {
       }
       else
          allProps = classProps;
+      staticProps = newStaticProps == null ? null : newStaticProps.toArray();
    }
 
    public boolean isSynced(String prop) {
@@ -132,8 +146,12 @@ public class SyncProperties {
       return syncGroup;
    }
 
+   public Object[] getStaticSyncProperties() {
+      return staticProps;
+   }
+
    public String toString() {
-      return "SyncProperties: " + (destName != null ? "dest=" + destName : "") + " " + (syncGroup != null ? "syncGroup=" + syncGroup : "") + " properties=" + DynUtil.arrayToInstanceName(classProps);
+      return "SyncProperties: " + (destName != null ? "dest=" + destName : "") + " " + (syncGroup != null ? "syncGroup=" + syncGroup : "") + " properties=" + DynUtil.arrayToInstanceName(classProps) + " staticProperties=" + DynUtil.arrayToInstanceName(staticProps);
    }
 
    public String getDestinationName() {
@@ -143,9 +161,10 @@ public class SyncProperties {
    // Merges the other properties - only replacing properties which do not exist in this sync properties.
    public void merge(SyncProperties other) {
       ArrayList<Object> myProps = null;
+      ArrayList<Object> myStaticProps = null;
       for (Object prop: other.classProps) {
          String propName;
-         int propFlags = 0;
+         int propFlags;
          if (prop instanceof SyncPropOptions) {
             SyncPropOptions opts = (SyncPropOptions) prop;
             propName = opts.propName;
@@ -155,18 +174,40 @@ public class SyncProperties {
             propName = (String) prop;
             propFlags = 0;
          }
-         if (propIndex.get(propName) == -1) {
+         if ((propFlags & SyncPropOptions.SYNC_STATIC) != 0) {
+            if (staticPropIndex == null) {
+               staticPropIndex = new IntCoalescedHashMap(classProps.length);
+            }
+            if (myStaticProps == null)
+               myStaticProps = new ArrayList<Object>();
+            if (staticPropIndex.get(propName) == -1) {
+               myStaticProps.add(propName);
+               staticPropIndex.put(propName, propFlags);
+            }
+         }
+         else if (propIndex.get(propName) == -1) {
             if (myProps == null)
                myProps = new ArrayList<Object>(Arrays.asList(classProps));
             myProps.add(prop);
             propIndex.put(propName, propFlags);
          }
       }
-      if (myProps == null)
-         return;
-      classProps = myProps.toArray(new Object[classProps.length]);
-      if (chainedProps != null) // TODO: this is used when building the SyncProperties at compile time which right now does not use chainedProps so we should be ok
-         System.err.println("*** Not merging in chainedProperties!");
-      allProps = classProps;
+      if (myProps != null) {
+         classProps = myProps.toArray(new Object[classProps.length]);
+         if (chainedProps != null) // TODO: this is used when building the SyncProperties at compile time which right now does not use chainedProps so we should be ok
+            System.err.println("*** Not merging in chainedProperties!");
+         allProps = classProps;
+      }
+
+      if (myStaticProps != null) {
+         if (staticProps == null)
+            staticProps = myStaticProps.toArray();
+         else {
+            ArrayList<Object> mergedStatic = new ArrayList<Object>();
+            mergedStatic.addAll(Arrays.asList(staticProps));
+            mergedStatic.addAll(myStaticProps);
+            staticProps = mergedStatic.toArray();
+         }
+      }
    }
 }

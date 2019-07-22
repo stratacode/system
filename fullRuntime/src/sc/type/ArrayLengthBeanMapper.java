@@ -27,7 +27,7 @@ public class ArrayLengthBeanMapper extends BeanMapper implements Cloneable {
    public ArrayLengthBeanMapper() {
    }
 
-   public Object getPropertyValue(Object parent, boolean getField) {
+   public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
       return Array.getLength(parent);
    }
 

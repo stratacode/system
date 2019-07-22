@@ -9,9 +9,9 @@ import sc.type.IBeanMapper;
 
 @sc.js.JSSettings(replaceWith="sc_PBindUtil", jsLibFiles="js/scpbind.js")
 public class PBindUtil {
-   public static Object getPropertyValue(Object obj, Object prop) {
+   public static Object getPropertyValue(Object obj, Object prop, boolean getField, boolean pendingChild) {
       if (prop instanceof IBinding)
-         return ((IBinding) prop).getPropertyValue(obj, false);
+         return ((IBinding) prop).getPropertyValue(obj, getField, pendingChild);
       return DynUtil.getProperty(obj, (String) prop);
    }
 

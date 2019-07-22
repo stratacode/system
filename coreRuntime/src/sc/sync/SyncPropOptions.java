@@ -28,6 +28,9 @@ public class SyncPropOptions {
    /** Do not add the sync listener for this property, but do send the initial value to the other side */
    public final static int SYNC_CONSTANT = 32;
 
+   /** A static property */
+   public final static int SYNC_STATIC = 64;
+
    public String propName;
    public int flags;
 
@@ -51,6 +54,8 @@ public class SyncPropOptions {
          sb.append(" (receive only)");
       if ((flags & SYNC_CONSTANT) != 0)
          sb.append(" (constant)");
+      if ((flags & SYNC_STATIC) != 0)
+         sb.append(" (static)");
       return sb.toString();
    }
 }

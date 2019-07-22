@@ -58,7 +58,7 @@ public class SelectorBinding extends DestinationListener {
       initBinding();
       addListeners();
       if (direction.doForward()) {
-         Object result = getBoundValue();
+         Object result = getBoundValue(false);
          if (Bind.trace || (flags & Bind.TRACE) != 0)
             System.out.println("Init:" + toString());
          if (result == UNSET_VALUE_SENTINEL)
@@ -75,7 +75,7 @@ public class SelectorBinding extends DestinationListener {
 
       if (direction.doForward()) {
          boundValues = new Object[boundProps.length];
-         boundValues[0] = PBindUtil.getPropertyValue(dstObj, boundProps[0]);
+         boundValues[0] = PBindUtil.getPropertyValue(dstObj, boundProps[0], false, false);
          bindingParent = boundValues[0];
       }
       int last = boundProps.length - 1;
@@ -83,7 +83,7 @@ public class SelectorBinding extends DestinationListener {
          Bind.setBindingParent(boundProps[i], this, direction);
          if (direction.doForward()) {
             if (bindingParent != null && bindingParent != UNSET_VALUE_SENTINEL) {
-               boundValues[i] = bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+               boundValues[i] = bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, false);
             }
             else {
                boundValues[i] = bindingParent = UNSET_VALUE_SENTINEL;
@@ -105,8 +105,8 @@ public class SelectorBinding extends DestinationListener {
          return evalBindingSlot(boundProps.length-2);
    }
 
-   protected Object getBoundValue() {
-      if (direction.doForward()) {
+   protected Object getBoundValue(boolean pendingChild) {
+      if (direction.doForward() || (pendingChild && isDefinedObject(boundValues[boundValues.length-1]))) {
          return boundValues[boundValues.length-1];
       }
       return evalBinding();
@@ -230,7 +230,7 @@ public class SelectorBinding extends DestinationListener {
                if (changed)
                   Bind.parentBindingChanged(boundProps[i]);
 
-               Object newValue = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(lastParent, boundProps[i]);
+               Object newValue = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(lastParent, boundProps[i], false, false);
 
                if (!DynUtil.equalObjects(newValue, boundValues[i])) {
                   bindingParent = newValue;
@@ -276,7 +276,7 @@ public class SelectorBinding extends DestinationListener {
          // elements since they may well have changed.
          for (i = 0; i < boundProps.length; i++) {
             if (changed || (PBindUtil.equalProps(srcProp, boundProps[i]) && srcObject == bindingParent)) {
-               Object newValue = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(lastParent, boundProps[i]);
+               Object newValue = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(lastParent, boundProps[i], false, false);
 
                if (!DynUtil.equalObjects(newValue, boundValues[i])) {
                   bindingParent = newValue;
@@ -332,7 +332,7 @@ public class SelectorBinding extends DestinationListener {
          Object lastParent = obj;
          boolean changed = false;
          for (int i = 0; i < validateTo; i++) {
-            Object newValue = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(lastParent, boundProps[i]);
+            Object newValue = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(lastParent, boundProps[i], false, false);
 
             if (!DynUtil.equalObjects(newValue, boundValues[i])) {
                updateBoundValue(i, newValue);
@@ -354,9 +354,9 @@ public class SelectorBinding extends DestinationListener {
 
       // TODO: Need to replace nulls with 0 for primitives?
       if (dstProp instanceof IBinding)
-         ((IBinding) dstProp).applyBinding(dstObj == dstProp ? null : dstObj, getBoundValue(), this, false, false);
+         ((IBinding) dstProp).applyBinding(dstObj == dstProp ? null : dstObj, getBoundValue(false), this, false, false);
       else if (dstProp instanceof String)
-         PBindUtil.setPropertyValue(dstObj, dstProp, getBoundValue());
+         PBindUtil.setPropertyValue(dstObj, dstProp, getBoundValue(false));
 
    }
 
@@ -365,9 +365,9 @@ public class SelectorBinding extends DestinationListener {
       Object bProp = getBoundProperty();
 
       valid = true;
-      Object newValue = PBindUtil.getPropertyValue(dstObj, dstProp);
+      Object newValue = PBindUtil.getPropertyValue(dstObj, dstProp, false, false);
 
-      if (!DynUtil.equalObjects(newValue, getBoundValue())) {
+      if (!DynUtil.equalObjects(newValue, getBoundValue(false))) {
          Bind.applyBinding(bObj, bProp, newValue, this);
          return true;
       }
@@ -382,7 +382,7 @@ public class SelectorBinding extends DestinationListener {
       Object bindingParent = null;
 
       for (int i = 0; i <= last; i++) {
-         bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+         bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, false);
          // The first time the bindingParent is null but it should be non-null for the second and subsequent
          if (bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL)
             return last == boundProps.length - 1 ? null : UNSET_VALUE_SENTINEL; // return null for the last one as that's the real binding's value.  otherwise the binding would yield an NPE so we return UNSET
@@ -417,7 +417,7 @@ public class SelectorBinding extends DestinationListener {
 
    private ISet<Object> dstPropSet() {
       if (dstProp instanceof IBinding)
-         return new SingleElementSet<Object>(((IBinding)dstProp).getPropertyValue(dstObj, false));
+         return new SingleElementSet<Object>(((IBinding)dstProp).getPropertyValue(dstObj, false, false));
       return null;
    }
 
@@ -447,7 +447,7 @@ public class SelectorBinding extends DestinationListener {
             Bind.parentBindingChanged(boundProps[i]);
             if (activated) {
                //boundValues[i] = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : boundProps[i].getPropertyValue(bindingParent);
-               updateBoundValue(i, boundValues[i] = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(bindingParent, boundProps[i]));
+               updateBoundValue(i, boundValues[i] = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, pendingChild));
             }
             bindingParent = boundValues[i];
          }
@@ -465,10 +465,10 @@ public class SelectorBinding extends DestinationListener {
       }
    }
 
-   public Object getPropertyValue(Object obj, boolean getField) {
+   public Object getPropertyValue(Object obj, boolean getField, boolean pendingChild) {
       if (!valid)
          validateBinding(obj);
-      return getBoundValue();
+      return getBoundValue(pendingChild);
    }
 
    public void addBindingListener(Object eventObject, IListener listener, int event) {
@@ -512,7 +512,7 @@ public class SelectorBinding extends DestinationListener {
    }
 
    protected Object getBoundProperty(Object bindingParent, int i) {
-      return !isValidObject(bindingParent) ? (bindingParent == PENDING_VALUE_SENTINEL ? PENDING_VALUE_SENTINEL : UNSET_VALUE_SENTINEL) : PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+      return !isValidObject(bindingParent) ? (bindingParent == PENDING_VALUE_SENTINEL ? PENDING_VALUE_SENTINEL : UNSET_VALUE_SENTINEL) : PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, false);
    }
 
    public void activate(boolean state, Object obj, boolean chained) {
@@ -545,7 +545,7 @@ public class SelectorBinding extends DestinationListener {
          for (int i = 0; i <= last; i++) {
             Object oldValue = boundValues[i];
             if (isValidObject(bindingParent)) {
-               boundValues[i] = bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i]);
+               boundValues[i] = bindingParent = PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, false);
             }
             else {
                boundValues[i] = bindingParent = UNSET_VALUE_SENTINEL;

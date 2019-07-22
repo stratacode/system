@@ -999,6 +999,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       if ((options & CopyReplace) != 0l) {
          replacedByStatement = res;
       }
+
       return res;
    }
 

@@ -305,7 +305,7 @@ public class ExecutionContext {
          try {
             IBeanMapper mapper = PTypeUtil.getPropertyMapping(currentObject.getClass(), name);
             if (mapper != null)
-               return mapper.getPropertyValue(currentObject, false);
+               return mapper.getPropertyValue(currentObject, false, false);
          }
          catch (IllegalArgumentException exc) {}
          if (res != null)

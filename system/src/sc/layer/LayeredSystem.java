@@ -3704,6 +3704,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.arraycopy(params, 0, newParams, 1, params.length);
             params = newParams;
          }
+         Class typeCL = (Class) typeObj;
          return PTypeUtil.createInstance((Class) typeObj, constrSig, params);
       }
       else
@@ -4065,7 +4066,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
            "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition",
            "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer", "sc.lang.java.Parameter",
            // From EditorContext (JLineInterpreter is replaced with EditorContext on the client so is implicitly sync'd)
-           "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession"));
+           "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession", "sc.sync.ClassSyncWrapper"));
 
    // Called by any clients who need to use the LayeredSystem as a sync object.  Because this class is not compiled by StrataCode, we define the sync mappings
    // explicitly through the apis.
@@ -13340,7 +13341,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   if (mapper != null) {
                      // Can't evaluate an instance property anyway
                      if (mapper.getStaticPropertyPosition() != -1)
-                        nextObj = mapper.getPropertyValue(null, false);
+                        nextObj = mapper.getPropertyValue(null, false, false);
                      else
                         return null;
                   }

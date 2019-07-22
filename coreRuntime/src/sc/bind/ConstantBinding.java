@@ -14,7 +14,7 @@ public class ConstantBinding implements IBinding {
       value = val;
    }
    
-   public Object getPropertyValue(Object parent, boolean getField) {
+   public Object getPropertyValue(Object parent, boolean getField, boolean pendingChild) {
       return value;
    }
 

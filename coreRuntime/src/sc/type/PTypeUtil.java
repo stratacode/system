@@ -217,7 +217,7 @@ public class PTypeUtil {
 
    public static Object getProperty(Object parent, Object mapping, boolean getField) {
       if (mapping instanceof IBeanMapper)
-         return ((IBeanMapper) mapping).getPropertyValue(parent, getField);
+         return ((IBeanMapper) mapping).getPropertyValue(parent, getField, false);
       else if (parent instanceof IDynObject) {
          if (mapping instanceof String)
             return ((IDynObject) parent).getProperty((String) mapping, getField);

@@ -116,4 +116,9 @@ public class InstanceWrapper implements IObjectId {
       }
       return sb.toString();
    }
+
+   public InstanceWrapper copyWithInstance(Object instance) {
+      InstanceWrapper newWrapper = new InstanceWrapper(ctx, instance, typeName, null, false);
+      return newWrapper;
+   }
 }

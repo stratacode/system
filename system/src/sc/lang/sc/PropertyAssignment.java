@@ -43,6 +43,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    public void init() {
       if (initialized) return;
+
       super.init();
 
       bindingDirection = ModelUtil.initBindingDirection(operator);
@@ -767,12 +768,11 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return pa;
    }
 
-   /** This returns the initializer for this assignment.  If this is an overrie statement with no initializer, the OverrideAssigment class will return the inherited initializer. */
    public IVariableInitializer getInheritedMember() {
       return this;
    }
 
-   /** This returns the initializer for this assignment.  If this is an overrie statement with no initializer, the OverrideAssigment class will return the inherited initializer. */
+   /** This returns the initializer for this assignment.  If this is an override statement with no initializer, the OverrideAssignment class will return the inherited initializer. */
    public Expression getInitializerExpr() {
       return initializer;
    }

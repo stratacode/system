@@ -107,12 +107,6 @@ public class QuestionMarkExpression extends Expression {
          falseChoice.setBindingInfo(bindingDirection, bindingStatement, true);
    }
 
-   public void changeExprssionsThis(TypeDeclaration fromTD, TypeDeclaration outer, String varName) {
-      condition.changeExpressionsThis(fromTD, outer, varName);
-      trueChoice.changeExpressionsThis(fromTD, outer, varName);
-      falseChoice.changeExpressionsThis(fromTD, outer, varName);
-   }
-
    public void visitTypeReferences(CycleInfo info, TypeContext ctx) {
       info.visit(condition, ctx, false);
       info.visit(trueChoice, ctx, false);
