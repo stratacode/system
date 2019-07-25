@@ -663,6 +663,7 @@ public class SyncLayer {
          isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) &&
                   (!currentObjNames.contains(changedObjName) || !equalStrings(changedObjPkg, changeCtx.lastPackageName)) &&
                   createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
+
          newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).instInfo.args : isNew ? parentContext.getNewArgs(changedObj) : null;
          Object changedObjType = syncHandler.getObjectType(changedObj);
          objTypeName = DynUtil.getTypeName(changedObjType, false);

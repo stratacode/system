@@ -1130,7 +1130,7 @@ public class SyncManager {
          if (isParentNewInstance(changedObj))
             return true;
 
-         // For calling remote methods, we need to support objects which are not synhronized - at least calls to rooted objects.  Those are never new anyway.
+         // For calling remote methods, we need to support objects which are not synchronized - at least calls to rooted objects.  Those are never new anyway.
          return !isRootedObject(changedObj);
       }
 
@@ -1419,7 +1419,7 @@ public class SyncManager {
          useLayer.addFetchProperty(inst, propName);
 
          if (trace || verbose || verboseValues) {
-            System.out.println("Fetch property: " + DynUtil.getInstanceName(inst)  + " scope: " + name + (!needsSync ? " *** first change in sync" : ""));
+            System.out.println("Fetch property: " + DynUtil.getInstanceName(inst) + "." + propName + " scope: " + name + (!needsSync ? " *** first change in sync" : ""));
          }
          markChanged();
       }
@@ -1977,6 +1977,9 @@ public class SyncManager {
                objectIds.remove(inst);
             SyncLayer changedLayer = getChangedSyncLayer(syncProps.syncGroup);
             changedLayer.removeSyncInst(inst);
+
+            if (initialSyncLayer != null)
+               initialSyncLayer.removeSyncInst(inst);
          }
 
          if (toRemove.valueListener != null) {
@@ -2923,6 +2926,25 @@ public class SyncManager {
       }
    }
 
+   public static SyncContext getRootSyncContextForInst(Object inst) {
+      // The scopes from global -> request
+      ArrayList<ScopeDefinition> scopes = ScopeDefinition.scopes;
+
+      // process them in the forward direction so we get the root scope context
+      for (int i = 0; i < scopes.size(); i++) {
+         ScopeDefinition scopeDef = scopes.get(i);
+         if (scopeDef != null) {
+            ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+            if (scopeCtx != null) {
+               SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+               if (syncCtx != null && syncCtx.hasSyncInst(inst))
+                  return syncCtx;
+            }
+         }
+      }
+      return null;
+   }
+
    public static SyncContext getSyncContextForInst(Object inst) {
       // The scopes from global -> request
       ArrayList<ScopeDefinition> scopes = ScopeDefinition.scopes;
@@ -2945,7 +2967,8 @@ public class SyncManager {
    public static void removeSyncInst(Object inst) {
       Object type = DynUtil.getType(inst);
 
-      SyncContext syncCtx = getSyncContextForInst(inst);
+      // Removing this instance from all sync contexts by starting at the top
+      SyncContext syncCtx = getRootSyncContextForInst(inst);
       if (syncCtx != null) {
          SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
          if (syncProps != null) {

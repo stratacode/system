@@ -217,7 +217,7 @@ public abstract class SyncDestination {
       boolean anyChanges; // Did the sync request contain any changes
       public SyncListener(ArrayList<SyncLayer> sls, boolean anyChanges) {
          syncLayers = sls;
-         clientContext = sls.get(0).syncContext;
+         clientContext = sls.get(sls.size()-1).syncContext;
          this.anyChanges = anyChanges;
       }
 
@@ -371,7 +371,7 @@ public abstract class SyncDestination {
       finally {
          if (!complete && errorMessage == null)
             errorMessage = "Sync failed.";
-         SyncManager.SyncContext clientContext = layers.get(0).syncContext;
+         SyncManager.SyncContext clientContext = layers.get(layers.size()-1).syncContext;
          for (SyncLayer syncLayer:layers) {
             syncLayer.completeSync(clientContext, errorMessage == null ? null : SYNC_FAILED_ERROR, errorMessage);
          }
