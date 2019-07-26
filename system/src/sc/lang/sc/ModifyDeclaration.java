@@ -866,8 +866,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object[] getConstructors(Object refType) {
-      Object[] res = super.getConstructors(refType);
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
+      Object[] res = super.getConstructors(refType, includeHidden);
 
       if (modifyTypeDecl != null && !modifyInherited) {
          Object[] modConsts = modifyTypeDecl.getConstructors(refType);

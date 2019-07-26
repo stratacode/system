@@ -243,4 +243,10 @@ public class HTMLElement<RE> extends Element<RE> {
       pendingType = null;
 
    }
+
+   // To be called on the client only where it calls the DOM focus element
+   @sc.obj.Exec(clientOnly=true)
+   public void focus() {
+   }
+
 }

@@ -819,7 +819,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
          Object[] constructors = null;
          if (!isObject || useNewTemplate) {
-            constructors = isObject && !useNewTemplate ? null : getConstructors(null);
+            constructors = isObject && !useNewTemplate ? null : getConstructors(null, false);
             if (constructorPropInfo != null && constructorPropInfo.constr != null) {
                if (constructors == null) {
                   constructors = new Object[] {constructorPropInfo.constr};
@@ -1591,7 +1591,7 @@ public class ClassDeclaration extends TypeDeclaration {
             ConstructorDefinition propConstr = res.constructorPropInfo.constr;
             if (propConstr != null) {
                propConstr.parentNode = this;
-               addToHiddenBody(propConstr, true);
+               res.addToHiddenBody(propConstr, true);
             }
          }
       }

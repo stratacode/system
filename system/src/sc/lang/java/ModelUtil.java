@@ -3158,9 +3158,15 @@ public class ModelUtil {
    }
 
    public static Object[] getConstructors(Object td, Object refType) {
+      return getConstructors(td, refType, false);
+   }
+
+   public static Object[] getConstructors(Object td, Object refType, boolean includeHidden) {
       while (ModelUtil.hasTypeParameters(td))
          td = ModelUtil.getParamTypeBaseType(td);
-      if (td instanceof ITypeDeclaration)
+      if (td instanceof BodyTypeDeclaration)
+         return ((BodyTypeDeclaration) td).getConstructors(refType, includeHidden);
+      else if (td instanceof ITypeDeclaration)
          return ((ITypeDeclaration) td).getConstructors(refType);
       else if (td instanceof Class) {
          Object[] res = RTypeUtil.getConstructors((Class) td);
@@ -9288,19 +9294,28 @@ public class ModelUtil {
       return Collections.emptySet();
    }
 
-   public static Object getEditorCreateMethod(Object typeObj) {
+   public static Object getEditorCreateMethod(LayeredSystem sys, Object typeObj) {
       Object[] methods = ModelUtil.getAllMethods(typeObj, "public", true, false, false);
-      if (methods == null)
-         return null;
-      for (Object method:methods) {
-         Object annot = ModelUtil.getAnnotation(method, "sc.obj.EditorCreate");
-         if (annot != null) {
-            if (ModelUtil.isConstructor(method)) {
-               if (ModelUtil.sameTypes(ModelUtil.getEnclosingType(method), typeObj))
-                  return method;
+      if (methods != null) {
+         for (Object method:methods) {
+            Object annot = ModelUtil.getAnnotation(method, "sc.obj.EditorCreate");
+            if (annot != null) {
+               if (ModelUtil.isConstructor(method)) {
+                  if (ModelUtil.sameTypes(ModelUtil.getEnclosingType(method), typeObj))
+                     return method;
+               }
+               return method;
             }
-            return method;
          }
+      }
+      // If it's set at the type level, pick the first constructor in the list.
+      Object annot = ModelUtil.getInheritedAnnotation(sys, typeObj, "sc.obj.EditorCreate");
+      if (annot != null) {
+         Object[] constrs = ModelUtil.getConstructors(typeObj, null, true);
+         // Refer the type itself when there's only the empty constructor
+         if (constrs == null || constrs.length == 0 )
+            return typeObj;
+         return constrs[0];
       }
       return null;
    }

@@ -18,6 +18,7 @@ import java.util.TreeMap;
 public class Select<RE> extends HTMLElement<RE> {
    private final static sc.type.IBeanMapper _selectedValueProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedValue");
    private final static sc.type.IBeanMapper _selectedIndexProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedIndex");
+   private final static sc.type.IBeanMapper _optionDataSourceProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "optionDataSource");
    private final static TreeMap<String,IBeanMapper> selectServerTagProps = new TreeMap<String,IBeanMapper>();
    static {
       selectServerTagProps.put("selectedIndex", _selectedIndexProp);
@@ -62,8 +63,15 @@ public class Select<RE> extends HTMLElement<RE> {
       return optionDataSource;
    }
 
+   @Bindable(manual=true)
    public void setOptionDataSource(List values) {
       optionDataSource = values;
+      if (values != optionDataSource) {
+         if (values != null && selectedIndex != -1 && selectedIndex < values.size() && selectedValue == null) {
+            setSelectedValue(values.get(selectedIndex));
+         }
+         Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _optionDataSourceProp, values);
+      }
    }
 
    private Object selectedValue;

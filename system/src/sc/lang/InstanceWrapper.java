@@ -114,6 +114,9 @@ public class InstanceWrapper implements IObjectId {
       if (theInstance != null) {
          sb.append(CTypeUtil.escapeIdentifierString(DynUtil.getInstanceId(theInstance)));
       }
+      else if (pendingCreate) {
+         sb.append("_pending_new_");
+      }
       return sb.toString();
    }
 

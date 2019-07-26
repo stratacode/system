@@ -768,9 +768,11 @@ public class EditorContext extends ClientEditorContext {
       }
 
       String layerPrefix = layer.packagePrefix;
-      if (!currentPackage.startsWith(layerPrefix))
+      if (currentPackage == null || currentPackage.length() == 0)
+         currentPackage = layerPrefix;
+      else if (currentPackage != null && !currentPackage.startsWith(layerPrefix))
          return "Bad package for layer!";
-      String relType = currentPackage.equals(layerPrefix) ? null : layerPrefix.length() == 0 ? currentPackage : currentPackage.substring(layerPrefix.length()+1);
+      String relType = currentPackage == null || currentPackage.equals(layerPrefix) ? null : layerPrefix.length() == 0 ? currentPackage : currentPackage.substring(layerPrefix.length()+1);
       String relPath = relType == null ? null : relType.replace(".", FileUtil.FILE_SEPARATOR);
 
       String relFile = FileUtil.concat(relPath, name + "." + SCLanguage.STRATACODE_SUFFIX);
@@ -779,7 +781,8 @@ public class EditorContext extends ClientEditorContext {
       if (abs.canRead())
          return "Type named: " + name + " already exists for layer: " + layer;
 
-      Object existingType = system.getSrcTypeDeclaration(CTypeUtil.prefixPath(currentPackage, name), layer.getNextLayer(), true);
+      String newTypeName = CTypeUtil.prefixPath(currentPackage, name);
+      Object existingType = system.getSrcTypeDeclaration(newTypeName, layer.getNextLayer(), true);
       TypeDeclaration td;
       if (existingType != null) {
          // Just create a modify if there's already a type by that name... should we ensure mode matches the existing type?
@@ -809,6 +812,8 @@ public class EditorContext extends ClientEditorContext {
       system.addNewModel(newModel, null, execContext, null, false, true);
 
       system.notifyModelAdded(newModel);
+
+      addCreateInstTypeName(newTypeName);
 
       return td;
    }

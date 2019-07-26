@@ -23,7 +23,20 @@ public class Document extends HTMLElement implements IObjectId {
    private final static sc.type.IBeanMapper mouseMoveEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Document.class, "mouseMoveEvent");
    private final static sc.type.IBeanMapper mouseUpEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Document.class, "mouseUpEvent");
 
+   private final static sc.type.IBeanMapper activeElementProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Document.class, "activeElement");
+
    private static IBeanMapper[] documentSyncProps = new IBeanMapper[] {mouseDownEventProp, mouseMoveEventProp, mouseUpEventProp};
+
+   private Element activeElement;
+
+   public void setActiveElement(Element ae) {
+      this.activeElement = ae;
+      Bind.sendChange(this, activeElementProp, ae);
+   }
+
+   public Element getActiveElement() {
+      return activeElement;
+   }
 
    /* inherited via the DOM events
    private MouseEvent mouseMoveEvent, mouseUpEvent;

@@ -179,4 +179,13 @@ public abstract class ClientEditorContext {
             return tn;
       return null;
    }
+
+   public void addCreateInstTypeName(String typeName) {
+      if (createInstTypeNames == null)
+         createInstTypeNames = new ArrayList<String>();
+      if (!createInstTypeNames.contains(typeName)) {
+         createInstTypeNames.add(typeName);
+         Bind.sendChangedEvent(this, "createInstTypeNames");
+      }
+   }
 }

@@ -2025,7 +2025,7 @@ public class Sequence extends NestedParselet  {
                   // design of the skipOnErrorParselet so that it leaves us in the state for the next match on this choice.  It should not breakup
                   // an identifier for example.
                   Object errorRes = parser.reparseNext(skipOnErrorParselet, oldChildParseNode, dctx, forceReparse, null);
-                  if (!(errorRes instanceof ParseError) && errorRes != null) {
+                  if (!(errorRes instanceof ParseError) && errorRes != null && !(errorRes instanceof ErrorParseNode)) {
                      if (value == null) {
                         value = resetOldParseNode(forceReparse ? null : oldParent, lastMatchIndex, false, false);
                      }

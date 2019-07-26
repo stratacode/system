@@ -4063,7 +4063,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
            "sc.lang.java.ClassDeclaration", "sc.lang.java.ClientTypeDeclaration", "sc.lang.java.VariableDefinition",
            "sc.lang.sc.PropertyAssignment", "sc.lang.java.JavaModel", "sc.lang.sc.SCModel",  "sc.lang.template.Template",
            "sc.layer.SrcEntry", "sc.lang.java.ParamTypedMember", "sc.lang.java.ParamTypeDeclaration",
-           "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition",
+           "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition", "sc.lang.java.ConstructorDefinition",
            "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer", "sc.lang.java.Parameter",
            // From EditorContext (JLineInterpreter is replaced with EditorContext on the client so is implicitly sync'd)
            "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession", "sc.sync.ClassSyncWrapper"));

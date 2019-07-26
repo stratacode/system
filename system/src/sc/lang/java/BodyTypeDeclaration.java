@@ -1008,21 +1008,30 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object[] getConstructors(Object refType) {
-      int ct = 0;
+      // By default, not returning the hidden constructors - i.e. those that are propagated but some places might need to pass this as 'true'
+      return getConstructors(refType, false);
+   }
 
-      if (body != null) {
-         ArrayList<Object> res = null;
-         for (Statement s : body) {
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
+      ArrayList<Object> res = addConstructors(null, body, refType);
+      if (includeHidden)
+         res = addConstructors(res, hiddenBody, refType);
+      if (res != null)
+         return res.toArray();
+      return null;
+   }
+
+   private ArrayList<Object> addConstructors(ArrayList<Object> res, SemanticNodeList<Statement> bodyList, Object refType) {
+      if (bodyList != null) {
+         for (Statement s : bodyList) {
             if (s instanceof ConstructorDefinition && (refType == null || ModelUtil.checkAccess(refType, s))) {
                if (res == null)
                   res = new ArrayList<Object>();
                res.add(s);
             }
          }
-         if (res != null)
-            return res.toArray();
       }
-      return null;
+      return res;
    }
 
    Object getPropagatedConstructor() {
@@ -10150,7 +10159,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public AbstractMethodDefinition getEditorCreateMethod() {
-      return (AbstractMethodDefinition) ModelUtil.getEditorCreateMethod(this);
+      return (AbstractMethodDefinition) ModelUtil.getEditorCreateMethod(getLayeredSystem(), this);
    }
 
    public String getConstructorParamNames() {
