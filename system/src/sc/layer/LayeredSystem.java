@@ -4113,7 +4113,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncHandler(ClassDeclaration.class, LayerSyncHandler.class);
 
          SyncManager.addSyncType(ClientTypeDeclaration.class, typeProps);
-         SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Need this so we can use restore to go back
+         SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Register this handler to replace ClientTypeDeclaration with the normal TypeDeclaration on the restore
 
          SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags"},
                                  null, SyncPropOptions.SYNC_INIT| SyncPropOptions.SYNC_CONSTANT, globalScopeId));

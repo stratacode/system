@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import sc.bind.Bind;
+import sc.bind.Bindable;
 import sc.bind.IChangeable;
 import sc.dyn.DynUtil;
 import sc.layer.Layer;
@@ -40,12 +41,15 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
    }
 
    private List<Object> declaredProperties;
-   @Constant
+   @Bindable(manual=true)
    public List<Object> getDeclaredProperties() {
       return declaredProperties;
    }
    public void setDeclaredProperties(List<Object> ap) {
-      declaredProperties = ap;
+      if (!DynUtil.equalObjects(ap, declaredProperties)) {
+         declaredProperties = ap;
+         Bind.sendChangedEvent(this, "declaredProperties");
+      }
    }
 
    private String constructorParamNames;
