@@ -91,9 +91,8 @@ public class JSONParser {
          // When the string value starts with 'ref:' we insert a \ as the first char so just need to strip this off.
          else if (val.charAt(0) == '\\' && len > 5 && isRefPrefix(val, 1))
             val = val.subSequence(1, len);
-
-         val = CTypeUtil.unescapeJavaString(val);
       }
+      val = CTypeUtil.unescapeJavaString(val);
       return val;
    }
 
