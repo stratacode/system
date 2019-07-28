@@ -41,6 +41,7 @@ public abstract class BaseURLParamProperty {
       if (mapper == null)
          throw new IllegalArgumentException("No query param property: " + this);
       propType = DynUtil.getPropertyType(mapper);
+      /*
       if (!ModelUtil.isAssignableFrom(String.class, propType)) {
          IBeanMapper converterMapper = PTypeUtil.getPropertyMappingConverter(mapper, String.class, null);
          if (converterMapper != null)
@@ -48,6 +49,7 @@ public abstract class BaseURLParamProperty {
          else
             throw new IllegalArgumentException("No converter for type: " + propType + " to convert query parameter for this: " + this);
       }
+      */
    }
 
 }

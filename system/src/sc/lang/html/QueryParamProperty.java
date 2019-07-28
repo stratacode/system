@@ -75,4 +75,26 @@ public class QueryParamProperty extends BaseURLParamProperty {
       sb.append("QueryParam: " + paramName + " mapped to: " + enclType + "." + propName);
       return sb.toString();
    }
+
+   public void setPropertyValue(Object inst, String strVal) {
+      IBeanMapper localMapper = getMapper();
+      if (ModelUtil.isInteger(propType)) {
+         // Don't set int properties which are not set. For strings, we'll set 'null' as the value
+         if (strVal == null && ModelUtil.isPrimitive(propType))
+            return;
+
+         int intVal;
+         try {
+            intVal = Integer.parseInt(strVal);
+         }
+         catch (NumberFormatException exc) {
+            throw new IllegalArgumentException("Illegal value for integer property: " + strVal);
+         }
+         localMapper.setPropertyValue(inst, intVal);
+      }
+      else if (ModelUtil.isString(propType))
+         localMapper.setPropertyValue(inst, strVal);
+      else
+         throw new UnsupportedOperationException("No converter for query parameter type: " + propType);
+   }
 }
