@@ -4061,6 +4061,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       boolean isComponent = ModelUtil.isComponentType(this);
 
+      // Register global objects here before initializing the fields so any resolveName calls made in there will find this instance and not try to create another one
+      if (!isLayerType && getDeclarationType() == DeclarationType.OBJECT)
+         registerGlobalObject(inst);
+
       if (isComponent) {
          initDynStatements(inst, ctx, TypeDeclaration.InitStatementMode.SimpleOnly);
       }
@@ -5540,7 +5544,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                                  break;
                            }
                            if (foundIx == sz) {
-                              // TODO: this variable is not presenet in the field def we need to remove this field
+                              // TODO: this variable is not present in the field def we need to remove this field
                               // from the dynamic model.  If it is present, we'll just come back around here again with
                               // replaced = true and update its initializer then.
                               System.err.println("*** Unimplemented: Not removing field from dynamic model!");
@@ -7288,14 +7292,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             initDynInstance(inst, ctx, true, true, outerObj, argValues);
          }
 
-         ScopeDefinition sd = getScopeDefinition();
-         if (getEnclosingInstType() == null && (sd == null || sd.isGlobal()))
-            getJavaModel().addGlobalObject(getFullTypeName(), inst);
+         // TODO: remove this? it should now be done in DynObject.create because it needs to be registered before we call the initDynamicFields in case
+         // there's a recursive reference to this type.
+         registerGlobalObject(inst);
       }
       if (inst == null)
          throw new IllegalArgumentException("Unable to create instance of : " + typeName);
 
       return inst;
+   }
+
+   void registerGlobalObject(Object inst) {
+      ScopeDefinition sd = getScopeDefinition();
+      if (getEnclosingInstType() == null && (sd == null || sd.isGlobal()))
+         getJavaModel().addGlobalObject(getFullTypeName(), inst);
    }
 
    // See also initDynSyncInst below which is similar but for DynObjects
@@ -9537,8 +9547,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    /**
-    * Used for synchronization.  We could just use TypeDeclaration but this class is treated as a special class - like java.lang.Class.
-    * DynUtil.isType needs to return false when we are using this for serialization so there needs to be a new class
+    * Used for synchronization.  We could just use TypeDeclaration but it is itself treated as a special class - like java.lang.Class that denotes a type in the system,
+    * Here we need an instance that's not considered a type so we use a special subclass. The main difference is that for ClientTypeDeclaration
+    * DynUtil.isType returns false.
     */
    public ClientTypeDeclaration getClientTypeDeclaration() {
       if (clientTypeDeclaration == null) {
