@@ -4073,10 +4073,25 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
+   private void destroyRepeatTags() {
+      if (repeatTags != null) {
+         for (int i = 0; i < repeatTags.size(); i++) {
+            Element elem = repeatTags.get(i);
+            DynUtil.dispose(elem, true);
+         }
+         repeatTags = null;
+      }
+   }
+
+   public void rebuildRepeat() {
+      destroyRepeatTags();
+      refreshRepeat(false);
+   }
+
    /**
-    * For application code to manually synchronize the repeat state of the tags.  The noRefresh flag applies to the client
-    * which is doing incremental refresh... here on the server, we render the entire page at the end of the response so
-    * it has no effect.
+    * For application code to manually synchronize the repeat state of the tags.
+    *    TODO: do we need to support noRefresh on the server? I think we always refresh at the end
+    *    of the request so maybe it's not needed here?
     */
    public void refreshRepeat(boolean noRefresh) {
       if (repeat != null) {
