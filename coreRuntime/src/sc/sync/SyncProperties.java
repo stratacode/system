@@ -9,6 +9,7 @@ import sc.util.IntCoalescedHashMap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /** Represents a set of properties which are synchronized to a specific destination. */
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
@@ -209,5 +210,55 @@ public class SyncProperties {
             staticProps = mergedStatic.toArray();
          }
       }
+   }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof SyncProperties))
+         return false;
+      if (other == this)
+         return true;
+
+      SyncProperties op = (SyncProperties) other;
+      if (!DynUtil.equalObjects(op.destName, destName))
+         return false;
+      if (!DynUtil.equalObjects(op.syncGroup, syncGroup))
+         return false;
+      if (!Arrays.equals(op.classProps, classProps))
+         return false;
+      if (!DynUtil.equalObjects(op.chainedProps, chainedProps))
+         return false;
+      if (!DynUtil.equalObjects(op.allowCreate, allowCreate))
+         return false;
+      if (!DynUtil.equalObjects(op.initDefault, initDefault))
+         return false;
+      if (!DynUtil.equalObjects(op.constant, constant))
+         return false;
+      if (!DynUtil.equalObjects(op.broadcast, broadcast))
+         return false;
+      if (!DynUtil.equalObjects(op.defaultScopeId, defaultScopeId))
+         return false;
+      if (!DynUtil.equalObjects(op.defaultPropOptions, defaultPropOptions))
+         return false;
+      return true;
+   }
+
+   public int hashCode() {
+      if (classProps == null)
+         return 0;
+      return Arrays.hashCode(classProps);
+   }
+
+   public Object[] getNewSyncProperties(SyncProperties old) {
+      Object[] oldProps = old.getSyncProperties();
+      Object[] newProps = getSyncProperties();
+      if (oldProps == null)
+         return newProps;
+      ArrayList<Object> res = new ArrayList<Object>();
+      List<Object> oldList = Arrays.asList(oldProps);
+      for (Object newProp:newProps) {
+         if (!oldList.contains(newProp))
+            res.add(newProp);
+      }
+      return res.toArray();
    }
 }

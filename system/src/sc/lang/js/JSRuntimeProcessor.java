@@ -1885,8 +1885,19 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          if (td.body != null) {
             for (Statement st:td.body) {
-               if (((st instanceof BlockStatement || st instanceof PropertyAssignment || st instanceof FieldDefinition) && !st.isStatic()) || st instanceof ConstructorDefinition)
+               if (((st instanceof BlockStatement || st instanceof PropertyAssignment || st instanceof FieldDefinition) && !st.isStatic()) || st instanceof ConstructorDefinition) {
                   updParams.needsConstructor = true;
+                  if (st instanceof FieldDefinition) {
+                     if (updParams.changedMethods == null)
+                        updParams.changedMethods = new TreeSet<String>();
+                     FieldDefinition field = (FieldDefinition) st;
+                     // Just in case this field is converted into get/set methods, need to send the changed methods.
+                     for (VariableDefinition varDef:field.variableDefinitions) {
+                        updParams.changedMethods.add("get" + CTypeUtil.capitalizePropertyName(varDef.variableName));
+                        updParams.changedMethods.add("set" + CTypeUtil.capitalizePropertyName(varDef.variableName));
+                     }
+                  }
+               }
                else if (st instanceof BodyTypeDeclaration) {
                   updParams.needsConstructor = true;
                   if (updParams.changedMethods == null)
@@ -1918,7 +1929,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
-   void appendJSMergeTemplate(BodyTypeDeclaration td, StringBuilder result, boolean syncTemplate) {
+   void appendJSMergeTemplate(BodyTypeDeclaration td, StringBuilder result, boolean syncTemplate, boolean updateStaticType) {
       if (td instanceof EnumDeclaration) {
          td = ((EnumDeclaration) td).transformEnumToJS();
          ensureTransformed(td);
@@ -1936,6 +1947,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       JSTypeParameters typeParams = new JSTypeParameters(td);
       typeParams.mergeTemplate = true;
       typeParams.syncTemplate = syncTemplate;
+      typeParams.updateStaticType = updateStaticType;
 
       String rootTypeResult = TransformUtil.evalTemplate(typeParams, getMergeJSTemplate(td, syncTemplate));
       result.append(rootTypeResult);
@@ -1959,13 +1971,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return td.getTransformedResult();  // Then walk back down to get the transformed result - the end Java version.  This is probably over kill...
    }
 
-   void appendInnerJSMergeTemplate(BodyTypeDeclaration innerType, StringBuilder result, boolean syncTemplate) {
+   void appendInnerJSMergeTemplate(BodyTypeDeclaration innerType, StringBuilder result, boolean syncTemplate, boolean updateStaticType) {
       /*
       if (!syncTemplate && innerType.needsTypeChange() && innerType instanceof ModifyDeclaration) {
          appendJSTypeTemplate(innerType.getModifiedType(), result);
       }
       */
-      appendJSMergeTemplate(innerType, result, syncTemplate);
+      appendJSMergeTemplate(innerType, result, syncTemplate, updateStaticType);
       /*
       if (syncTemplate || innerType instanceof ModifyDeclaration)
          appendJSMergeTemplate(innerType, result, syncTemplate);
@@ -2399,7 +2411,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                appendJSMergeUpdateTemplate(modelType, sb);
             // When we are updating the newly created type, not part of the sync context (where that's really just creating an instance)
             // NOTE: this same logic is also in appendInnerJSMergeTemplate
-            appendJSMergeTemplate(modelType, sb, syncTemplate);
+            appendJSMergeTemplate(modelType, sb, syncTemplate, !syncTemplate);
             /*
             if (syncTemplate || modelType instanceof ModifyDeclaration)
                appendJSMergeTemplate(modelType, sb, syncTemplate);
@@ -3428,6 +3440,21 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       public JSUpdateProperty newUpdateProperty() {
          return new JSUpdateProperty();
+      }
+
+      public class JSAddField extends AddField {
+         public void updateInstances(ExecutionContext ctx) {
+            super.updateInstances(ctx);
+
+            JavaModel model = newType.getJavaModel();
+            TypeDeclaration modifyType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
+            FieldDefinition field = (FieldDefinition) varDef.getDefinition();
+            modifyType.addBodyStatement(field.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyInitLevels, null));
+         }
+      }
+
+      public JSAddField newAddField() {
+         return new JSAddField();
       }
 
       /** For the default operation, removes are run as they are processed because it's too late to retrieve them after the field has been removed from the type. */

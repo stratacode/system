@@ -4283,7 +4283,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (isEnumeratedType())
          return true;
 
-      List<Statement> initSts = getInitStatements(InitStatementsMode.Static, true);
+      List<Statement> initSts = getInitStatements(InitStatementsMode.Static, true, false);
       return initSts != null && initSts.size() > 0;
    }
 
@@ -5575,7 +5575,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      else
                         addBodyStatementAtIndent(insertIx, def);
 
-                     addStaticOrInstField(varDef, ctx);
+                     addStaticOrInstField(varDef, ctx, updateInstances, info);
                   }
                }
             }
@@ -5722,14 +5722,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       System.err.println("*** Can't find statement to remove");
    }
 
-   public void addStaticOrInstField(VariableDefinition varDef, ExecutionContext ctx) {
-      if (!varDef.isDynamicType()) {
+   public void addStaticOrInstField(VariableDefinition varDef, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
+      boolean isDynType = varDef.isDynamicType();
+      if (!isDynType) {
          varDef.getLayeredSystem().setStaleCompiledModel(true, "Adding new field: ", varDef.variableName, " to compiled type: ", varDef.getEnclosingType().toString());
-         return;
       }
       if (varDef.getDefinition().hasModifier("static")) {
          ctx.pushStaticFrame(this);
          try {
+            // TODO: add to UpdateInstanceInfo here!
             // We won't initialize the static value unless they've already been initialized
             addStaticField(varDef, varDef.variableName, staticValues != null ? getVariableInitValue(varDef.getLayeredSystem(), varDef, ctx) : null);
          }
@@ -5738,13 +5739,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
       else {
-         addDynInstField(varDef, true);
-         addFieldToInstances(varDef, ctx);
+         if (isDynType)
+            addDynInstField(varDef, true);
+         addFieldToInstances(varDef, ctx, updateInstances, info);
       }
    }
 
-   public void addFieldToInstances(VariableDefinition varDef, ExecutionContext ctx) {
-      addFieldToInstancesLeaf(varDef, ctx);
+   public void addFieldToInstances(VariableDefinition varDef, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
+      addFieldToInstancesLeaf(varDef, ctx, updateInstances, info);
    }
 
    private static Object getVariableInitValue(LayeredSystem sys, VariableDefinition varDef, ExecutionContext ctx) {
@@ -5760,29 +5762,48 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return initValue;
    }
 
-   public void addFieldToInstancesLeaf(VariableDefinition varDef, ExecutionContext ctx) {
+   public void doAddFieldToInstances(VariableDefinition varDef, ExecutionContext ctx) {
+      LayeredSystem sys = getLayeredSystem();
+      Iterator insts = sys.getInstancesOfType(getRuntimeFullTypeName());
+      if (insts != null) {
+         while (insts.hasNext()) {
+            Object inst = insts.next();
+            Object initValue = null;
+            ctx.pushCurrentObject(inst);
+            try {
+               initValue = getVariableInitValue(sys, varDef, ctx);
+            }
+            finally {
+               // Add the field even if we get an RTE trying to evaluate the value... perhaps ideally case, we could cleanly roll back the add of the field but that's not the case now so we add it with null.
+               if (inst instanceof IDynObject)
+                  ((IDynObject) inst).addProperty(varDef.getTypeDeclaration(), varDef.variableName, initValue);
+               ctx.popCurrentObject();
+            }
+         }
+      }
+   }
+
+   public void addFieldToInstancesLeaf(VariableDefinition varDef, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
       JavaModel model = getJavaModel();
       LayeredSystem sys = model.getLayeredSystem();
+
+      syncPropertiesInited = false;
+      syncProperties = null;
+      // Because we've added a field to either this type or a sub-type, our transformed model needs to be updated - in particular for the new addSyncType call
+      // that includes the new property
+      model.markTransformedChanged();
+
       if (sys.options.liveDynamicTypes && ModelUtil.getLiveDynamicTypes(this)) {
-         Iterator insts = sys.getInstancesOfType(getRuntimeFullTypeName());
-         if (insts != null) {
-            while (insts.hasNext()) {
-               Object inst = insts.next();
-               Object initValue = null;
-               ctx.pushCurrentObject(inst);
-               try {
-                  initValue = getVariableInitValue(sys, varDef, ctx);
-               }
-               finally {
-                  // Add the field even if we get an RTE trying to evaluate the value... perhaps ideally case, we could cleanly roll back the add of the field but that's not the case now so we add it with null.
-                  if (inst instanceof IDynObject)
-                     ((IDynObject) inst).addProperty(varDef.getTypeDeclaration(), varDef.variableName, initValue);
-                  ctx.popCurrentObject();
-               }
+         if (updateInstances && replacedByType == null) {
+            if (info != null) {
+               info.addField(this, varDef);
+            }
+            else {
+               doAddFieldToInstances(varDef, ctx);
             }
          }
          if (isModifiedBySameType()) {
-            replacedByType.addFieldToInstancesLeaf(varDef, ctx);
+            replacedByType.addFieldToInstancesLeaf(varDef, ctx, updateInstances, info);
          }
 
          Iterator<BodyTypeDeclaration> subTypes = sys.getSubTypesOfType((TypeDeclaration) this);
@@ -5790,7 +5811,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             while (subTypes.hasNext()) {
                BodyTypeDeclaration subType = subTypes.next();
                subType = subType.resolve(true);
-               subType.addFieldToInstancesLeaf(varDef, ctx);
+               subType.addFieldToInstancesLeaf(varDef, ctx, updateInstances, info);
             }
          }
       }
@@ -8072,6 +8093,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctx.visited.add(this);
       }
 
+      ModelUtil.ensureStarted(this, false);
+
       try {
          PerfMon.start("getDependencies");
          // Use object identity for hashing the semantic nodes since their hash/equals iterates over all of the properties.
@@ -8272,9 +8295,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                }
                String procPostAssign = defProc.getPostAssignment();
                // TODO: the sync annotation processor doesn't work with constructor args when applied as an instance body.
-               // One fix: add a hiddenBody to ConstructorDefinition similar to hiddenBody.  Make sure isSemanticChildValue is implemented.
-               // loop over the constructors (or just add to the body if there is none).  For each one, append the types but after setting
-               // params.constructor and the args.  For now, sync is handled in createInstance.
+               // One fix: add a hiddenBody to ConstructorDefinition similar to hiddenBody in the type.  Make sure isSemanticChildValue is implemented.
+               // loop over the constructors (or just add to the type body if there is no constructor).  For each constructor, append the types but after setting
+               // params.constructor and the args.  For now, dynamic types implement the sync constructor using special code in createInstance.
                if (procPostAssign != null && !(defProc instanceof SyncAnnotationProcessor)) {
                   TransformUtil.applyTemplateStringToType((TypeDeclaration) this, procPostAssign, "postAssign", true);
                }
@@ -8520,13 +8543,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public List<Statement> getInitStatements(InitStatementsMode mode, boolean isTransformed) {
+   public List<Statement> getInitStatements(InitStatementsMode mode, boolean isTransformed, boolean updateStaticType) {
       List<Statement> res = new ArrayList<Statement>();
 
       if (body != null) {
          for (Statement s:body) {
             if (!(s instanceof AbstractBlockStatement)) {
                if (s.hasModifier("static") != mode.doStatic())
+                  continue;
+            }
+
+            if (updateStaticType) {
+               if (!updateStaticStatement(s))
                   continue;
             }
 
@@ -8541,6 +8569,24 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
       return res;
+   }
+
+   private boolean updateStaticStatement(Statement s) {
+      if (s instanceof BlockStatement) {
+         BlockStatement bs = (BlockStatement) s;
+         if (!bs.staticEnabled)
+            return false;
+
+         // TODO: need to differentiate between static statements which should not be run during a type-update operation (e.g. setting a static instance var back to null) and
+         // one which should be run like SyncManager.addSyncType. Maybe a property in the DefinitionProcessor which tags these statements so we can make this more general?
+         // Or maybe an extension for just making API calls to update the sync info when a field is added or removed.
+         if (bs.statements != null && bs.statements.size() == 1 && bs.statements.get(0) instanceof IdentifierExpression) {
+            IdentifierExpression addSync = (IdentifierExpression) bs.statements.get(0);
+            if (addSync.identifiers != null && addSync.identifiers.size() == 4 && addSync.identifiers.get(2).equals("SyncManager") && addSync.identifiers.get(3).equals("addSyncType"))
+               return true;
+         }
+      }
+      return false;
    }
 
    public String getSignature() {
@@ -9516,8 +9562,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void addInitStatements(List<Statement> res, InitStatementsMode mode) {
       JavaModel model = getJavaModel();
-      // When we are merging changes from the server, an inner type such an object or modify operation is added
-      // as an init statement so we preserve the order of execution of the inner type with respect to its parent.
+      // When this type is part of an SCN update applied to the server (!mergeDeclaration), an inner type either - an object or a modify is added
+      // as an init statement. This preserves the order of execution of the inner type with respect to its parent.
       if (!model.mergeDeclaration && mode == InitStatementsMode.Init) {
          res.add(this);
       }

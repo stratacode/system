@@ -9,6 +9,8 @@ import sc.dyn.IDynObject;
 import sc.dyn.ITypeChangeListener;
 import sc.layer.LayeredSystem;
 import sc.obj.ITypeUpdateHandler;
+import sc.sync.SyncManager;
+import sc.sync.SyncProperties;
 
 import java.util.*;
 
@@ -133,6 +135,35 @@ public class UpdateInstanceInfo {
       }
    }
 
+   public static class AddField extends UpdateAction {
+      protected VariableDefinition varDef;
+
+      public void updateTypes(ExecutionContext ctx) {
+      }
+
+      public void updateInstances(ExecutionContext ctx) {
+         // Make sure sync properties are updated since we clear them before adding the field
+         newType.initSyncProperties();
+         if (newType.isDynamicType()) {
+            if (newType.syncProperties != null) {
+               // In case the sync properties have changed for a dynamic type, update them with the sync manager using the API.
+               // The original call to addSyncType was done through a staticMixinTemplate so uses the same logic
+               // as the compiled type version except that here we have programmatically build the SyncProperties, instead of code-gen
+               for (SyncProperties syncProps:newType.syncProperties) {
+                  SyncManager.addSyncType(newType, syncProps);
+               }
+            }
+         }
+
+         newType.doAddFieldToInstances(varDef, ctx);
+      }
+      void postUpdate(ExecutionContext ctx) {
+      }
+      public String toString() {
+         return "add field " + varDef.variableName + " to: " + newType.typeName;
+      }
+   }
+
    public static class ExecBlock extends UpdateAction {
       protected BlockStatement blockStatement;
 
@@ -159,6 +190,17 @@ public class UpdateInstanceInfo {
       prop.overriddenAssign = overriddenAssign;
       prop.initType = initType;
       actionsToPerform.add(prop);
+   }
+
+   public AddField newAddField() {
+      return new AddField();
+   }
+
+   public void addField(BodyTypeDeclaration newType, VariableDefinition varDef) {
+      AddField af = newAddField();
+      af.newType = newType;
+      af.varDef = varDef;
+      actionsToPerform.add(af);
    }
 
    public ExecBlock newExecBlock() {

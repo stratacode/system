@@ -2858,6 +2858,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       clearTransformed();
    }
 
+   public void markTransformedChanged() {
+      if (getNeedsGeneratedText())
+         refreshGeneratedText();
+      else
+         clearGeneratedText();
+      Bind.sendChangedEvent(this, "cachedGeneratedJSText");
+      Bind.sendChangedEvent(this, "cachedGeneratedText");
+      Bind.sendChangedEvent(this, "cachedGeneratedSCText");
+      Bind.sendChangedEvent(this, "cachedGeneratedClientJavaText");
+      clearTransformed();
+   }
+
    public void setParseNodeValid(boolean val) {
       super.setParseNodeValid(val);
    }

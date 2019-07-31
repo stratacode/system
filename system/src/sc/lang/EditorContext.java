@@ -677,10 +677,6 @@ public class EditorContext extends ClientEditorContext {
          return (String) cdObj;
       TypeDeclaration cd = (TypeDeclaration) cdObj;
       String err = addStatement(currentType, cd, true, addBefore, relPropertyName);
-      if (err == null) {
-         Layer currentLayer = ModelUtil.getLayerForType(system, currentType);
-         system.addTypeByName(currentLayer, cd.getFullTypeName(), cd, currentLayer.getNextLayer());
-      }
       return err;
    }
 
@@ -813,6 +809,18 @@ public class EditorContext extends ClientEditorContext {
 
       system.notifyModelAdded(newModel);
 
+      if (sync && system.peerSystems != null && !newModel.hasErrors()) {
+         for (int i = 0; i < system.peerSystems.size(); i++) {
+            LayeredSystem peerSys = system.peerSystems.get(i);
+            Layer peerLayer = peerSys.getSameLayerFromRemote(layer);
+            if (peerLayer != null) {
+               JavaModel peerModel = (JavaModel) newModel.deepCopy(ISemanticNode.CopyNormal, null);
+               peerSys.addNewModel(peerModel, null, new ExecutionContext(peerSys), null, false, true);
+               peerSys.notifyModelAdded(peerModel);
+            }
+         }
+      }
+
       addCreateInstTypeName(newTypeName);
 
       return td;
@@ -829,39 +837,72 @@ public class EditorContext extends ClientEditorContext {
       return null;
    }
 
-   public String addStatement(Object currentType, Statement st, boolean addOp, boolean addBefore, String relPropertyName) {
-      BodyTypeDeclaration currentTD = (BodyTypeDeclaration) currentType;
+   private String doAddStatement(LayeredSystem sys, BodyTypeDeclaration currentTD, Statement st, boolean addOp, boolean addBefore, String relPropertyName) {
       JavaModel model = currentTD.getJavaModel();
-
       MessageHandler handler = new MessageHandler();
       IMessageHandler oldHandler = model.getErrorHandler();
-      ExecutionContext ctx = new ExecutionContext(system);
+      ExecutionContext ctx = new ExecutionContext(sys);
       Statement replaced = null;
       try {
          model.setErrorHandler(handler);
 
-         ctx.pushStaticFrame(currentType);
+         ctx.pushStaticFrame(currentTD);
+
+         UpdateInstanceInfo info = sys.newUpdateInstanceInfo();
          if (st instanceof PropertyAssignment) {
-            Object replacedObj = currentTD.updateProperty((PropertyAssignment) st, ctx, true, null);
+            Object replacedObj = currentTD.updateProperty((PropertyAssignment) st, ctx, true, info);
             if (replacedObj instanceof VariableDefinition)
                replaced = ((VariableDefinition) replacedObj).getDefinition();
             else
                replaced = (Statement) replacedObj;
          }
          else
-            replaced = currentTD.updateBodyStatement(st, ctx, true, null, addBefore, relPropertyName);
+            replaced = currentTD.updateBodyStatement(st, ctx, true, info, addBefore, relPropertyName);
          if (handler.err != null)
             return handler.err;
+
+         // Mark it as changed to clear the transformed model before we update the instances
+         typeChanged(currentTD);
+
+         info.updateInstances(ctx);
       }
       finally {
          ctx.popStaticFrame();
          model.setErrorHandler(oldHandler);
       }
 
-      typeChanged(currentType);
-
       if (addOp)
-         addOp(new AddStatementOp(currentType, replaced, st, addBefore, relPropertyName));
+         addOp(new AddStatementOp(currentTD, replaced, st, addBefore, relPropertyName));
+
+      if (st instanceof TypeDeclaration) {
+         TypeDeclaration innerTD = (TypeDeclaration) st;
+         Layer currentLayer = ModelUtil.getLayerForType(sys, currentTD);
+         sys.addTypeByName(currentLayer, innerTD.getFullTypeName(), innerTD, currentLayer.getNextLayer());
+      }
+
+      return null;
+   }
+
+   public String addStatement(Object currentType, Statement st, boolean addOp, boolean addBefore, String relPropertyName) {
+      BodyTypeDeclaration currentTD = (BodyTypeDeclaration) currentType;
+
+      system.resetBuild(true);
+
+      String err = doAddStatement(system, currentTD, st, addOp, addBefore, relPropertyName);
+      if (err != null)
+         return err;
+
+      if (sync && system.peerSystems != null) {
+         for(LayeredSystem peerSys:system.peerSystems) {
+            BodyTypeDeclaration peerType = peerSys.getSrcTypeDeclaration(currentTD.getFullTypeName(), null, true);
+            if (peerType != null && peerType.getLayer().getLayerName().equals(currentTD.getLayer().getLayerName())) {
+               Statement peerSt = st.deepCopy(ISemanticNode.CopyNormal, null);
+               err = doAddStatement(peerSys, peerType, peerSt, false, addBefore, relPropertyName);
+               if (err != null)
+                  return err;
+            }
+         }
+      }
 
       return null;
    }

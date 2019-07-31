@@ -43,6 +43,9 @@ public class JSTypeParameters extends ObjectTypeParameters {
    /** IS this a type-update operation.  Once we've processed the UpdateMerge template with the changes, we process the new type with this template to extract the code parts we need to send to the client */
    public boolean updateTemplate = false;
 
+   /** When applying the merge operation which is not a sync (i.e. for a changed type), we sometimes need to update the static type info for the changed type */
+   public boolean updateStaticType = false;
+
    List<JSStatement> jsPreInitStatements;
    List<JSStatement> jsInitStatements = null;
    public boolean needsConstructor = true;
@@ -581,7 +584,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
             LayeredSystem sys = btd.getLayeredSystem();
             JSRuntimeProcessor rt = getJSRuntimeProcessor();
             StringBuilder sb = new StringBuilder();
-            rt.appendInnerJSMergeTemplate(btd, sb, syncTemplate);
+            rt.appendInnerJSMergeTemplate(btd, sb, syncTemplate, updateStaticType);
             return sb.toString();
          }
          return jsStatement.formatToJS(mode, JSTypeParameters.this, 0).toString();
@@ -651,7 +654,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public List<JSStatement> getPreInitStatements() {
       if (jsPreInitStatements == null) {
-         List<Statement> initSts = type.getInitStatements(InitStatementsMode.PreInit, true);
+         List<Statement> initSts = type.getInitStatements(InitStatementsMode.PreInit, true, false);
          jsPreInitStatements = convertStatements(initSts, JSFormatMode.PreInit);
       }
       return jsPreInitStatements;
@@ -659,7 +662,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public List<JSStatement> getInitStatements() {
       if (jsInitStatements == null) {
-         List<Statement> initSts = type.getInitStatements(InitStatementsMode.Init, true);
+         List<Statement> initSts = type.getInitStatements(InitStatementsMode.Init, true, false);
          jsInitStatements = convertStatements(initSts, JSFormatMode.InstInit);
       }
       return jsInitStatements;
@@ -769,7 +772,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public List<JSStatement> getStaticInitStatements() {
       if (staticStatements == null) {
-         List<Statement> initSts = type.getInitStatements(InitStatementsMode.Static, true);
+         List<Statement> initSts = type.getInitStatements(InitStatementsMode.Static, true, updateStaticType);
          staticStatements = convertStatements(initSts, JSFormatMode.Static);
       }
       return staticStatements;

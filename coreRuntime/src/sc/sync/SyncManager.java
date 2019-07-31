@@ -1368,7 +1368,11 @@ public class SyncManager {
             ii.valueListener = listener;
          }
 
-         SyncChangeListener syncListener = null;
+         initPropertyListeners(depChanges, inst, ii, props, inherited, syncProps, addPropChanges, initial, syncLayer);
+      }
+
+      public void initPropertyListeners(List<SyncLayer.SyncChange> depChanges, Object inst, InstInfo ii, Object[] props, boolean inherited, SyncProperties syncProps, boolean addPropChanges, boolean initial, SyncLayer syncLayer) {
+         SyncChangeListener syncListener;
          if (props != null) {
             syncListener = getSyncListenerForGroup(syncProps.syncGroup);
             for (Object prop:props) {
@@ -1389,20 +1393,6 @@ public class SyncManager {
                }
             }
          }
-
-         /* TODO: remove this?  This was an alternate approach to learning when an instance is accessed in a new child scope...
-            we now support this with accessSyncInst calls added for the getX method in the parent scopes that are shared like global
-            This would only work the first time a binding listener was added in a new scope so the accessSyncInst call seems like a better
-            and more valuable hook and pattern.
-
-         if (!inherited && childContexts != null) {
-            if (syncListener == null)
-               syncListener = getSyncListenerForGroup(syncProps.syncGroup);
-
-            Bind.addListener(inst, null, syncListener, IListener.LISTENER_ADDED, 0);
-         }
-         */
-
       }
 
       /**
@@ -1929,6 +1919,21 @@ public class SyncManager {
          }
       }
 
+      void removePropertyListener(InstInfo toRemove, Object inst, Object prop, SyncProperties syncProps, SyncChangeListener syncListener) {
+         String propName;
+         int flags;
+         if (prop instanceof SyncPropOptions) {
+            SyncPropOptions propOpts = (SyncPropOptions) prop;
+            propName = propOpts.propName;
+            flags = propOpts.flags;
+         } else {
+            propName = (String) prop;
+            flags = syncProps.getSyncFlags(propName);
+         }
+         if ((flags & SyncPropOptions.SYNC_ON_DEMAND) == 0 || toRemove.isFetchedOnDemand(propName))
+            Bind.removeListener(inst, propName, syncListener, IListener.VALUE_CHANGED_MASK);
+      }
+
       void removeSyncInstInternal(InstInfo toRemove, Object inst, SyncProperties syncProps, boolean listenersOnly, boolean removeFromParentList) {
          if (trace)
             System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name + (toRemove.inherited ? " inherited from: " + toRemove.parContext.name : ""));
@@ -1939,18 +1944,7 @@ public class SyncManager {
             Object[] props = syncProps.getSyncProperties();
             if (props != null) {
                for (Object prop:props) {
-                  String propName;
-                  int flags;
-                  if (prop instanceof SyncPropOptions) {
-                     SyncPropOptions propOpts = (SyncPropOptions) prop;
-                     propName = propOpts.propName;
-                     flags = propOpts.flags;
-                  } else {
-                     propName = (String) prop;
-                     flags = syncProps.getSyncFlags(propName);
-                  }
-                  if ((flags & SyncPropOptions.SYNC_ON_DEMAND) == 0 || toRemove.isFetchedOnDemand(propName))
-                     Bind.removeListener(inst, propName, syncListener, IListener.VALUE_CHANGED_MASK);
+                  removePropertyListener(toRemove, inst, prop, syncProps, syncListener);
                }
             }
             removePropertyValueListeners(inst);
@@ -2450,7 +2444,7 @@ public class SyncManager {
       // If no specific destination is given, register it for all destinations
       if (props.destName == null) {
          for (SyncManager mgr:syncManagers) {
-            old = mgr.syncTypes.put(type, props);
+            mgr.addNewSyncType(type, props);
          }
          // Keep track of all global sync types added in case the SyncManager has not yet been created
          globalSyncTypes.put(type, props);
@@ -2460,18 +2454,39 @@ public class SyncManager {
          if (syncMgr == null) {
              throw new IllegalArgumentException("*** No sync destination registered for: " + props.destName);
          }
-         old = syncMgr.syncTypes.put(type, props);
+         syncMgr.addNewSyncType(type, props);
+      }
+   }
+
+   private void addNewSyncType(Object type, SyncProperties syncProps) {
+      SyncProperties old = syncTypes.put(type, syncProps);
+      if (old != null && old != type && !old.equals(type)) {
+         SyncContext ctx = syncProps.defaultScopeId == -1 ? getDefaultSyncContext() : getSyncContext(syncProps.defaultScopeId, false);
+         if (ctx != null) {
+            // TODO: only considering new properties added to the sync type - this would happen if we updated the type to add a field for example.
+            // This might cause some errors if we try to remove listeners from properties that got removed but don't see any other reason to remove them here
+            Object[] newProps = syncProps.getNewSyncProperties(old);
+            if (newProps != null && newProps.length > 0) {
+               for (Map.Entry<Object,InstInfo> ent:ctx.syncInsts.entrySet()) {
+                  InstInfo ii = ent.getValue();
+                  if (ii.props == old) {
+                     ii.props = syncProps;
+                     ctx.initPropertyListeners(null, ent.getKey(), ii, newProps, false, syncProps, false, true, null);
+                  }
+               }
+            }
+         }
       }
 
       if (verbose && old == null) {
-         System.out.println("New synchronized type: " + DynUtil.getInstanceName(type) + " properties: " + props);
+         System.out.println("New synchronized type: " + DynUtil.getInstanceName(type) + " properties: " + syncProps);
       }
 
-      // TODO: do we need to support static synchronized properties? We could basically call addSyncInst here with the type
+      // TODO: do we need to support static synchronized properties? We could basically call addSyncInst here with the type as the inst
       // but there's the issue of how to support sharing and synchronization. Using a separate instance to hold the
-      // static properties lets you put that object into different scopes etc.
-      if (props.staticProps != null && old == null) {
-         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + props);
+      // static properties lets you put that object into different scopes etc. Maybe there's a use case in server-to-server synchronization?
+      if (syncProps.staticProps != null && old == null) {
+         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + syncProps);
       }
    }
 

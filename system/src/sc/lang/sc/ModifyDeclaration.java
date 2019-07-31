@@ -2342,9 +2342,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       return false;
    }
 
-   public void addFieldToInstances(VariableDefinition varDef, ExecutionContext ctx) {
+   public void addFieldToInstances(VariableDefinition varDef, ExecutionContext ctx, boolean updateInstances, UpdateInstanceInfo info) {
       //if (modifyTypeDecl == null)
-         super.addFieldToInstances(varDef, ctx);
+         super.addFieldToInstances(varDef, ctx, updateInstances, info);
       //else {
          //addDynInstField(varDef);
          // We do want to update instances registered on those types but do not want to add this field to the
@@ -2768,19 +2768,20 @@ public class ModifyDeclaration extends TypeDeclaration {
       return super.getCompiledImplements();
    }
 
-   public List<Statement> getInitStatements(InitStatementsMode mode, boolean isTransformed) {
+
+   public List<Statement> getInitStatements(InitStatementsMode mode, boolean isTransformed, boolean updateStaticType) {
       List<Statement> res = null;
       JavaModel model = getJavaModel();
-      if (model != null && model.mergeDeclaration && modifyTypeDecl != null && !modifyInherited) {
+      if (model != null && ((mode == InitStatementsMode.Static && updateStaticType) || model.mergeDeclaration) && modifyTypeDecl != null && !modifyInherited) {
          BodyTypeDeclaration modTD = modifyTypeDecl;
          if (isTransformed) {
             BodyTypeDeclaration xformType = modTD.getTransformedResult();
             if (xformType != modTD && xformType != null)
-               return xformType.getInitStatements(mode, isTransformed);
+               return xformType.getInitStatements(mode, isTransformed, updateStaticType);
          }
-         res = modTD.getInitStatements(mode, isTransformed);
+         res = modTD.getInitStatements(mode, isTransformed, updateStaticType);
       }
-      List<Statement> append = super.getInitStatements(mode, isTransformed);
+      List<Statement> append = super.getInitStatements(mode, isTransformed, updateStaticType);
       if (append != null) {
          if (res == null)
             res = append;
