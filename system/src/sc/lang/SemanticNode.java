@@ -995,6 +995,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    public void styleNode(IStyleAdapter adapter, Parselet parselet) {
+      if (parseNode == null)
+         restoreParseNode();
       if (parseNode != null) {
          if (parseNodeInvalid)
             validateParseNode(false);
