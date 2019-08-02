@@ -13896,6 +13896,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          readLocked++;
 
+      String lastLockStack = debugLockStack;
+      String lastLockThread = currentLockThreadName;
+
       if (options.verboseLocks && writeLocked == 1)
          debugLockStack = PTypeUtil.getStackTrace(new Throwable());
 
@@ -13904,13 +13907,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
          if (duration > 1000) {
-            System.err.println("Warning: waited: " + duration + " millis for lock on thread: " + DynUtil.getCurrentThreadString());
-            if (debugLockStack != null)
-               System.err.println(" Stack trace of thread that acquired lock: " + debugLockStack);
-            if (duration > 2000 && Thread.currentThread().getName().contains("AWT-Event")) {
-               System.err.println("*** Stack of waiting thread: ");
-               new Throwable().printStackTrace(System.err);
-            }
+            System.err.println("Warning: thread: " +DynUtil.getCurrentThreadString() + " took: " + duration + " millis to acquire system lock");
+            if (lastLockThread != null)
+               System.err.println(" Stack trace of owner thread: " + lastLockThread + ": " + lastLockStack);
          }
          else if (duration > 100 && options.verboseLocks)
             System.out.println("Acquired system dyn lock " + (readOnly ? "(readOnly)" : "") + " after waiting: " + duration + " millis" + " thread: " + DynUtil.getCurrentThreadString());
