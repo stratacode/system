@@ -2049,7 +2049,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    // For synchronizing to the client
    @Constant
    public List<Object> getDeclaredProperties() {
-      return getDeclaredProperties(null, true, false);
+      return getDeclaredProperties("public", true, false);
    }
 
    // Here so this property appears writable so we can sync it on the client.
@@ -2082,10 +2082,35 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             else
                props.add(member);
          }
-         else if (ModelUtil.isObjectType(member))
+         else if (ModelUtil.isObjectType(member) && (modifier == null || ModelUtil.hasModifier(member, modifier)))
             props.add(member);
-         else if (includeAssigns && member instanceof PropertyAssignment)
+         else if (includeAssigns && member instanceof PropertyAssignment && (modifier == null || ModelUtil.hasModifier(member, modifier)))
             props.add(member);
+      }
+
+      for (int i = 0; i < props.size(); i++) {
+         Object checkProp = props.get(i);
+         String checkName = ModelUtil.getPropertyName(checkProp);
+         for (int j = i+1; j < props.size(); j++) {
+            Object nextProp = props.get(j);
+            String nextName = ModelUtil.getPropertyName(nextProp);
+            if (nextName.equals(checkName)) {
+               if (nextProp instanceof VariableDefinition && checkProp instanceof MethodDefinition) {
+                  props.remove(j);
+                  j--;
+               }
+               else if (checkProp instanceof VariableDefinition && nextProp instanceof MethodDefinition) {
+                  props.remove(i);
+                  i--;
+                  break;
+               }
+               // Both methods - keep the first one
+               else if (nextProp instanceof MethodDefinition && checkProp instanceof MethodDefinition) {
+                  props.remove(j);
+                  j--;
+               }
+            }
+         }
       }
    }
 
