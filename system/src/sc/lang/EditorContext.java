@@ -21,10 +21,7 @@ import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.TypeUtil;
-import sc.util.FileUtil;
-import sc.util.IMessageHandler;
-import sc.util.MessageHandler;
-import sc.util.StringUtil;
+import sc.util.*;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.OverrideAssignment;
 import sc.lang.java.*;
@@ -79,6 +76,8 @@ public class EditorContext extends ClientEditorContext {
    //
    // TODO: need to make the references to these instances "weak" so we don't hang onto them
    HashMap<String,Object> selectedInstances = new HashMap<String,Object>();
+
+   WeakIdentityHashMap<Object,InstanceWrapper> instanceWrappers = new WeakIdentityHashMap<Object,InstanceWrapper>();
 
    boolean syncInited = false;
 
@@ -162,11 +161,11 @@ public class EditorContext extends ClientEditorContext {
       if (addNull)
          ret.add(new InstanceWrapper(this, null, typeName, nullLabelName, selectToCreate));
       if (scopeInst != null)
-         ret.add(new InstanceWrapper(this, scopeInst, typeName, null, false));
+         ret.add(getOrCreateInstanceWrapper(scopeInst));
       while (i < max && it.hasNext()) {
          Object inst = it.next();
          if (inst != scopeInst)
-            ret.add(new InstanceWrapper(this, inst, typeName, null, false));
+            ret.add(getOrCreateInstanceWrapper(inst));
       }
 
       /*
@@ -176,9 +175,23 @@ public class EditorContext extends ClientEditorContext {
       */
 
       if (ModelUtil.isEnum(type)) {
-         ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type), typeName, null, false));
+         //ret.add(new InstanceWrapper(this, ModelUtil.getRuntimeEnum(type), typeName, null, false));
+         ret.add(getOrCreateInstanceWrapper(ModelUtil.getRuntimeEnum(type), typeName));
       }
       return ret;
+   }
+
+   private InstanceWrapper getOrCreateInstanceWrapper(Object inst) {
+      return getOrCreateInstanceWrapper(inst, DynUtil.getTypeName(DynUtil.getType(inst), false));
+   }
+
+   private InstanceWrapper getOrCreateInstanceWrapper(Object inst, String typeName) {
+      InstanceWrapper wrapper = instanceWrappers.get(inst);
+      if (wrapper == null) {
+         wrapper = new InstanceWrapper(this, inst, typeName, null, false);
+         instanceWrappers.put(inst, wrapper);
+      }
+      return wrapper;
    }
 
    public EditorContext(LayeredSystem sys) {
@@ -1750,7 +1763,7 @@ public class EditorContext extends ClientEditorContext {
       syncInited = true;
       // Manually adding these (roughly based on the generated code from js/layer/lang/EditorContext.java - so we sync the same properties
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo", "createInstTypeNames"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
+      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentType", "needsSave", "canUndo", "canRedo", "createInstTypeNames", "system"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
       SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncInst(this, true, true, null, null);
