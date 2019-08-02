@@ -390,12 +390,16 @@ public class PerfMon {
       return formatter.format(time / 1000000.0);
    }
 
+   public static String getTimeDelta(long startTime) {
+      long now = System.currentTimeMillis();
+      return getTimeDelta(startTime, now);
+   }
+
    // Here we print the time since the PageDispatcher started since that's perhaps the easiest basic way to follow "elapsed time" in the context of a server process.
    // I could imagine having an option to show this relative to start-session or start-thread time or even displaying multiple time spaces in the same log to diagnose different scenarios
-   public static String getTimeDelta(long startTime) {
+   public static String getTimeDelta(long startTime, long now) {
       if (startTime == 0)
          return "<server not yet started!>";
-      long now = System.currentTimeMillis();
       StringBuilder sb = new StringBuilder();
       long elapsed = now - startTime;
       sb.append("+");
