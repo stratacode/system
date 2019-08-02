@@ -1070,18 +1070,24 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                   if (parentType.definesMember(fieldName, MemberType.FieldSet, this, null, true, false) == null) {
                      Object exprType = expr.getTypeDeclaration();
                      String escBodyMethod = templateProcessor == null ? null : templateProcessor.escapeBodyMethod();
+                     // Try to find the most accurate type for the property - it's often/usually going to be a String. If we end up with 'Object' we might need
+                     // an annotation on the field to tell the editor it's a value object.
+                     String exprTypeName;
                      if (ModelUtil.isPrimitive(exprType)) {
                         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                         args.add(expr);
                         expr = IdentifierExpression.createMethodCall(args, "String.valueOf");
+                        exprTypeName = "String";
                      }
                      else if (escape && escBodyMethod != null && !expr.producesHtml()) {
                         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                         args.add(expr);
                         expr = IdentifierExpression.createMethodCall(args, escBodyMethod);
+                        exprTypeName = "String";
                      }
-                     // The field's variable definition's initializer is the parseResult's semantic value.
-                     FieldDefinition tempField = FieldDefinition.createFromJavaType(ClassType.create("Object"), fieldName, ":=", expr);
+                     else
+                        exprTypeName = ModelUtil.getTypeName(exprType);
+                     FieldDefinition tempField = FieldDefinition.createFromJavaType(ClassType.create(exprTypeName), fieldName, ":=", expr);
                      tempField.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
                      tempField.addModifier("public");
                      parentType.addBodyStatementIndent(tempField);
