@@ -392,6 +392,14 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       if (!bindable && !referenceOnly) {
          JavaModel model = getJavaModel();
          LayeredSystem sys = model == null ? null : model.getLayeredSystem();
+
+         // TODO: if we've already transformed the model and are making it bindable, we have a problem. We can re-transform this model, but then
+         // may need to retransform any model that depends on this model too because we changed the definition. This happens when we use an intermediate
+         // build layer but don't make properties bindable that are later used in bindable expressions. The best from the code perspective to avoid that is to use annotations
+         // to make them bindable before building the first time.
+         //if (model != null)
+         //   model.clearTransformed();
+
          // Only start checking after the current buildLayer is compiled.  Otherwise, this touches runtime classes
          // during the normal build which can suck in a version that will be replaced later on.
          // Don't do this test for the JS runtime... it forces us to load the js version of the class
