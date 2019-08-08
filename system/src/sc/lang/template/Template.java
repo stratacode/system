@@ -1007,17 +1007,21 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          expr.parentNode = block;
          int origStartIndex = expr.parseNode == null ? -1 : expr.parseNode.getStartIndex();
 
+         String escBodyMethod = templateProcessor == null ? null : templateProcessor.escapeBodyMethod();
+
          // The replace glue call will unwrap any template definitions with Java definitions.  After that we have a nice well formed Java statement.  We generate that explicitly here because we are switching languages.
          ct = replaceStatementGlue(expr, ct, true);
 
          Parselet exprParselet = TemplateLanguage.INSTANCE.optExpression;
+
+         // This creates the parse-node representation of that statement
          Object parseResult = exprParselet.generate(TemplateLanguage.INSTANCE.newGenerateContext(exprParselet, expr), expr);
          if (parseResult instanceof ParseError) {
             displayError("Error parsing template: ", parseResult.toString(), " for expression: ", expr.toString(), " used in template ");
          }
          else if (parseResult instanceof IParseNode) {
             boolean handled = false;
-            // Propagate the original node's position in the file for debugging
+            // Propagate the original node's position in the file for debug line number mapping
             if (origStartIndex != -1)
                ((IParseNode) parseResult).setStartIndex(origStartIndex);
 
@@ -1069,7 +1073,6 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
                   if (parentType.definesMember(fieldName, MemberType.FieldSet, this, null, true, false) == null) {
                      Object exprType = expr.getTypeDeclaration();
-                     String escBodyMethod = templateProcessor == null ? null : templateProcessor.escapeBodyMethod();
                      // Try to find the most accurate type for the property - it's often/usually going to be a String. If we end up with 'Object' we might need
                      // an annotation on the field to tell the editor it's a value object.
                      String exprTypeName;
@@ -1115,7 +1118,15 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
             if (!handled) {
                if (!mergeStringInOutput(block, expr, null, getSrcStatement(parentElement, decl, lastSrcSt))) {
-                  String resultStr = parseResult.toString();
+                  String resultStr;
+                  if (escape && escBodyMethod != null && !expr.producesHtml()) {
+                     SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+                     args.add(expr);
+                     IdentifierExpression escExpr = IdentifierExpression.createMethodCall(args, escBodyMethod);
+                     resultStr = escExpr.toString();
+                  }
+                  else
+                     resultStr = parseResult.toString();
                   Statement outputSt = getExprStringOutputStatement(resultStr);
                   if (outputSt != null) {
                      outputSt.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
