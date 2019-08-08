@@ -45,6 +45,16 @@ public class TypeIndexEntry implements Serializable {
       return false;
    }
 
+   /** Returns true if the entry has changed so that we need to recompute the 'allNames' list */
+   public boolean namesChanged(Object other) {
+      if (!(other instanceof TypeIndexEntry))
+         return false;
+      TypeIndexEntry ot = (TypeIndexEntry) other;
+      if (!StringUtil.equalStrings(typeName, ot.typeName))
+         return false;
+      return true;
+   }
+
    public boolean equals(Object other) {
       if (!(other instanceof TypeIndexEntry))
          return false;
@@ -58,6 +68,10 @@ public class TypeIndexEntry implements Serializable {
             return false;
       }
       return true;
+   }
+
+   public int hashCode() {
+      return typeName == null ? 0 : typeName.hashCode();
    }
 
    public static final TypeIndexEntry EXCLUDED_SENTINEL = new TypeIndexEntry();

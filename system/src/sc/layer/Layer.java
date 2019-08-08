@@ -822,12 +822,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                System.out.println("*** Error - updating layer type index before the layer has been initialized");
             layerTypeIndex = new LayerTypeIndex();
          }
+         boolean entryChanged = false;
+         boolean invalidateTypeNames = false;
          TypeIndexEntry oldTypeEnt = layerTypeIndex.layerTypeIndex.put(typeName, typeIndexEntry);
          // We can only have one type per file name so don't also register inner types here
          if (!typeIndexEntry.isInnerType)
             layerTypeIndex.fileIndex.put(typeIndexEntry.fileName, typeIndexEntry);
          if (typeIndexRestored) {
             if (oldTypeEnt == null || !oldTypeEnt.equals(typeIndexEntry)) {
+               entryChanged = true;
+               invalidateTypeNames = oldTypeEnt == null || oldTypeEnt.namesChanged(typeIndexEntry);
                if (layeredSystem.options.verbose && !typeIndexNeedsSave) {
                   verbose("Type index for layer: " + layerDirName + " needs save - first changed type: " + typeName);
                }
@@ -838,9 +842,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
 
          SysTypeIndex sysIndex = layeredSystem.typeIndex;
-         if (sysIndex != null) {
+         if (sysIndex != null && entryChanged) {
             LayerListTypeIndex useTypeIndex = activated ? sysIndex.activeTypeIndex : sysIndex.inactiveTypeIndex;
-            useTypeIndex.layerTypeIndexChanged();
+            useTypeIndex.layerTypeIndexChanged(invalidateTypeNames, typeName, typeIndexEntry);
          }
       }
    }

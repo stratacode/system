@@ -824,7 +824,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (layer != null)
              res.add(layer.model.getModelTypeDeclaration());
          else {
-            layer = getInactiveLayer(typeName.replace('.', '/'), openAllLayers, true, true, true);
+            layer = !openAllLayers ? lookupInactiveLayer(typeName, true, true) :
+                                     getInactiveLayer(typeName.replace('.', '/'), openAllLayers, true, true, true);
             if (layer != null && layer.model != null)
                res.add(layer.model.getModelTypeDeclaration());
          }
@@ -845,24 +846,34 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             ArrayList<TypeIndexEntry> typeIndexEntries = sysIndex.getTypeIndexes(typeName);
             if (typeIndexEntries != null) {
                for (TypeIndexEntry typeIndexEntry : typeIndexEntries) {
-                  Layer layer = getInactiveLayerByPath(typeIndexEntry.layerName, null, openAllLayers, true);
-                  if (layer != null) {
-                     if (!layer.closed || openAllLayers) {
-                        Object newTypeObj = layer.layeredSystem.getSrcTypeDeclaration(typeName, layer.getNextLayer(), true, false, true, layer, false);
-                        if (newTypeObj != null)
-                           res.add(newTypeObj);
+                  Layer layer = openAllLayers ? getInactiveLayerByPath(typeIndexEntry.layerName, null, openAllLayers, true) : lookupInactiveLayer(typeIndexEntry.layerName, true, true);
+                  if (layer != null && (!layer.closed || openAllLayers)) {
+                     LayeredSystem layerSys = layer.layeredSystem;
+                     Object newTypeObj;
+                     if (openTypes) {
+                        newTypeObj = layerSys.getSrcTypeDeclaration(typeName, layer.getNextLayer(), true, false, true, layer, false);
                      }
                      else {
-                        boolean found = false;
-                        for (Object resEnt:res) {
-                           if (typeIndexEntry.sameType(resEnt)) {
-                              found = true;
-                              break;
-                           }
+                        newTypeObj = layerSys.getCachedTypeDeclaration(typeName, null, null, false, false, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
+                        if (newTypeObj == null) {
+                           SrcEntry srcEnt = layerSys.getSrcFileFromTypeName(typeName, true, null, true, null);
+                           if (srcEnt != null)
+                              newTypeObj = srcEnt;
                         }
-                        if (!found)
-                           res.add(typeIndexEntry);
                      }
+                     if (newTypeObj != null)
+                        res.add(newTypeObj);
+                  }
+                  else {
+                     boolean found = false;
+                     for (Object resEnt:res) {
+                        if (typeIndexEntry.sameType(resEnt)) {
+                           found = true;
+                           break;
+                        }
+                     }
+                     if (!found)
+                        res.add(typeIndexEntry);
                   }
                }
             }
@@ -1059,7 +1070,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private EnumMap<BuildPhase,List<BuildCommandHandler>> runCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
    private EnumMap<BuildPhase,List<BuildCommandHandler>> testCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
 
-   private List<IModelListener> modelListeners = new ArrayList<IModelListener>();
+   private List<IModelListener> modelListeners = Collections.synchronizedList(new ArrayList<IModelListener>());
    private List<ITypeChangeListener> typeChangeListeners = new ArrayList<ITypeChangeListener>();
    private final List<ICodeUpdateListener> codeUpdateListeners = new ArrayList<ICodeUpdateListener>();
    private List<IDynListener> dynListeners = null;
@@ -1104,7 +1115,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    TreeMap<String,Layer> pendingActiveLayers = new TreeMap<String,Layer>();
    TreeMap<String,Layer> pendingInactiveLayers = new TreeMap<String,Layer>();
 
-   Map<String,Layer> inactiveLayerIndex = new HashMap<String,Layer>();
+   // Synchronizing so we can look up inactive layers without the dyn lock
+   Map<String,Layer> inactiveLayerIndex = Collections.synchronizedMap(new HashMap<String,Layer>());
 
    // Global dependencies - used to store things like jar files, the set of mains, the set of tests, etc.
    public BuildInfo buildInfo;
@@ -3038,6 +3050,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       return null;
    }
+
+
+   /** Called to append all of the names in the given layer into the all names list (so we don't have to refresh the "allNames" list when updating the LayerListIndex) */
+   public void addAllNamesForLayerTypeIndex(LayerTypeIndex index) {
+      LayeredSystem msys = getMainLayeredSystem();
+      if (msys.allNames != null) {
+         index.addMatchingGlobalNames("", msys.allNames, false, false, LayerListTypeIndex.MAX_NAMES_IN_INDEX);
+      }
+      // else - index not built yet
+   }
+
+   public void addAllNamesForIndexEntry(String typeName, TypeIndexEntry newEntry) {
+      LayeredSystem msys = getMainLayeredSystem();
+      if (msys.allNames != null) {
+         msys.allNames.add(CTypeUtil.getClassName(typeName));
+      }
+   }
+
 
    /** This method is used by the IDE to retrieve names for code-completion, name-lookup, etc.  */
    public boolean findMatchingGlobalNames(Layer fromLayer, Layer refLayer,
@@ -5979,7 +6009,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       // Rebuild the index layers in any listeners like the LayersView
-      typeIndex.inactiveTypeIndex.indexLayersCache = null;
+      typeIndex.inactiveTypeIndex.clearIndexLayersCache();
 
       notifyLayerAdded(layer);
 
@@ -6029,7 +6059,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (res != null && (!skipExcluded || !res.excluded))
          return res;
       if (checkPeers && peerSystems != null) {
-         for (LayeredSystem peer:peerSystems) {
+         for (int i = 0; i < peerSystems.size(); i++) {
+            LayeredSystem peer = peerSystems.get(i);
             Layer peerRes = peer.lookupInactiveLayer(layerName, false, skipExcluded);
             if (peerRes != null)
                return peerRes;
@@ -10507,7 +10538,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       refreshScheduled = true;
       DynUtil.invokeLater(new Runnable() {
          public void run() {
+            info("Start scheduled refreshRuntimes");
             refreshRuntimes(false); // TODO: should we also refresh the active runtimes here/
+            info("end scheduled refreshRuntimes");
          }
       }, 0);
    }
@@ -10517,6 +10550,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     *  Even if you specify active, this will not rebuild the active layers.
     */
    public SystemRefreshInfo refreshRuntimes(boolean active) {
+      if (options.verbose)
+         verbose("Start refreshRuntimes");
       updatePeerModels(true);
 
       acquireDynLock(false);
@@ -10541,6 +10576,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       finally {
          releaseDynLock(false);
       }
+      if (options.verbose)
+         verbose("end refreshRuntimes");
       return sysInfo;
    }
 
@@ -13907,12 +13944,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (options.verboseLocks || options.verbose) {
          long duration = System.currentTimeMillis() - startTime;
          if (duration > 1000) {
-            System.err.println("Warning: thread: " +DynUtil.getCurrentThreadString() + " took: " + duration + " millis to acquire system lock");
+            System.err.println("Warning: thread: " + currentLockThreadName + " took: " + duration + " millis to acquire system lock");
             if (lastLockThread != null)
                System.err.println(" Stack trace of owner thread: " + lastLockThread + ": " + lastLockStack);
          }
          else if (duration > 100 && options.verboseLocks)
-            System.out.println("Acquired system dyn lock " + (readOnly ? "(readOnly)" : "") + " after waiting: " + duration + " millis" + " thread: " + DynUtil.getCurrentThreadString());
+            System.out.println("Acquired system dyn lock " + (readOnly ? "(readOnly)" : "") + " after waiting: " + duration + " millis" + " thread: " + currentLockThreadName);
       }
    }
 
@@ -14563,10 +14600,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
               verbose("No type: " + typeName + " to refresh");
          return;
       }
+      verbose("refreshType: " + typeName);
 
       // As long as there is a dynamic type which we're loading, to be sure we really need to refresh
       // everything.  Eventually a file system watcher will make this more incremental.
       refreshRuntimes(true);
+
+      verbose("end refreshType: " + typeName);
 
       //JavaModel model = toRefresh.getJavaModel();
       //ExecutionContext ctx = new ExecutionContext();
@@ -15624,6 +15664,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Returns the complete set of inactive layers - returns the more complete inactiveLayer entry or the one from the type index if the inactive layer is not loaded yet */
    public List<Layer> getInactiveIndexLayers() {
       return typeIndex.inactiveTypeIndex.getIndexLayers(this);
+   }
+
+   public List<Layer> getCurrentInactiveLayers() {
+      ArrayList<Layer> res = new ArrayList<Layer>(inactiveLayers.size());
+      for (int i = 0; i < inactiveLayers.size(); i++) {
+         Layer layer = inactiveLayers.get(i);
+         if (!layer.closed)
+            res.add(layer);
+      }
+      return res;
    }
 
    public void clearCaches() {

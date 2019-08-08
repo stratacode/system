@@ -47,12 +47,12 @@ public class LayerOrderIndex implements Serializable {
 
    public boolean refreshAll(LayeredSystem sys, boolean reset) {
       boolean anyChanges = false;
+      int numInactiveLayers = sys.inactiveLayers.size();
       if (reset) {
-         inactiveLayerNames.clear();
+         inactiveLayerNames = new ArrayList<String>(numInactiveLayers);
          anyChanges = true;
       }
       int lastPos = -1;
-      int numInactiveLayers = sys.inactiveLayers.size();
       for (int i = 0; i < numInactiveLayers; i++) {
          String layerName = sys.inactiveLayers.get(i).getLayerName();
          int nextPos = inactiveLayerNames.indexOf(layerName);

@@ -5,14 +5,14 @@
 package sc.layer;
 
 import sc.lang.java.BodyTypeDeclaration;
+import sc.lang.java.DeclarationType;
 import sc.obj.SyncMode;
+import sc.type.CTypeUtil;
+import sc.util.StringUtil;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 /**
  * Stores the information we persist in the type-index for a given layer.
@@ -188,5 +188,50 @@ public class LayerTypeIndex implements Serializable {
       if (toStartLaterTypes == null)
          toStartLaterTypes = new ArrayList<BodyTypeDeclaration>();
       toStartLaterTypes.add(toStartType);
+   }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof LayerTypeIndex))
+         return false;
+
+      LayerTypeIndex lti = (LayerTypeIndex) other;
+
+      if (!StringUtil.equalStrings(layerDirName, lti.layerDirName))
+         return false;
+
+      if (!StringUtil.equalStrings(layerPathName, lti.layerPathName))
+         return false;
+
+      if (!StringUtil.equalStrings(packagePrefix, lti.packagePrefix))
+         return false;
+
+      if (!StringUtil.equalStrings(defaultModifier, lti.defaultModifier))
+         return false;
+
+      return true;
+   }
+
+   public int hashCode() {
+      return layerPathName == null ? 0 : layerPathName.hashCode();
+   }
+
+   boolean addMatchingGlobalNames(String prefix, Set<String> candidates, boolean retFullTypeName, boolean annotTypes, int max) {
+      HashMap<String,TypeIndexEntry> layerTypeMap = layerTypeIndex;
+      for (Map.Entry<String,TypeIndexEntry> typeEnt:layerTypeMap.entrySet()) {
+         String typeName = typeEnt.getKey();
+         String className = CTypeUtil.getClassName(typeName);
+         if (className.startsWith(prefix)) {
+            TypeIndexEntry ent = typeEnt.getValue();
+            if (annotTypes != (ent.declType == DeclarationType.ANNOTATION))
+               continue;
+            if (retFullTypeName)
+               candidates.add(typeName);
+            else
+               candidates.add(className);
+            if (candidates.size() >= max)
+               return false;
+         }
+      }
+      return true;
    }
 }
