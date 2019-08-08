@@ -794,6 +794,8 @@ public class ModelUtil {
          // Protected works for either the same package or a subclass
          case Protected:
             Object encType = getEnclosingType(member);
+            if (encType == null)
+               return false;
             Object refEnclType = refType;
             while (refEnclType != null) {
                boolean val = ModelUtil.isAssignableFrom(encType, refEnclType);
