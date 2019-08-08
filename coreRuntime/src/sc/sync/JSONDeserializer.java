@@ -283,6 +283,7 @@ public class JSONDeserializer {
          // This is the security check - to be sure we're allowed to invoke the method
          if (!mgr.allowInvoke(meth)) {
             System.err.println("Remote call to method: " + methName + " not allowed - missing sc.obj.Remote annotation or remoteRuntimes is missing: " + mgr.syncDestination.remoteRuntimeName);
+            boolean badRes = mgr.allowInvoke(meth);
             return;
          }
          // Sync up with the binding system - in case any property changes influence the inputs of this method invocation
