@@ -816,7 +816,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                   Layer remoteLayer = boundType == null ? null : ModelUtil.getLayerForMember(sys, boundType);
                   String remoteIdent;
                   if (remoteLayer == null)
-                     remoteIdent = boundType == null ? "<compiled class>" : "<compiled class: " + ModelUtil.getTypeName(boundType) + ">";
+                     remoteIdent = boundType == null ? "<compiled class>" : "<compiled class: " + ModelUtil.getMethodName(boundType) + ">";
                   else
                      remoteIdent = remoteLayer.getLayeredSystem().getProcessIdent();
                   displayTypeError("Method call to remote method - from: " + sys.getProcessIdent() + " to: " + remoteIdent + " - only allowed in binding expression: ");
