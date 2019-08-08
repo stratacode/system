@@ -86,10 +86,14 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       }
    }
 
+   private Annotation getRemoteRuntimesAnnotation() {
+      return Annotation.create("sc.obj.Remote", "remoteRuntimes", String.join(",",remoteRuntimes));
+   }
+
    public boolean transform(ILanguageModel.RuntimeType type) {
       if (remoteRuntimes != null) {
          // Mark this method so it's accessible from the remote runtime
-         addModifier(Annotation.create("sc.obj.Remote", "remoteRuntimes", String.join(",",remoteRuntimes)));
+         addModifier(getRemoteRuntimesAnnotation());
       }
       boolean res = super.transform(type);
       return res;
@@ -1021,5 +1025,15 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    public String getObjectId() {
       String methName = name == null ? "_init_" : name;
       return DynUtil.getObjectId(this, null, "MMD_" + getMethodTypeName()  + "_" + methName);
+   }
+
+   public Object getAnnotation(String annotationName) {
+      Object res = super.getAnnotation(annotationName);
+      if (res != null)
+         return res;
+      if (remoteRuntimes != null && annotationName.equals("sc.obj.Remote")) {
+         return getRemoteRuntimesAnnotation();
+      }
+      return null;
    }
 }
