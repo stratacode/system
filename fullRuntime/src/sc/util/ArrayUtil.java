@@ -26,6 +26,8 @@ public class ArrayUtil {
    }
 
    public static String argsToString(Object[] args) {
+      if (args == null)
+         return "";
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < args.length; i++) {
          if (i != 0)
