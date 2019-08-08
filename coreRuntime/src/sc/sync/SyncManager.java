@@ -3410,8 +3410,11 @@ public class SyncManager {
 
    public static SyncContext getDefaultSyncContext() {
       SyncDestination def = SyncDestination.defaultDestination;
-      if (def == null)
+      if (def == null) {
+         if (trace)
+            System.out.println("No default sync destination included");
          return null;
+      }
       return SyncDestination.defaultDestination.syncManager.getSyncContext(GlobalScopeDefinition.getGlobalScopeDefinition().scopeId, true);
    }
 
@@ -3435,6 +3438,8 @@ public class SyncManager {
 
    public static Object getSyncInst(String name) {
       SyncContext defaultCtx = getDefaultSyncContext();
+      if (defaultCtx == null) // Probably js.sync or servlet.core not included in the stack - need to include a SyncDestination component if you are using sync
+         return null;
       Object obj = defaultCtx.getObjectByName(name, true);
       return obj;
    }
