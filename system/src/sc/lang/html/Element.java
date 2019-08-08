@@ -5240,6 +5240,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return tagId;
    }
 
+   /**
+    * Walks the tree represented by this element and adds or updates the server tag information necessary for this tag.
+    * The scopeDef provided is the scope to store the server tag instances - usually 'window' for stateful pages but for
+    * request pages, we need to store this in the request scope and re-create it from scratch on each request.
+    */
    public void addServerTags(ScopeDefinition scopeDef, ServerTagContext stCtx, boolean defaultServerTag) {
       if (defaultServerTag || serverTag) {
 
@@ -5282,8 +5287,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         }
                      }
                      else {
-                        // This starts out only being set on the parent from the code-generation perspective but we need it set on
-                        // every synchronized object.
+                        // Set the serverTag flag for elements where we did not set it during code-generation. Currently we only set the serverTag flag
+                        // for the parent element in a tree of server tags but since it's inherited, sub-tags should get this flag set too so we set it
+                        // here to avoid walking up the tree to determine if an element is a server tag or not.
                         this.serverTag = true;
 
                         // Even though this tag is already part of some ScopeContext, here we are registering it with it's tagId in the document.
