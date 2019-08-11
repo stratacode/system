@@ -253,4 +253,9 @@ public class GlueExpression extends Expression {
    public boolean isLeafStatement() {
       return false;
    }
+
+   // TODO: This is completing template text so don't bother searching for types etc. We could do spelling, word completion etc here
+   public String addNodeCompletions(JavaModel origModel, JavaSemanticNode origNode, String matchPrefix, int offset, String dummyIdentifier, Set<String> candidates, boolean nextNameInPath, int max) {
+      return null;
+   }
 }
