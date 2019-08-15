@@ -1014,8 +1014,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object[] getConstructors(Object refType, boolean includeHidden) {
       ArrayList<Object> res = addConstructors(null, body, refType);
-      if (includeHidden)
+      if (includeHidden) {
+         if (!started)
+            ModelUtil.ensureStarted(this, false);
          res = addConstructors(res, hiddenBody, refType);
+      }
       if (res != null)
          return res.toArray();
       return null;
@@ -1752,6 +1755,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (fullTypeName != null)
          return fullTypeName;
       fullTypeName = getFullTypeName(".", false);
+      if (fullTypeName != null && fullTypeName.equals("TypeTree")) {
+         fullTypeName = getFullTypeName(".", false);
+      }
       return fullTypeName;
    }
 
@@ -5984,22 +5990,23 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object oldExtType;
    }
 
-   UpdateTypeCtx buildUpdateTypeContext(BodyTypeDeclaration newType, TypeUpdateMode updateMode, UpdateInstanceInfo info) {
+   UpdateTypeCtx buildUpdateTypeContext(BodyTypeDeclaration newType, TypeUpdateMode updateMode, UpdateInstanceInfo info, boolean activated) {
       UpdateTypeCtx tctx = new UpdateTypeCtx();
 
       // TODO: performance - when the layer is not activated I think we could skip a lot of this - fields, etc.... it's nice that we can refresh type and variable references without a global refresh
       // but maybe it's not worth it?
 
-      tctx.dynamicType = isDynamicType();
-      tctx.dynamicStub = isDynamicStub(false);
-      tctx.dynamicNew = isDynamicNew();
-
-      tctx.oldExtType = getExtendsTypeDeclaration();
+      if (activated) {
+         tctx.dynamicType = isDynamicType();
+         tctx.dynamicStub = isDynamicStub(false);
+         tctx.dynamicNew = isDynamicNew();
+         tctx.oldExtType = getExtendsTypeDeclaration();
+      }
 
       // During initialization, this type might have been turned into a dynamic type from a subsequent layer.
       // Since we do not restart all of the other layers, we won't turn this new guy back into a dynamic type
       // so just copy that state over here.
-      if (dynamicType && !newType.dynamicType) {
+      if (activated && dynamicType && !newType.dynamicType) {
          newType.dynamicType = true;
          if (newType.dynamicNew)
             newType.dynamicNew = false;
@@ -6007,59 +6014,61 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       LayeredSystem sys = getLayeredSystem();
 
-      tctx.oldFields = updateMode == TypeUpdateMode.Replace ? getDeclaredFields(null, false, false, true, false, false) :
-              getAllFields(null, false, false, true, true, false);
-      tctx.numOldFields = tctx.oldFields == null ? 0 : tctx.oldFields.size();
-      tctx.newFields = updateMode == TypeUpdateMode.Replace ? newType.getDeclaredFields(null, false, false, true, false, false) :
-              newType.getAllFields(null, false, false, true, true, false);
-      tctx.numNewFields = tctx.newFields == null ? 0 : tctx.newFields.size();
-      tctx.oldFieldIndex = new CoalescedHashMap<String, List<Object>>(tctx.numOldFields);
-      // Keep a list of fields for each name to deal with reverse only bindings.  Those do not replace/override the previous definition.
-      for (int i = 0; i < tctx.numOldFields; i++) {
-         Object varDef = tctx.oldFields.get(i);
-         addFieldToIndex(tctx.oldFieldIndex, varDef);
-      }
-      tctx.newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
-      tctx.newTypesSize = tctx.newTypes == null ? 0 : tctx.newTypes.size();
-      tctx.newTypeIndex = new CoalescedHashMap<String, Object>(tctx.newTypesSize);
-      for (int i = 0; i < tctx.newTypesSize; i++) {
-         Object newInnerType = tctx.newTypes.get(i);
-         tctx.newTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(newInnerType)), newInnerType);
-      }
+      if (activated) {
+         tctx.oldFields = updateMode == TypeUpdateMode.Replace ? getDeclaredFields(null, false, false, true, false, false) :
+                 getAllFields(null, false, false, true, true, false);
+         tctx.numOldFields = tctx.oldFields == null ? 0 : tctx.oldFields.size();
+         tctx.newFields = updateMode == TypeUpdateMode.Replace ? newType.getDeclaredFields(null, false, false, true, false, false) :
+                 newType.getAllFields(null, false, false, true, true, false);
+         tctx.numNewFields = tctx.newFields == null ? 0 : tctx.newFields.size();
+         tctx.oldFieldIndex = new CoalescedHashMap<String, List<Object>>(tctx.numOldFields);
+         // Keep a list of fields for each name to deal with reverse only bindings.  Those do not replace/override the previous definition.
+         for (int i = 0; i < tctx.numOldFields; i++) {
+            Object varDef = tctx.oldFields.get(i);
+            addFieldToIndex(tctx.oldFieldIndex, varDef);
+         }
+         tctx.newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
+         tctx.newTypesSize = tctx.newTypes == null ? 0 : tctx.newTypes.size();
+         tctx.newTypeIndex = new CoalescedHashMap<String, Object>(tctx.newTypesSize);
+         for (int i = 0; i < tctx.newTypesSize; i++) {
+            Object newInnerType = tctx.newTypes.get(i);
+            tctx.newTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(newInnerType)), newInnerType);
+         }
 
-      tctx.oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
-      tctx.oldTypesSize = tctx.oldTypes == null ? 0 : tctx.oldTypes.size();
-      tctx.oldTypeIndex = new CoalescedHashMap<String, Object>(tctx.oldTypesSize);
-      for (int i = 0; i < tctx.oldTypesSize; i++) {
-         Object oldInnerType = tctx.oldTypes.get(i);
-         tctx.oldTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(oldInnerType)), oldInnerType);
-      }
+         tctx.oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
+         tctx.oldTypesSize = tctx.oldTypes == null ? 0 : tctx.oldTypes.size();
+         tctx.oldTypeIndex = new CoalescedHashMap<String, Object>(tctx.oldTypesSize);
+         for (int i = 0; i < tctx.oldTypesSize; i++) {
+            Object oldInnerType = tctx.oldTypes.get(i);
+            tctx.oldTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(oldInnerType)), oldInnerType);
+         }
 
-      if (body != null && updateMode == TypeUpdateMode.Replace) {
-         for (int i = 0; i < body.size(); i++) {
-            Object oldBodyDef = body.get(i);
-            if (oldBodyDef instanceof PropertyAssignment) {
-               addFieldToIndex(tctx.oldFieldIndex, oldBodyDef);
+         if (body != null && updateMode == TypeUpdateMode.Replace) {
+            for (int i = 0; i < body.size(); i++) {
+               Object oldBodyDef = body.get(i);
+               if (oldBodyDef instanceof PropertyAssignment) {
+                  addFieldToIndex(tctx.oldFieldIndex, oldBodyDef);
+               }
             }
          }
-      }
-      tctx.newFieldIndex = new CoalescedHashMap<String, List<Object>>(tctx.numNewFields);
-      for (int i = 0; i < tctx.numNewFields; i++) {
-         Object varDef = tctx.newFields.get(i);
-         addFieldToIndex(tctx.newFieldIndex, varDef);
-      }
-      if (newType.body != null && updateMode == TypeUpdateMode.Replace) {
-         for (int i = 0; i < newType.body.size(); i++) {
-            Object newBodyDef = newType.body.get(i);
-            if (newBodyDef instanceof PropertyAssignment)
-               addFieldToIndex(tctx.newFieldIndex, newBodyDef);
+         tctx.newFieldIndex = new CoalescedHashMap<String, List<Object>>(tctx.numNewFields);
+         for (int i = 0; i < tctx.numNewFields; i++) {
+            Object varDef = tctx.newFields.get(i);
+            addFieldToIndex(tctx.newFieldIndex, varDef);
+         }
+         if (newType.body != null && updateMode == TypeUpdateMode.Replace) {
+            for (int i = 0; i < newType.body.size(); i++) {
+               Object newBodyDef = newType.body.get(i);
+               if (newBodyDef instanceof PropertyAssignment)
+                  addFieldToIndex(tctx.newFieldIndex, newBodyDef);
+            }
          }
       }
 
       boolean doChangeMethods = info != null && info.needsChangedMethods();
 
       // First go through all of the old fields, methods etc and remove any which are not present in the new index
-      if (body != null && (updateMode == TypeUpdateMode.Replace || updateMode == TypeUpdateMode.Remove)) {
+      if (activated && body != null && (updateMode == TypeUpdateMode.Replace || updateMode == TypeUpdateMode.Remove)) {
          for (int i = 0; i < body.size(); i++) {
             Object oldBodyDef = body.get(i);
             if (oldBodyDef instanceof FieldDefinition) {
@@ -6175,7 +6184,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
 
-      if (newType.body != null) {
+      if (activated && newType.body != null) {
          for (int i = 0; i < newType.body.size(); i++) {
             Object newBodyDef = newType.body.get(i);
             if (newBodyDef instanceof FieldDefinition) {
@@ -6281,7 +6290,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (newInnerType == null)
             newInnerType = (TypeDeclaration) tctx.newTypeIndex.get(oldInnerType.typeName);
          if (oldInnerType != newInnerType) { // Not sure why this is necessary but clearly don't update if it's the same thing
-            UpdateTypeCtx innerTypeCtx = oldInnerType.buildUpdateTypeContext(newInnerType, updateMode, info);
+            UpdateTypeCtx innerTypeCtx = oldInnerType.buildUpdateTypeContext(newInnerType, updateMode, info, activated);
             tctx.toUpdateCtxs.add(innerTypeCtx);
          }
          else
@@ -6338,7 +6347,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (updateMode == TypeUpdateMode.Replace || ((newType instanceof ModifyDeclaration) && !((ModifyDeclaration) newType).modifyInherited)) {
          if (this == newType)
             System.err.println("*** Replacing a type with itself!");
-         replacedByType = newType;
+
+         // In the IDE, if we set replacedByType here, we end up with one long chain of references and so never free models during editing
+         if (activated)
+            replacedByType = newType;
          if (updateMode == TypeUpdateMode.Replace)
             replaced = true;
       }
@@ -6354,7 +6366,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          if (this == newType)
             System.err.println("*** Replacing a type with itself!");
-         replacedByType = newType;
+         if (activated)
+            replacedByType = newType;
          replaced = true;
          newType.replacedByType = null;
       }
@@ -6472,69 +6485,71 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return;
       }
 
-      UpdateTypeCtx tctx = buildUpdateTypeContext(newType, updateMode, info);
+      UpdateTypeCtx tctx = buildUpdateTypeContext(newType, updateMode, info, activated);
 
       updateTypeInternals(tctx, newType, ctx, updateMode, updateInstances, info, true);
 
       // Start the type after it's fully registered into the new type system so any new references we create point
       // to the new model.  If we are batching updates do not start the type here.  We may be updating many types and
       // if we start it here, we'll resolve references to other types that will become stale.
-      if (updateMode != TypeUpdateMode.Remove && info == null)
+      if (activated && updateMode != TypeUpdateMode.Remove && info == null)
          ParseUtil.realInitAndStartComponent(newType);
 
-      completeUpdateType(tctx, newType, ctx, updateMode, updateInstances, info, true);
+      completeUpdateType(tctx, newType, ctx, updateMode, updateInstances, info, true, activated);
    }
 
-   void completeUpdateType(UpdateTypeCtx tctx, BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info, boolean outerType) {
+   void completeUpdateType(UpdateTypeCtx tctx, BodyTypeDeclaration newType, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo info, boolean outerType, boolean activated) {
       LayeredSystem sys = getLayeredSystem();
       String fullTypeName = getFullTypeName();
       boolean skipAdd = false;
       boolean skipUpdate = false;
-      if (dynamicNew && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0)) {
-         dynamicNew = false;
-         dynamicType = true;
-      }
-      // TODO: should we use sys.isClassLoaded here as well as hasInstancesOfType?
-      if (!tctx.dynamicNew && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
-         if (tctx.toAddFields.size() > 0)
-            sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + tctx.toAddFields + " to compiled type: " + fullTypeName);
-         if (tctx.toAddObjs.size() > 0)
-            sys.setStaleCompiledModel(true, "Recompile needed to add inner objects: " + tctx.toAddObjs + " to compiled type: " + fullTypeName);
-         skipAdd = true;
-      }
-      if (tctx.newConstructors) {
-         if (tctx.dynamicNew && tctx.dynamicStub && sys.isClassLoaded(getCompiledClassName()))
-            sys.setStaleCompiledModel(true, "Recompile needed - constructor added to dynamic stub class: " + fullTypeName);
-      }
+      if (activated) {
+         if (dynamicNew && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0)) {
+            dynamicNew = false;
+            dynamicType = true;
+         }
+         // TODO: should we use sys.isClassLoaded here as well as hasInstancesOfType?
+         if (!tctx.dynamicNew && (tctx.toAddObjs.size() > 0 || tctx.toAddFields.size() > 0) && sys.hasInstancesOfType(fullTypeName)) {
+            if (tctx.toAddFields.size() > 0)
+               sys.setStaleCompiledModel(true, "Recompile needed to add fields: " + tctx.toAddFields + " to compiled type: " + fullTypeName);
+            if (tctx.toAddObjs.size() > 0)
+               sys.setStaleCompiledModel(true, "Recompile needed to add inner objects: " + tctx.toAddObjs + " to compiled type: " + fullTypeName);
+            skipAdd = true;
+         }
+         if (tctx.newConstructors) {
+            if (tctx.dynamicNew && tctx.dynamicStub && sys.isClassLoaded(getCompiledClassName()))
+               sys.setStaleCompiledModel(true, "Recompile needed - constructor added to dynamic stub class: " + fullTypeName);
+         }
 
-      // Any change to the extends type will require a recompile if there are any instances of that type outstanding
-      // Do this after we've added everybody to the tables
-      Object compiledExtendsType = prevCompiledExtends;
-      Object oldExtType = tctx.oldExtType;
-      Object newExtType = newType.getExtendsTypeDeclaration();
-      boolean prevExtends = false;
-      if (compiledExtendsType != null) {
-         prevExtends = true;
-         oldExtType = compiledExtendsType;
-      }
-      if (!ModelUtil.sameTypes(oldExtType, newExtType)) {
-         boolean classLoaded = sys.isClassLoaded(fullTypeName);
-         boolean hasInstances = sys.hasInstancesOfType(fullTypeName);
-         // Only a problem if there are any instances of this type outstanding right now
-         if (!tctx.dynamicNew) {
-            sys.setStaleCompiledModel(true, "Recompile needed: " + typeName + " 's " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType);
-            skipAdd = true;
-            skipUpdate = true;
+         // Any change to the extends type will require a recompile if there are any instances of that type outstanding
+         // Do this after we've added everybody to the tables
+         Object compiledExtendsType = prevCompiledExtends;
+         Object oldExtType = tctx.oldExtType;
+         Object newExtType = newType.getExtendsTypeDeclaration();
+         boolean prevExtends = false;
+         if (compiledExtendsType != null) {
+            prevExtends = true;
+            oldExtType = compiledExtendsType;
          }
-         // Don't warn for the stale class loader type until we have a new extends type which is incompatible.  That will avoid one restart warning...
-         else if (hasInstances || classLoaded || (newExtType != null && sys.staleClassLoader)) {
-            sys.setStaleCompiledModel(true, "Recompile needed: " + " type: " + typeName + "'s " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType + (hasInstances ? " to update active instances" : (classLoaded ? " to reload compiled class " : " layers have been removed making class loaders stale")));
-            skipAdd = true;
-            skipUpdate = true;
-         }
-         // TODO: classLoaded is always false here - do we need this code anymore?
-         else if (classLoaded && oldExtType != null && newExtType == null) {
-            newType.prevCompiledExtends = oldExtType;
+         if (!ModelUtil.sameTypes(oldExtType, newExtType)) {
+            boolean classLoaded = sys.isClassLoaded(fullTypeName);
+            boolean hasInstances = sys.hasInstancesOfType(fullTypeName);
+            // Only a problem if there are any instances of this type outstanding right now
+            if (!tctx.dynamicNew) {
+               sys.setStaleCompiledModel(true, "Recompile needed: " + typeName + " 's " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType);
+               skipAdd = true;
+               skipUpdate = true;
+            }
+            // Don't warn for the stale class loader type until we have a new extends type which is incompatible.  That will avoid one restart warning...
+            else if (hasInstances || classLoaded || (newExtType != null && sys.staleClassLoader)) {
+               sys.setStaleCompiledModel(true, "Recompile needed: " + " type: " + typeName + "'s " + (prevExtends ? "previous " : "") + "extends type changed from: " + oldExtType + " to: " + newExtType + (hasInstances ? " to update active instances" : (classLoaded ? " to reload compiled class " : " layers have been removed making class loaders stale")));
+               skipAdd = true;
+               skipUpdate = true;
+            }
+            // TODO: classLoaded is always false here - do we need this code anymore?
+            else if (classLoaded && oldExtType != null && newExtType == null) {
+               newType.prevCompiledExtends = oldExtType;
+            }
          }
       }
 
@@ -6551,7 +6566,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      if (!skipAdd) {
+      if (!skipAdd && activated) {
          for (int i = 0; i < tctx.toAddObjs.size(); i++) {
             // if static,  the slot in the static fields
             TypeDeclaration newInnerType = tctx.toAddObjs.get(i);
@@ -6581,7 +6596,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      if (!skipUpdate) {
+      if (!skipUpdate && activated) {
          // Now that stuff is in a stable state, re-initialize any properties that need to be initialized
          // This should fill in any uninitialized slots (all new fields are here) plus any properties whose initializers
          // are changed we run those.  Note we're keeping the order the same as they appear in the body of this type.
@@ -6607,11 +6622,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (newInnerType == null)
                newInnerType = (TypeDeclaration) tctx.newTypeIndex.get(oldInnerType.typeName);
             if (oldInnerType != newInnerType) // Not sure why this is necessary but clearly don't update if it's the same thing
-               oldInnerType.completeUpdateType(tctx.toUpdateCtxs.get(i), newInnerType, ctx, updateMode, updateInstances, info, false);
+               oldInnerType.completeUpdateType(tctx.toUpdateCtxs.get(i), newInnerType, ctx, updateMode, updateInstances, info, false, activated);
          }
       }
 
-      if (!skipAdd) {
+      if (!skipAdd && activated) {
          for (int i = 0; i < tctx.toAddObjs.size(); i++) {
             // if static,  the slot in the static fields
             TypeDeclaration newInnerType = tctx.toAddObjs.get(i);
