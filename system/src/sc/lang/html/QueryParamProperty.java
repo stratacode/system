@@ -92,6 +92,18 @@ public class QueryParamProperty extends BaseURLParamProperty {
          }
          localMapper.setPropertyValue(inst, intVal);
       }
+      else if (ModelUtil.isBoolean(propType)) {
+         boolean boolVal = false;
+         if (strVal != null) {
+            if (strVal.equals("") || strVal.equalsIgnoreCase("true"))
+               boolVal = true;
+            else if (!strVal.equalsIgnoreCase("false"))
+               throw new IllegalArgumentException("Invalid value for boolean query parameter: " + strVal + " - must be null, empty, true, or false");
+         }
+
+         // The presence of the query param means true in this case e.g. ?foo
+         localMapper.setPropertyValue(inst, boolVal);
+      }
       else if (ModelUtil.isString(propType))
          localMapper.setPropertyValue(inst, strVal);
       else
