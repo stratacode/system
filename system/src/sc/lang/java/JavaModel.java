@@ -1024,6 +1024,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public String getPackagePrefix() {
+      if (!initPackage)
+         initPackageAndImports();
       if (computedPackagePrefix != null)
          return computedPackagePrefix;
       if (packageDef != null)
@@ -1804,7 +1806,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    public void updateModel(JavaModel newModel, ExecutionContext ctx, TypeUpdateMode updateMode, boolean updateInstances, UpdateInstanceInfo updateInfo) {
       if (!newModel.isInitialized()) {
          // We do not want to start the new type until we've replaced it in the type system.  That will happen
-         ParseUtil.initComponent(newModel);
+         // Don't want to init the model in the IDE at this point...
+         //ParseUtil.initComponent(newModel);
          // Do not want to validate this (and compute the sync properties), until we've updated the models in other runtimes
          // ParseUtil.processComponent(newModel);
       }
@@ -1832,7 +1835,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       // If we are batching updates (updateInfo != null), we might be updating more than one model so don't start it here.
       if (!newModel.isStarted() && updateInfo == null) {
-         ParseUtil.realInitAndStartComponent(newModel);
+         //ParseUtil.realInitAndStartComponent(newModel);
       }
    }
 
@@ -3272,7 +3275,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             layeredSystem.fileRenamed(oldSrcEnt, srcFile, true);
       }
       if (layeredSystem != null) {
-         layeredSystem.updateTypeName(oldFullName, newFullName, true);
+         Layer layer = getLayer();
+         layeredSystem.updateTypeName(oldFullName, newFullName, layer != null && layer.activated, true);
       }
    }
 
@@ -3408,7 +3412,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             if (model == null) {
                SrcEntry srcEnt = sys.getSrcEntryForPath(ref.absFileName, false, true);
                if (srcEnt != null) {
-                  Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false, false);
+                  Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false, false, true);
                   if (obj instanceof ILanguageModel)
                      model = (ILanguageModel) obj;
                   else
