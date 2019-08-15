@@ -54,7 +54,7 @@ public class JSONDeserializer {
                throw new IllegalArgumentException("Sync array value not an object in: " + parser);
             CharSequence cmdName = parser.parseName();
             if (cmdName == null || cmdName.length() == 0) {
-               throw new IllegalArgumentException("Incomplete JSON file: " + parser);
+               return false;
             }
             if (cmdName.charAt(0) == '$') {
                Commands cmd = Commands.get(cmdName);
@@ -344,7 +344,12 @@ public class JSONDeserializer {
    }
 
    public void fetchProperty(String propName) {
-      syncCtx.updateProperty(getCurObj(), propName, false, true);
+      Object obj = getCurObj();
+      if (obj == null){
+         System.err.println("*** Unable to fetch property: " + propName + " null current object");
+         return;
+      }
+      syncCtx.updateProperty(obj, propName, false, true);
    }
 
    public void invokeRemoteMethod() {
