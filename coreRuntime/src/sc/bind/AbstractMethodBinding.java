@@ -94,10 +94,10 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          else
             PBindUtil.addBindingListener(dstObj, dstProp, this, VALUE_CHANGED_MASK);
 
-         // This is a bit of a hack.  For reverse only bindings, we should not be changing the value of the property
-         // at all.  Because the binding replaces the assignment expression, it's awkward to rewrite the code so the
-         // property assignment never happens.  Instead, we'll just change it to the same value.
-         // This also lets us register the IChangeable hook and keep it up to date in the value change part
+         // This is a bit of a hack.  For reverse only bindings, we should not be changing the value of the dst property
+         // at all.  When the binding replaces the assignment expression, it's awkward to rewrite the code so the
+         // property assignment never happens (TODO: is this still true? reverse bindings do not set the destination property)
+         // In some cases we do also need to register the IChangeable hook and keep it up to date in the value change part
          if (!direction.doForward()) {
             if (dstProp == null)
                System.out.println("*** Null property in binding");
