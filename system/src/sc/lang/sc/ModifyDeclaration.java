@@ -2037,6 +2037,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (modifyObj == null)
          modProps = declProps;
       else {
+         if (modifyObj == this) {
+            System.err.println("*** Misformed model!");
+            return declProps;
+         }
          Object[] props = ModelUtil.getProperties(modifyObj, modifier, includeAssigns);
          if (props != null)
             modProps = Arrays.asList(props);
@@ -2972,10 +2976,18 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
       if (extendsBoundTypes != null) {
          for (Object extBoundType:extendsBoundTypes) {
+            extBoundType = ModelUtil.resolveSrcTypeDeclaration(getLayeredSystem(), extBoundType, false, true, getLayer());
             if (extBoundType instanceof BodyTypeDeclaration)
                ((BodyTypeDeclaration) extBoundType).addConstructorProps(cpi);
          }
       }
       super.addConstructorProps(cpi);
+   }
+
+   public ConstructorPropInfo getConstructorPropInfo() {
+      // TODO: is modifyInherited a difference case here?
+      if (modifyTypeDecl instanceof TypeDeclaration)
+         return ((TypeDeclaration)modifyTypeDecl).getConstructorPropInfo();
+      return null;
    }
 }
