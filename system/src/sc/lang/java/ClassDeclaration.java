@@ -1205,7 +1205,12 @@ public class ClassDeclaration extends TypeDeclaration {
       return null;
    }
 
+   /** Initializes the ConstructorPropInfo field of the type - to help determine how to manage the set of constructorProperties. */
    void initConstructorPropInfo() {
+      if (constructorPropInfo != null)
+         return;
+
+      // Get the most specific type - the type modifying this one to use for querying the current configuration
       BodyTypeDeclaration modType = resolve(true);
 
       List<Object> compilerSettingsList = modType.getCompilerSettingsList();
@@ -1228,6 +1233,7 @@ public class ClassDeclaration extends TypeDeclaration {
                cpi.propTypes.add(null);
             }
 
+            // Now gather up the current type's definitions for these properties
             modType.addConstructorProps(cpi);
 
             boolean valid = true;
@@ -1247,9 +1253,11 @@ public class ClassDeclaration extends TypeDeclaration {
             IdentifierExpression superExpr = null;
             List<String> extPropNames = null;
             if (valid) {
+               // Is there a constructor that already matches the one we need?
                Object constrObj = declaresConstructor(cpi.propTypes, null);
                Object superConstr = null;
-               Object extType = getExtendsTypeDeclaration();
+               Object extType = modType.getExtendsTypeDeclaration();
+               // Find constructor properties for the super type and the mapping for the super() if any
                if (extType != null) {
                   extPropNames = getConstructorPropNamesForType(sys, extType, getLayer());
                   if (extPropNames != null) {
@@ -1328,6 +1336,13 @@ public class ClassDeclaration extends TypeDeclaration {
             }
          }
       }
+   }
+
+   public ConstructorPropInfo getConstructorPropInfo() {
+      if (constructorPropInfo != null)
+         return constructorPropInfo;
+      initConstructorPropInfo();
+      return constructorPropInfo;
    }
 
    private Statement createCallToInitMethod(JavaType fieldType, String variableName, String methodName, boolean useAltComponent) {
