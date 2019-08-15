@@ -37,6 +37,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.zip.ZipEntry;
@@ -192,10 +193,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public String userClassPath;  /* The part of the above which is not part of the system classpath.  It is used to generate run scripts for example where we don't want to include the JRE or anything present when the script is run.  */
 
    /** Stores the latest representation of each model from the absolute file name.  When the externalModelIndex is set, this index shadows the external index, i.e. storing the last result we retreive from that index. */
-   private Map<String,ILanguageModel> modelIndex = new HashMap<String,ILanguageModel>();
+   private Map<String,ILanguageModel> modelIndex = new ConcurrentHashMap<String,ILanguageModel>();
 
    /** Stores the inactive model types, separate from the active ones.  Here the layer stack is lazily formed and contains files we are not compiling... just loading for tooling purposes like the IDE or the doc styling */
-   private HashMap<String,ILanguageModel> inactiveModelIndex = new HashMap<String,ILanguageModel>();
+   private ConcurrentHashMap<String,ILanguageModel> inactiveModelIndex = new ConcurrentHashMap<String,ILanguageModel>();
 
    /** During a refresh, keep track of the types which have been stopped so we can update instances based on these types when they are restarted (or remove them if they are not) */
    private LinkedHashMap<String,TypeDeclaration> stoppedTypes = null;
@@ -348,7 +349,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * For the master LayeredSystem only - the map from processident to TypeIndexEntry HashMap, used to bootstrap the TypeIndexes, before the
     * peerSystems are created.
     */
-   HashMap<String, SysTypeIndex> typeIndexProcessMap = null;
+   ConcurrentHashMap<String, SysTypeIndex> typeIndexProcessMap = null;
 
    TreeSet<String> customSuffixes = new TreeSet<String>();
 
@@ -859,6 +860,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            SrcEntry srcEnt = layerSys.getSrcFileFromTypeName(typeName, true, null, true, null);
                            if (srcEnt != null)
                               newTypeObj = srcEnt;
+                           else {
+                              Layer indexLayer = getAllIndexLayer(typeIndexEntry.layerName);
+                              if (indexLayer != null) {
+                                 String layerPackage = indexLayer.packagePrefix;
+                                 if (layerPackage == null)
+                                    layerPackage = "";
+                                 if (typeName.startsWith(layerPackage) && typeName.length() > layerPackage.length() + 1)  {
+                                    String relFileName = layerPackage.length() == 0 ? typeName : typeName.substring(layerPackage.length()+1);
+                                    relFileName = FileUtil.addExtension(relFileName.replace('.',FileUtil.FILE_SEPARATOR_CHAR), FileUtil.getExtension(typeIndexEntry.fileName));
+                                    newTypeObj = new SrcEntry(indexLayer, typeIndexEntry.fileName, relFileName);
+                                 }
+                              }
+                           }
                         }
                      }
                      if (newTypeObj != null)
@@ -938,49 +952,54 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public void updateTypeNames(String packageName, Map<String,TypeDeclaration> oldDefinedTypes, Map<String,TypeDeclaration> newDefinedTypes) {
       for (String oldTypeName:oldDefinedTypes.keySet()) {
          if (newDefinedTypes.get(oldTypeName) == null) {
-            removeTypeName(CTypeUtil.prefixPath(packageName, oldTypeName), true);
+            removeTypeName(CTypeUtil.prefixPath(packageName, oldTypeName), false, true);
          }
       }
       // TODO: do we need to do more than this?  It seems like the new type will be added to the type index on it's own
    }
 
-   public void updateTypeName(String oldFullName, String newFullName, boolean updatePeers) {
-      TypeDeclarationCacheEntry tds = typesByName.remove(oldFullName);
-      if (tds != null)
-         typesByName.put(newFullName, tds);
+   public void updateTypeName(String oldFullName, String newFullName, boolean active, boolean updatePeers) {
+      if (active) {
+         TypeDeclarationCacheEntry tds = typesByName.remove(oldFullName);
+         if (tds != null)
+            typesByName.put(newFullName, tds);
 
-      HashMap<String,Boolean> subTypes = subTypesByType.remove(oldFullName);
-      if (subTypes != null) {
-         subTypesByType.put(newFullName, subTypes);
+         HashMap<String,Boolean> subTypes = subTypesByType.remove(oldFullName);
+         if (subTypes != null) {
+            subTypesByType.put(newFullName, subTypes);
+         }
+
+         Object inner = removeFromInnerTypeCache(oldFullName);
+         if (inner != null)
+            addToInnerTypeCache(newFullName, inner);
       }
 
-      Object inner = removeFromInnerTypeCache(oldFullName);
-      if (inner != null)
-         addToInnerTypeCache(newFullName, inner);
-
-      typeIndex.updateTypeName(oldFullName, newFullName);
+      if (!active)
+         typeIndex.updateTypeName(oldFullName, newFullName);
 
       if (updatePeers && peerSystems != null) {
          for (int i = 0; i < peerSystems.size(); i++) {
             LayeredSystem peer = peerSystems.get(i);
-            peer.updateTypeName(oldFullName, newFullName, false);
+            peer.updateTypeName(oldFullName, newFullName, active, false);
          }
       }
    }
 
-   public void removeTypeName(String oldFullName, boolean updatePeers) {
-      typesByName.remove(oldFullName);
+   public void removeTypeName(String oldFullName, boolean active, boolean updatePeers) {
+      if (active) {
+         typesByName.remove(oldFullName);
 
-      subTypesByType.remove(oldFullName);
+         subTypesByType.remove(oldFullName);
 
-      Object inner = removeFromInnerTypeCache(oldFullName);
-
-      typeIndex.removeTypeName(oldFullName);
+         Object inner = removeFromInnerTypeCache(oldFullName);
+      }
+      else
+         typeIndex.removeTypeName(oldFullName);
 
       if (updatePeers && peerSystems != null) {
          for (int i = 0; i < peerSystems.size(); i++) {
             LayeredSystem peer = peerSystems.get(i);
-            peer.removeTypeName(oldFullName,false);
+            peer.removeTypeName(oldFullName,active, false);
          }
       }
    }
@@ -3030,7 +3049,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   return ent;
             }
             if (peerSystems != null && !peerMode) {
-               for (LayeredSystem peerSys:peerSystems) {
+               for (int i = 0; i < peerSystems.size(); i++) {
+                  LayeredSystem peerSys = peerSystems.get(i);
                   TypeIndexEntry ent = peerSys.getTypeIndexEntry(filePath);
                   if (ent != null)
                      return ent;
@@ -6867,7 +6887,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       acquireDynLock(false);
       try {
          if (typeIndexProcessMap == null) {
-            typeIndexProcessMap = new HashMap<String, SysTypeIndex>();
+            typeIndexProcessMap = new ConcurrentHashMap<String, SysTypeIndex>();
             if (typeIndex == null) {
                typeIndex = new SysTypeIndex(this, getTypeIndexIdent());
             }
@@ -9751,7 +9771,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         Map<String, ILanguageModel> oldInactiveModels = (Map<String, ILanguageModel>) inactiveModelIndex.clone();
+         Map<String, ILanguageModel> oldInactiveModels = new HashMap<String,ILanguageModel>(inactiveModelIndex);
          for (ILanguageModel oldModel:oldInactiveModels.values()) {
             if (oldModel.isStarted() && !oldModel.isReplacedModel())
                oldModel.refreshBoundTypes(flags);
@@ -10051,14 +10071,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Object parseSrcFile(SrcEntry srcEnt, boolean reportErrors) {
-      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, reportErrors, false);
+      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, reportErrors, false, true);
    }
 
    /**
     * For IDE-like operations where we need to parse a file but using the current-in memory copy for fast model validation.  This method
     * should not alter the runtime code model
     */
-   public Object parseSrcBuffer(SrcEntry srcEnt, boolean enablePartialValues, String buffer, boolean dummy) {
+   public Object parseSrcBuffer(SrcEntry srcEnt, boolean enablePartialValues, String buffer, boolean dummy, boolean doInit) {
       long modTimeStart = srcEnt.getLastModified();
       IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
       if (processor == null && srcEnt.layer != null && !srcEnt.layer.isStarted()) {
@@ -10072,7 +10092,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (result instanceof ParseError) {
             if (enablePartialValues) {
                Object val = ((ParseError) result).getRootPartialValue();
-               initNewBufferModel(srcEnt, val, modTimeStart, dummy, false);
+               initNewBufferModel(srcEnt, val, modTimeStart, dummy, false, doInit);
             }
             return result;
          }
@@ -10082,7 +10102,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (!(modelObj instanceof IFileProcessorResult))
                return modelObj;
 
-            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, false);
+            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, false, doInit);
 
             return modelObj;
          }
@@ -10094,10 +10114,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * For IDE-like operations where we need to parse a file but using the current-in memory copy for fast model validation.  This method
     * should not alter the runtime code model
     */
-   public Object reparseSrcBuffer(SrcEntry srcEnt, ILanguageModel oldModel, boolean enablePartialValues, String buffer, boolean dummy) {
+   public Object reparseSrcBuffer(SrcEntry srcEnt, ILanguageModel oldModel, boolean enablePartialValues, String buffer, boolean dummy, boolean doInit) {
       IParseNode pnode = oldModel.getParseNode();
       if (pnode == null)
-         return parseSrcBuffer(srcEnt, enablePartialValues, buffer, dummy);
+         return parseSrcBuffer(srcEnt, enablePartialValues, buffer, dummy, doInit);
 
       long modTimeStart = srcEnt.getLastModified();
       IFileProcessor processor = getFileProcessorForSrcEnt(srcEnt, null, false);
@@ -10107,7 +10127,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (result instanceof ParseError) {
             if (enablePartialValues) {
                Object val = ((ParseError) result).getRootPartialValue();
-               initNewBufferModel(srcEnt, val, modTimeStart, dummy, true);
+               initNewBufferModel(srcEnt, val, modTimeStart, dummy, true, doInit);
             }
             return result;
          }
@@ -10123,7 +10143,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   System.err.println("**** Reparsed buffer has null type name!");
             }
 
-            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, true);
+            initNewBufferModel(srcEnt, modelObj, modTimeStart, dummy, true, doInit);
 
             return modelObj;
          }
@@ -10131,7 +10151,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       throw new IllegalArgumentException(("No language processor for file: " + srcEnt.relFileName));
    }
 
-   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy, boolean incremental) {
+   private void initNewBufferModel(SrcEntry srcEnt, Object modelObj, long modTimeStart, boolean dummy, boolean incremental, boolean doInit) {
       if (modelObj instanceof IFileProcessorResult) {
          IFileProcessorResult res = (IFileProcessorResult) modelObj;
          SrcEntry oldSrcEnt = res.getSrcFile();
@@ -10176,11 +10196,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // on that model before we use it but if this stuff is not set, we won't reset it.
             try {
                if (clonedModels != null)
-                  initClonedModels(clonedModels, srcEnt, modTimeStart, true);
+                  initClonedModels(clonedModels, srcEnt, modTimeStart, true, doInit);
             }
             finally {
                try {
-                  initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
+                  if (doInit)
+                     initModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
+                  else
+                     preInitModel(srcEnt.layer, modTimeStart, newModel, srcEnt.isLayerFile(), false);
                }
                finally {
                   if (!dummy)
@@ -10188,14 +10211,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                   // If initModel is aborted, we still want to register the models into the name space so things are not left in a half-finished situation
                   if (clonedModels != null)
-                     initClonedModels(clonedModels, srcEnt, modTimeStart, false);
+                     initClonedModels(clonedModels, srcEnt, modTimeStart, false, doInit);
                }
             }
          }
       }
    }
 
-   public Object parseSrcFile(SrcEntry srcEnt, boolean isLayer, boolean checkPeers, boolean enablePartialValues, boolean reportErrors, boolean temporary) {
+   public Object parseSrcFile(SrcEntry srcEnt, boolean isLayer, boolean checkPeers, boolean enablePartialValues, boolean reportErrors, boolean temporary, boolean doInit) {
       // Once we parse one source file that's not an annotation layer in java.util or java.lang we cannot by-pass the src mechanism for the final js.sys java.util or java.lang classes - they have interdependencies.
       if (srcEnt.layer != null && !srcEnt.layer.annotationLayer) {
          /*
@@ -10303,19 +10326,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   }
 
                   if (clonedModels != null)
-                     initClonedModels(clonedModels, srcEnt, modTimeStart, true);
+                     initClonedModels(clonedModels, srcEnt, modTimeStart, true, doInit);
 
-                  initModel(srcEnt.layer, modTimeStart, model, isLayer, false);
+                  if (doInit)
+                     initModel(srcEnt.layer, modTimeStart, model, isLayer, false);
+                  else
+                     preInitModel(srcEnt.layer, modTimeStart, model, isLayer, false);
 
                   if (clonedModels != null)
-                     initClonedModels(clonedModels, srcEnt, modTimeStart, false);
+                     initClonedModels(clonedModels, srcEnt, modTimeStart, false, doInit);
                }
                finally {
                   beingLoaded.remove(srcEnt.absFileName);
                }
             }
             else if (modelObj instanceof ILanguageModel && temporary) {
-               initModel(srcEnt.layer, modTimeStart, (ILanguageModel) modelObj, isLayer, false);
+               if (doInit)
+                  initModel(srcEnt.layer, modTimeStart, (ILanguageModel) modelObj, isLayer, false);
+               else
+                  preInitModel(srcEnt.layer, modTimeStart, (ILanguageModel) modelObj, isLayer, false);
             }
             return modelObj;
          }
@@ -10462,7 +10491,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return modelIndex.get(absFileName) != null || beingLoaded.get(absFileName) != null;
    }
 
-   void initModel(Layer srcEntLayer, long modTimeStart, ILanguageModel model, boolean isLayer, boolean switchLayers) {
+   void preInitModel(Layer srcEntLayer, long modTimeStart, ILanguageModel model, boolean isLayer, boolean switchLayers) {
       model.setLayeredSystem(this);
       if (switchLayers)
          ((JavaModel) model).switchLayers(srcEntLayer);
@@ -10473,6 +10502,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (isLayer && model instanceof JavaModel)
          ((JavaModel) model).isLayerModel = true;
+   }
+
+   void initModel(Layer srcEntLayer, long modTimeStart, ILanguageModel model, boolean isLayer, boolean switchLayers) {
+      preInitModel(srcEntLayer, modTimeStart, model, isLayer, switchLayers);
 
       // initialize the model
       ParseUtil.initComponent(model);
@@ -10486,7 +10519,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return copy;
    }
 
-   void initCloneModel(JavaModel copy, SrcEntry origSrcEnt, long modTimeStart) {
+   void initCloneModel(JavaModel copy, SrcEntry origSrcEnt, long modTimeStart, boolean doInit) {
       Layer peerLayer = copy.layer;
       SrcEntry copySrcEnt = new SrcEntry(peerLayer, origSrcEnt.absFileName, origSrcEnt.relFileName, origSrcEnt.prependPackage);
 
@@ -10500,7 +10533,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          beingLoaded.put(copySrcEnt.absFileName, copy);
 
          try {
-            initModel(peerLayer, modTimeStart, copy, false, true);
+            if (doInit)
+               initModel(peerLayer, modTimeStart, copy, false, true);
+            else
+               preInitModel(peerLayer, modTimeStart, copy, false, true);
          }
          finally {
             beingLoaded.remove(copySrcEnt.absFileName);
@@ -10513,12 +10549,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          System.err.println("*** Error cloned model in layer not started");
    }
 
-   void initClonedModels(ArrayList<JavaModel> copyModels, SrcEntry origSrcEnt, long modTimeStart, boolean preStart) {
+   void initClonedModels(ArrayList<JavaModel> copyModels, SrcEntry origSrcEnt, long modTimeStart, boolean preStart, boolean doInit) {
       // Need to initialize these in their own layered system.
       for (JavaModel copy:copyModels) {
          LayeredSystem sys = copy.layeredSystem;
          if (sys.enableRemoteMethods == preStart)
-            sys.initCloneModel(copy, origSrcEnt, modTimeStart);
+            sys.initCloneModel(copy, origSrcEnt, modTimeStart, doInit);
       }
    }
 
@@ -11140,7 +11176,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public Object parseSrcType(SrcEntry srcEnt, Layer fromLayer, boolean isLayer, boolean reportErrors) {
-      Object result = parseSrcFile(srcEnt, isLayer, true, false, reportErrors, false);
+      Object result = parseSrcFile(srcEnt, isLayer, true, false, reportErrors, false, true);
       if (result instanceof ILanguageModel) {
          ILanguageModel model = (ILanguageModel) result;
 
@@ -11332,7 +11368,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return null;
       SrcEntry srcEnt = new SrcEntry(null, fileName, relFileName);
 
-      Object res = parseSrcFile(srcEnt, false, false, false, true, false);
+      Object res = parseSrcFile(srcEnt, false, false, false, true, false, true);
       if (res instanceof JavaModel) {
          JavaModel model = (JavaModel) res;
          ParseUtil.startComponent(model);
@@ -11398,6 +11434,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (beingLoaded.get(srcEnt.absFileName) != oldModel)
             return;
       }
+
       if (oldModel != null && options.verbose && oldModel.getLayer() != null && oldModel.getLayer().activated) {
          System.err.println("Replacing model " + absName + " in layer: " + oldModel.getLayer() + " with: " + model.getLayer());
       }
@@ -11411,11 +11448,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          JavaModel newModel = (JavaModel) model;
          if (oldModel != null) {
             // TODO: should we be calling updateModel here?
-            //newModel.replacesModel = (JavaModel) oldModel;
             if (!newModel.isLayerModel) {
                if (oldModel instanceof JavaModel && !batchingModelUpdates)
                   ((JavaModel) oldModel).updateModel(newModel, ctx, TypeUpdateMode.Replace, false, updateInfo);
-               else
+               else if (!layer.activated)
                   newModel.replacesModel = (JavaModel) oldModel;
             }
          }
@@ -12639,13 +12675,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model != null)
             return model;
       }
-      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true, false);
+      return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true, false, true);
    }
 
    public Object parseActiveFile(SrcEntry srcEnt) {
       ILanguageModel model = getCachedModel(srcEnt, true);
       if (model == null) {
-         return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true, false);
+         return parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, true, false, true);
       }
       return model;
    }
@@ -12670,8 +12706,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (model == null) {
             model = externalModelIndex.lookupJavaModel(srcEnt, true);
             if (model != null) {
-               if (!model.isInitialized())
-                  System.err.println("*** Error - external index returns model that's not initialized!");
+               if (!model.isInitialized()) {
+                  ParseUtil.initComponent(model);
+               }
 
                //ParseUtil.initAndStartComponent(model);
                if (model.getLayer() != null && model.getLayer().activated)
@@ -12689,7 +12726,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       model = inactiveModelIndex.get(srcEnt.absFileName);
       if (model == null) {
-         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !options.disableCommandLineErrors, false);
+         Object result = parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, false, !options.disableCommandLineErrors, false, true);
          // We might have to load files for inactive types which the IDE is not maintaining.  So we always cache these
          // models in the local index so we avoid loading them over and over again.
          if (result instanceof ILanguageModel) {
@@ -13504,7 +13541,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    JavaModel parseLayerModel(SrcEntry defFile, String expectedName, boolean addType, boolean reportErrors) {
-      Object modelObj = addType ? parseSrcType(defFile, null, true, reportErrors) : parseSrcFile(defFile, true, false, false, reportErrors, false);
+      Object modelObj = addType ? parseSrcType(defFile, null, true, reportErrors) : parseSrcFile(defFile, true, false, false, reportErrors, false, true);
       if (!(modelObj instanceof JavaModel))
          return null;
 
@@ -13911,6 +13948,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public volatile static int readLocked, writeLocked;
    public volatile static String debugLockStack;
    public volatile static String currentLockThreadName;
+   public volatile static long lockAcquireTime = -1;
 
    public void acquireDynLock(boolean readOnly) {
       long startTime = 0;
@@ -13941,8 +13979,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       currentLockThreadName = Thread.currentThread().getName();
 
+      lockAcquireTime = System.currentTimeMillis();
+
       if (options.verboseLocks || options.verbose) {
-         long duration = System.currentTimeMillis() - startTime;
+         long duration = lockAcquireTime - startTime;
          if (duration > 1000) {
             System.err.println("Warning: thread: " + currentLockThreadName + " took: " + duration + " millis to acquire system lock");
             if (lastLockThread != null)
@@ -13964,10 +14004,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       else
          readLocked--;
 
-      if (writeLocked == 0)
+      boolean released = false;
+      long myAcquireTime = -1;
+      String releaseThreadName = null;
+
+      if (writeLocked == 0) {
+         released = true;
+         releaseThreadName = currentLockThreadName;
          currentLockThreadName = null;
+         myAcquireTime = lockAcquireTime;
+         lockAcquireTime = -1;
+      }
 
       lock.unlock();
+
+      long releaseTime = System.currentTimeMillis();
+      long delta = releaseTime - myAcquireTime;
+      if (options.verbose && myAcquireTime != -1 && delta > 500) {
+         System.out.println("Releasing system dyn lock held for: " + delta + " millis - thread: " + releaseThreadName);
+      }
    }
 
    public void ensureLocked() {
@@ -14929,6 +14984,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return allLayerIndex;
    }
 
+   public Layer getAllIndexLayer(String layerName) {
+      Map<String,LayerIndexInfo> allLayerIndex = getAllLayerIndex();
+      LayerIndexInfo info = allLayerIndex.get(layerName);
+      if (info != null)
+         return info.layer;
+      return null;
+   }
+
    void initAllLayerIndex() {
       allLayerIndex = new LinkedHashMap<String, LayerIndexInfo>();
       // defaults to using paths relative to the current directory
@@ -14999,7 +15062,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      LayerIndexInfo lii = new LayerIndexInfo();
                      lii.layerPathRoot = pathName;
                      lii.layerDirName = layer.layerDirName;
-                     lii.packageName = layerModel.getPackagePrefix();
+                     layer.packagePrefix = lii.packageName = layerModel.getPackagePrefix();
                      lii.system = this;
                      lii.layer = layer;
 
