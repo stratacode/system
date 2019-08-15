@@ -469,154 +469,158 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
       beingInitialized = true;
 
-      // Do this first so the conversion process can find types in this model.
-      initPackageAndImports();
+      try {
 
-      Layer layer = getLayer();
+         // Do this first so the conversion process can find types in this model.
+         initPackageAndImports();
 
-      PerfMon.start("initTemplate", false);
+         Layer layer = getLayer();
 
-      /*
-      LayeredSystem sys = getLayeredSystem();
-      if (sys != null && sys.options.verbose) {
-         sys.verbose("Init " + getSrcFile());
-      }
-      */
+         PerfMon.start("initTemplate", false);
 
-      // If we are an annotation layer, the template itself is not active - the elements can be used to create new types though
-      // The key is that we do not generate a type for this class... we're just annotating a class in the classpath with a defaut template.
-      if (layer == null || !layer.annotationLayer) {
-         Object firstTempl = firstInList(templateDeclarations);
-         if (firstTempl instanceof TemplateDeclaration) {
-            Object firstDef = firstInList(((TemplateDeclaration) firstTempl).body);
-            if (firstDef instanceof TypeDeclaration) {
-               TypeDeclaration rootTD = (TypeDeclaration) firstDef;
-               ((TypeDeclaration) firstDef).modelType = this;
-               rootType = firstDef;
-               implicitRoot = true;
+         /*
+         LayeredSystem sys = getLayeredSystem();
+         if (sys != null && sys.options.verbose) {
+            sys.verbose("Init " + getSrcFile());
+         }
+         */
 
-               String defExtTypeName;
-               if (rootTD.getExtendsType() == null && templateProcessor != null && (defExtTypeName = templateProcessor.getDefaultExtendsType()) != null) {
-                  defaultExtendsTypeName = defExtTypeName;
-                  JavaType extClassType = ClassType.create(defExtTypeName);
-                  if (rootTD instanceof ModifyDeclaration) {
-                     SemanticNodeList extTypes = new SemanticNodeList();
-                     extTypes.add(extClassType);
-                     rootTD.setProperty("extendsTypes", extTypes);
+         // If we are an annotation layer, the template itself is not active - the elements can be used to create new types though
+         // The key is that we do not generate a type for this class... we're just annotating a class in the classpath with a defaut template.
+         if (layer == null || !layer.annotationLayer) {
+            Object firstTempl = firstInList(templateDeclarations);
+            if (firstTempl instanceof TemplateDeclaration) {
+               Object firstDef = firstInList(((TemplateDeclaration) firstTempl).body);
+               if (firstDef instanceof TypeDeclaration) {
+                  TypeDeclaration rootTD = (TypeDeclaration) firstDef;
+                  ((TypeDeclaration) firstDef).modelType = this;
+                  rootType = firstDef;
+                  implicitRoot = true;
+
+                  String defExtTypeName;
+                  if (rootTD.getExtendsType() == null && templateProcessor != null && (defExtTypeName = templateProcessor.getDefaultExtendsType()) != null) {
+                     defaultExtendsTypeName = defExtTypeName;
+                     JavaType extClassType = ClassType.create(defExtTypeName);
+                     if (rootTD instanceof ModifyDeclaration) {
+                        SemanticNodeList extTypes = new SemanticNodeList();
+                        extTypes.add(extClassType);
+                        rootTD.setProperty("extendsTypes", extTypes);
+                     }
+                     else
+                        rootTD.setProperty("extendsType", extClassType);
                   }
-                  else
-                     rootTD.setProperty("extendsType", extClassType);
                }
             }
-         }
-         TypeDeclaration td = null;
-         boolean elementsOnly;
-         if (rootType == null) {
-            String typeName = getModelTypeName();
+            TypeDeclaration td = null;
+            boolean elementsOnly;
+            if (rootType == null) {
+               String typeName = getModelTypeName();
 
-            if (typeName != null) {
+               if (typeName != null) {
 
-               if (templateProcessor != null && templateProcessor.getCompressSingleElementTemplates()) {
-                  preTagContent = new StringBuilder();
-                  // TODO: white space?
-                  Element elem = getSingleFileElement(preTagContent);
-                  if (elem != null) {
-                     elem.setId(CTypeUtil.getClassName(typeName));
+                  if (templateProcessor != null && templateProcessor.getCompressSingleElementTemplates()) {
+                     preTagContent = new StringBuilder();
+                     // TODO: white space?
+                     Element elem = getSingleFileElement(preTagContent);
+                     if (elem != null) {
+                        elem.setId(CTypeUtil.getClassName(typeName));
 
-                     if (preTagContent.length() == 0)
-                        preTagContent = null;
+                        if (preTagContent.length() == 0)
+                           preTagContent = null;
 
-                     singleElementType = true;
-                     Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(getFullTypeName(), false) : null;
-                     rootType = td = elem.convertToObject(this, null, modifyType, templateModifiers, preTagContent);
-                     td.fromStatement = elem;
+                        singleElementType = true;
+                        Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(getFullTypeName(), false) : null;
+                        rootType = td = elem.convertToObject(this, null, modifyType, templateModifiers, preTagContent);
+                        td.fromStatement = elem;
+                     }
                   }
-               }
 
-               if (td == null && templateProcessor != null && templateProcessor.getDefaultModify()) {
-                  Object modifyType = getPreviousDeclaration(getFullTypeName(), false);
-                  if (modifyType != null) {
-                     td = ModifyDeclaration.create(CTypeUtil.getClassName(typeName));
-                     if (templateProcessor != null) {
-                        String defaultExtTypeName = templateProcessor.getDefaultExtendsType();
-                        if (defaultExtTypeName != null) {
-                           SemanticNodeList<JavaType> extTypes = new SemanticNodeList<JavaType>();
-                           extTypes.add(ClassType.create(defaultExtTypeName));
-                           td.setProperty("extendsTypes", extTypes);
-                           defaultExtendsTypeName = defaultExtTypeName;
+                  if (td == null && templateProcessor != null && templateProcessor.getDefaultModify()) {
+                     Object modifyType = getPreviousDeclaration(getFullTypeName(), false);
+                     if (modifyType != null) {
+                        td = ModifyDeclaration.create(CTypeUtil.getClassName(typeName));
+                        if (templateProcessor != null) {
+                           String defaultExtTypeName = templateProcessor.getDefaultExtendsType();
+                           if (defaultExtTypeName != null) {
+                              SemanticNodeList<JavaType> extTypes = new SemanticNodeList<JavaType>();
+                              extTypes.add(ClassType.create(defaultExtTypeName));
+                              td.setProperty("extendsTypes", extTypes);
+                              defaultExtendsTypeName = defaultExtTypeName;
+                           }
                         }
                      }
                   }
-               }
 
-               if (td == null) {
-                  ClassDeclaration cd;
-                  td = cd = new ClassDeclaration();
-                  cd.operator = templateProcessor == null || templateProcessor.getIsDefaultObjectType() ? "object" : "class"; // So we get object resolution semantics and toString
-                  cd.typeName = CTypeUtil.getClassName(typeName);
-                  if (templateProcessor != null) {
-                     String defaultExtTypeName = templateProcessor.getDefaultExtendsType();
-                     defaultExtendsTypeName = defaultExtTypeName;
-                     if (defaultExtTypeName != null)
-                        cd.setProperty("extendsType", ClassType.create(defaultExtTypeName));
+                  if (td == null) {
+                     ClassDeclaration cd;
+                     td = cd = new ClassDeclaration();
+                     cd.operator = templateProcessor == null || templateProcessor.getIsDefaultObjectType() ? "object" : "class"; // So we get object resolution semantics and toString
+                     cd.typeName = CTypeUtil.getClassName(typeName);
+                     if (templateProcessor != null) {
+                        String defaultExtTypeName = templateProcessor.getDefaultExtendsType();
+                        defaultExtendsTypeName = defaultExtTypeName;
+                        if (defaultExtTypeName != null)
+                           cd.setProperty("extendsType", ClassType.create(defaultExtTypeName));
+                     }
+                     if (templateModifiers != null)
+                        cd.setProperty("modifiers", templateModifiers);
+                      td.fromStatement = findFirstSrcStatement();
                   }
-                  if (templateModifiers != null)
-                     cd.setProperty("modifiers", templateModifiers);
-                   td.fromStatement = findFirstSrcStatement();
+                  td.parentNode = this;
+                  rootType = td;
+                  implicitRoot = true;
+                  td.modelType = this;
                }
-               td.parentNode = this;
-               rootType = td;
-               implicitRoot = true;
-               td.modelType = this;
+               elementsOnly = false;
             }
-            elementsOnly = false;
+            else {
+               td = (TypeDeclaration) rootType;
+               elementsOnly = true;
+            }
+
+            if (!singleElementType)
+               addBodyStatementsFromChildren(td, templateDeclarations, null, elementsOnly);
+
+            if (rootType == null && defaultExtendsType != null)
+               rootType = defaultExtendsType;
          }
          else {
-            td = (TypeDeclaration) rootType;
-            elementsOnly = true;
+            generateOutputMethod = false;
+            if (templateProcessor != null) {
+               defaultExtendsTypeName = templateProcessor.getDefaultExtendsType();
+            }
          }
 
-         if (!singleElementType)
-            addBodyStatementsFromChildren(td, templateDeclarations, null, elementsOnly);
+         if (types == null)
+            setProperty("types", new SemanticNodeList());
+         if (rootType != null && rootType instanceof TypeDeclaration) {
+            TypeDeclaration rootDecl = (TypeDeclaration) rootType;
+            if (dynamicType) {
+               rootDecl.dynamicType = true;
+            }
 
-         if (rootType == null && defaultExtendsType != null)
-            rootType = defaultExtendsType;
-      }
-      else {
-         generateOutputMethod = false;
-         if (templateProcessor != null) {
-            defaultExtendsTypeName = templateProcessor.getDefaultExtendsType();
+            // Added in convertToObject for singleElementTypes to set the parent
+            if (!singleElementType)
+               types.add(rootDecl);
+            if (temporary)
+               rootDecl.markAsTemporary();
          }
+         if (outputMethod != null)
+            ParseUtil.initComponent(outputMethod);
+
+         // Make sure the actual base type of this page can support the stateful option - i.e. it has the invalidate method we need.  When users override the page class, they may not support that in their class.
+         if (statefulPage && rootType != null && !ModelUtil.isAssignableFrom(IStatefulPage.class, rootType))
+            statefulPage = false;
+
+         super.init();
+
+         if (templateProcessor != null)
+            resultSuffix = templateProcessor.getResultSuffix();
       }
-
-      if (types == null)
-         setProperty("types", new SemanticNodeList());
-      if (rootType != null && rootType instanceof TypeDeclaration) {
-         TypeDeclaration rootDecl = (TypeDeclaration) rootType;
-         if (dynamicType) {
-            rootDecl.dynamicType = true;
-         }
-
-         // Added in convertToObject for singleElementTypes to set the parent
-         if (!singleElementType)
-            types.add(rootDecl);
-         if (temporary)
-            rootDecl.markAsTemporary();
+      finally {
+         beingInitialized = false;
+         PerfMon.end("initTemplate");
       }
-      if (outputMethod != null)
-         ParseUtil.initComponent(outputMethod);
-
-      // Make sure the actual base type of this page can support the stateful option - i.e. it has the invalidate method we need.  When users override the page class, they may not support that in their class.
-      if (statefulPage && rootType != null && !ModelUtil.isAssignableFrom(IStatefulPage.class, rootType))
-         statefulPage = false;
-
-      super.init();
-
-      if (templateProcessor != null)
-         resultSuffix = templateProcessor.getResultSuffix();
-
-      beingInitialized = false;
-      PerfMon.end("initTemplate");
    }
 
    private ISrcStatement findFirstSrcStatement() {
