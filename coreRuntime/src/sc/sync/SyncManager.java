@@ -76,6 +76,8 @@ public class SyncManager {
 
    public static String defaultLanguage = "json";
 
+   private static boolean syncNoInitDisplayed = false;
+
    /**
     * Set this to true for the server or the sync manager which manages the initialization.  It is set to false for the client or the one who receives the initial state.
     * When the server restarts, it can rebuild the initial state automatically so this prevents the client having to send all of that info over.  It's a bit conflicting
@@ -2840,9 +2842,10 @@ public class SyncManager {
                SyncContext parCtx;
                if (parentScope != null) {
                   parCtx = getSyncContext(parentScope.scopeId, true);
-                  if (parCtx != null)
+                  if (parCtx != null) {
                      parCtx.addChildContext(syncCtx);
-                  syncCtx.addParentContext(parCtx);
+                     syncCtx.addParentContext(parCtx);
+                  }
                }
             }
          }
@@ -3411,8 +3414,10 @@ public class SyncManager {
    public static SyncContext getDefaultSyncContext() {
       SyncDestination def = SyncDestination.defaultDestination;
       if (def == null) {
-         if (trace)
-            System.out.println("No default sync destination included");
+         if (trace && !syncNoInitDisplayed) {
+            syncNoInitDisplayed = true;
+            System.out.println("No default sync destination defined - sync disabled");
+         }
          return null;
       }
       return SyncDestination.defaultDestination.syncManager.getSyncContext(GlobalScopeDefinition.getGlobalScopeDefinition().scopeId, true);
