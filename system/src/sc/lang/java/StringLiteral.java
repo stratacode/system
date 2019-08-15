@@ -15,8 +15,11 @@ public class StringLiteral extends AbstractLiteral {
    public String stringValue;
 
    public Object getLiteralValue() {
-      if (stringValue == null)
+      if (stringValue == null) {
+         if (value != null) // In case we are not initialized like in an annotation accessed from the template initialization code
+            return CTypeUtil.unescapeJavaString(value);
          return "";
+      }
       return stringValue;
    }
 
