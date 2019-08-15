@@ -1943,6 +1943,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    void initConstructorPropInfo() {
    }
 
+   public ConstructorPropInfo getConstructorPropInfo() {
+      return null;
+   }
+
    void initPropagateConstructors() {
       if (constructorsInited)
          return;
