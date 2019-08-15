@@ -345,7 +345,8 @@ public class LayerListTypeIndex {
       synchronized (this) {
          ArrayList<String> indexNames = orderIndex.inactiveLayerNames;
          indexLayersCache = new ArrayList<Layer>(indexNames.size());
-         for (String indexName:indexNames) {
+         for (int i = 0; i < indexNames.size(); i++) {
+            String indexName = indexNames.get(i);
             Layer layer = null;
             if (sys != null) {
                layer = sys.lookupInactiveLayer(indexName, false, true);
