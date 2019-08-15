@@ -2408,7 +2408,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (child instanceof Element) {
                Element childElem = (Element) child;
                Element oldChildElem = (Element) oldChild;
-               String childName = childElem.getObjectName();
+               // Should be the same name - this keeps us from resolving the extends element in childElem if it's one of those anonymous tags whose name depends on the base type of the parent.
+               if (childElem.cachedObjectName == null && oldChildElem.cachedObjectName != null)
+                  childElem.cachedObjectName = oldChildElem.cachedObjectName;
+               String childName = childElem.tagObject == null ? null : childElem.getObjectName();
                if (childElem.isRepeatElement()) {
                   String repeatName = childElem.getRepeatObjectName();
                   TypeDeclaration childRepeatType = (TypeDeclaration) parentType.getInnerType(repeatName, null);
@@ -2657,682 +2660,692 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          System.err.println("*** Already converting tag to object!");
 
       convertingToObject = true;
+      TypeDeclaration tagType;
+      try {
+         String objName = getObjectName();
 
-      String objName = getObjectName();
+         MergeMode tagMerge = getTagMergeMode();
+         MergeMode bodyMerge = getBodyMergeMode();
 
-      MergeMode tagMerge = getTagMergeMode();
-      MergeMode bodyMerge = getBodyMergeMode();
+         String scopeName = getFixedAttribute("scope");
 
-      String scopeName = getFixedAttribute("scope");
-
-      if (existing == null) {
-         if (parentType != null)
-            existing = parentType.getInnerType(objName, null);
-         // else - no existing type - this must be passed in from the template
-      }
-
-      Object extTypeDecl = getExtendsTypeDeclaration();
-      boolean canProcess = true;
-      boolean canInherit = true;
-      JavaModel javaModel = getJavaModel();
-      Layer tagLayer = javaModel.getLayer();
-
-      if (ModelUtil.isCompiledClass(extTypeDecl)) {
-         Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl, false, true, tagLayer);
-         if (newExtTypeDecl instanceof BodyTypeDeclaration)
-            extTypeDecl = newExtTypeDecl;
-      }
-
-      if (existing != null && ModelUtil.isCompiledClass(existing)) {
-         Object newExisting = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), existing, false, true, tagLayer);
-         if (newExisting instanceof BodyTypeDeclaration) {
-            existing = newExisting;
-            if (ModelUtil.isCompiledClass(existing)) {
-               displayWarning("Ignoring compiled class as previous type for tag: " + tagName + " in: ");
-               existing = null;
-            }
+         if (existing == null) {
+            if (parentType != null)
+               existing = parentType.getInnerType(objName, null);
+            // else - no existing type - this must be passed in from the template
          }
-      }
 
-      // We used to exclude the generation of child tag objects and modified how the parent was generated based
-      // on the exec.  Now, we are going to add the @Exec annotation for the exec attribute and let StrataCode
-      // do the processing to remove the tag objects using that annotation.  That's because we might be modified
-      // by a new layer which resets our 'exec' attribute.  To support that, we cannot be doing this processing
-      // during the 'init' phase - we need to do it after start.  The @Exec will be applied during start as
-      // setting properties (setting excluded and not starting children) and transform - removing the node
-      // from the transformed layer.
-      boolean remoteContent = oldExecTag ? isRemoteContent() : false;
+         Object extTypeDecl = getExtendsTypeDeclaration();
+         boolean canProcess = true;
+         boolean canInherit = true;
+         JavaModel javaModel = getJavaModel();
+         Layer tagLayer = javaModel.getLayer();
 
-      boolean isRepeatElement = isRepeatElement();
-      boolean isRepeatWrap = false;
-      boolean isDefaultWrap = false;
-      Object repeatWrapperType = null;
-      Object repeatElementType = isRepeatElement ? getRepeatElementType() : null;
-      boolean needsWrapperInterface = true;
-      if (isRepeatElement && !remoteContent) {
-         String repeatWrapperName = getFixedAttribute("repeatWrapper");
-         if (repeatWrapperName != null) {
-            repeatWrapperType = findType(repeatWrapperName, this, null);
-            if (repeatWrapperType == null) {
-               JavaModel model = getJavaModel();
-               if (model != null) {
-                  repeatWrapperType = model.findTypeDeclaration(repeatWrapperName, true, false);
-                  if (repeatWrapperType == null) {
-                     displayError("No repeatWrapper type: ", repeatWrapperName, " for tag: ");
-                  }
+         if (ModelUtil.isCompiledClass(extTypeDecl)) {
+            Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl, false, true, tagLayer);
+            if (newExtTypeDecl instanceof BodyTypeDeclaration)
+               extTypeDecl = newExtTypeDecl;
+         }
+
+         if (existing != null && ModelUtil.isCompiledClass(existing)) {
+            Object newExisting = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), existing, false, true, tagLayer);
+            if (newExisting instanceof BodyTypeDeclaration) {
+               existing = newExisting;
+               if (ModelUtil.isCompiledClass(existing)) {
+                  displayWarning("Ignoring compiled class as previous type for tag: " + tagName + " in: ");
+                  existing = null;
                }
             }
-            if (repeatWrapperType != null && !ModelUtil.isAssignableFrom(Element.class, repeatWrapperType)) {
-               displayError("Element's repeatWrapper type: " + repeatWrapperType + " must be extends be a tag object (i.e. extends sc.lang.html.Element)");
-               repeatWrapperType = null;
+         }
+
+         // We used to exclude the generation of child tag objects and modified how the parent was generated based
+         // on the exec.  Now, we are going to add the @Exec annotation for the exec attribute and let StrataCode
+         // do the processing to remove the tag objects using that annotation.  That's because we might be modified
+         // by a new layer which resets our 'exec' attribute.  To support that, we cannot be doing this processing
+         // during the 'init' phase - we need to do it after start.  The @Exec will be applied during start as
+         // setting properties (setting excluded and not starting children) and transform - removing the node
+         // from the transformed layer.
+         boolean remoteContent = oldExecTag ? isRemoteContent() : false;
+
+         boolean isRepeatElement = isRepeatElement();
+         boolean isRepeatWrap = false;
+         boolean isDefaultWrap = false;
+         Object repeatWrapperType = null;
+         Object repeatElementType = isRepeatElement ? getRepeatElementType() : null;
+         boolean needsWrapperInterface = true;
+         if (isRepeatElement && !remoteContent) {
+            String repeatWrapperName = getFixedAttribute("repeatWrapper");
+            if (repeatWrapperName != null) {
+               repeatWrapperType = findType(repeatWrapperName, this, null);
+               if (repeatWrapperType == null) {
+                  JavaModel model = getJavaModel();
+                  if (model != null) {
+                     repeatWrapperType = model.findTypeDeclaration(repeatWrapperName, true, false);
+                     if (repeatWrapperType == null) {
+                        displayError("No repeatWrapper type: ", repeatWrapperName, " for tag: ");
+                     }
+                  }
+               }
+               if (repeatWrapperType != null && !ModelUtil.isAssignableFrom(Element.class, repeatWrapperType)) {
+                  displayError("Element's repeatWrapper type: " + repeatWrapperType + " must be extends be a tag object (i.e. extends sc.lang.html.Element)");
+                  repeatWrapperType = null;
+               }
+               if (repeatWrapperType != null)
+                  needsWrapperInterface = !ModelUtil.isAssignableFrom(IRepeatWrapper.class, repeatWrapperType);
             }
-            if (repeatWrapperType != null)
-               needsWrapperInterface = !ModelUtil.isAssignableFrom(IRepeatWrapper.class, repeatWrapperType);
-         }
-         String wrapStr = getFixedAttribute("wrap");
-         if (wrapStr != null) {
-            if (wrapStr.equals("true"))
-               isRepeatWrap = true;
-         }
-         else {
-            if (defaultWrapTags.contains(lowerTagName())) {
-               isRepeatWrap = true;
-               isDefaultWrap = true;
+            String wrapStr = getFixedAttribute("wrap");
+            if (wrapStr != null) {
+               if (wrapStr.equals("true"))
+                  isRepeatWrap = true;
             }
+            else {
+               if (defaultWrapTags.contains(lowerTagName())) {
+                  isRepeatWrap = true;
+                  isDefaultWrap = true;
+               }
+            }
+            if (isRepeatWrap)
+               wrap = true; // Set this before we call getRepeatObjectName so it returns the proper name
+            repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(getLayeredSystem(), repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
+            if (needsWrapperInterface)
+               repeatWrapper.addImplements(JavaType.createJavaType(getLayeredSystem(), IRepeatWrapper.class));
+            repeatWrapper.element = this;
+            repeatWrapper.layer = tagLayer;
+            repeatWrapper.addModifier("public");
+
+            if (needsWrapperInterface) {
+               // TODO: cache this to avoid reparsing it each time?
+               if (repeatElementType == null)
+                  repeatElementType = Object.class;
+               SemanticNodeList<Statement> repeatMethList = (SemanticNodeList<Statement>) TransformUtil.parseCodeTemplate(Object.class,
+                       "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
+                               "      if (oldTag != null)\n" +
+                               "         return oldTag;\n " +
+                               "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)enclosingTag, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
+                               "      return elem;\n" +
+                               "   }",
+                       SCLanguage.INSTANCE.classBodySnippet, false);
+
+               Statement repeatMeth = repeatMethList.get(0);
+               repeatMeth.setFromStatement(this);
+               // TODO: should the Repeat wrapper implement IObjChildren so that the getObjChildren method is implemented by
+               // retrieving the current repeat tags?   This would let a node in the editor that is a repeat display its
+               // children in the child form.
+               repeatWrapper.addBodyStatement(repeatMeth);
+            }
+
+            if (parentType != null)
+               parentType.addBodyStatement(repeatWrapper);
+            else
+               template.addTypeDeclaration(repeatWrapper);
+
+            addParentNodeAssignment(repeatWrapper);
+            repeatWrapper.fromStatement = this;
          }
-         if (isRepeatWrap)
-            wrap = true; // Set this before we call getRepeatObjectName so it returns the proper name
-         repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(getLayeredSystem(), repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
-         if (needsWrapperInterface)
-            repeatWrapper.addImplements(JavaType.createJavaType(getLayeredSystem(), IRepeatWrapper.class));
-         repeatWrapper.element = this;
-         repeatWrapper.layer = tagLayer;
-         repeatWrapper.addModifier("public");
 
-         if (needsWrapperInterface) {
-            // TODO: cache this to avoid reparsing it each time?
-            if (repeatElementType == null)
-               repeatElementType = Object.class;
-            SemanticNodeList<Statement> repeatMethList = (SemanticNodeList<Statement>) TransformUtil.parseCodeTemplate(Object.class,
-                    "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
-                            "      if (oldTag != null)\n" +
-                            "         return oldTag;\n " +
-                            "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)enclosingTag, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
-                            "      return elem;\n" +
-                            "   }",
-                    SCLanguage.INSTANCE.classBodySnippet, false);
+         modifyType = tagMerge == MergeMode.Replace ? null : existing;
 
-            Statement repeatMeth = repeatMethList.get(0);
-            repeatMeth.setFromStatement(this);
-            // TODO: should the Repeat wrapper implement IObjChildren so that the getObjChildren method is implemented by
-            // retrieving the current repeat tags?   This would let a node in the editor that is a repeat display its
-            // children in the child form.
-            repeatWrapper.addBodyStatement(repeatMeth);
-         }
-
-         if (parentType != null)
-            parentType.addBodyStatement(repeatWrapper);
-         else
-            template.addTypeDeclaration(repeatWrapper);
-
-         addParentNodeAssignment(repeatWrapper);
-         repeatWrapper.fromStatement = this;
-      }
-
-      modifyType = tagMerge == MergeMode.Replace ? null : existing;
-
-      /* TODO: probably should remove this ExecProcess phase altogether.  It was an attempt to generate a minimal .html file from the process phase based on a template by not inheriting any elements, stripping out functionality.  It's a mess.  Now we just added the postBuild phase so that we can use the generated code to generate the initial template */
-      /* Also, exec="process" just doesn't work because we only generate client and server versions of the object.  We'd have to go back to an older mode where we did not generate the Java class, and process the template directly (or generate a 3rd class) but that was ugly for it's own reasons. */
-      if (template.execMode == ExecProcess) {
-         int definedExecFlags = getDefinedExecFlags();
-         // If it's not explicitly set to a mode, we'll detect whether we can use this types at the process phase
-         if ((definedExecFlags & ExecProcess) == 0) {
-            if ((getComputedExecFlags() & ExecProcess) != 0) {
-               Element parentTag = getEnclosingTag();
-               // If we can't process the parent tag, we may have lost context from the parent type and so can only process the child if it sets the process mode explicitly (i.e. telling us it can process)
-               if (parentTag == null || !parentTag.staticContentOnly)
-                  canProcess = (existing == null || ModelUtil.isProcessableType(existing)) && (extTypeDecl == null || ModelUtil.isProcessableType(extTypeDecl));
+         /* TODO: probably should remove this ExecProcess phase altogether.  It was an attempt to generate a minimal .html file from the process phase based on a template by not inheriting any elements, stripping out functionality.  It's a mess.  Now we just added the postBuild phase so that we can use the generated code to generate the initial template */
+         /* Also, exec="process" just doesn't work because we only generate client and server versions of the object.  We'd have to go back to an older mode where we did not generate the Java class, and process the template directly (or generate a 3rd class) but that was ugly for it's own reasons. */
+         if (template.execMode == ExecProcess) {
+            int definedExecFlags = getDefinedExecFlags();
+            // If it's not explicitly set to a mode, we'll detect whether we can use this types at the process phase
+            if ((definedExecFlags & ExecProcess) == 0) {
+               if ((getComputedExecFlags() & ExecProcess) != 0) {
+                  Element parentTag = getEnclosingTag();
+                  // If we can't process the parent tag, we may have lost context from the parent type and so can only process the child if it sets the process mode explicitly (i.e. telling us it can process)
+                  if (parentTag == null || !parentTag.staticContentOnly)
+                     canProcess = (existing == null || ModelUtil.isProcessableType(existing)) && (extTypeDecl == null || ModelUtil.isProcessableType(extTypeDecl));
+                  else
+                     canProcess = false;
+               }
                else
                   canProcess = false;
             }
-            else
-               canProcess = false;
-         }
-         else {
-            while (extTypeDecl != null && !ModelUtil.isProcessableType(extTypeDecl)) {
-               extTypeDecl = ModelUtil.getExtendsClass(extTypeDecl);
-               canInherit = false;
+            else {
+               while (extTypeDecl != null && !ModelUtil.isProcessableType(extTypeDecl)) {
+                  extTypeDecl = ModelUtil.getExtendsClass(extTypeDecl);
+                  canInherit = false;
+               }
+               if (extTypeDecl == null) {
+                  extTypeDecl = HTMLElement.class;
+                  canInherit = false;
+               }
             }
-            if (extTypeDecl == null) {
-               extTypeDecl = HTMLElement.class;
+
+            if (!canProcess) {
+               existing = null;
                canInherit = false;
+               extTypeDecl = getDefaultExtendsTypeDeclaration(true);
+               staticContentOnly = true;
+               execFlags = execFlags & ~ExecProcess;
             }
          }
 
+         String typeParamName = "RE_" + objName;
+
+         JavaType extendsType;
+         JavaType[] typeParams = new JavaType[1];
+         typeParams[0] = ClassType.create(typeParamName);
          if (!canProcess) {
-            existing = null;
-            canInherit = false;
-            extTypeDecl = getDefaultExtendsTypeDeclaration(true);
-            staticContentOnly = true;
-            execFlags = execFlags & ~ExecProcess;
-         }
-      }
-
-      String typeParamName = "RE_" + objName;
-
-      JavaType extendsType;
-      JavaType[] typeParams = new JavaType[1];
-      typeParams[0] = ClassType.create(typeParamName);
-      if (!canProcess) {
-         if (extTypeDecl == null) {
-            if (existing == null || !ModelUtil.isAssignableFrom(HTMLElement.class, existing)) {
-               extTypeDecl = HTMLElement.class;
-               extendsType = JavaType.createTypeFromTypeParams(HTMLElement.class, typeParams);
+            if (extTypeDecl == null) {
+               if (existing == null || !ModelUtil.isAssignableFrom(HTMLElement.class, existing)) {
+                  extTypeDecl = HTMLElement.class;
+                  extendsType = JavaType.createTypeFromTypeParams(HTMLElement.class, typeParams);
+               }
+               else
+                  extendsType = null;
             }
-            else
-               extendsType = null;
+            else {
+               extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
+            }
          }
          else {
-            extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
-         }
-      }
-      else {
-         if (!canInherit)
-            extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
-         else {
-            String parentPrefix = parentType == null ? null : parentType.getFullTypeName();
-            TypeDeclaration rootType = parentType == null ? null : parentType.getRootType();
-            String rootTypeName = null;
-            if (rootType == null)
-               rootType = parentType;
-            if (rootType != null)
-               rootTypeName = rootType.getFullTypeName();
+            if (!canInherit)
+               extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
+            else {
+               String parentPrefix = parentType == null ? null : parentType.getFullTypeName();
+               TypeDeclaration rootType = parentType == null ? null : parentType.getRootType();
+               String rootTypeName = null;
+               if (rootType == null)
+                  rootType = parentType;
+               if (rootType != null)
+                  rootTypeName = rootType.getFullTypeName();
 
-            extendsType = getExtendsType(parentPrefix, rootTypeName);
-            // If we are modifying a type need to be sure this type is compatible with that type (and that one is a tag type)
-            if (modifyType != null) {
-               Object declaredExtends = getDeclaredExtendsTypeDeclaration();
-               Object modifyExtendsType = ModelUtil.getExtendsClass(modifyType);
+               extendsType = getExtendsType(parentPrefix, rootTypeName);
+               // If we are modifying a type need to be sure this type is compatible with that type (and that one is a tag type)
+               if (modifyType != null) {
+                  Object declaredExtends = getDeclaredExtendsTypeDeclaration();
+                  Object modifyExtendsType = ModelUtil.getExtendsClass(modifyType);
 
-               if (modifyExtendsType != null && modifyExtendsType != Object.class) {
-                  if (declaredExtends != null && !ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
-                     // This is the equivalent of redefining the class for schtml - just define an incompatible base class and it breaks the link automatically with the previous type - the sensible default.
-                     if (ModelUtil.isAssignableFrom(HTMLElement.class, declaredExtends)) {
-                        modifyType = null;
-                        modifyExtendsType = null;
+                  if (modifyExtendsType != null && modifyExtendsType != Object.class) {
+                     if (declaredExtends != null && !ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
+                        // This is the equivalent of redefining the class for schtml - just define an incompatible base class and it breaks the link automatically with the previous type - the sensible default.
+                        if (ModelUtil.isAssignableFrom(HTMLElement.class, declaredExtends)) {
+                           modifyType = null;
+                           modifyExtendsType = null;
+                        }
                      }
-                  }
-                  if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
-                     // These errors can occur in normal situations in inactive layers - because we are not guaranteeing just one stacking order... for now we are going to ignore them and use the declared
-                     // extends and modify types for code navigation purposes.   We do need to null out the 'extends' type or else we can end up creating a 'modifyInherited' type with an extends type which is not allowed.
-                     if (javaModel.getLayer().activated) {
-                        displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
-                        extendsType = null;
-                     }
-                  }
-                  if (declaredExtends != null) {
-                     if (!ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
+                     if (modifyExtendsType != null && !ModelUtil.isAssignableFrom(HTMLElement.class, modifyExtendsType)) {
+                        // These errors can occur in normal situations in inactive layers - because we are not guaranteeing just one stacking order... for now we are going to ignore them and use the declared
+                        // extends and modify types for code navigation purposes.   We do need to null out the 'extends' type or else we can end up creating a 'modifyInherited' type with an extends type which is not allowed.
                         if (javaModel.getLayer().activated) {
-                           displayError("The extends attribute: ", ModelUtil.getTypeName(declaredExtends), " overrides an incompatible extends type: ", ModelUtil.getTypeName(modifyExtendsType), " for tag: ");
+                           displayError("tag with id: ", objName, " modifies type: ", ModelUtil.getTypeName(modifyType), " in layer:", ModelUtil.getLayerForType(null, modifyType) + " already extends: ", ModelUtil.getTypeName(modifyExtendsType), " which has no schtml file (and does not extends HTMLElement): ");
                            extendsType = null;
                         }
                      }
+                     if (declaredExtends != null) {
+                        if (!ModelUtil.isAssignableFrom(modifyExtendsType, declaredExtends)) {
+                           if (javaModel.getLayer().activated) {
+                              displayError("The extends attribute: ", ModelUtil.getTypeName(declaredExtends), " overrides an incompatible extends type: ", ModelUtil.getTypeName(modifyExtendsType), " for tag: ");
+                              extendsType = null;
+                           }
+                        }
+                     }
+                     // Do not set an extends type here - we need to inherit it from the modified type
+                     else
+                        extendsType = null;
                   }
-                  // Do not set an extends type here - we need to inherit it from the modified type
-                  else
-                     extendsType = null;
                }
             }
          }
-      }
 
-      if (extTypeDecl != null && !ModelUtil.isAssignableFrom(HTMLElement.class, extTypeDecl)) {
-         Layer l = javaModel.getLayer();
-         if (l != null && l.activated)
-            displayTypeError("extends type for tag must extend HTMLElement or come from an schtml template: ");
-      }
-
-      TypeDeclaration tagType;
-      boolean isModify = false;
-      if (existing != null && tagMerge != MergeMode.Replace) {
-         if (!ModelUtil.sameTypes(extTypeDecl, ModelUtil.getExtendsClass(existing)))
-            tagType = ModifyDeclaration.create(objName, extendsType);
-         else
-            tagType = ModifyDeclaration.create(objName);
-         isModify = true;
-      }
-      else {
-         tagType = ClassDeclaration.create(isAbstract() || isRepeatElement ? "class" : "object", getObjectName(), extendsType);
-      }
-
-      SemanticNodeList<Object> tagModifiers = null;
-      // Start with any modifiers specified in the template declaration for this object. We build these up as a list before
-      // we set them due to the fact that we are not yet initialized, and parselets only tracks changes
-      // on initialized objects.
-      // TODO: when adding to this list, we really need to be merging in annotations - especially TypeSettings
-      if (templateModifiers != null) {
-         tagModifiers = (SemanticNodeList<Object>) templateModifiers.deepCopy(ISemanticNode.CopyNormal, null);
-      }
-
-      // If we make these classes abstract, it makes it simpler to identify them and omit from type groups, but it means we can't
-      // instantiate these classes as base type.  This means more classes in the code.  So instead the type groups stuff needs
-      // to check Element.isAbstract.
-      if (!isModify) {
-         if (tagLayer != null && tagLayer.defaultModifier != null) {
-            if (tagModifiers == null)
-               tagModifiers = new SemanticNodeList<Object>();
-            tagModifiers.add(tagLayer.defaultModifier);
+         if (extTypeDecl != null && !ModelUtil.isAssignableFrom(HTMLElement.class, extTypeDecl)) {
+            Layer l = javaModel.getLayer();
+            if (l != null && l.activated)
+               displayTypeError("extends type for tag must extend HTMLElement or come from an schtml template: ");
          }
-         if (isAbstract()) {
-            if (tagModifiers == null)
-               tagModifiers = new SemanticNodeList<Object>();
-            if (tagTypeNeedsAbstract()) {
-               tagModifiers.add("abstract");
-            }
-            else {
-               // Need to mark the compiled class as abstract even if we don't mark it that way for Java for the dynamic type system.
-               // This is ultimately an optimization because otherwise we generate new classes for each tag instantiation of a base class.
-               // If we can't detect abstract tag objects at runtime though, we will not apply JSSettings like jsModuleFile subTypeOnly correctly
-               // which ignore abstract classes.
-               tagModifiers.add(Annotation.create("sc.obj.TypeSettings", "dynAbstract", Boolean.TRUE));
-            }
-         }
-      }
 
-      if (tagModifiers == null)
-         tagModifiers = new SemanticNodeList<Object>();
-
-      processScope(tagType, scopeName, tagModifiers);
-      processExecAttr(tagType, tagModifiers);
-
-      String componentStr = getFixedAttribute("component");
-      if (componentStr != null && componentStr.equalsIgnoreCase("true")) {
-         tagModifiers.add(Annotation.create("sc.obj.Component"));
-      }
-
-      if (tagModifiers != null && tagModifiers.size() > 0)
-         tagType.setProperty("modifiers", tagModifiers);
-
-      // Leave a trail for finding where this statement was generated from for debugging purposes
-      tagType.fromStatement = this;
-      if (repeatWrapper == null && extTypeDecl != null) {
-         // Only support the repeat element type parameter if the base class has it set.
-         List<?> extTypeParams = ModelUtil.getTypeParameters(extTypeDecl);
-         if (extTypeParams != null && extTypeParams.size() == 1) {
-            SemanticNodeList typeParamsList = new SemanticNodeList();
-            typeParamsList.add(TypeParameter.create(typeParamName));
-            tagType.setProperty("typeParameters", typeParamsList);
-         }
-      }
-
-      if (template.temporary)
-         tagType.markAsTemporary();
-
-      tagObject = tagType;
-      tagType.element = this;
-      tagType.layer = tagLayer;
-
-      if (!isModify && ModelUtil.hasModifier(extTypeDecl, "public") && !tagType.hasModifier("public"))
-         tagType.addModifier("public");
-
-      if (repeatWrapper != null)
-         repeatWrapper.addSubTypeDeclaration(tagType);
-      else if (parentType != null)
-         parentType.addSubTypeDeclaration(tagType);
-      else
-         template.addTypeDeclaration(tagType);
-
-      int idIx = addParentNodeAssignment(tagType);
-
-      // This sets hiddenChildren so must be done up here - before initAttrExprs or we look at the children
-      SemanticNodeList<Object> uniqueChildren = remoteContent ? null : getUniqueChildren(canInherit);
-
-      initAttrExprs();
-
-      if (remoteContent) {
-         idIx = addSetServerAtt(tagType, idIx, "serverContent");
-      }
-      serverTag = oldExecTag ? isMarkedAsServerTag() : false;
-      if (serverTag) {
-         Element parentTag = getEnclosingTag();
-         // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
-         // switching back to a client tag from within a server tag, but not sure that use case makes sense anyway.  We could add 'clientTag'
-         // to switch it back in that case rather than having to set this on every inner tag object.
-         if (parentTag == null || !parentTag.serverTag) {
-            idIx = addSetServerAtt(repeatWrapper != null ? repeatWrapper : tagType, idIx, "serverTag");
-         }
-      }
-
-      List<Object> implTypes = getTagImplementsTypes();
-      if (implTypes != null && !staticContentOnly) {
-         // The implements can refer to other tag objects from which we inherit attributes and body children, not the actual class so we strip these out here.
-         for (int i = 0; i < implTypes.size(); i++) {
-            Object implType = implTypes.get(i);
-            if (!ModelUtil.isInterface(implType)) {
-               implTypes.remove(i);
-               i--;
-            }
-         }
-         if (implTypes.size() != 0) {
-            for (Object implType:implTypes)
-               tagObject.addImplements(JavaType.createJavaTypeFromName(ModelUtil.getTypeName(implType)));
-         }
-      }
-
-      String fixedIdAtt = getFixedAttribute("id");
-      if (fixedIdAtt != null) {
-         if (fixedIdAtt.equals(ALT_ID)) {
-            fixedIdAtt = getAltId();
-         }
-         fixedIdAtt = CTypeUtil.escapeIdentifierString(fixedIdAtt);
-      }
-      if (needsAutoId(fixedIdAtt)) {
-         // Needs to be after the setParent call.
-         addSetIdAssignment(tagType, tagType.typeName, false);
-         specifiedId = true;
-      }
-      if (repeatWrapper != null) {
-         // Needs to be after the setParent call.
-         addSetIdAssignment(repeatWrapper, repeatWrapper.typeName, false);
-      }
-      if (tagName != null) {
-         // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
-         if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl) || !tagName.equals(getExtendsDefaultTagNameForType(tagType))) {
-            PropertyAssignment pa = PropertyAssignment.create("tagName", StringLiteral.create(tagName), "=");
-            // For repeat tags, figure out if wrap is set explicitly or we are using the default.  For dl tags in particular it makes
-            // no sense to replicate the "dl" tag inside the loop.  Instead, we just render the contents for each iteration.
-            // TODO: if we did a "setTagName()" call instead of tagName = we could infer the default value of wrap from the defaultWrapTags
-            // but we'd have to also include that logic in the client.  This way, it's only on the server and is put into the generated tag classes.
-            if (isDefaultWrap)
-               addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("wrap", BooleanLiteral.create(true), "="));
-
-            // For repeat tags, if 'wrap' is true it's the repeat wrapper that renders the start/end tags and so needs the tag name
-            if (isRepeatWrap)
-               addTagTypeBodyStatement(repeatWrapper, pa);
+         boolean isModify = false;
+         if (existing != null && tagMerge != MergeMode.Replace) {
+            if (!ModelUtil.sameTypes(extTypeDecl, ModelUtil.getExtendsClass(existing)))
+               tagType = ModifyDeclaration.create(objName, extendsType);
             else
-               addTagTypeBodyStatement(tagType, pa);
-         }
-      }
-
-      // Using the compiledExtTypeDecl here to catch the case where we use a modify inherited type... that creates a real class
-      // in the type hierarchy (e.g. ElementView in the test.editor2). Because we are not propagating the constructors, the modified
-      // type will not have the constructor for (repeatVal,repeatIx) so we need to just create a new one here instead of trying to
-      // inherit it.
-      Object compiledExtTypeDecl = ModelUtil.getCompiledExtendsTypeDeclaration(tagType);
-      if (compiledExtTypeDecl == null) {
-         System.err.println("*** Null compiled extends type for tagType!");
-         compiledExtTypeDecl = ModelUtil.getCompiledExtendsTypeDeclaration(tagType);
-      }
-
-      LayeredSystem sys = getLayeredSystem();
-
-      // TODO: definesConstructor and declaresConstructor really are the same thing - we used to only partially implement inheritance of
-      // constructors with this method. Perhaps instead, we should have an @Repeatable annotation we put on the type which we can set to false
-      // for body, html, head, etc. which are singleton tags. The goal here is to reduce the number of constructors that will never be used
-      // - each repeatable tag, needs at least 2 - the default and for the repeat. So if it's a repeatable tag, we could handle either the
-      // case where the direct extends class provides the repeatVar/ix constructor, or we could just add it using setRepeatVar/ix so at least
-      // we start out at this type with a consistent repeatable tag where repeatVar/ and ix won't be null.
-      //
-      // Ideally we'd only include the repeat constructors for tags we knew were used in a repeat but it's hard to tell that because of
-      // inheritance and modifiability.
-      if (compiledExtTypeDecl != null && ModelUtil.definesConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
-         if (repeatElementType == null)
-            repeatElementType = Object.class;
-         Layer refLayer = getJavaModel().getLayer();
-         boolean hasDefaultConstructor = ModelUtil.hasDefaultConstructor(sys, compiledExtTypeDecl, null, this, refLayer);
-         Object propConstr = ModelUtil.getPropagatedConstructor(sys, compiledExtTypeDecl, this, refLayer);
-         Object[] repeatConstrTypes = new Object[3];
-         repeatConstrTypes[0] = Element.class;
-         repeatConstrTypes[1] = repeatElementType;
-         repeatConstrTypes[2] = Integer.TYPE;
-         ConstructorDefinition repeatConst = ConstructorDefinition.create(tagType, repeatConstrTypes, repeatConstrNames);
-         repeatConst.addModifier("public");
-         boolean needsConstructor = false;
-         // If we create constructors, it overrides the behavior of the propagateConstructor - stopping the propagation
-         if (propConstr == null) {
-            if (ModelUtil.declaresConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
-               SemanticNodeList<Expression> sargs = new SemanticNodeList<Expression>();
-               for (int p = 0; p < repeatConstrNames.length; p++)
-                  sargs.add(IdentifierExpression.create(repeatConstrNames[p]));
-               IdentifierExpression constSuperExpr = IdentifierExpression.createMethodCall(sargs, "super");
-               repeatConst.addBodyStatementAt(0, constSuperExpr);
-               needsConstructor = true;
-            }
-            else if (hasDefaultConstructor) {
-               SemanticNodeList<Expression> parArgs = new SemanticNodeList<Expression>();
-               parArgs.add(IdentifierExpression.create(repeatConstrNames[0]));
-               repeatConst.addBodyStatementAt(0, IdentifierExpression.createMethodCall(parArgs, "setParentNode"));
-               SemanticNodeList<Expression> srvArgs = new SemanticNodeList<Expression>();
-               srvArgs.add(IdentifierExpression.create(repeatConstrNames[1]));
-               repeatConst.addBodyStatementAt(1, IdentifierExpression.createMethodCall(srvArgs, "setRepeatVar"));
-               SemanticNodeList<Expression> ixArgs = new SemanticNodeList<Expression>();
-               ixArgs.add(IdentifierExpression.create(repeatConstrNames[2]));
-               repeatConst.addBodyStatementAt(2, IdentifierExpression.createMethodCall(ixArgs, "setRepeatIndex"));
-               needsConstructor = true;
-            }
-         }
-         if (needsConstructor) {
-            addTagTypeBodyStatement(tagType, repeatConst);
-
-            ConstructorDefinition emptyConst = ConstructorDefinition.create(tagType, null, null);
-            emptyConst.addModifier("public");
-            emptyConst.initBody();
-            addTagTypeBodyStatement(tagType, emptyConst);
-         }
-      }
-
-      /* done below as part of the normal attribute to code process
-      if (getBooleanAttribute("refreshBindings")) {
-         tagType.addBodyStatement(PropertyAssignment.create("refreshBindings", BooleanLiteral.create(true), "="));
-      }
-      */
-
-      // Add property assignments for attributes which are set in the tag that correspond to properties
-      ArrayList<Attr> attList = getInheritedAttributes();
-      if (attList != null) {
-         for (Attr att:attList) {
-             if (att.valueExpr != null && att.valueProp != null) {
-                if (!staticContentOnly) {
-                   boolean isIdProperty = att.name.equalsIgnoreCase("id");
-                   Expression attExpr = att.valueExpr;
-
-                   // Need to make a copy of the attribute expressions.  We can regenerate the tag type and update it.  if we share the same expression with the old and new types, the update messes things up.
-                   if (attExpr != null) {
-                      ISemanticNode parentNode = attExpr.parentNode;
-                      att.valueExprClone = attExpr = attExpr.deepCopy(CopyNormal | CopyInitLevels, null);
-                      att.valueExprClone.parentNode = parentNode;
-                   }
-
-                   if (isIdProperty) {
-                      attExpr = getIdInitExpr(attExpr, att.value); // Converts the provided id attribute value to an expression for initializing this tag or returns null if we can inherit it
-                      if (attExpr == null)
-                         continue;
-                   }
-                   // For remote content, only look at the id attribute
-                   if (!isInheritedAtt(att) && (!remoteContent || isIdProperty)) {
-                      PropertyAssignment pa = PropertyAssignment.create(Element.mapAttributeToProperty(att.name), attExpr, att.op);
-                      pa.fromAttribute = att;
-                      // TODO: enforce a rule about not modifying the value of the ID attribute.  Maybe it should be marked final?
-                      // Always want the ID property to be set first
-                      if (isIdProperty) {
-                         tagType.addBodyStatementAtIndent(idIx, pa);
-                         specifiedId = true;
-                      }
-                      // For the 'repeat' case, we have two classes which might hold the property - the wrapper or the element type.  We give preference
-                      // to the element type in case the property is in both.
-                      else if (att.name.equals("repeat") || repeatWrapper != null) {
-                         Object valuePropType =  ModelUtil.getEnclosingType(att.valueProp);
-                         // The repeat and wrap attributes are set on the tag but are applied to the repeatWrapper class, not the tag class
-                         if (att.name.equals("repeat") || att.name.equals("wrap") ||
-                             (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
-                            repeatWrapper.addBodyStatementIndent(pa);
-                         else
-                            tagType.addBodyStatementIndent(pa);
-                      }
-                      else
-                         tagType.addBodyStatementIndent(pa);
-
-                      // The serverTag property needs to be set on both the repeat inner tag class and the wrapper
-                      if (repeatWrapper != null && att.name.equals("serverTag")) {
-                         PropertyAssignment npa = pa.deepCopy(ISemanticNode.CopyParseNode, null);
-                         npa.fromAttribute = att;
-                         repeatWrapper.addBodyStatementIndent(npa);
-                      }
-
-                      // If we're tracking changes for the page content
-                      if (template.statefulPage && !isReadOnlyAttribute(att.name) && isHtmlAttribute(att.name) && !hasInvalidateBinding(att.name) && !isRefreshAttribute(att.name)) {
-                         IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidateStartTag");
-                         methCall.fromStatement = att; // We will strip off the PropertyAssignment so need to set this up here too
-                         PropertyAssignment ba = PropertyAssignment.create(Element.mapAttributeToProperty(att.name), methCall, "=:");
-                         ba.fromStatement = att;
-                         tagType.addBodyStatementIndent(ba);
-                      }
-                   }
-                }
-                else
-                   att.valueExpr.inactive = true; // de-activate these expressions as we won't be able to resolve them
-            }
-            else if (att.value instanceof Expression) {
-                if (!staticContentOnly)
-                   ((Expression) att.value).inactive = true;
-            }
-         }
-      }
-
-
-      if (!staticContentOnly && !remoteContent) {
-         String repeatVarName = getRepeatVarName();
-         if (repeatVarName != null && !repeatVarName.equals("repeatVar")) {
-            Expression repeatExpr = IdentifierExpression.create("repeatVar");
-            if (repeatElementType == null)
-               repeatElementType = Object.class;
-            else {
-               repeatExpr = CastExpression.create(ModelUtil.getTypeName(repeatElementType), repeatExpr);
-            }
-            FieldDefinition repeatVarField = FieldDefinition.create(getLayeredSystem(), repeatElementType, repeatVarName, ":=:", repeatExpr);
-            addTagTypeBodyStatement(tagType, repeatVarField);
-         }
-      }
-
-      if (!remoteContent) {
-         template.addBodyStatementsFromChildren(tagType, hiddenChildren, this, false);
-         template.addBodyStatementsFromChildren(tagType, children, this, false);
-
-         SemanticNodeList<Object> mods = new SemanticNodeList<Object>();
-         mods.add("public");
-         int resCt = 0;
-
-         // TODO: test this and put it back in!  It should work and reduces the code a bit
-         // As an optimization, omit the outputStartTag method when it's a really simple case.
-         //if (!canInherit || !inheritsId(fixedIdAtt) || specifiedId || (attList != null && attList.size() > 0)) {
-            // Generate the outputStartTag method
-            MethodDefinition outputStartMethod = new MethodDefinition();
-            outputStartMethod.name = "outputStartTag";
-            outputStartMethod.parentNode = tagType;
-            outputStartMethod.setProperty("modifiers", mods);
-            outputStartMethod.setProperty("type", PrimitiveType.create("void"));
-            // TODO: make these parameters configurable - e.g. request and response?  Or just as a RequestContext method we can customize for different frameworks
-            outputStartMethod.setProperty("parameters", template.getDefaultOutputParameters());
-            outputStartMethod.initBody();
-            SemanticNodeList<Expression> trueArgs = new SemanticNodeList<Expression>(1);
-            trueArgs.add(BooleanLiteral.create(true));
-            outputStartMethod.addBodyStatementAt(0, IdentifierExpression.createMethodCall(trueArgs, "markStartTagValid"));
-            outputStartMethod.fromStatement = this;
-            String preTagStr;
-            if (preTagContent == null) {
-               StringBuilder parentPreTagContent = getInheritedPreTagContent();
-
-               // If we extend or modify a tag that has the doctype control in it, we need to compile it in here because we do not always inherit the outputStartTag method
-               if (parentPreTagContent != null && parentPreTagContent.length() > 0) {
-                  preTagContent = parentPreTagContent;
-               }
-            }
-            if (preTagContent != null && (preTagStr = preTagContent.toString().trim()).length() > 0) {
-               template.addTemplateDeclToOutputMethod(tagType, outputStartMethod.body, preTagStr, false, "StartTag", resCt, this, this, true, false);
-            }
-            resCt = addToOutputMethod(tagType, outputStartMethod.body, template, doOutputStart, children, resCt, true);
-            tagType.addBodyStatementIndent(outputStartMethod);
-         /*
+               tagType = ModifyDeclaration.create(objName);
+            isModify = true;
          }
          else {
-            System.out.println("---");
+            tagType = ClassDeclaration.create(isAbstract() || isRepeatElement ? "class" : "object", getObjectName(), extendsType);
+         }
+
+         SemanticNodeList<Object> tagModifiers = null;
+         // Start with any modifiers specified in the template declaration for this object. We build these up as a list before
+         // we set them due to the fact that we are not yet initialized, and parselets only tracks changes
+         // on initialized objects.
+         // TODO: when adding to this list, we really need to be merging in annotations - especially TypeSettings
+         if (templateModifiers != null) {
+            tagModifiers = (SemanticNodeList<Object>) templateModifiers.deepCopy(ISemanticNode.CopyNormal, null);
+         }
+
+         // If we make these classes abstract, it makes it simpler to identify them and omit from type groups, but it means we can't
+         // instantiate these classes as base type.  This means more classes in the code.  So instead the type groups stuff needs
+         // to check Element.isAbstract.
+         if (!isModify) {
+            if (tagLayer != null && tagLayer.defaultModifier != null) {
+               if (tagModifiers == null)
+                  tagModifiers = new SemanticNodeList<Object>();
+               tagModifiers.add(tagLayer.defaultModifier);
+            }
+            if (isAbstract()) {
+               if (tagModifiers == null)
+                  tagModifiers = new SemanticNodeList<Object>();
+               if (tagTypeNeedsAbstract()) {
+                  tagModifiers.add("abstract");
+               }
+               else {
+                  // Need to mark the compiled class as abstract even if we don't mark it that way for Java for the dynamic type system.
+                  // This is ultimately an optimization because otherwise we generate new classes for each tag instantiation of a base class.
+                  // If we can't detect abstract tag objects at runtime though, we will not apply JSSettings like jsModuleFile subTypeOnly correctly
+                  // which ignore abstract classes.
+                  tagModifiers.add(Annotation.create("sc.obj.TypeSettings", "dynAbstract", Boolean.TRUE));
+               }
+            }
+         }
+
+         if (tagModifiers == null)
+            tagModifiers = new SemanticNodeList<Object>();
+
+         processScope(tagType, scopeName, tagModifiers);
+         processExecAttr(tagType, tagModifiers);
+
+         String componentStr = getFixedAttribute("component");
+         if (componentStr != null && componentStr.equalsIgnoreCase("true")) {
+            tagModifiers.add(Annotation.create("sc.obj.Component"));
+         }
+
+         if (tagModifiers != null && tagModifiers.size() > 0)
+            tagType.setProperty("modifiers", tagModifiers);
+
+         // Leave a trail for finding where this statement was generated from for debugging purposes
+         tagType.fromStatement = this;
+         if (repeatWrapper == null && extTypeDecl != null) {
+            // Only support the repeat element type parameter if the base class has it set.
+            List<?> extTypeParams = ModelUtil.getTypeParameters(extTypeDecl);
+            if (extTypeParams != null && extTypeParams.size() == 1) {
+               SemanticNodeList typeParamsList = new SemanticNodeList();
+               typeParamsList.add(TypeParameter.create(typeParamName));
+               tagType.setProperty("typeParameters", typeParamsList);
+            }
+         }
+
+         if (template.temporary)
+            tagType.markAsTemporary();
+
+         tagObject = tagType;
+         tagType.element = this;
+         tagType.layer = tagLayer;
+
+         if (!isModify && ModelUtil.hasModifier(extTypeDecl, "public") && !tagType.hasModifier("public"))
+            tagType.addModifier("public");
+
+         if (repeatWrapper != null)
+            repeatWrapper.addSubTypeDeclaration(tagType);
+         else if (parentType != null)
+            parentType.addSubTypeDeclaration(tagType);
+         else
+            template.addTypeDeclaration(tagType);
+
+         int idIx = addParentNodeAssignment(tagType);
+
+         // This sets hiddenChildren so must be done up here - before initAttrExprs or we look at the children
+         SemanticNodeList<Object> uniqueChildren = remoteContent ? null : getUniqueChildren(canInherit);
+
+         initAttrExprs();
+
+         if (remoteContent) {
+            idIx = addSetServerAtt(tagType, idIx, "serverContent");
+         }
+         serverTag = oldExecTag ? isMarkedAsServerTag() : false;
+         if (serverTag) {
+            Element parentTag = getEnclosingTag();
+            // For now, only setting the serverTag property on the first parent which is a serverTag.  This won't work as is for
+            // switching back to a client tag from within a server tag, but not sure that use case makes sense anyway.  We could add 'clientTag'
+            // to switch it back in that case rather than having to set this on every inner tag object.
+            if (parentTag == null || !parentTag.serverTag) {
+               idIx = addSetServerAtt(repeatWrapper != null ? repeatWrapper : tagType, idIx, "serverTag");
+            }
+         }
+
+         List<Object> implTypes = getTagImplementsTypes();
+         if (implTypes != null && !staticContentOnly) {
+            // The implements can refer to other tag objects from which we inherit attributes and body children, not the actual class so we strip these out here.
+            for (int i = 0; i < implTypes.size(); i++) {
+               Object implType = implTypes.get(i);
+               if (!ModelUtil.isInterface(implType)) {
+                  implTypes.remove(i);
+                  i--;
+               }
+            }
+            if (implTypes.size() != 0) {
+               for (Object implType:implTypes)
+                  tagObject.addImplements(JavaType.createJavaTypeFromName(ModelUtil.getTypeName(implType)));
+            }
+         }
+
+         String fixedIdAtt = getFixedAttribute("id");
+         if (fixedIdAtt != null) {
+            if (fixedIdAtt.equals(ALT_ID)) {
+               fixedIdAtt = getAltId();
+            }
+            fixedIdAtt = CTypeUtil.escapeIdentifierString(fixedIdAtt);
+         }
+         if (needsAutoId(fixedIdAtt)) {
+            // Needs to be after the setParent call.
+            addSetIdAssignment(tagType, tagType.typeName, false);
+            specifiedId = true;
+         }
+         if (repeatWrapper != null) {
+            // Needs to be after the setParent call.
+            addSetIdAssignment(repeatWrapper, repeatWrapper.typeName, false);
+         }
+         if (tagName != null) {
+            // If either we are the first class to extend HTMLElement or we are derived indirectly from Page (and so may not have assigned a tag name)
+            if (extTypeDecl == HTMLElement.class || ModelUtil.isAssignableFrom(Page.class, extTypeDecl) || !tagName.equals(getExtendsDefaultTagNameForType(tagType))) {
+               PropertyAssignment pa = PropertyAssignment.create("tagName", StringLiteral.create(tagName), "=");
+               // For repeat tags, figure out if wrap is set explicitly or we are using the default.  For dl tags in particular it makes
+               // no sense to replicate the "dl" tag inside the loop.  Instead, we just render the contents for each iteration.
+               // TODO: if we did a "setTagName()" call instead of tagName = we could infer the default value of wrap from the defaultWrapTags
+               // but we'd have to also include that logic in the client.  This way, it's only on the server and is put into the generated tag classes.
+               if (isDefaultWrap)
+                  addTagTypeBodyStatement(repeatWrapper, PropertyAssignment.create("wrap", BooleanLiteral.create(true), "="));
+
+               // For repeat tags, if 'wrap' is true it's the repeat wrapper that renders the start/end tags and so needs the tag name
+               if (isRepeatWrap)
+                  addTagTypeBodyStatement(repeatWrapper, pa);
+               else
+                  addTagTypeBodyStatement(tagType, pa);
+            }
+         }
+
+         // Using the compiledExtTypeDecl here to catch the case where we use a modify inherited type... that creates a real class
+         // in the type hierarchy (e.g. ElementView in the test.editor2). Because we are not propagating the constructors, the modified
+         // type will not have the constructor for (repeatVal,repeatIx) so we need to just create a new one here instead of trying to
+         // inherit it.
+         Object compiledExtTypeDecl = ModelUtil.getCompiledExtendsTypeDeclaration(tagType);
+         if (compiledExtTypeDecl == null) {
+            System.err.println("*** Null compiled extends type for tagType!");
+            compiledExtTypeDecl = ModelUtil.getCompiledExtendsTypeDeclaration(tagType);
+         }
+
+         LayeredSystem sys = getLayeredSystem();
+
+         // TODO: definesConstructor and declaresConstructor really are the same thing - we used to only partially implement inheritance of
+         // constructors with this method. Perhaps instead, we should have an @Repeatable annotation we put on the type which we can set to false
+         // for body, html, head, etc. which are singleton tags. The goal here is to reduce the number of constructors that will never be used
+         // - each repeatable tag, needs at least 2 - the default and for the repeat. So if it's a repeatable tag, we could handle either the
+         // case where the direct extends class provides the repeatVar/ix constructor, or we could just add it using setRepeatVar/ix so at least
+         // we start out at this type with a consistent repeatable tag where repeatVar/ and ix won't be null.
+         //
+         // Ideally we'd only include the repeat constructors for tags we knew were used in a repeat but it's hard to tell that because of
+         // inheritance and modifiability.
+         if (compiledExtTypeDecl != null && ModelUtil.definesConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
+            if (repeatElementType == null)
+               repeatElementType = Object.class;
+            Layer refLayer = getJavaModel().getLayer();
+            boolean hasDefaultConstructor = ModelUtil.hasDefaultConstructor(sys, compiledExtTypeDecl, null, this, refLayer);
+            if (hasDefaultConstructor && compiledExtTypeDecl instanceof TypeDeclaration) {
+               TypeDeclaration extTD = (TypeDeclaration) compiledExtTypeDecl;
+               ConstructorPropInfo cpi = extTD.getConstructorPropInfo();
+               if (cpi != null && cpi.propNames.size() > 0)
+                  hasDefaultConstructor = false;
+            }
+            Object propConstr = ModelUtil.getPropagatedConstructor(sys, compiledExtTypeDecl, this, refLayer);
+            Object[] repeatConstrTypes = new Object[3];
+            repeatConstrTypes[0] = Element.class;
+            repeatConstrTypes[1] = repeatElementType;
+            repeatConstrTypes[2] = Integer.TYPE;
+            ConstructorDefinition repeatConst = ConstructorDefinition.create(tagType, repeatConstrTypes, repeatConstrNames);
+            repeatConst.addModifier("public");
+            boolean needsConstructor = false;
+            // If we create constructors, it overrides the behavior of the propagateConstructor - stopping the propagation
+            if (propConstr == null) {
+               if (ModelUtil.declaresConstructor(sys, compiledExtTypeDecl, repeatConstrParams, null) != null) {
+                  SemanticNodeList<Expression> sargs = new SemanticNodeList<Expression>();
+                  for (int p = 0; p < repeatConstrNames.length; p++)
+                     sargs.add(IdentifierExpression.create(repeatConstrNames[p]));
+                  IdentifierExpression constSuperExpr = IdentifierExpression.createMethodCall(sargs, "super");
+                  repeatConst.addBodyStatementAt(0, constSuperExpr);
+                  needsConstructor = true;
+               }
+               else if (hasDefaultConstructor) {
+                  SemanticNodeList<Expression> parArgs = new SemanticNodeList<Expression>();
+                  parArgs.add(IdentifierExpression.create(repeatConstrNames[0]));
+                  repeatConst.addBodyStatementAt(0, IdentifierExpression.createMethodCall(parArgs, "setParentNode"));
+                  SemanticNodeList<Expression> srvArgs = new SemanticNodeList<Expression>();
+                  srvArgs.add(IdentifierExpression.create(repeatConstrNames[1]));
+                  repeatConst.addBodyStatementAt(1, IdentifierExpression.createMethodCall(srvArgs, "setRepeatVar"));
+                  SemanticNodeList<Expression> ixArgs = new SemanticNodeList<Expression>();
+                  ixArgs.add(IdentifierExpression.create(repeatConstrNames[2]));
+                  repeatConst.addBodyStatementAt(2, IdentifierExpression.createMethodCall(ixArgs, "setRepeatIndex"));
+                  needsConstructor = true;
+               }
+            }
+            if (needsConstructor) {
+               addTagTypeBodyStatement(tagType, repeatConst);
+
+               ConstructorDefinition emptyConst = ConstructorDefinition.create(tagType, null, null);
+               emptyConst.addModifier("public");
+               emptyConst.initBody();
+               addTagTypeBodyStatement(tagType, emptyConst);
+            }
+         }
+
+         /* done below as part of the normal attribute to code process
+         if (getBooleanAttribute("refreshBindings")) {
+            tagType.addBodyStatement(PropertyAssignment.create("refreshBindings", BooleanLiteral.create(true), "="));
          }
          */
 
-         if (uniqueChildren != null) {
-            // Generate the outputBody method
-            MethodDefinition outputBodyMethod = new MethodDefinition();
-            outputBodyMethod.name = "outputBody";
-            mods = new SemanticNodeList<Object>();
+         // Add property assignments for attributes which are set in the tag that correspond to properties
+         ArrayList<Attr> attList = getInheritedAttributes();
+         if (attList != null) {
+            for (Attr att:attList) {
+                if (att.valueExpr != null && att.valueProp != null) {
+                   if (!staticContentOnly) {
+                      boolean isIdProperty = att.name.equalsIgnoreCase("id");
+                      Expression attExpr = att.valueExpr;
+
+                      // Need to make a copy of the attribute expressions.  We can regenerate the tag type and update it.  if we share the same expression with the old and new types, the update messes things up.
+                      if (attExpr != null) {
+                         ISemanticNode parentNode = attExpr.parentNode;
+                         att.valueExprClone = attExpr = attExpr.deepCopy(CopyNormal | CopyInitLevels, null);
+                         att.valueExprClone.parentNode = parentNode;
+                      }
+
+                      if (isIdProperty) {
+                         attExpr = getIdInitExpr(attExpr, att.value); // Converts the provided id attribute value to an expression for initializing this tag or returns null if we can inherit it
+                         if (attExpr == null)
+                            continue;
+                      }
+                      // For remote content, only look at the id attribute
+                      if (!isInheritedAtt(att) && (!remoteContent || isIdProperty)) {
+                         PropertyAssignment pa = PropertyAssignment.create(Element.mapAttributeToProperty(att.name), attExpr, att.op);
+                         pa.fromAttribute = att;
+                         // TODO: enforce a rule about not modifying the value of the ID attribute.  Maybe it should be marked final?
+                         // Always want the ID property to be set first
+                         if (isIdProperty) {
+                            tagType.addBodyStatementAtIndent(idIx, pa);
+                            specifiedId = true;
+                         }
+                         // For the 'repeat' case, we have two classes which might hold the property - the wrapper or the element type.  We give preference
+                         // to the element type in case the property is in both.
+                         else if (att.name.equals("repeat") || repeatWrapper != null) {
+                            Object valuePropType =  ModelUtil.getEnclosingType(att.valueProp);
+                            // The repeat and wrap attributes are set on the tag but are applied to the repeatWrapper class, not the tag class
+                            if (att.name.equals("repeat") || att.name.equals("wrap") ||
+                                (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
+                               repeatWrapper.addBodyStatementIndent(pa);
+                            else
+                               tagType.addBodyStatementIndent(pa);
+                         }
+                         else
+                            tagType.addBodyStatementIndent(pa);
+
+                         // The serverTag property needs to be set on both the repeat inner tag class and the wrapper
+                         if (repeatWrapper != null && att.name.equals("serverTag")) {
+                            PropertyAssignment npa = pa.deepCopy(ISemanticNode.CopyParseNode, null);
+                            npa.fromAttribute = att;
+                            repeatWrapper.addBodyStatementIndent(npa);
+                         }
+
+                         // If we're tracking changes for the page content
+                         if (template.statefulPage && !isReadOnlyAttribute(att.name) && isHtmlAttribute(att.name) && !hasInvalidateBinding(att.name) && !isRefreshAttribute(att.name)) {
+                            IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidateStartTag");
+                            methCall.fromStatement = att; // We will strip off the PropertyAssignment so need to set this up here too
+                            PropertyAssignment ba = PropertyAssignment.create(Element.mapAttributeToProperty(att.name), methCall, "=:");
+                            ba.fromStatement = att;
+                            tagType.addBodyStatementIndent(ba);
+                         }
+                      }
+                   }
+                   else
+                      att.valueExpr.inactive = true; // de-activate these expressions as we won't be able to resolve them
+               }
+               else if (att.value instanceof Expression) {
+                   if (!staticContentOnly)
+                      ((Expression) att.value).inactive = true;
+               }
+            }
+         }
+
+
+         if (!staticContentOnly && !remoteContent) {
+            String repeatVarName = getRepeatVarName();
+            if (repeatVarName != null && !repeatVarName.equals("repeatVar")) {
+               Expression repeatExpr = IdentifierExpression.create("repeatVar");
+               if (repeatElementType == null)
+                  repeatElementType = Object.class;
+               else {
+                  repeatExpr = CastExpression.create(ModelUtil.getTypeName(repeatElementType), repeatExpr);
+               }
+               FieldDefinition repeatVarField = FieldDefinition.create(getLayeredSystem(), repeatElementType, repeatVarName, ":=:", repeatExpr);
+               addTagTypeBodyStatement(tagType, repeatVarField);
+            }
+         }
+
+         if (!remoteContent) {
+            template.addBodyStatementsFromChildren(tagType, hiddenChildren, this, false);
+            template.addBodyStatementsFromChildren(tagType, children, this, false);
+
+            SemanticNodeList<Object> mods = new SemanticNodeList<Object>();
             mods.add("public");
-            outputBodyMethod.parentNode = tagType;
-            outputBodyMethod.setProperty("modifiers", mods);
-            outputBodyMethod.setProperty("type", PrimitiveType.create("void"));
-            outputBodyMethod.setProperty("parameters", template.getDefaultOutputParameters());
-            outputBodyMethod.fromStatement = this;
-            outputBodyMethod.initBody();
-            SemanticNodeList<Expression> outArgs = getOutputArgs(template);
-            // TODO: add Options here to do this inside of the body via a new special case of "super" with no args or anything.  Manually wrap the sub-page's content.  Not sure this is necessary because of the flexibility of merging.
-            // ? Optional feature: rename the outputBody method via an attribute on the super-class so that you can do customized add-ons to template types (e.g. "BodyPages" where the html, head, etc. are generated from a common wrapper template) - NOTE - now thinking this is not necessary because of the flexibility of merging
-            if (bodyMerge == MergeMode.Append || bodyMerge == MergeMode.Merge) {
-               // Use of addBefore or addAfter with append mode?  Not sure this makes sense... maybe an error?
-               if (uniqueChildren == children || bodyMerge == MergeMode.Merge) {
-                  // Do not do the super if there are any addBefore or addAfter's in our children's list
-                  IdentifierExpression superExpr;
-                  if (needsSuper) {
-                     superExpr = IdentifierExpression.createMethodCall(outArgs, "super.outputBody");
+            int resCt = 0;
+
+            // TODO: test this and put it back in!  It should work and reduces the code a bit
+            // As an optimization, omit the outputStartTag method when it's a really simple case.
+            //if (!canInherit || !inheritsId(fixedIdAtt) || specifiedId || (attList != null && attList.size() > 0)) {
+               // Generate the outputStartTag method
+               MethodDefinition outputStartMethod = new MethodDefinition();
+               outputStartMethod.name = "outputStartTag";
+               outputStartMethod.parentNode = tagType;
+               outputStartMethod.setProperty("modifiers", mods);
+               outputStartMethod.setProperty("type", PrimitiveType.create("void"));
+               // TODO: make these parameters configurable - e.g. request and response?  Or just as a RequestContext method we can customize for different frameworks
+               outputStartMethod.setProperty("parameters", template.getDefaultOutputParameters());
+               outputStartMethod.initBody();
+               SemanticNodeList<Expression> trueArgs = new SemanticNodeList<Expression>(1);
+               trueArgs.add(BooleanLiteral.create(true));
+               outputStartMethod.addBodyStatementAt(0, IdentifierExpression.createMethodCall(trueArgs, "markStartTagValid"));
+               outputStartMethod.fromStatement = this;
+               String preTagStr;
+               if (preTagContent == null) {
+                  StringBuilder parentPreTagContent = getInheritedPreTagContent();
+
+                  // If we extend or modify a tag that has the doctype control in it, we need to compile it in here because we do not always inherit the outputStartTag method
+                  if (parentPreTagContent != null && parentPreTagContent.length() > 0) {
+                     preTagContent = parentPreTagContent;
                   }
-                  // If we are not calling the super, we still need to set bodyValid = true.  Doing this as a method so it's a hook point tag objects can extend
-                  else {
-                     SemanticNodeList<Expression> validArgs = new SemanticNodeList<Expression>();
-                     validArgs.add(BooleanLiteral.create(true));
-                     superExpr = IdentifierExpression.createMethodCall(validArgs, "markBodyValid");
-                  }
-                  superExpr.fromStatement = this;
-                  outputBodyMethod.addStatement(superExpr);
                }
-               else
-                  displayWarning("Use of addBefore/addAfter with bodyMerge='append' - not appending to eliminate duplicate content");
+               if (preTagContent != null && (preTagStr = preTagContent.toString().trim()).length() > 0) {
+                  template.addTemplateDeclToOutputMethod(tagType, outputStartMethod.body, preTagStr, false, "StartTag", resCt, this, this, true, false);
+               }
+               resCt = addToOutputMethod(tagType, outputStartMethod.body, template, doOutputStart, children, resCt, true);
+               tagType.addBodyStatementIndent(outputStartMethod);
+            /*
+            }
+            else {
+               System.out.println("---");
+            }
+            */
+
+            if (uniqueChildren != null) {
+               // Generate the outputBody method
+               MethodDefinition outputBodyMethod = new MethodDefinition();
+               outputBodyMethod.name = "outputBody";
+               mods = new SemanticNodeList<Object>();
+               mods.add("public");
+               outputBodyMethod.parentNode = tagType;
+               outputBodyMethod.setProperty("modifiers", mods);
+               outputBodyMethod.setProperty("type", PrimitiveType.create("void"));
+               outputBodyMethod.setProperty("parameters", template.getDefaultOutputParameters());
+               outputBodyMethod.fromStatement = this;
+               outputBodyMethod.initBody();
+               SemanticNodeList<Expression> outArgs = getOutputArgs(template);
+               // TODO: add Options here to do this inside of the body via a new special case of "super" with no args or anything.  Manually wrap the sub-page's content.  Not sure this is necessary because of the flexibility of merging.
+               // ? Optional feature: rename the outputBody method via an attribute on the super-class so that you can do customized add-ons to template types (e.g. "BodyPages" where the html, head, etc. are generated from a common wrapper template) - NOTE - now thinking this is not necessary because of the flexibility of merging
+               if (bodyMerge == MergeMode.Append || bodyMerge == MergeMode.Merge) {
+                  // Use of addBefore or addAfter with append mode?  Not sure this makes sense... maybe an error?
+                  if (uniqueChildren == children || bodyMerge == MergeMode.Merge) {
+                     // Do not do the super if there are any addBefore or addAfter's in our children's list
+                     IdentifierExpression superExpr;
+                     if (needsSuper) {
+                        superExpr = IdentifierExpression.createMethodCall(outArgs, "super.outputBody");
+                     }
+                     // If we are not calling the super, we still need to set bodyValid = true.  Doing this as a method so it's a hook point tag objects can extend
+                     else {
+                        SemanticNodeList<Expression> validArgs = new SemanticNodeList<Expression>();
+                        validArgs.add(BooleanLiteral.create(true));
+                        superExpr = IdentifierExpression.createMethodCall(validArgs, "markBodyValid");
+                     }
+                     superExpr.fromStatement = this;
+                     outputBodyMethod.addStatement(superExpr);
+                  }
+                  else
+                     displayWarning("Use of addBefore/addAfter with bodyMerge='append' - not appending to eliminate duplicate content");
+               }
+
+               addToOutputMethod(tagType, outputBodyMethod.body, template, doOutputBody, uniqueChildren, resCt, true);
+
+               if (bodyMerge == MergeMode.Prepend) {
+                  if (uniqueChildren == children) {
+                     outputBodyMethod.addStatement(IdentifierExpression.createMethodCall(outArgs, "super.outputBody"));
+                  }
+                  else
+                     displayWarning("Use of addBefore/addAfter with bodyMerge='prepend' - not prepending to eliminate duplicate content");
+               }
+               addTagTypeBodyStatement(tagType, outputBodyMethod);
             }
 
-            addToOutputMethod(tagType, outputBodyMethod.body, template, doOutputBody, uniqueChildren, resCt, true);
-
-            if (bodyMerge == MergeMode.Prepend) {
-               if (uniqueChildren == children) {
-                  outputBodyMethod.addStatement(IdentifierExpression.createMethodCall(outArgs, "super.outputBody"));
-               }
-               else
-                  displayWarning("Use of addBefore/addAfter with bodyMerge='prepend' - not prepending to eliminate duplicate content");
+            if (tagName.equals("head")) {
+               addStyleSheetPaths();
             }
-            addTagTypeBodyStatement(tagType, outputBodyMethod);
          }
 
-         if (tagName.equals("head")) {
-            addStyleSheetPaths();
+         /*
+           * Right now, we build JS after we build Java so the JS files are not avaiable at compile time for Java where we need them.
+           * Moving to a solution where the JSRuntime's buildInfo can be used to retrieve the list of files.
+         if (isPageElement()) {
+            List<String> jsFiles = getJSFiles();
+            if (jsFiles != null) {
+               MethodDefinition getJSFiles = new MethodDefinition();
+               getJSFiles.name = "getJSFiles";
+               getJSFiles.addModifier("public");
+               ClassType retType = (ClassType) ClassType.create("java.util.List");
+               SemanticNodeList<JavaType> typeArgs = new SemanticNodeList<JavaType>();
+               typeArgs.add(ClassType.create("String"));
+               retType.setResolvedTypeArguments(typeArgs);
+               getJSFiles.setProperty("type", retType);
+
+               getJSFiles.addBodyStatementAt(0, ReturnStatement.create(Expression.createFromValue(jsFiles, false)));
+
+               tagType.addBodyStatementIndent(getJSFiles);
+            }
          }
+         */
       }
-
-      /*
-        * Right now, we build JS after we build Java so the JS files are not avaiable at compile time for Java where we need them.
-        * Moving to a solution where the JSRuntime's buildInfo can be used to retrieve the list of files.
-      if (isPageElement()) {
-         List<String> jsFiles = getJSFiles();
-         if (jsFiles != null) {
-            MethodDefinition getJSFiles = new MethodDefinition();
-            getJSFiles.name = "getJSFiles";
-            getJSFiles.addModifier("public");
-            ClassType retType = (ClassType) ClassType.create("java.util.List");
-            SemanticNodeList<JavaType> typeArgs = new SemanticNodeList<JavaType>();
-            typeArgs.add(ClassType.create("String"));
-            retType.setResolvedTypeArguments(typeArgs);
-            getJSFiles.setProperty("type", retType);
-
-            getJSFiles.addBodyStatementAt(0, ReturnStatement.create(Expression.createFromValue(jsFiles, false)));
-
-            tagType.addBodyStatementIndent(getJSFiles);
-         }
+      finally {
+         convertingToObject = false;
       }
-      */
 
       // Generate the outputBody method
       return tagType;
@@ -4857,7 +4870,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       return sys.buildInfo.getURLPaths();
    }
-
 
    transient public String HTMLClass;
 
