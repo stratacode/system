@@ -215,7 +215,8 @@ public class IdentifierExpression extends ArgumentsExpression {
             }
             else {
                Object superType = thisType.getDerivedTypeDeclaration();
-               Object extendsType = thisType.getExtendsTypeDeclaration();
+               // Need to use resolve to pick up the most specific extends type - but don't use resolve for the derived type
+               Object extendsType = thisType.resolve(true).getExtendsTypeDeclaration();
 
                if (sz == 1) {
                   if (arguments == null) {
@@ -246,7 +247,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                                  boundTypes[0] = constr;
                            }
                            if (constr == null) {
-                              Object[] constructors = ModelUtil.getConstructors(superType, null);
+                              Object[] constructors = ModelUtil.getConstructors(superType, null, true);
                               if (arguments.size() > 0 || (constructors != null && constructors.length > 0)) {
                                  if (model != null && !model.disableTypeErrors && isInferredSet() && isInferredFinal()) {
                                     String typeMessage = superType == extendsType || extendsType == null ?
@@ -3596,9 +3597,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          ITypeDeclaration itype = (ITypeDeclaration) type;
          if (itype instanceof BodyTypeDeclaration) {
             BodyTypeDeclaration btype = (BodyTypeDeclaration) itype;
+            /*
             // Don't use modified replacedBy's here when we have a super expression - we mapped to a specific type
             // in that case.  We do still have to skip replaced types of course so we pass false when isSuper=true
             if (btype.replacedByType != null && (btype.replaced || isSuper))
+               return btype.resolve(!isSuper);
+            */
+            if (btype.replacedByType != null)
                return btype.resolve(!isSuper);
          }
          else
