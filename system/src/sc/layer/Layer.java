@@ -354,7 +354,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public HashMap<String,SrcIndexEntry> buildSrcIndex;
 
    /** Stores the set of models in this layer, in the order in which we traversed the tree for consistency. */
-   LinkedHashSet<IdentityWrapper<ILanguageModel>> layerModels = new LinkedHashSet<IdentityWrapper<ILanguageModel>>();
+   Set<IdentityWrapper<ILanguageModel>> layerModels = Collections.synchronizedSet(new LinkedHashSet<IdentityWrapper<ILanguageModel>>());
 
    List<String> classDirs;
 
