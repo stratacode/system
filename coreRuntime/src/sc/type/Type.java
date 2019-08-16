@@ -113,6 +113,10 @@ public enum Type {
       public Object stringToValue(String val) {
          return java.lang.Integer.valueOf(val);
       }
+
+      public boolean isByte() {
+         return true;
+      }
    },
    Short {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -139,6 +143,9 @@ public enum Type {
 
       public Object stringToValue(String val) {
          return java.lang.Integer.valueOf(val);
+      }
+      public boolean isInteger() {
+         return true;
       }
    }, Character {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -282,6 +289,10 @@ public enum Type {
       public Object stringToValue(String val) {
          return java.lang.Integer.valueOf(val);
       }
+
+      public boolean isInteger() {
+         return true;
+      }
    },
    Float {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -384,6 +395,9 @@ public enum Type {
 
       public Object stringToValue(String val) {
          return java.lang.Float.valueOf(val);
+      }
+      public boolean isFloat() {
+         return true;
       }
    },
    Long {
@@ -502,6 +516,9 @@ public enum Type {
       public Object stringToValue(String val) {
          return java.lang.Long.valueOf(val);
       }
+      public boolean isInteger() {
+         return true;
+      }
    },
    Double {
       public Object evalArithmetic(String operator, Object lhsObj, Object rhsObj) {
@@ -604,6 +621,9 @@ public enum Type {
 
       public Object stringToValue(String val) {
          return java.lang.Double.valueOf(val);
+      }
+      public boolean isDouble() {
+         return true;
       }
    },
    String {
@@ -712,6 +732,16 @@ public enum Type {
 
       public Object stringToValue(String val) {
          return java.lang.Double.valueOf(val);
+      }
+      // These next two are for when we've converted to JS because both int and float are converted to Number
+      public boolean isInteger() {
+         return true;
+      }
+      public boolean isFloat() {
+         return true;
+      }
+      public boolean isDouble() {
+         return true;
       }
    },
    Void {
@@ -854,7 +884,7 @@ public enum Type {
    }
 
    public boolean isANumber() {
-      return primitiveClass != null && (isAnInteger() || isAFloat());
+      return isAnInteger() || isAFloat();
    }
 
    public boolean isAnInteger() {
@@ -862,31 +892,31 @@ public enum Type {
    }
 
    public boolean isInteger() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return false;
    }
 
    public boolean isShort() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return false;
    }
 
    public boolean isByte() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return false;
    }
 
    public boolean isLong() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return false;
    }
 
    public boolean isFloat() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return false;
    }
 
    public boolean isDouble() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return false;
    }
 
    public boolean isAFloat() {
-      throw new UnsupportedOperationException(NOT_IMPL_ERROR);
+      return isFloat() || isDouble();
    }
 
    public boolean isAssignableFromAssignment(Type other, Class from, Class to) {
