@@ -2912,11 +2912,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         }
 
                         if (!ModelUtil.sameTypes(depTD, type)) {
-                           if (!type.isAssignableFrom(depTD, false))
-                              addTypeToFile(depTD, typesInFile, parentLibFile, genLayer, typesInSameFile, addLaterTypes);
-                           else { // Because this may be the only reference to a type which depends on this type, we need to just make sure this gets added to the file after this type and it's dependencies have been added.
+                           // We used to add dependent types before the extended types but it's not necessary and causes the extends types not to be sorted in some
+                           // odd-ball cases. Now adding all of those dependent types afterwards unless they are referenced in the extends hierarchy.
+                           //if (!type.isAssignableFrom(depTD, false))
+                           //   addTypeToFile(depTD, typesInFile, parentLibFile, genLayer, typesInSameFile, addLaterTypes);
+                           //else { // Because this may be the only reference to a type which depends on this type, we need to just make sure this gets added to the file after this type and it's dependencies have been added.
                               addLaterTypes.add(depTD);
-                           }
+                           //}
                         }
                      }
                   }
