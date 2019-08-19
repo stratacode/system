@@ -9118,7 +9118,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         JavaModel depModel = (JavaModel) depModelObj;
                         ParseUtil.validateComponent(depModel);
                         ParseUtil.processComponent(depModel);
-                        List<String> prevTypeGroupMembers = depModel.getPrevTypeGroupMembers(genLayer, dep.typeGroupName);
+                        // Use the current layer for when this is the first time we've transformed the model. The type group will be from the previous compile in this
+                        // layer. If we have transformed it already, use the version in the previously transformed layer. If that's changed, we need to retransform it
+                        // even if it's members have not changed because otherwise we end up using the incorrect transformed model for genLayer.
+                        Layer prevLayer = depModel.transformedInLayer == null ? genLayer : depModel.transformedInLayer;
+                        List<String> prevTypeGroupMembers = depModel.getPrevTypeGroupMembers(prevLayer, dep.typeGroupName);
                         if (genLayer.buildInfo == null) {
                            System.out.println("*** Error - layer: " + genLayer + " not initialized to build");
                         }
