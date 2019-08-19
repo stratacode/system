@@ -145,7 +145,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * For tags which are created by a repeat tag where 'wrap=true' do not output the start/end tag - just the body.  You can also set this to true explicitly
     * as an attribute to represents content hiding the outer start/end tag.
     */
-   public transient boolean bodyOnly;
+   private transient boolean bodyOnly;
 
    /** When we have a repeat value, this listener */
    private transient RepeatListener repeatListener = null;
@@ -235,6 +235,26 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    /** Is this tag visible.  Note: using isVisible here to match swing's isVisible */
    public boolean isVisible() {
       return visible;
+   }
+
+   public boolean getBodyOnly() {
+      return bodyOnly;
+   }
+
+   public void setBodyOnly(boolean nbo) {
+      if (bodyOnly == nbo)
+         return;
+      bodyOnly = nbo;
+      if (startTagValid)
+         invalidateStartTag();
+      else {
+         Element enclTag = getEnclosingTag();
+         if (enclTag != null) {
+            enclTag.bodyTxtValid = false;
+            enclTag.invalidateBody();
+         }
+      }
+      Bind.sendChangedEvent(this, "bodyOnly");
    }
 
    public void setReplaceWith(Element replTag) {
@@ -4086,7 +4106,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   private void destroyRepeatTags() {
+   public void destroyRepeatTags() {
       if (repeatTags != null) {
          for (int i = 0; i < repeatTags.size(); i++) {
             Element elem = repeatTags.get(i);
