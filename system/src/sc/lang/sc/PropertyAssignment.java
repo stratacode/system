@@ -529,10 +529,21 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       // If this is a constructor property, suppressGeneration will already be set and we don't need to initialize it twice
       if (init == null || suppressGeneration)
          return;
-      if (init.isReferenceInitializer()) {
+      if (init.isReferenceInitializer() || overridesReferenceInitializer()) {
          // Make sure to pick up the inherited initializer/operator if this is an override statement
          refInits.add(convertToAssignmentExpression(null, false, getInheritedMember().getOperatorStr(), true));
       }
+   }
+
+   private boolean overridesReferenceInitializer() {
+      if (assignedProperty == null)
+         return true;
+      if (assignedProperty instanceof VariableDefinition) {
+         return ((VariableDefinition) assignedProperty).isReferenceInitializer();
+      }
+      else if (assignedProperty instanceof IBeanMapper)
+         return false;
+      return false; // Compiled type
    }
 
    /** Called during the transform from the enclosing class to find initialization statements for the constructor properties. */
