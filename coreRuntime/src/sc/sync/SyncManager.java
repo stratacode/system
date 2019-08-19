@@ -1035,8 +1035,12 @@ public class SyncManager {
        */
       public void applyRemoteChanges(Object inst, Map<String,Object> pendingMap) {
          InstInfo ii = findSyncInstInfo(inst);
-         if (ii.syncContext != this)
-            System.out.println("*** applying remote changes on a parent context - does this happen?");
+         if (ii.syncContext != this) {
+            // Pretty sure we need to create this here (or perhaps sooner) so that we store the previous values for the
+            // specific context that retrieved them. This seems to happen for say global objects which are not on-demand and
+            // so not discovered in the context of a reference.
+            ii = createInheritedInstInfo(inst, ii);
+         }
 
          HashMap<String,Object> prevMap = ii.previousValues;
          HashMap<String,Object> initMap = ii.initialValues;
