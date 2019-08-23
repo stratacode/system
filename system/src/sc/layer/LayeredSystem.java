@@ -294,6 +294,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public long lastChangedModelTime = -1;
    public long sysStartTime = -1;
    long buildStartTime = -1;
+   // Set this flag to true for any inactive models updated by directly editing the Java model - from the IDE. It's used to determine when we have to refresh the bound types in the IDE for files which have changed in the editor (and so don't show up in the changed models we discover on the file system)
+   public boolean modelsHaveChanged = false;
 
    /** Set to true for cases where we create a runtime purely for representing inactive types - e.g. the documentation.  In that case, no active layers are populated */
    public boolean inactiveRuntime = false;
@@ -10859,7 +10861,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          setCurrent(this);
       }
 
-      if (changes.size() > 0) {
+      if (changes.size() > 0 || modelsHaveChanged) {
+         modelsHaveChanged = false;
          // Once we've refreshed some of the models in the system, we now need to go and update the type references globally to point to the new references
          // TODO: we are doing this twice now if we need to rebuild the system as well as just refreshing the types - maybe eliminate this one in that case?
          refreshBoundTypes(ModelUtil.REFRESH_TYPEDEFS, active);
