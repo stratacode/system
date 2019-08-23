@@ -2469,8 +2469,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          else if (layerTypeIndex.layerPathName.equals(layerUniqueName))
             System.out.println("*** Invalid layer path index name");
          File typeIndexFile = new File(getTypeIndexFileName());
+         File typeIndexDir = typeIndexFile.getParentFile();
          ObjectOutputStream os = null;
          try {
+            typeIndexDir.mkdirs();
             os = new ObjectOutputStream(new FileOutputStream(typeIndexFile));
             os.writeObject(layerTypeIndex);
             typeIndexNeedsSave = false;
