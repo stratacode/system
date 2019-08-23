@@ -2455,9 +2455,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object refreshBoundType(Object boundType) {
       if (replaced) {
-         if (replacedByType == null)
-            return this;
-         return replacedByType.refreshBoundType(boundType);
+         if (replacedByType != null)
+            return replacedByType.refreshBoundType(boundType);
       }
       /*
       Layer layer = model.getLayer();
