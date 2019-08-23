@@ -1740,4 +1740,36 @@ public class DynUtil {
       }
    }
 
+   public static Object findCommonSuperType(Object c1, Object c2) {
+      Object o1 = c1;
+      Object o2 = c2;
+
+      if (o1 == null && o2 != null)
+         return o2;
+      if (o2 == null && o1 != null)
+         return o1;
+
+      while (o1 != null && o2 != null && !DynUtil.isAssignableFrom(o1, o2))
+         o1 = DynUtil.getExtendsType(o1);
+
+      while (c1 != null && o2 != null && !DynUtil.isAssignableFrom(o2, c1))
+         o2 = DynUtil.getExtendsType(o2);
+
+      return o1 != null && o2 != null && DynUtil.isAssignableFrom(o1, o2) ? o2 : o1;
+   }
+
+   public static int compare(Object o1, Object o2) {
+      int res;
+      if (o1 instanceof Comparable) {
+         res = ((Comparable) o1).compareTo(o2);
+      }
+      else if (o2 instanceof Comparable) {
+         res = -((Comparable) o2).compareTo(o1);
+      }
+      else {
+         System.err.println("*** Unable to compare values: " + o1 + " to " + o2);
+         res = 0;
+      }
+      return res;
+   }
 }
