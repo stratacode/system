@@ -747,8 +747,9 @@ public class SyncLayer {
                   }
                }
                // Treat top-level types as top-level.  Also treat TypeDeclarations as top-level even if they represent an inner type
-               else if (DynUtil.getNumInnerTypeLevels(newObjType) == 0 || objName.startsWith("sc_type_"))
+               else if (DynUtil.getNumInnerTypeLevels(newObjType) == 0 || objName.startsWith("sc_type_")) {
                   newObjName = "";
+               }
             }
          }
 
