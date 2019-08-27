@@ -25,7 +25,8 @@ public class RemoteResult {
 
    /**
     * Set this property to an implementation class to be notified of success/errors in the method call immediately as the return value is processed.  Use this listener
-    * when you need notification of a remote method response which */
+    * when you need notification of a remote method response that is called in sequence with the other changes made during the 'sync'
+    */
    public IResponseListener responseListener;
 
    /**
