@@ -70,6 +70,10 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       return null;
    }
 
+   public boolean hasField() {
+      return false;
+   }
+
    public boolean hasGetMethod() {
       return false;
    }

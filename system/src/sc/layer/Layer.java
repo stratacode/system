@@ -36,16 +36,26 @@ import static sc.layer.LayerUtil.opAppend;
 /** 
  * The main implementation class for a Layer.  There's one instance of this class for
  * a given layer in a given LayeredSystem.  The LayeredSystem stores the current list of layers
- * that are active in the system in it's layers property.   
+ * that are active in the system in it's layers property for when it's used to model a set of layers
+ * to build+run. When the LayeredSystem is used in the IDE, it maintains a list of inactiveLayers that
+ * are also kept in a sorted order based on dependencies.
  * <p>
- * You define a new layer with a layer definition file, placed in the layer's directory in your
- * system's layerpath.  
+ * To create a new layer, add a layer definition file, placed in the layer's directory in your
+ * system's layerpath (e.g. /home/StrataCode/bundles/example/example/unitConverter/clientServer/clientServer.sc)
+ * </p>
  * <p>
- * At startup time, the LayeredSystem creates a Layer instance for each layer definition file.  
+ * At startup time, the LayeredSystem creates a Layer instance for each layer definition file.
  * It sorts the list of layers based on dependencies.  It initializes all of the layers by calling
  * tbe initialize method in the layer definition file.  It then starts all Layers by calling the 
- * start method.  By setting properties in your Layer, implementing the initialize and start methods
- * you have a variety of ways to alter the behavior of how your project is built and run.
+ * start method.  The layer definition file can define new build properties, or instances of layered components to define
+ * new features in the project. Add compiled libraries to the classPath or additional source directories to the source path.
+ * Define new file types or a MvnRepositoryPackage component to automatically download and include a specific 3rd party package.
+ * This component chooses a specific version that can be easily overridden by a downstream layer.
+ * </p>
+ * <p>
+ * Even more control can be obtained by adding code to the init or start methods in the Layer definition component.
+ * To use layers in the IDE, make sure not to start processes unless the 'activated' flag is true.
+ * </p>
  */
 @CompilerSettings(dynChildManager="sc.layer.LayerDynChildManager")
 public class Layer implements ILifecycle, LayerConstants, IDynObject {

@@ -6348,10 +6348,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             System.err.println("*** Replacing a type with itself!");
 
          // In the IDE, if we set replacedByType here, we end up with one long chain of references and so never free models during editing
-         if (activated)
+         if (activated) {
             replacedByType = newType;
-         if (updateMode == TypeUpdateMode.Replace)
-            replaced = true;
+            if (updateMode == TypeUpdateMode.Replace)
+               replaced = true; // Don't set replaced unless we set replacedByType because that getLayerTypeDeclaration returns the wrong type and we can get into an infinite loop by returning the modifying model in place of this one
+         }
+         // else - TODO: do we need to set removed here or some other flag to indicate this is not the current model?
       }
 
       // In this case, we are stripping off a type layer... "this" type is being removed and replaced by some previous type in the chain.
@@ -9663,6 +9665,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setComment(getComment());
          ctd.setAnnotations(getAnnotations());
          ctd.setModifierFlags(getModifierFlags());
+         ctd.setModifiedType(getModifiedType());
          /*
          if (modifiers != null) {
             ArrayList<String> clientMods = new ArrayList<String>(modifiers.size());
@@ -9930,7 +9933,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             return null;
          return replacedByType.refreshNode();
       }
-      JavaModel newModel = (JavaModel) myModel.getLayeredSystem().getAnnotatedModel(myModel.getSrcFile());
+      LayeredSystem sys = myModel.getLayeredSystem();
+      if (sys == null)
+         return this;
+      JavaModel newModel = (JavaModel) sys.getAnnotatedModel(myModel.getSrcFile());
       if (newModel == myModel)
          return this;
       if (newModel == null)

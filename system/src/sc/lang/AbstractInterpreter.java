@@ -99,6 +99,16 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       public Class getCompiledClass() {
          return AbstractInterpreter.this.getClass();
       }
+
+      // Our parentNode gets set to the currently edited model so that we can resolve identifiers properly in the current context
+      // Need to return null here explicitly so the current object is not interpreted as the enclosing type.
+      public TypeDeclaration getEnclosingIType() {
+         return null;
+      }
+
+      public TypeDeclaration getEnclosingType() {
+         return null;
+      }
    }
 
    public static ClassDeclaration defaultCmdObject = new DefaultCmdClassDeclaration();

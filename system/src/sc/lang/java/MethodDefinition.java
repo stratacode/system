@@ -617,6 +617,12 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyName != null;
    }
 
+   public boolean hasField() {
+      Object member = getEnclosingType().definesMember(propertyName, MemberType.FieldSet, null, null);
+      // Need to make sure the field is public if we are going to use it as an accessor for the property.
+      return member != null && ModelUtil.hasModifier(member, "public");
+   }
+
    public boolean hasGetMethod() {
       return isGetMethod() || getEnclosingType().definesMember(propertyName, MemberType.GetMethodSet, null, null) != null;
    }

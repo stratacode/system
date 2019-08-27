@@ -4143,7 +4143,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncProperties typeProps = new SyncProperties(null, null,
                    new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
                                   "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags", "extendsTypeName",
-                                  "constructorParamNames", "editorCreateMethod"},
+                                  "constructorParamNames", "editorCreateMethod", "modifiedType"},
                                             null, SyncPropOptions.SYNC_INIT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);

@@ -3299,6 +3299,9 @@ public class ModelUtil {
    public static boolean hasField(Object varObj) {
       if ((varObj instanceof IBeanMapper) && ((IBeanMapper) varObj).getField() != null)
          return true;
+      if ((varObj instanceof IMethodDefinition)) {
+         return ((IMethodDefinition) varObj).hasField();
+      }
       return false;
    }
 
@@ -3309,11 +3312,11 @@ public class ModelUtil {
    }
 
    public static boolean isReadableProperty(Object member) {
-      return isProperty(member) && (hasGetMethod(member)  || isField(member));
+      return isProperty(member) && (hasGetMethod(member) || isField(member) || hasField(member));
    }
 
    public static boolean isWritableProperty(Object member) {
-      return isProperty(member) && (hasSetMethod(member)  || isField(member));
+      return isProperty(member) && (hasSetMethod(member) || isField(member) || hasField(member));
    }
 
    public static boolean isGetSetMethod(Object member) {

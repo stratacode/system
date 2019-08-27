@@ -23,6 +23,8 @@ public interface IMethodDefinition extends IMember {
 
    String getPropertyName();
 
+   boolean hasField();
+
    boolean hasGetMethod();
 
    boolean hasSetMethod();

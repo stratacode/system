@@ -192,4 +192,13 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
       return modifierFlags;
    }
 
+   private BodyTypeDeclaration modifiedType;
+   @Constant
+   public void setModifiedType(BodyTypeDeclaration mt) {
+      modifiedType = mt;
+   }
+   public BodyTypeDeclaration getModifiedType() {
+      return modifiedType;
+   }
+
 }

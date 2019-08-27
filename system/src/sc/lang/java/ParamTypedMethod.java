@@ -750,6 +750,10 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.getPropertyName(method);
    }
 
+   public boolean hasField() {
+      return ModelUtil.hasField(method);
+   }
+
    public boolean hasGetMethod() {
       return ModelUtil.hasGetMethod(method);
    }

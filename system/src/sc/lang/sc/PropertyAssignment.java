@@ -96,7 +96,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       }
 
       if (assignedProperty == null) {
-         if (!getJavaModel().disableTypeErrors) {
+         JavaModel model = getJavaModel();
+         if (model != null && !model.disableTypeErrors) {
             // Get the member again with no reference type
             Object errorProp = encType.definesMember(propertyName, mtype, null, null);
             if (errorProp != null) {

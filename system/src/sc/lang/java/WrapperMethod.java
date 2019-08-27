@@ -46,6 +46,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getPropertyName(wrapped);
    }
 
+   public boolean hasField() {
+      return ModelUtil.hasField(wrapped);
+   }
+
    public boolean hasGetMethod() {
       return ModelUtil.hasGetMethod(wrapped);
    }

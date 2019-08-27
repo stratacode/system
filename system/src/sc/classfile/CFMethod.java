@@ -133,7 +133,11 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
    public String getPropertyName() {
       return propertyName;
    }
-   
+
+   public boolean hasField() {
+      return ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.FieldSet, null, null, null) != null;
+   }
+
    public boolean hasGetMethod() {
       return isGetMethod() ||
               ModelUtil.definesMember(ownerClass, propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, null, null) != null;
