@@ -3225,9 +3225,10 @@ public class SyncManager {
       if (outputLanguage.equals("js") && res.length() > 0) {
          StringBuilder jsRes = new StringBuilder();
          jsRes.append("sc_SyncManager_c." +
-                 "applySyncLayer(\"" + syncDestination.getOutputLanguage() + "\", \"");
-         jsRes.append(CTypeUtil.escapeJavaString(res.toString(), false));
-         jsRes.append("\", \"init\");\n");
+                 "applySyncLayer(\"" + syncDestination.getOutputLanguage() + "\", `");
+         // Need to escape the / character in the strings to be sure that </script> turns into <\/script> when inside of a <script tag> or the JS parsing fails
+         jsRes.append(CTypeUtil.escapeJavaString(res.toString(), '`', true));
+         jsRes.append("`, \"init\");\n");
          return jsRes;
       }
       return res;
