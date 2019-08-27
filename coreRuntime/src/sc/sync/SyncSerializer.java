@@ -345,7 +345,7 @@ public class SyncSerializer {
       statementSB.append("sc.sync.SyncManager.processMethodReturn(");
       statementSB.append("null, ");
       statementSB.append("\"");
-      statementSB.append(CTypeUtil.escapeJavaString(mres.callId, false));
+      statementSB.append(CTypeUtil.escapeJavaString(mres.callId, '"', false));
       statementSB.append("\", ");
       parentContext.formatExpression(statement, statementSB, mres.retValue, newObjNames, newLastPackageName, preBlockCode, postBlockCode, null, true, "", depChanges, syncLayer);
       statementSB.append(", ");
@@ -353,7 +353,7 @@ public class SyncSerializer {
          statementSB.append("null");
       else {
          statementSB.append("\"");
-         statementSB.append(CTypeUtil.escapeJavaString(mres.exceptionStr, false));
+         statementSB.append(CTypeUtil.escapeJavaString(mres.exceptionStr, '"', false));
          statementSB.append("\"");
       }
       statementSB.append(");\n");
@@ -475,13 +475,13 @@ public class SyncSerializer {
 
    public void formatChar(StringBuilder sb, String val) {
       sb.append("'");
-      sb.append(CTypeUtil.escapeJavaString(val, true));
+      sb.append(CTypeUtil.escapeJavaString(val, '\'', false));
       sb.append("'");
    }
 
    public void formatString(StringBuilder sb, String val) {
       sb.append('"');
-      sb.append(CTypeUtil.escapeJavaString(val, false));
+      sb.append(CTypeUtil.escapeJavaString(val, '"', false));
       sb.append('"');
    }
 

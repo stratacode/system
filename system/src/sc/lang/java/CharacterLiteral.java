@@ -39,6 +39,6 @@ public class CharacterLiteral extends AbstractLiteral {
    }
 
    public String toGenerateString() {
-      return "'" + CTypeUtil.escapeJavaString(String.valueOf(charValue), true) + "'";
+      return "'" + CTypeUtil.escapeJavaString(String.valueOf(charValue), '\'', false) + "'";
    }
 }

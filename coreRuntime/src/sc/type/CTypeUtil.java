@@ -159,14 +159,18 @@ public class CTypeUtil {
    }
    */
 
-   public static String escapeJavaString(String s, boolean charMode) {
+   // Returns an escaped string using normal Java/JS rules for escaping for the given delimiter - either ', ", or ` (for js template literals)
+   public static String escapeJavaString(String s, char delim, boolean escSlash) {
       StringBuilder sb = null;
       char c;
 
       if (s == null)
          return null;
 
-      for (int i = 0; i < s.length(); i++) {
+      boolean escNewLines = delim != '`';
+
+      int len = s.length();
+      for (int i = 0; i < len; i++) {
          c = s.charAt(i);
          switch (c) {
             case '\b':
@@ -182,15 +186,23 @@ public class CTypeUtil {
                sb.append("\\t");
                break;
             case '\n':
-               sb = initsb(sb, s, i);
-               sb.append("\\n");
+               if (escNewLines) {
+                  sb = initsb(sb, s, i);
+                  sb.append("\\n");
+               }
+               else if (sb != null)
+                  sb.append(c);
                break;
             case '\r':
-               sb = initsb(sb, s, i);
-               sb.append("\\r");
+               if (escNewLines) {
+                  sb = initsb(sb, s, i);
+                  sb.append("\\r");
+               }
+               else if (sb != null)
+                  sb.append(c);
                break;
             case '\'':
-               if (charMode) {
+               if (delim == '\'') {
                   sb = initsb(sb, s, i);
                   sb.append("\\'");
                }
@@ -200,9 +212,19 @@ public class CTypeUtil {
                }
                break;
             case '"':
-               if (!charMode) {
+               if (delim == '"') {
                   sb = initsb(sb, s, i);
                   sb.append("\\\"");
+               }
+               else {
+                  if (sb != null)
+                     sb.append(c);
+               }
+               break;
+            case '`':
+               if (delim == '`') {
+                  sb = initsb(sb, s, i);
+                  sb.append("\\`");
                }
                else {
                   if (sb != null)
@@ -213,6 +235,15 @@ public class CTypeUtil {
                sb = initsb(sb, s, i);
                sb.append("\\\\");
                break;
+            // TODO: we really only need to escape / when it follows <
+            case '/':
+               // When including a string literal inside of a script tag, need to escape the / so that </script> is not parsed out of the string literal
+               if (escSlash) {
+                  sb = initsb(sb, s, i);
+                  sb.append("\\/");
+                  break;
+               }
+               // else - fall through!
             default:
                if (c < 32 || c > 0x7f) {
                   sb = initsb(sb, s, i);

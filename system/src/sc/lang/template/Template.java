@@ -1290,7 +1290,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    }
 
    public static Statement getConstStringOutputStatement(String stringConstant) {
-      return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(CTypeUtil.escapeJavaString(stringConstant, false)), "out.append(\"<%= expr %>\");", SCLanguage.INSTANCE.blockStatements, true)).get(0);
+      return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(CTypeUtil.escapeJavaString(stringConstant, '"', false)), "out.append(\"<%= expr %>\");", SCLanguage.INSTANCE.blockStatements, true)).get(0);
    }
 
    private int replaceStatementGlue(Statement st, int ix, boolean statefulContext) {

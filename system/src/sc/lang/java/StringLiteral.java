@@ -52,13 +52,13 @@ public class StringLiteral extends AbstractLiteral {
       if (!this.initialized)
          this.init();
       this.stringValue = this.stringValue + str;
-      this.value = this.value + CTypeUtil.escapeJavaString(str, false);
+      this.value = this.value + CTypeUtil.escapeJavaString(str, '"', false);
    }
 
    static public StringLiteral create(String val) {
       StringLiteral res = new StringLiteral();
       res.stringValue = val;
-      res.value = CTypeUtil.escapeJavaString(val, false);
+      res.value = CTypeUtil.escapeJavaString(val, '"', false);
       return res;
    }
 
