@@ -1371,6 +1371,13 @@ public class DynUtil {
       return PTypeUtil.isObjectType(type);
    }
 
+   public static boolean isSingletonType(Object type) {
+      String scopeName = DynUtil.getScopeNameForType(type);
+      if (scopeName == null)
+         return false;
+      return true; // TODO: Any scopes which we should not treat as singletons?
+   }
+
    public static boolean isObject(Object obj) {
       if (dynamicSystem != null)
          return dynamicSystem.isObject(obj);
