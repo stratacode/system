@@ -8,6 +8,8 @@ import sc.js.JSSettings;
 import sc.obj.CurrentScopeContext;
 import sc.util.ISet;
 
+import java.util.List;
+
 /**
  * This interface is implemented by the VariableBinding, MethodBinding, etc. objects.  The event dispatch mechanism
  * uses it to communicate change event information to the bindings.  The bindings also provide state that controls
@@ -73,5 +75,5 @@ public interface IListener {
 
    boolean isCrossScope();
 
-   CurrentScopeContext getCurrentScopeContext();
+   List<CurrentScopeContext> getCurrentScopeContexts();
 }

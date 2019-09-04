@@ -8,6 +8,9 @@ import sc.dyn.DynUtil;
 import sc.obj.CurrentScopeContext;
 import sc.sync.SyncManager;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * The base class for binding objects which can be the root level binding - i.e. that have
  * a reference to the dstObj, the dstProp, and are initially given the direction.
@@ -18,7 +21,10 @@ public abstract class DestinationListener extends AbstractListener implements IB
    BindingDirection direction;
    int flags;
    BindOptions opts;
-   CurrentScopeContext curScopeCtx;
+   // For crossScope bindings, this stores the list of CurrentScopeContexts where change events should be delivered. If
+   // the current CurrentScopeContext matches one in this list, it's sent right away. If not it's queued and delivered the
+   // next time a thread runs in that context;
+   List<CurrentScopeContext> curScopeCtxs;
 
    protected void initFlags(int flags, BindOptions opts) {
       this.flags = flags;
@@ -36,7 +42,7 @@ public abstract class DestinationListener extends AbstractListener implements IB
          sync = Bind.bindingManager.getDefaultSyncType();
       }
       if ((flags & Bind.CROSS_SCOPE) != 0)
-         curScopeCtx = CurrentScopeContext.getCurrentScopeContext();
+         addCurrentScopeContext(CurrentScopeContext.getCurrentScopeContext());
 
       int propFlags = (flags & Bind.PROPAGATED_FLAGS);
       if (propFlags != 0) {
@@ -72,7 +78,11 @@ public abstract class DestinationListener extends AbstractListener implements IB
 
    public abstract int refreshBinding();
 
-   public abstract void accessBinding();
+   public void accessBinding() {
+      if ((flags & Bind.CROSS_SCOPE) != 0) {
+         addCurrentScopeContext(CurrentScopeContext.getCurrentScopeContext());
+      }
+   }
 
    protected void accessObj(Object obj) {
       String scopeName = DynUtil.getScopeName(obj);
@@ -107,7 +117,15 @@ public abstract class DestinationListener extends AbstractListener implements IB
 
    public boolean isCrossScope() { return (flags & Bind.CROSS_SCOPE) != 0; }
 
-   public CurrentScopeContext getCurrentScopeContext() { return curScopeCtx; }
+   public List<CurrentScopeContext> getCurrentScopeContexts() { return curScopeCtxs; }
+
+   public void addCurrentScopeContext(CurrentScopeContext ctx) {
+      if (curScopeCtxs == null)
+         curScopeCtxs = new ArrayList<CurrentScopeContext>();
+      else if (curScopeCtxs.contains(ctx))
+         return;
+      curScopeCtxs.add(ctx);
+   }
 
    protected void initFlagsOnChildren(int flags) {
       this.flags |= flags;

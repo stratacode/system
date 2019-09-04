@@ -428,6 +428,7 @@ public class AssignmentBinding extends DestinationListener {
    }
 
    public void accessBinding() {
+      super.accessBinding();
       if (dstObj != null)
          accessObj(dstObj);
       lhsBinding.accessBinding();

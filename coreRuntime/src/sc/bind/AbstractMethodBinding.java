@@ -474,6 +474,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
    }
 
    public void accessBinding() {
+      super.accessBinding();
       if (!activated)
          return;
       if (direction.doForward() && !direction.doReverse() && !isRefreshDisabled()) {

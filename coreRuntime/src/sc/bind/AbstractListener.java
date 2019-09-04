@@ -9,6 +9,8 @@ import sc.js.JSSettings;
 import sc.obj.CurrentScopeContext;
 import sc.util.ISet;
 
+import java.util.List;
+
 @JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
 public abstract class AbstractListener implements IListener {
    boolean activated = true;  // Set to false on nested bindings when they are not in an active code path (i.e. the not-chosen option for a ternary or part of a conditional that's not reached)
@@ -96,5 +98,5 @@ public abstract class AbstractListener implements IListener {
 
    public boolean isCrossScope() { return false; }
 
-   public CurrentScopeContext getCurrentScopeContext() { return null; }
+   public List<CurrentScopeContext> getCurrentScopeContexts() { return null; }
 }

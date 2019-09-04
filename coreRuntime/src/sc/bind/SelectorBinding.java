@@ -594,6 +594,7 @@ public class SelectorBinding extends DestinationListener {
    }
 
    public void accessBinding() {
+      super.accessBinding();
       if (!activated)
          return;
 

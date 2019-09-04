@@ -1118,29 +1118,36 @@ public class Bind {
    static void dispatchEvent(int event, Object obj, IBeanMapper prop, IListener listener, Object eventDetail) {
       if (listener.isCrossScope()) {
          CurrentScopeContext curScopeCtx = CurrentScopeContext.getCurrentScopeContext();
-         CurrentScopeContext listenerCtx = listener.getCurrentScopeContext();
-         if (listenerCtx != curScopeCtx) {
-            ScopeContext listenerEventScopeCtx = listenerCtx.getEventScopeContext();
-            ScopeContext curEventScopeCtx = curScopeCtx.getEventScopeContext();
-            if (listenerEventScopeCtx != null && listenerEventScopeCtx != curEventScopeCtx) { // TODO - should this be equals?  how will we wake up two different CurrentScopeContext objects if they represent the same list of ScopeContexts
-               BindingContext bctx = (BindingContext) listenerEventScopeCtx.eventListener;
-               if (bctx == null) {
-                  synchronized (listenerEventScopeCtx.eventListenerLock) {
-                     bctx = (BindingContext) listenerEventScopeCtx.eventListener;
-                     if (bctx == null)
-                        listenerEventScopeCtx.eventListener = bctx = new BindingContext(IListener.SyncType.IMMEDIATE);
+         List<CurrentScopeContext> listenerCtxs = listener.getCurrentScopeContexts();
+         boolean deliverToCurrent = false;
+         int ct = 0;
+         for (CurrentScopeContext listenerCtx:listenerCtxs) {
+            if (listenerCtx != curScopeCtx) {
+               ScopeContext listenerEventScopeCtx = listenerCtx.getEventScopeContext();
+               ScopeContext curEventScopeCtx = curScopeCtx.getEventScopeContext();
+               // TODO: should the binding store the ScopeContext where the component lives instead? Then there would only be one ScopeContext, even for a shared object,
+               // we would not have to use accessBinding to add each leaf context and the change event
+               if (listenerEventScopeCtx != null && listenerEventScopeCtx != curEventScopeCtx) {
+                  BindingContext bctx = (BindingContext) listenerEventScopeCtx.eventListener;
+                  if (bctx == null) {
+                     synchronized (listenerEventScopeCtx.eventListenerLock) {
+                        bctx = (BindingContext) listenerEventScopeCtx.eventListener;
+                        if (bctx == null)
+                           listenerEventScopeCtx.eventListener = bctx = new BindingContext(IListener.SyncType.IMMEDIATE);
+                     }
                   }
+                  if (ScopeDefinition.trace || trace)
+                     System.out.println("Bind - cross scope event: " + DynUtil.getInstanceName(obj) + "." + (prop == null ? "<default-event>" : prop.getPropertyName()) + " - Queuing event from: " + curScopeCtx + " to: " + listenerEventScopeCtx + " in: " + listenerCtx);
+                  bctx.queueEvent(event, obj, prop, listener, eventDetail);
+                  listenerEventScopeCtx.scopeChanged();
+                  ct++;
                }
-               if (ScopeDefinition.trace || trace)
-                  System.out.println("Bind - cross scope event: " + DynUtil.getInstanceName(obj) + "." + (prop == null ? "<default-event>" : prop.getPropertyName()) + " - Queuing event from: " + curScopeCtx + " to: " + listenerEventScopeCtx + " in: " + listenerCtx);
-               bctx.queueEvent(event, obj, prop, listener, eventDetail);
-               listenerEventScopeCtx.scopeChanged();
-               return;
+               else
+                  deliverToCurrent = true;
             }
-
-            if (listenerEventScopeCtx == null)
-               System.err.println("*** No binding context for object" + obj);
          }
+         if (!deliverToCurrent)
+            return;
       }
       ThreadState threadState = initThreadState(obj, prop, listener);
       try {
