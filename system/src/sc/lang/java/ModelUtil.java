@@ -6310,7 +6310,8 @@ public class ModelUtil {
 
    public static Object[] getProperties(Object typeObj, String modifier, boolean includeAssigns) {
       if (typeObj instanceof Class) {
-         return TypeUtil.getProperties((Class) typeObj, modifier);
+         // Need to convert this to an Object[] from an IBeanMapper[] so that it can be modified downstream
+         return new ArrayList<Object>(Arrays.asList(TypeUtil.getProperties((Class) typeObj, modifier))).toArray();
       }
       else if (typeObj instanceof ITypeDeclaration) {
          List<Object> props = ((ITypeDeclaration) typeObj).getAllProperties(modifier, includeAssigns);
@@ -6376,23 +6377,28 @@ public class ModelUtil {
    public static Object[] getPropertiesAndTypes(Object typeObj, String modifier) {
       ArrayList<Object> res = new ArrayList();
       if (typeObj instanceof Class) {
-         Object[] props = TypeUtil.getProperties((Class) typeObj, null);
+         Object[] props = TypeUtil.getProperties((Class) typeObj, modifier);
          if (props != null) {
             for (int i = 0; i < props.length; i++) {
                Object prop = props[i];
                if (prop instanceof Class)
                   continue;
+               /* Eliminate write-only properties? For now, keeping the in the list
+               if (!ModelUtil.isReadableProperty(prop))
+                  continue; */
                res.add(prop);
             }
          }
       }
       else if (typeObj instanceof ITypeDeclaration) {
-         List<Object> props = ((ITypeDeclaration) typeObj).getAllProperties(null, true);
+         List<Object> props = ((ITypeDeclaration) typeObj).getAllProperties(modifier, true);
          if (props != null) {
             for (int i = 0; i < props.size(); i++) {
                Object prop = props.get(i);
                if (prop instanceof BodyTypeDeclaration)
                   continue;
+               //if (!ModelUtil.isReadableProperty(prop))
+               //   continue;
                res.add(prop);
             }
          }

@@ -190,7 +190,8 @@ public class TypeUtil  {
          return props;
       int ct = 0;
       for (int i = 0; i < props.length; i++) {
-         if (PTypeUtil.hasModifier(props[i].getPropertyMember(), modifier))
+         IBeanMapper newProp = props[i];
+         if (PTypeUtil.hasModifier(newProp.getPropertyMember(), modifier) /* && newProp.isReadable() */)
             ct++;
       }
       if (ct == props.length)
@@ -200,8 +201,9 @@ public class TypeUtil  {
       IBeanMapper[] newProps = new IBeanMapper[ct];
       ct = 0;
       for (int i = 0; i < props.length; i++) {
-         if (PTypeUtil.hasModifier(props[i].getPropertyMember(), modifier))
-            newProps[ct++] = props[i];
+         IBeanMapper newProp = props[i];
+         if (PTypeUtil.hasModifier(newProp.getPropertyMember(), modifier) /* && newProp.isReadable() */)
+            newProps[ct++] = newProp;
       }
       if (ct != newProps.length)
          System.err.println("*** Internal error retrieving properties for: " + beanClass);
@@ -298,6 +300,11 @@ public class TypeUtil  {
    }
 
    public static Object getPropertyValueFromName(Object parent, String propName, boolean getField) {
+      if (parent == null) {
+         System.out.println("*** No parent class supplied for getPropertyValueFromName: " + propName);
+         throw new IllegalArgumentException("No property class supplied to getPropertyValueFromName");
+      }
+
       Object newMapping = getPropertyMapping(parent.getClass(), propName, null, null);
       // No mapping
       if (newMapping == null) {

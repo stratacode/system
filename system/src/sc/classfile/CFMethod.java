@@ -55,8 +55,9 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
       // Do this before set method because isSetMethod includes indexed properties
       else if ((propertyName = ModelUtil.isSetIndexMethod(name, parameterJavaTypes, returnType)) != null)
          propertyMethodType = PropertyMethodType.SetIndexed;
-      else if ((propertyName = ModelUtil.isSetMethod(name, parameterJavaTypes, returnType)) != null)
+      else if ((propertyName = ModelUtil.isSetMethod(name, parameterJavaTypes, returnType)) != null) {
          propertyMethodType = PropertyMethodType.Set;
+      }
       else if ((propertyName = ModelUtil.isGetIndexMethod(name, parameterJavaTypes, returnType)) != null)
          propertyMethodType = PropertyMethodType.GetIndexed;
 
@@ -78,6 +79,17 @@ public class CFMethod extends ClassFile.FieldMethodInfo implements IVariable, IM
             unboundParameterTypes[i] = parameterJavaTypes[i].getTypeDeclaration(null, null, false, false, true, null, -1);
          }
       }
+
+      /* TODO: should is be a property if there's only a setX method and no way to get the property?  This does not work because we init the fieldsByName index
+         in the classes start and so we can't find fields by the same name at this point. Right now, we're saying that they are properties but isReadable() is false
+         so the editor can filter them out or render them differently (maybe with a way to just set the value but not get it, like for passwords)
+      if (propertyMethodType == PropertyMethodType.Set || propertyMethodType == PropertyMethodType.SetIndexed) {
+         if (!hasGetMethod() && !hasField()) {
+            propertyName = null;
+            propertyMethodType = null;
+         }
+      }
+       */
 
       super.start();
    }

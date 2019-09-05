@@ -78,6 +78,10 @@ public abstract class AbstractBeanMapper implements IBeanMapper, IBinding, Clone
       return getSetSelector() != null || (getField() != null && !isConstant());
    }
 
+   public boolean isReadable() {
+      return getGetSelector() != null || getField() != null;
+   }
+
    public abstract boolean isConstant();
 
    public void parentBindingChanged() {}

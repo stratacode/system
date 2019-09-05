@@ -56,6 +56,9 @@ public class BeanMapper extends AbstractBeanMapper {
          if (getField && field != null)
             return field.get(parent);
 
+         if (getSelector == null)
+            throw new IllegalArgumentException("Attempt to get value of write only property: " + getPropertyName() + " on value: " + parent);
+
          if (getIsField)
             return ((Field) getSelector).get(parent);
          else

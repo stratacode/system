@@ -1360,7 +1360,7 @@ public class RTypeUtil {
 
    public static Object[] getDeclaredProperties(Class typeObj, String modifier) {
       ArrayList<Object> declProps = new ArrayList<Object>();
-      Object[] allProps = TypeUtil.getProperties(typeObj, modifier);
+      IBeanMapper[] allProps = TypeUtil.getProperties(typeObj, modifier);
       for (int i = 0; i < allProps.length; i++) {
          Object prop = allProps[i];
          if (prop != null && getEnclosingType(prop) == typeObj)

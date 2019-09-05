@@ -58,4 +58,6 @@ public interface IBeanMapper extends IBinding, Comparable<IBeanMapper> {
    Object getOwnerType();
 
    boolean isWritable();
+
+   boolean isReadable();
 }
