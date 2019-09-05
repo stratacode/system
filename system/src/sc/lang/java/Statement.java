@@ -466,7 +466,12 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
             ISemanticNode srcRoot = srcStatement.getRootNode();
             if (srcRoot instanceof JavaModel) {
                JavaModel srcModel = (JavaModel) srcRoot;
-               int startGenOffset = getParseNode().getStartIndex();
+               IParseNode pn = getParseNode();
+               if (pn == null) {
+                  System.out.println("*** Attempt to add statement to genLine index with no parse-node - ~/.stratacode/modelCache is corrupt?");
+                  return;
+               }
+               int startGenOffset = pn.getStartIndex();
                if (startGenOffset == -1) {
                   System.out.println("*** Attempt to add statement to genLine index with a parse-node that's missing a startIndex");
                   return;
