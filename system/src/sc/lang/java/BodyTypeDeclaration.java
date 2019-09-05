@@ -64,9 +64,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     */
    public transient TreeMap<String, List<Statement>> methodsByName;
 
-   public transient boolean replaced = false;  // Set to true when another type in the same layer has replaced this type
+   public transient boolean replaced = false;  // Set to true when another active type in the same layer has replaced this type
 
    public transient boolean removed = false;  // Set to true when the source for this type has been removed from the system.
+
+   public transient boolean replacedInactive = false; // Set to true when an inactive type has been replaced by a newer version
 
    /**
     * Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime
@@ -6338,7 +6340,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          newType.replacedByType = replacedByType;
          if (replacedByType != null)
             replacedByType.replacesType = newType;
-         replaced = true;
+         if (activated)
+            replaced = true;
+         else
+            replacedInactive = true;
       }
 
       // Now we are replaced by another type (note dual purpose use of "replacedByType" modulated by replaced flag)
@@ -6353,6 +6358,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (updateMode == TypeUpdateMode.Replace)
                replaced = true; // Don't set replaced unless we set replacedByType because that getLayerTypeDeclaration returns the wrong type and we can get into an infinite loop by returning the modifying model in place of this one
          }
+         else
+            replacedInactive = true;
          // else - TODO: do we need to set removed here or some other flag to indicate this is not the current model?
       }
 
