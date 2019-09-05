@@ -1247,16 +1247,12 @@ public class EditorContext extends ClientEditorContext {
       }
    }
 
-   public int complete(String command, int cursor, List<String> candidates) {
-      return complete(command, cursor, candidates, cmdlang.completionCommands, null, null);
-   }
-
-   public int complete(String command, int cursor, List<String> candidates, String ctxText, JavaModel fileModel) {
-      return complete(command, cursor, candidates, cmdlang.completionCommands, ctxText, fileModel);
+   public int complete(String command, int cursor, List<String> candidates, String ctxText, JavaModel fileModel, Object currentType) {
+      return complete(command, cursor, candidates, cmdlang.completionCommands, ctxText, fileModel, currentType);
    }
 
    public int completeType(String command, List<String> candidates) {
-      int relPos = complete(command, 0, candidates, null, null);
+      int relPos = complete(command, 0, candidates, null, null, null);
       if (candidates.size() == 0) {
          List<BodyTypeDeclaration> res = system.findTypesByRootMatchingPrefix(command);
          if (res != null) {
@@ -1444,7 +1440,7 @@ public class EditorContext extends ClientEditorContext {
       return currentType;
    }
 
-   public int completeParseNode(Parser p, Object parseTree, String command, int cursor, List<String> candidates, BodyTypeDeclaration currentType, String packagePrefix) {
+   public int completeParseNode(Parser p, Object parseTree, String command, int cursor, List<String> candidates, Object currentType, String packagePrefix) {
       int resPos = -1;
       // We can either fail out right or parse a subset of the grammar... in the latter case, the stored errors
       // will reflect why we could not parse the rest.
@@ -1490,7 +1486,7 @@ public class EditorContext extends ClientEditorContext {
       return resPos;
    }
 
-   public int completePartialContext(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel, BodyTypeDeclaration currentType) {
+   public int completePartialContext(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel, Object currentType) {
       if (!cmdlang.typeCommands.initialized) {
          ParseUtil.initAndStartComponent(completeParselet);
       }
@@ -1527,12 +1523,11 @@ public class EditorContext extends ClientEditorContext {
 
    }
 
-   public int complete(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel) {
+   public int complete(String command, int cursor, List<String> candidates, Parselet completeParselet, String ctxText, JavaModel fileModel, Object currentType) {
       if (!cmdlang.typeCommands.initialized) {
          ParseUtil.initAndStartComponent(completeParselet);
       }
 
-      BodyTypeDeclaration currentType = null;
       if (ctxText != null) {
          Object ctxValue = completeFullTypeContext(ctxText, fileModel.getLanguage().getStartParselet(), cursor, candidates, fileModel);
          if (ctxValue instanceof Integer)
@@ -1543,22 +1538,25 @@ public class EditorContext extends ClientEditorContext {
       return completePartialContext(command, cursor, candidates, completeParselet, ctxText, fileModel, currentType);
    }
 
-   public int completeCommand(String defaultPackage, Object semanticValue, String command, int cursor, List candidates, BodyTypeDeclaration currentType, Object continuationValue) {
+   public int completeCommand(String defaultPackage, Object semanticValue, String command, int cursor, List candidates, Object currentType, Object continuationValue) {
       if (currentType == null)
          currentType = getCurrentType(true);
-      JavaSemanticNode defaultParent = currentType;
-      if (currentType == null)
+      BodyTypeDeclaration currentTD = currentType instanceof BodyTypeDeclaration ? (BodyTypeDeclaration) currentType : null;
+      JavaSemanticNode defaultParent = currentTD;
+      if (currentTD == null)
          defaultParent = currentTypes.size() == 0 ? getModel() : currentTypes.get(currentTypes.size()-1);
       return completeCommand(defaultPackage, semanticValue, command, cursor, candidates, currentType, execContext, defaultParent, continuationValue);
    }
 
-   public static int completeCommand(String defaultPackage, Object semanticValue, String command, int cursor, List candidates, BodyTypeDeclaration currentType, ExecutionContext execContext, JavaSemanticNode defaultParent, Object continuationValue) {
+   public static int completeCommand(String defaultPackage, Object semanticValue, String command, int cursor, List candidates, Object currentType, ExecutionContext execContext, JavaSemanticNode defaultParent, Object continuationValue) {
       if (semanticValue instanceof JavaSemanticNode) {
          JavaSemanticNode node = (JavaSemanticNode) semanticValue;
 
+         BodyTypeDeclaration currentTD = currentType instanceof BodyTypeDeclaration ? (BodyTypeDeclaration) currentType : null;
+
          // Because node has not been attached to a model only it's innerTypeName is accurate
-         boolean nodeIsCurrentType = node instanceof BodyTypeDeclaration && currentType != null &&
-                 StringUtil.equalStrings(currentType.getInnerTypeName(), ((BodyTypeDeclaration) node).getInnerTypeName());
+         boolean nodeIsCurrentType = node instanceof BodyTypeDeclaration && currentTD != null &&
+                 StringUtil.equalStrings(currentTD.getInnerTypeName(), ((BodyTypeDeclaration) node).getInnerTypeName());
 
          // We want to set the parent node of the element from the model fragment to point to the
          // currentType - in case we have a more complete version of that type.  We also need to preserve
@@ -1574,27 +1572,27 @@ public class EditorContext extends ClientEditorContext {
          while (true);
 
          if (!(toReparent instanceof JavaModel)) {
-            if (currentType == null)
+            if (currentTD == null)
                toReparent.setParentNode(defaultParent);
             else {
                // The node we completed is the current type - need to reparent it up one-level
                if (nodeIsCurrentType) {
-                  BodyTypeDeclaration nextType = currentType.getEnclosingType();
+                  BodyTypeDeclaration nextType = currentTD.getEnclosingType();
                   if (nextType != null)
                      toReparent.setParentNode(nextType);
                   else
-                     toReparent.setParentNode(currentType.getJavaModel());
+                     toReparent.setParentNode(currentTD.getJavaModel());
                }
                else
-                  toReparent.setParentNode(currentType);
+                  toReparent.setParentNode(currentTD);
             }
          }
 
          JavaModel theModel = node.getJavaModel();
          if (theModel != null) {
-            if (theModel.layeredSystem == null && currentType != null) {
-               theModel.layeredSystem = currentType.getLayeredSystem();
-               theModel.layer = currentType.getLayer();
+            if (theModel.layeredSystem == null && currentTD != null) {
+               theModel.layeredSystem = currentTD.getLayeredSystem();
+               theModel.layer = currentTD.getLayer();
             }
             // Temporarily turn off error display for this type
             boolean oldTE = theModel.disableTypeErrors;

@@ -20,7 +20,7 @@ public abstract class CommandWizard {
    /** Optional method - called with a non-null result from parseCommand */
    public void processStatement(Object commandResult) {}
 
-   public int complete(String command, int cursor, List candidates) {
+   public int complete(String command, int cursor, List candidates, Object currentType) {
       return -1;
    }
 

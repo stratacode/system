@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.lang.java.JavaModel;
 import sc.layer.LayeredSystem;
 import jline.console.completer.Completer;
 import jline.console.ConsoleReader;
@@ -195,13 +196,17 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       smartTerminal = input.getTerminal().isSupported(); // Or isAnsiSupported?  Or isEchoEnabled()?  These also are different between the dumb IntelliJ terminal and the real command line
    }
 
-   public int complete(String command, int cursor, List candidates) {
+   public int complete(String command, int cursor, List candidates, String ctxText, JavaModel fileModel, Object currentType) {
       if (currentWizard != null)
-         return currentWizard.complete(command, cursor, candidates);
+         return currentWizard.complete(command, cursor, candidates, currentType);
 
-      return super.complete(command, cursor, candidates);
+      return super.complete(command, cursor, candidates, ctxText, fileModel, currentType);
    }
 
+   // For jline - to do command line completion
+   public int complete(String command, int cursor, List candidates) {
+      return complete(command, cursor, candidates, null, null, null);
+   }
 
    /**
     * TODO: This is here as part of the thread implementation... should not be exposed to command methods.

@@ -72,7 +72,7 @@ public class AddLayerWizard extends CommandWizard {
       commandInterpreter.setCurrentLayer(sys.lastLayer);
    }
 
-   public int complete(String command, int cursor, List candidates) {
+   public int complete(String command, int cursor, List candidates, Object currentType) {
       switch (currentStep) {
          case LayerNames:
             return commandInterpreter.completeExistingLayer(command, cursor, candidates);

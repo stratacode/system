@@ -195,7 +195,7 @@ public class CreateLayerWizard extends CommandWizard {
       return Boolean.TRUE;
    }
 
-   public int complete(String command, int cursor, List candidates) {
+   public int complete(String command, int cursor, List candidates, Object currentType) {
       switch (currentStep) {
          case Extends:
             return commandInterpreter.completeExistingLayer(command, cursor, candidates);
