@@ -94,6 +94,16 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          }
       }
 
+      /*
+      if (propertyMethodType == PropertyMethodType.Set || propertyMethodType == PropertyMethodType.SetIndexed) {
+         // Can't do this logic in 'init' right now because it causes a loop.  No one should be looking at these until start.
+         if (!hasGetMethod() && !hasField()) {
+            propertyName = null;
+            propertyMethodType = null;
+         }
+      }
+      */
+
       if (body != null) {
          Object retType = getTypeDeclaration();
          if (retType != null && !ModelUtil.typeIsVoid(retType)) {
