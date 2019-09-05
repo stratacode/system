@@ -184,6 +184,8 @@ public class ClassDeclaration extends TypeDeclaration {
             System.err.println("*** recursive extends loop for type: " + typeName);
             return;
          }
+         if (!extTd.isInitialized())
+            extTd.init();
          if (!extTd.isStarted())
             extTd.start();
          if (!extTd.isValidated())
@@ -1644,8 +1646,20 @@ public class ClassDeclaration extends TypeDeclaration {
 
    public Object getExtendsTypeDeclaration() {
       Object res = super.getExtendsTypeDeclaration();
-      if (res != null)
+      if (res != null) {
+         if (res instanceof BodyTypeDeclaration) {
+            BodyTypeDeclaration bres = (BodyTypeDeclaration) res;
+            if (bres.replacedInactive) {
+               BodyTypeDeclaration newRes = bres.refreshNode();
+               if (newRes.replacedInactive) {
+                  System.err.println("*** Unable to refresh replaced node!");
+               }
+               else
+                  res = newRes;
+            }
+         }
          extendsBoundType = res;
+      }
       return res;
    }
 
