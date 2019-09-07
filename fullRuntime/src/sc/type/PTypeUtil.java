@@ -1165,4 +1165,9 @@ public class PTypeUtil {
          ((Lock) locks.get(i)).unlock();
       }
    }
+
+   /** Hook for diagnostics for JS to compare against 'undefined' */
+   public static boolean isUndefined(Object o) {
+      return false;
+   }
 }
