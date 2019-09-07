@@ -328,7 +328,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return null;
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
       return null;
    }
 

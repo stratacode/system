@@ -3018,7 +3018,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    private void addChildTypes(Set<String> typeNames, String typeName, Object type, boolean restrictToLayer) {
-      Object[] innerTypes = ModelUtil.getAllInnerTypes(type, null, true);
+      Object[] innerTypes = ModelUtil.getAllInnerTypes(type, null, true, false);
       if (innerTypes == null)
          return;
 
@@ -4032,18 +4032,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public boolean transparentToLayer(Layer other) {
+   public boolean transparentToLayer(Layer other, int mergeLayersCt) {
       if (other == this)
          return true;
 
-      if (!transparent)
+      if (!transparent && mergeLayersCt == 0)
          return false;
+
+      int nextMergeLayersCt = mergeLayersCt - 1;
+      if (transparent)
+         nextMergeLayersCt++;
 
       if (baseLayers == null)
          return false;
       for (int i = 0; i < baseLayers.size(); i++) {
          Layer base = baseLayers.get(i);
-         if (base.transparentToLayer(other))
+         if (base.transparentToLayer(other, nextMergeLayersCt))
             return true;
       }
       return false;
@@ -4064,6 +4068,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return res;
    }
 
+   // When this layer is selected return the set of layers that should be marked as 'current' and included in the editors view
+   public List<Layer> getSelectedLayers() {
+      ArrayList<Layer> res = new ArrayList<Layer>();
+      res.add(this);
+      if (transparent && baseLayers != null) {
+         res.addAll(baseLayers);
+      }
+      return res;
+   }
 
    /** To be visible in the editor, we cannot be extended only from hidden layers.  We need at least one visible, non-hidden layer to extend this layer */
    public boolean getVisibleInEditor() {

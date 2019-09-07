@@ -5205,6 +5205,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res;
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public boolean isEventSource() {
       return false;
    }
@@ -5260,6 +5261,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return stag;
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public Map<String,IBeanMapper> getCustomServerTagProps() {
       return null;
    }

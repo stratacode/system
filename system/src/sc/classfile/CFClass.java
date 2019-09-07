@@ -728,7 +728,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return res;
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
       int num = classFile.getNumInnerClasses();
       ArrayList<Object> innerTypes = new ArrayList<Object>(num);
       for (int i = 0; i < num; i++) {

@@ -286,6 +286,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    transient public List<Object> compilerSettingsList = null;
 
+   transient Boolean inheritProperties = null;
+   transient Boolean exportProperties = null;
+
    public List<Object> getCompilerSettingsList() {
       if (compilerSettingsList == null) {
          compilerSettingsList = getAllInheritedAnnotations("sc.obj.CompilerSettings");
@@ -293,6 +296,25 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             compilerSettingsList = EMPTY_COMPILER_SETTINGS;
       }
       return compilerSettingsList;
+   }
+
+   public boolean getInheritProperties() {
+      if (inheritProperties == null) {
+         inheritProperties = (Boolean) ModelUtil.getAnnotationValue(this, "sc.obj.CompilerSettings", "inheritProperties");
+         if (inheritProperties == null)
+            inheritProperties = true;
+      }
+      return inheritProperties;
+   }
+
+   public boolean getExportProperties() {
+      if (exportProperties == null) {
+         // This one is not inherited
+         exportProperties = (Boolean) ModelUtil.getAnnotationValue(this, "sc.obj.CompilerSettings", "exportProperties");
+         if (exportProperties == null)
+            exportProperties = true;
+      }
+      return exportProperties;
    }
 
    public Object[] getPropagateConstructorArgs() {
@@ -706,7 +728,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       bodyChanged();
       // If we have been reparsed, make sure to flush out the member cache for all inner types
       if (hasBeenStopped) {
-         List<Object> innerTypes = getAllInnerTypes(null, true);
+         List<Object> innerTypes = getAllInnerTypes(null, true, false);
          if (innerTypes != null) {
             for (Object innerType : innerTypes) {
                if (innerType instanceof BodyTypeDeclaration)
@@ -2045,7 +2067,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /**
     * Returns the list of properties with the given modifiers or null if there aren't any.
     */
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
       if (body == null)
          return null;
 
@@ -2057,7 +2079,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    // For synchronizing to the client
    @Constant
    public List<Object> getDeclaredProperties() {
-      return getDeclaredProperties("public", true, false);
+      return getDeclaredProperties("public", true, false, true);
    }
 
    // Here so this property appears writable so we can sync it on the client.
@@ -2073,7 +2095,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * Returns the list of properties with the given modifiers or null if there aren't any.
     */
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
-      return getDeclaredProperties(modifier, includeAssigns, false);
+      return getDeclaredProperties(modifier, includeAssigns, false, false);
    }
 
    public static void addAllProperties(SemanticNodeList<Statement> body, List<Object> props, String modifier, boolean includeAssigns) {
@@ -2252,39 +2274,43 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return replacedByType.resolve(modified);
    }
 
-   public BodyTypeDeclaration getDeclarationForLayer(Layer layer, boolean includeInherited, boolean merge) {
-      if (layer == null)
+   public BodyTypeDeclaration getDeclarationForLayer(List<Layer> layers, int inheritTypeCt, int mergeLayerCt) {
+      if (layers == null || layers.size() == 0)
          return this;
 
       BodyTypeDeclaration root = getModifiedByRoot();
       Layer rootLayer = root.getLayer();
-      if (rootLayer == layer || (merge && layer.extendsLayer(rootLayer)) || layer.transparentToLayer(rootLayer))
+
+      if (layers.contains(rootLayer))
          return root;
+      //if (layer.transparentToLayer(rootLayer, mergeLayerCt))
+      //   return root;
 
-      if (includeInherited) {
-         Object extObj = getExtendsTypeDeclaration();
-         if (extObj instanceof BodyTypeDeclaration) {
-            BodyTypeDeclaration extDecl = (BodyTypeDeclaration) extObj;
-            if (extDecl.getDeclarationForLayer(layer, true, merge) != null)
-               return root;
-         }
+      for (BodyTypeDeclaration next = root.getModifiedType(); next != null; next = next.getModifiedType()) {
+         if (layers.contains(next.getLayer()))
+            return next;
+      }
 
-         Object[] implTypes = getImplementsTypeDeclarations();
-         if (implTypes != null) {
-            for (Object implObj : implTypes) {
-               if (implObj instanceof BodyTypeDeclaration) {
-                  BodyTypeDeclaration implDecl = (BodyTypeDeclaration) implObj;
-                  if (implDecl.getDeclarationForLayer(layer, true, merge) != null)
-                     return root;
-               }
+      //if (inheritTypeCt > 0) {
+      Object extObj = getExtendsTypeDeclaration();
+      if (extObj instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration extDecl = (BodyTypeDeclaration) extObj;
+         if (extDecl.getDeclarationForLayer(layers, inheritTypeCt, mergeLayerCt) != null)
+            return root;
+      }
+
+      Object[] implTypes = getImplementsTypeDeclarations();
+      if (implTypes != null) {
+         for (Object implObj : implTypes) {
+            if (implObj instanceof BodyTypeDeclaration) {
+               BodyTypeDeclaration implDecl = (BodyTypeDeclaration) implObj;
+               if (implDecl.getDeclarationForLayer(layers, inheritTypeCt, mergeLayerCt) != null)
+                  return root;
             }
          }
       }
+      //}
 
-      for (BodyTypeDeclaration next = root.getModifiedType(); next != null; next = next.getModifiedType()) {
-         if (next.getLayer() == layer || (merge && layer.extendsLayer(layer)))
-            return next;
-      }
       return null;
    }
 
@@ -2341,7 +2367,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * Returns any inner types defined by this type.  If the
     * modifier is supplied, only methods with that modifier are returned.
     */
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
       // NOTE: we may not be started here and should not called ensureStarted at least when calling this from the updateType process.
       // on the new type. We only start that one after we stop the old one so that we don't double-add to the sub-types table, and then remove
       // the valid entry when we stop the old type
@@ -4762,7 +4788,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * Returns all standalone inner type stubs.  It will not return the stubs for inner types which are real inner types in the main class
     */
    List<SrcEntry> getInnerDynStubs(String buildDir, Layer buildLayer, boolean generate) {
-      List<Object> myIts = getAllInnerTypes(null, true);
+      List<Object> myIts = getAllInnerTypes(null, true, false);
       if (myIts == null)
          return null;
 
@@ -6028,7 +6054,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Object varDef = tctx.oldFields.get(i);
             addFieldToIndex(tctx.oldFieldIndex, varDef);
          }
-         tctx.newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
+         tctx.newTypes = newType.getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace, false);
          tctx.newTypesSize = tctx.newTypes == null ? 0 : tctx.newTypes.size();
          tctx.newTypeIndex = new CoalescedHashMap<String, Object>(tctx.newTypesSize);
          for (int i = 0; i < tctx.newTypesSize; i++) {
@@ -6036,7 +6062,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             tctx.newTypeIndex.put(CTypeUtil.getClassName(ModelUtil.getTypeName(newInnerType)), newInnerType);
          }
 
-         tctx.oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace);
+         tctx.oldTypes = getAllInnerTypes(null, updateMode == TypeUpdateMode.Replace, false);
          tctx.oldTypesSize = tctx.oldTypes == null ? 0 : tctx.oldTypes.size();
          tctx.oldTypeIndex = new CoalescedHashMap<String, Object>(tctx.oldTypesSize);
          for (int i = 0; i < tctx.oldTypesSize; i++) {
@@ -8365,7 +8391,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void markExcluded(boolean topLevel) {
       excluded = true;
-      List<Object> innerTypes = getAllInnerTypes(null, true);
+      List<Object> innerTypes = getAllInnerTypes(null, true, false);
       if (innerTypes != null) {
          for (Object innerType:innerTypes) {
             if (innerType instanceof BodyTypeDeclaration) {
@@ -9960,8 +9986,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       res = newModel.layeredSystem.getSrcTypeDeclaration(getFullTypeName(), newModelLayer == null ? null : newModelLayer.getNextLayer(), true, false, false, newModelLayer, newModel.isLayerModel);
       if (res instanceof TypeDeclaration) {
          TypeDeclaration newType = (TypeDeclaration) res;
+         Layer newTypeLayer = newType.getLayer();
+         Layer thisLayer = getLayer();
          // We might switch from an inactive layer to an active layer, or maybe the layers themselves were reloaded?
-         if (newType.getLayer().getLayerName().equals(getLayer().getLayerName()))
+         if (newTypeLayer != null && (thisLayer == null || newTypeLayer.getLayerName().equals(thisLayer.getLayerName())))
             return (TypeDeclaration) res;
          return this;
       }

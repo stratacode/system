@@ -37,8 +37,8 @@ public class EnumConstant extends BodyTypeDeclaration {
    }
 
    /** For this type only we add the enum constants as properties */
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
-      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified);
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
 
       if (res == null)
          return null;
@@ -55,8 +55,8 @@ public class EnumConstant extends BodyTypeDeclaration {
    }
 
    /** Just like above - we cannot show the enum constants as children of themselves even if they inherit them through the type hierarchy */
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      List<Object> res = super.getAllInnerTypes(modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      List<Object> res = super.getAllInnerTypes(modifier, thisClassOnly, includeInherited);
 
       // Need to remove the enum constants from the list before we return them.  We can't inherit those or it turns all recursive
       if (res != null) {

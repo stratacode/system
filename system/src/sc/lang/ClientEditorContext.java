@@ -33,6 +33,8 @@ public abstract class ClientEditorContext {
 
    public Layer currentLayer;
 
+   public List<Layer> currentLayers = Collections.emptyList();
+
    public String layerPrefix;
 
    HashMap<SrcEntry,MemoryEditSession> memSessions = new HashMap<SrcEntry, MemoryEditSession>();
@@ -188,4 +190,42 @@ public abstract class ClientEditorContext {
          Bind.sendChangedEvent(this, "createInstTypeNames");
       }
    }
+
+   public void updateCurrentLayer(Layer l) {
+      currentLayer = l;
+      currentLayers = l == null ? Collections.emptyList() : l.getSelectedLayers();
+   }
+
+   public void addCurrentLayer(Layer l) {
+      if (currentLayers == null)
+         updateCurrentLayer(l);
+      else {
+         for (int i = 0; i < currentLayers.size(); i++) {
+            Layer current = currentLayers.get(i);
+            if (current == l)
+               return;
+            if (current.getLayerPosition() > l.getLayerPosition()) {
+               currentLayers.add(i, l);
+               return;
+            }
+         }
+         currentLayers.add(l);
+         Bind.sendChangedEvent(this, "currentLayers");
+      }
+   }
+
+   @Bindable(manual=true)
+   public void setCurrentLayer(Layer newLayer) {
+      // TODO: should we try to preserve imports here and only switch the layer of the pending model if there's no type?
+      if (currentLayer != newLayer) {
+         updateCurrentLayer(newLayer);
+         if (currentLayer != null)
+            layerPrefix = currentLayer.packagePrefix;
+         else
+            layerPrefix = null;
+         Bind.sendChangedEvent(this, "currentLayer");
+         Bind.sendChangedEvent(this, "currentLayers");
+      }
+   }
+
 }

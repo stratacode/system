@@ -3147,7 +3147,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (new File(jsEnt.absFileName).canRead()) {
          sb.append(FileUtil.getFileAsString(jsEnt.absFileName));
       }
-      List<Object> innerTypes = type.getAllInnerTypes(null, true);
+      List<Object> innerTypes = type.getAllInnerTypes(null, true, false);
       if (innerTypes != null) {
          for (Object innerType:innerTypes) {
             if (innerType instanceof BodyTypeDeclaration && !(innerType instanceof EnumConstant))

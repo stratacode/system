@@ -947,6 +947,28 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return result;
    }
 
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
+      if (includeInherited) {
+         if (getInheritProperties()) {
+            Object extType = getExtendsTypeDeclaration();
+            if (extType != null) {
+               if (ModelUtil.getExportProperties(getLayeredSystem(), extType)) {
+                  Object[] extRes = ModelUtil.getDeclaredProperties(extType, modifier, includeAssigns, includeModified, includeInherited);
+                  List<Object> extProps;
+                  if (extRes != null)
+                     extProps = Arrays.asList(extRes);
+                  else
+                     extProps = null;
+
+                  res = ModelUtil.mergeProperties(extProps, res, true, includeAssigns);
+               }
+            }
+         }
+      }
+      return res;
+   }
+
    public boolean isCompiledProperty(String propName, boolean fieldMode, boolean interfaceMode) {
 
       // We only want this to return true when there's a compiled implementation of the property.  It gets used to decide if we need to make a dynamic property for this given type.  if we have a compiled
@@ -1223,21 +1245,25 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      List<Object> result = super.getAllInnerTypes(modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      List<Object> result = super.getAllInnerTypes(modifier, thisClassOnly, includeInherited);
 
-      if (!thisClassOnly) {
+      if (!thisClassOnly || (includeInherited && getInheritProperties())) {
          // Only init the type info if we are looking for the implements types.  In updateType we do not want to init the type just to do the update since
          // the update happens during the 'reinitialize' process, which is too soon to accurately resolve types.  We need to reinit the other types first.
          initTypeInfo();
 
+         LayeredSystem sys = getLayeredSystem();
+
          if (implementsBoundTypes != null) {
             for (Object impl : implementsBoundTypes) {
-               Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly);
-               if (implResult != null && implResult.length > 0) {
-                  if (result == null)
-                     result = new ArrayList<Object>();
-                  result.addAll(Arrays.asList(implResult));
+               if (!thisClassOnly || ModelUtil.getExportProperties(sys, impl)) {
+                  Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly, includeInherited);
+                  if (implResult != null && implResult.length > 0) {
+                     if (result == null)
+                        result = new ArrayList<Object>();
+                     result.addAll(Arrays.asList(implResult));
+                  }
                }
             }
          }

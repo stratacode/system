@@ -44,6 +44,7 @@ public class Form extends HTMLElement {
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _submitCountProp, _submitCount);
    }
 
+   @sc.obj.EditorSettings(visible=false)
    @Bindable(manual=true) public Event getSubmitEvent() {
       return getDOMEvent(EventType.Submit);
    }
@@ -56,10 +57,12 @@ public class Form extends HTMLElement {
    public void submit() {
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public Map<String,IBeanMapper> getCustomServerTagProps() {
       return formServerTagProps;
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public boolean isEventSource() {
       return true;
    }

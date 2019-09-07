@@ -818,7 +818,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          res.add(typeObj);
       else {
          if (!openTypes) {
-            SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null);
+            SrcEntry srcEnt = getSrcFileFromTypeName(typeName, true, null, true, null, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
             if (srcEnt != null)
                res.add(srcEnt);
          }
@@ -859,7 +859,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      else {
                         newTypeObj = layerSys.getCachedTypeDeclaration(typeName, null, null, false, false, openAllLayers ? Layer.ANY_INACTIVE_LAYER : Layer.ANY_OPEN_INACTIVE_LAYER, false);
                         if (newTypeObj == null) {
-                           SrcEntry srcEnt = layerSys.getSrcFileFromTypeName(typeName, true, null, true, null);
+                           SrcEntry srcEnt = layer.getSrcEntryForType(typeName);
+                           //SrcEntry srcEnt = layerSys.getSrcFileFromTypeName(typeName, true, null, true, null);
                            if (srcEnt != null)
                               newTypeObj = srcEnt;
                            else {
@@ -4143,7 +4144,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncProperties typeProps = new SyncProperties(null, null,
                    new Object[] { "typeName" , "fullTypeName", "layer", "packageName" , "dynamicType" , "isLayerType" ,
                                   "declaredProperties", "declarationType", "comment" , "existsInJSRuntime", "annotations", "modifierFlags", "extendsTypeName",
-                                  "constructorParamNames", "editorCreateMethod", "modifiedType"},
+                                  "constructorParamNames", "editorCreateMethod", "modifiedType", "enclosingTypeName"},
                                             null, SyncPropOptions.SYNC_INIT, globalScopeId);
 
          SyncManager.addSyncType(ModifyDeclaration.class, typeProps);
@@ -4167,22 +4168,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          SyncManager.addSyncType(ClientTypeDeclaration.class, typeProps);
          SyncManager.addSyncHandler(ClientTypeDeclaration.class, LayerSyncHandler.class); // Register this handler to replace ClientTypeDeclaration with the normal TypeDeclaration on the restore
 
-         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags"},
+         SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags", "enclosingTypeName"},
                                  null, SyncPropOptions.SYNC_INIT| SyncPropOptions.SYNC_CONSTANT, globalScopeId));
          SyncManager.addSyncType(PropertyAssignment.class,
               new SyncProperties(null, null,
-                                 new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags" },
+                                 new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags", "enclosingTypeName"},
                                  null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncManager.addSyncType(MethodDefinition.class,
                  new SyncProperties(null, null,
-                         new Object[] { "name" , "parameterList", "comment", "methodTypeName", "returnTypeName", "annotations", "modifierFlags", "propertyName" },
+                         new Object[] { "name" , "parameterList", "comment", "methodTypeName", "returnTypeName", "annotations", "modifierFlags", "propertyName", "enclosingTypeName"},
                          null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
          SyncManager.addSyncHandler(MethodDefinition.class, LayerSyncHandler.class);
 
          SyncManager.addSyncType(ConstructorDefinition.class,
                  new SyncProperties(null, null,
-                         new Object[] { "name" , "parameterList", "comment", "methodTypeName", "annotations", "modifierFlags" },
+                         new Object[] { "name" , "parameterList", "comment", "methodTypeName", "annotations", "modifierFlags", "enclosingTypeName"},
                          null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
          SyncManager.addSyncType(Parameter.class,
@@ -10474,6 +10475,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public void markBeingLoadedModel(SrcEntry srcEnt, ILanguageModel model) {
+      if (model instanceof JavaModel && ((JavaModel) model).temporary)
+         System.err.println("*** Marking temporary model as being loaded");
       beingLoaded.put(srcEnt.absFileName, model);
    }
 
@@ -11400,6 +11403,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.err.println("*** Invalid attempt to add active model into inactive index");
          if (model.getLayeredSystem() != this)
             System.err.println("*** Invalid attempt to add model from another system to index");
+         if (model instanceof JavaModel && ((JavaModel) model).temporary)
+            System.err.println("*** Adding temporary model to the cache");
          ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
          if (oldModel != null && model instanceof JavaModel && oldModel != model) {
             if (layer != null)

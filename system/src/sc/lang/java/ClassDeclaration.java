@@ -1526,20 +1526,29 @@ public class ClassDeclaration extends TypeDeclaration {
       return ModelUtil.mergeProperties(modProps, declProps, true);
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      List declProps = super.getAllInnerTypes(modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      List declProps = super.getAllInnerTypes(modifier, thisClassOnly, includeInherited);
       List modProps;
-      Object extendsObj = thisClassOnly ? null : getDerivedTypeDeclaration();
+      Object extendsObj = thisClassOnly ? includeInherited ? getInheritPropertiesDerivedTypeDeclaration() : null : getDerivedTypeDeclaration();
       if (extendsObj == null)
          return declProps;
       else {
-         Object[] props = ModelUtil.getAllInnerTypes(extendsObj, modifier, thisClassOnly);
+         Object[] props = ModelUtil.getAllInnerTypes(extendsObj, modifier, thisClassOnly, includeInherited);
          if (props != null)
             modProps = Arrays.asList(props);
          else
             modProps = null;
       }
       return ModelUtil.mergeInnerTypes(modProps, declProps);
+   }
+
+   public Object getInheritPropertiesDerivedTypeDeclaration() {
+      Object extendsObj = !getInheritProperties() ? null : getDerivedTypeDeclaration();
+      if (extendsObj instanceof BodyTypeDeclaration) {
+         if (((BodyTypeDeclaration) extendsObj).getExportProperties())
+            return extendsObj;
+      }
+      return null;
    }
 
    public void refreshBoundTypes(int flags) {

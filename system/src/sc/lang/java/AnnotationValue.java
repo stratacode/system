@@ -70,7 +70,8 @@ public class AnnotationValue extends ErrorSemanticNode {
       else if (elementValue instanceof Annotation) {
          return null; // TODO: not sure what to do here?
       }
-      else if (elementValue instanceof String || elementValue instanceof Boolean || elementValue instanceof Number || elementValue instanceof Character)
+      else if (elementValue instanceof String || elementValue instanceof Boolean || elementValue instanceof Number || elementValue instanceof Character ||
+               elementValue.getClass().isArray() || elementValue.getClass().isEnum())
          return elementValue;
       else if (elementValue instanceof IValueNode) {
          return ((IValueNode) elementValue).getPrimitiveValue();

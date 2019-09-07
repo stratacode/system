@@ -201,8 +201,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return Arrays.asList(baseFields);
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      Object[] res = ModelUtil.getAllInnerTypes(baseType, modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      Object[] res = ModelUtil.getAllInnerTypes(baseType, modifier, thisClassOnly, includeInherited);
       if (res == null)
          return Collections.emptyList();
       return Arrays.asList(res);

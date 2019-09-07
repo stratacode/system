@@ -38,11 +38,13 @@ public class HtmlPage extends Html {
       super(concreteType);
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public IPageDispatcher pageDispatcher;
 
    private QueryParamProperty[] queryParamProperties;
 
    /** List of associations between URL query parameters and properties of the page object */
+   @sc.obj.EditorSettings(visible=false)
    public QueryParamProperty[] getQueryParamProperties() {
       return queryParamProperties;
    }

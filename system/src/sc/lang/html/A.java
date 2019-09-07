@@ -51,6 +51,7 @@ public class A extends HTMLElement {
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _clickCountProp, _clickCount);
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public Map<String,IBeanMapper> getCustomServerTagProps() {
       return aServerTagProps;
    }

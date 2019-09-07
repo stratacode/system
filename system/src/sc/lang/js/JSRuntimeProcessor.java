@@ -691,7 +691,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (resFiles != null)
             resFiles.add(resEnt);
 
-         List<Object> innerTypes = td.getAllInnerTypes(null, true);
+         List<Object> innerTypes = td.getAllInnerTypes(null, true, false);
          if (innerTypes != null) {
             for (Object innerTypeObj:innerTypes) {
                if (innerTypeObj instanceof BodyTypeDeclaration) {
@@ -3105,7 +3105,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          td = ensureTransformedResult(origtd);
          return;
       }
-      List<Object> innerTypes = td.getAllInnerTypes(null, true);
+      List<Object> innerTypes = td.getAllInnerTypes(null, true, false);
       if (innerTypes != null) {
          for (Object innerTypeObj:innerTypes) {
             if (innerTypeObj instanceof BodyTypeDeclaration) {

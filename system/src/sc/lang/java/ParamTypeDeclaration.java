@@ -400,8 +400,8 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return parameterizePropList(baseFields);
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      Object[] res = ModelUtil.getAllInnerTypes(baseType, modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      Object[] res = ModelUtil.getAllInnerTypes(baseType, modifier, thisClassOnly, includeInherited);
       if (res == null)
          return Collections.emptyList();
       return Arrays.asList(res);

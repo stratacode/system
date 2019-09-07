@@ -51,6 +51,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    // Used for serializing VariableDefinition metadata
    public transient Map<String,Object> annotations = null;
    public transient int modifierFlags = 0;
+   public transient String enclosingTypeName = null;
 
    private static boolean wasBound = false;
 
@@ -910,6 +911,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          return true;
       }
       return false;
+   }
+
+   public String getEnclosingTypeName() {
+      return enclosingTypeName;
    }
 
 }

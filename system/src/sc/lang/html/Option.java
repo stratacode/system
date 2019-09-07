@@ -51,10 +51,12 @@ public class Option<T> extends HTMLElement {
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _optionDataProp, values);
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public Map<String,IBeanMapper> getCustomServerTagProps() {
       return optionServerTagProps;
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public boolean isEventSource() {
       return true;
    }

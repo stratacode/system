@@ -99,4 +99,10 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
 
    /** Set this to a comma separated list of properties that should be defined as part of the constructor of this type. Use for properties that are initializable before the instance is created (i.e. the initializer does not refer to this) */
    String constructorProperties() default "";
+
+   /** Set to false on a type, or a base-type so that properties in the base-type are inherited by sub-classes in the editor's view of the type */
+   boolean inheritProperties() default true;
+
+   /** Set to false on a type to indicate it does not export it's properties to sub-types in the editor's view of the type */
+   boolean exportProperties() default true;
 }

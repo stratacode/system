@@ -188,11 +188,13 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {
-      if (propertyName == null)
+      // Don't return unless we are bound to a property or else a property assignment defines a valid property in the IDE only. This breaks the swingUCAdjustScript test when we return null for activated layers.
+      if (propertyName == null || (assignedProperty == null && getLayer() == null || !getLayer().activated))
          return null;
-      if (mtype.contains(MemberType.Assignment))
+      if (mtype.contains(MemberType.Assignment)) {
          if (propertyName.equals(name) && (!mtype.contains(MemberType.Initializer) || initializer != null))
             return this;
+      }
       if (mtype.contains(MemberType.ForwardAssignment) && propertyName.equals(name) && (bindingDirection == null || bindingDirection != BindingDirection.REVERSE) && initializer != null)
          return this;
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);

@@ -830,7 +830,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+      public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
          return null;
       }
 
@@ -1163,7 +1163,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+      public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
          return null;
       }
 

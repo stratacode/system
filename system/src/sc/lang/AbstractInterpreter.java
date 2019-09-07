@@ -1470,7 +1470,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public void updateLayerState() {
       super.updateLayerState();
-      updateCurrentLayer();
+      currentLayerUpdated();
       for (Layer layer:system.specifiedLayers) {
          String pref = layer.packagePrefix;
          if (layer.exportPackage && pref != null) {
@@ -1480,7 +1480,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
    }
 
-   public void updateCurrentLayer() {
+   public void currentLayerUpdated() {
       if (pendingModel != null && pendingModel.layer != currentLayer) {
          clearPendingModel();
          initPendingModel();
@@ -1698,7 +1698,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             System.out.println("No global types with prefix: " + getPrefix());
       }
       else {
-         Object[] types = ModelUtil.getAllInnerTypes(currentTypes.get(currentTypes.size()-1), null, false);
+         Object[] types = ModelUtil.getAllInnerTypes(currentTypes.get(currentTypes.size()-1), null, false, false);
          if (types != null)
             System.out.print(ModelUtil.arrayToString(types));
       }
@@ -1723,7 +1723,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             System.out.println("No global types with prefix: " + getPrefix());
       }
       else {
-         Object[] types = ModelUtil.getAllInnerTypes(currentTypes.get(currentTypes.size()-1), null, false);
+         Object[] types = ModelUtil.getAllInnerTypes(currentTypes.get(currentTypes.size()-1), null, false, false);
          if (types != null) {
             ArrayList<Object> objs = new ArrayList<Object>();
             for (Object type:types) {
@@ -2043,7 +2043,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                this.inputFileName = srcEnt.absFileName;
                this.inputRelName = srcEnt.relFileName;
                includeLayer = srcEnt.layer;
-               currentLayer = srcEnt.layer;
+               updateCurrentLayer(srcEnt.layer);
                resetInput();
                this.returnOnInputChange = true;
                if (!readParseLoop())
@@ -2057,7 +2057,6 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             throw new IllegalArgumentException("includeSuper - no super script for: " + inputFileName + " relative name: " + inputRelName + " from layer: " + curLayer);
       }
    }
-
 
    private List<LayeredSystem> getSyncSystems() {
       return system.getSyncSystems();

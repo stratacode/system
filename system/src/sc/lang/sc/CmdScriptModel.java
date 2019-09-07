@@ -149,8 +149,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return getCmdObject().getAllFields(modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      return getCmdObject().getAllInnerTypes(modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      return getCmdObject().getAllInnerTypes(modifier, thisClassOnly, includeInherited);
    }
 
    public DeclarationType getDeclarationType() {

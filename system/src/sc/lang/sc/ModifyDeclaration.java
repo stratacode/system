@@ -1959,8 +1959,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return modProps;
    }
 
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified) {
-      List<Object> declProps = super.getDeclaredProperties(modifier, includeAssigns, includeModified);
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+      List<Object> declProps = super.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
       if (isEnumeratedType()) {
          if (body != null) {
             for (int i = 0; i < body.size(); i++) {
@@ -1996,7 +1996,6 @@ public class ModifyDeclaration extends TypeDeclaration {
                i--;
             }
          }
-
       }
       return declProps;
    }
@@ -2113,10 +2112,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       return false;
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
-      List<Object> declProps = super.getAllInnerTypes(modifier, thisClassOnly);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
+      List<Object> declProps = super.getAllInnerTypes(modifier, thisClassOnly, includeInherited);
       List<Object> modProps;
-      if (!modifyInherited || !thisClassOnly) {
+      if (!modifyInherited || (!thisClassOnly || (includeInherited && getInheritProperties()))) {
 
          // Need to start this type here because we are about to get the modify object
          ModelUtil.ensureStarted(this, false);
@@ -2125,7 +2124,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyObj == null)
             modProps = declProps;
          else {
-            Object[] props = ModelUtil.getAllInnerTypes(modifyObj, modifier, thisClassOnly);
+            Object[] props = ModelUtil.getAllInnerTypes(modifyObj, modifier, thisClassOnly, includeInherited);
             if (props != null)
                modProps = Arrays.asList(props);
             else
@@ -2135,12 +2134,14 @@ public class ModifyDeclaration extends TypeDeclaration {
       }
       else
          modProps = declProps;
-      if (extendsBoundTypes != null && !thisClassOnly) {
+      if (extendsBoundTypes != null && (!thisClassOnly || (includeInherited && getInheritProperties()))) {
          for (Object extType:extendsBoundTypes) {
-            Object[] props = ModelUtil.getAllInnerTypes(extType, modifier, thisClassOnly);
-            if (props != null) {
-               List extProps = Arrays.asList(props);
-               modProps = ModelUtil.mergeInnerTypes(extProps, modProps);
+            if (!thisClassOnly || ModelUtil.getExportProperties(getLayeredSystem(), extType)) {
+               Object[] props = ModelUtil.getAllInnerTypes(extType, modifier, thisClassOnly, includeInherited);
+               if (props != null) {
+                  List extProps = Arrays.asList(props);
+                  modProps = ModelUtil.mergeInnerTypes(extProps, modProps);
+               }
             }
          }
       }

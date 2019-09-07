@@ -1569,8 +1569,11 @@ public class ModelUtil {
       else if (type instanceof WrappedTypeDeclaration) {
          return isBoolean(((WrappedTypeDeclaration) type).getBaseType());
       }
-      if (type instanceof ModifyDeclaration && isBoolean(((ModifyDeclaration) type).getDerivedTypeDeclaration()))
-         return true;
+      if (type instanceof ModifyDeclaration) {
+         ModifyDeclaration modType = ((ModifyDeclaration) type);
+         if (modType.typeName != null && modType.typeName.equals("Boolean"))
+            return isBoolean(modType.getDerivedTypeDeclaration());
+      }
       return false;
    }
 
@@ -1588,8 +1591,11 @@ public class ModelUtil {
       else if (type instanceof WrappedTypeDeclaration) {
          return isCharacter(((WrappedTypeDeclaration) type).getBaseType());
       }
-      if (type instanceof ModifyDeclaration && isCharacter(((ModifyDeclaration) type).getDerivedTypeDeclaration()))
-         return true;
+      if (type instanceof ModifyDeclaration) {
+         ModifyDeclaration modType = ((ModifyDeclaration) type);
+         if (modType.typeName != null && modType.typeName.equals("Character"))
+            return isCharacter(modType.getDerivedTypeDeclaration());
+      }
 
       return false;
    }
@@ -3464,6 +3470,9 @@ public class ModelUtil {
          return prop;
       else if (prop instanceof EnumConstant)
          return ((EnumConstant) prop).getEnclosingType();
+      else if (prop instanceof VariableDefinition) {
+         return ((VariableDefinition) prop).getTypeDeclaration();
+      }
       throw new UnsupportedOperationException();
    }
 
@@ -3856,6 +3865,11 @@ public class ModelUtil {
       else if (srcMember instanceof ITypeDeclaration)
          return null; // CmdScriptModel or Template?
       throw new UnsupportedOperationException();
+   }
+
+   // This version is here to mirror the client api which needs the layered system to map the type name to the type
+   public static Object getEnclosingType(Object prop, LayeredSystem sys) {
+      return getEnclosingType(prop);
    }
 
    public static Object getOuterObject(Object toConstructType, ExecutionContext ctx) {
@@ -4316,11 +4330,11 @@ public class ModelUtil {
       return type;
    }
 
-   public static Object[] getAllInnerTypes(Object type, String modifier, boolean thisClassOnly) {
+   public static Object[] getAllInnerTypes(Object type, String modifier, boolean thisClassOnly, boolean includeInherited) {
       if (type instanceof Class)
          return RTypeUtil.getAllInnerClasses((Class) type, modifier); // TODO: implement thisClassOnly - currently not needed for compiled types
       else if (type instanceof ITypeDeclaration) {
-         List<Object> types = ((ITypeDeclaration) type).getAllInnerTypes(modifier, thisClassOnly);
+         List<Object> types = ((ITypeDeclaration) type).getAllInnerTypes(modifier, thisClassOnly, includeInherited);
          return types == null ? null : types.toArray(new Object[types.size()]);
       }
       else
@@ -6211,13 +6225,13 @@ public class ModelUtil {
    }
 
    public static Object[] getDeclaredMergedPropertiesAndTypes(Object type, String modifier, boolean includeModified) {
-      Object[] types = getAllInnerTypes(type, modifier, true);
+      Object[] types = getAllInnerTypes(type, modifier, true, true);
       Object[] props = getDeclaredMergedProperties(type, modifier, includeModified);
       return mergeTypesAndProperties(type, types, props);
    }
 
    public static Object[] getMergedPropertiesAndTypes(Object type, String modifier, LayeredSystem sys) {
-      Object[] types = getAllInnerTypes(type, modifier, false);
+      Object[] types = getAllInnerTypes(type, modifier, false, false);
       Object[] props = getMergedProperties(type, modifier);
       return mergeTypesAndProperties(type, types, props);
    }
@@ -6256,7 +6270,7 @@ public class ModelUtil {
    }
 
    public static Object[] getDeclaredMergedProperties(Object type, String modifier, boolean includeModified) {
-      Object[] props = getDeclaredProperties(type, modifier, true, includeModified);
+      Object[] props = getDeclaredProperties(type, modifier, true, includeModified, true);
       if (props == null)
          return new Object[0];
       for (int i = 0; i < props.length; i++) {
@@ -6322,12 +6336,14 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object[] getDeclaredProperties(Object typeObj, String modifier, boolean includeAssigns, boolean includeModified) {
+   public static Object[] getDeclaredProperties(Object typeObj, String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+      if (typeObj instanceof ParamTypeDeclaration)
+         typeObj = ((ParamTypeDeclaration) typeObj).getBaseType();
       if (typeObj instanceof Class) {
          return RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
       }
       else if (typeObj instanceof BodyTypeDeclaration) {
-         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, includeAssigns, includeModified);
+         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
          return props == null ? null : props.toArray(new Object[props.size()]);
       }
       throw new UnsupportedOperationException();
@@ -6339,7 +6355,7 @@ public class ModelUtil {
       if (ModelUtil.isGenericArray(typeObj) || typeObj instanceof ArrayTypeDeclaration)
          typeObj = ModelUtil.getGenericComponentType(typeObj);
 
-      Object[] types = ModelUtil.getAllInnerTypes(typeObj, modifier, true);
+      Object[] types = ModelUtil.getAllInnerTypes(typeObj, modifier, true, true);
       ArrayList<Object> res = new ArrayList<Object>();
       if (typeObj instanceof Class) {
          Object[] props = RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
@@ -6357,7 +6373,7 @@ public class ModelUtil {
          }
       }
       else if (typeObj instanceof BodyTypeDeclaration) {
-         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, true, false);
+         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, true, false, true);
          if (props != null) {
             for (int i = 0; i < props.size(); i++) {
                Object prop = props.get(i);
@@ -6405,7 +6421,7 @@ public class ModelUtil {
       }
       else
          throw new UnsupportedOperationException();
-      Object[] types = ModelUtil.getAllInnerTypes(typeObj, modifier, false);
+      Object[] types = ModelUtil.getAllInnerTypes(typeObj, modifier, false, true);
       if (types != null)
          res.addAll(Arrays.asList(types));
       return res.toArray();
@@ -7075,7 +7091,7 @@ public class ModelUtil {
                }
             }
          }
-         Object[] types = getAllInnerTypes(type, null, false);
+         Object[] types = getAllInnerTypes(type, null, false, false);
          if (types != null) {
             for (int i = 0; i < types.length; i++) {
                String mname = CTypeUtil.getClassName(ModelUtil.getTypeName(types[i]));
@@ -8590,7 +8606,7 @@ public class ModelUtil {
          else
             return true;
 
-         Object[] innerTypes = getAllInnerTypes(typeObj, null, false);
+         Object[] innerTypes = getAllInnerTypes(typeObj, null, false, false);
          if (innerTypes != null) {
             for (Object inner:innerTypes) {
                if (!isGlobalScope(sys, inner))
@@ -9352,6 +9368,20 @@ public class ModelUtil {
       }
       else if (def instanceof IBeanMapper) {
          return JavaType.createJavaTypeFromName(ModelUtil.getTypeName(((IBeanMapper) def).getPropertyType()));
+      }
+      else
+         throw new UnsupportedOperationException();
+   }
+
+   public static boolean getExportProperties(LayeredSystem sys, Object type) {
+      if (type instanceof ParamTypeDeclaration)
+         type = ((ParamTypeDeclaration) type).getBaseType();
+      if (type instanceof BodyTypeDeclaration) {
+         return ((BodyTypeDeclaration) type).getExportProperties();
+      }
+      else if (ModelUtil.isCompiledClass(type)) {
+         Boolean exportProperties = (Boolean) ModelUtil.getAnnotationValue(type, "sc.obj.CompilerSettings", "exportProperties");
+         return exportProperties == null || exportProperties;
       }
       else
          throw new UnsupportedOperationException();

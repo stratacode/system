@@ -323,10 +323,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return Arrays.asList(f);
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly) {
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
       if (rootType == null)
          return null;
-      Object[] its = ModelUtil.getAllInnerTypes(rootType, modifier, thisClassOnly);
+      Object[] its = ModelUtil.getAllInnerTypes(rootType, modifier, thisClassOnly, includeInherited);
       if (its == null)
          return null;
       return Arrays.asList(its);

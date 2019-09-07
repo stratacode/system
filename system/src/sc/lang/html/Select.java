@@ -17,9 +17,12 @@ import java.util.TreeMap;
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Select<RE> extends HTMLElement<RE> {
    private final static sc.type.IBeanMapper _selectedValueProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedValue");
+   private final static sc.type.IBeanMapper _disabledProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "disabled");
+   private final static sc.type.IBeanMapper _multipleProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "multiple");
    private final static sc.type.IBeanMapper _selectedIndexProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedIndex");
    private final static sc.type.IBeanMapper _optionDataSourceProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "optionDataSource");
    private final static TreeMap<String,IBeanMapper> selectServerTagProps = new TreeMap<String,IBeanMapper>();
+   private final static sc.type.IBeanMapper _sizeProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "size");
    static {
       selectServerTagProps.put("selectedIndex", _selectedIndexProp);
    }
@@ -27,10 +30,6 @@ public class Select<RE> extends HTMLElement<RE> {
       tagName = "select";
    }
    public String name;
-
-   public boolean disabled;
-
-   public int size;
 
    public Select() {
    }
@@ -55,7 +54,14 @@ public class Select<RE> extends HTMLElement<RE> {
       }
    }
 
-   public boolean multiple = false;
+   private boolean multiple = false;
+   @Bindable(manual=true) public boolean getMultiple() {
+      return multiple;
+   }
+   @Bindable(manual=true) public void setMultiple(boolean _multiple) {
+      multiple = _multiple;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _multipleProp, _multiple);
+   }
 
    List<RE> optionDataSource;
 
@@ -81,6 +87,24 @@ public class Select<RE> extends HTMLElement<RE> {
    @Bindable(manual=true) public void setSelectedValue(Object _selectedValue) {
       selectedValue = _selectedValue;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _selectedValueProp, _selectedValue);
+   }
+
+   private boolean disabled;
+   @Bindable(manual=true) public boolean getDisabled() {
+      return disabled;
+   }
+   @Bindable(manual=true) public void setDisabled(boolean _disabled) {
+      disabled = _disabled;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _disabledProp, _disabled);
+   }
+
+   private int size = 20;
+   @Bindable(manual=true) public int getSize() {
+      return size;
+   }
+   @Bindable(manual=true) public void setSize(int _s) {
+      size = _s;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _sizeProp, _s);
    }
 
    /** Output the contents of the select tag.  If there are no options, render any option tags with the 'empty' id, or if none, render the default body of the tag. */
@@ -133,10 +157,12 @@ public class Select<RE> extends HTMLElement<RE> {
       outputEndTag(sb, ctx);
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public Map<String,IBeanMapper> getCustomServerTagProps() {
       return selectServerTagProps;
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public boolean isEventSource() {
       return true;
    }

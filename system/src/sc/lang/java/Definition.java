@@ -810,4 +810,11 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       return modFlags;
    }
 
+   /** This is here specifically for serializing the enclosingTypeName as part of the Definition in js.layer */
+   public String getEnclosingTypeName() {
+      ITypeDeclaration enclType = getEnclosingIType();
+      if (enclType != null)
+         return enclType.getFullTypeName();
+      return null;
+   }
 }

@@ -90,7 +90,7 @@ public interface ITypeDeclaration {
     */
    List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified);
 
-   List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly);
+   List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited);
 
    DeclarationType getDeclarationType();
 

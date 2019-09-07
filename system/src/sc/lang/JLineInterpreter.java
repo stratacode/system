@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.lang.java.JavaModel;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import jline.console.completer.Completer;
 import jline.console.ConsoleReader;
@@ -183,11 +184,13 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       includeLayer = newInput.includeLayer;
       // When we have an include layer in the push, we will have set the currentLayer so need to restore that here.
       if (newInput.pushLayer) {
+         Layer newLayer;
          if (newInput.includeLayer == null)
-            currentLayer = system.lastLayer;
+            newLayer = system.lastLayer;
          else
-            currentLayer = newInput.includeLayer;
-         updateCurrentLayer();
+            newLayer = newInput.includeLayer;
+         updateCurrentLayer(newLayer);
+         currentLayerUpdated();
       }
       returnOnInputChange = newInput.returnOnInputChange;
       inputStream = newInput.inputStream;

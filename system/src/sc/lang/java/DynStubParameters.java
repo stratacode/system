@@ -307,7 +307,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
    // for the outer object when constructing the inner object.
    public DynInnerConstructor[] getChildComponentConstructors() {
       List<DynInnerConstructor> res = new ArrayList<DynInnerConstructor>();
-      List<Object> innerTypes = objTypeDecl.getAllInnerTypes(null, true);
+      List<Object> innerTypes = objTypeDecl.getAllInnerTypes(null, true, false);
       if (innerTypes != null) {
          for (Object t:innerTypes) {
             if (t instanceof BodyTypeDeclaration) {
@@ -437,7 +437,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
    /** Returns the info for any objects which have compiled definitions which are being overridden in this type. */
    public DynObjectInfo[] getDynCompiledObjects() {
-      List<Object> innerTypes = objTypeDecl.getAllInnerTypes(null, true);
+      List<Object> innerTypes = objTypeDecl.getAllInnerTypes(null, true, false);
       List<DynObjectInfo> defs = new ArrayList<DynObjectInfo>();
       if (innerTypes == null)
          return new DynObjectInfo[0];
@@ -455,7 +455,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
    }
 
    public List<BodyTypeDeclaration> getInnerDynStubs() {
-      List<Object> myIts = objTypeDecl.getAllInnerTypes(null, false);
+      List<Object> myIts = objTypeDecl.getAllInnerTypes(null, false, false);
       if (myIts == null)
          return Collections.emptyList();
 

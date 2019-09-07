@@ -4,6 +4,7 @@
 
 package sc.lang;
 
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 
 import java.io.*;
@@ -133,11 +134,13 @@ public class CommandInterpreter extends AbstractInterpreter {
       returnOnInputChange = newInput.returnOnInputChange;
       // When we have an include layer in the push, we will have set the currentLayer so need to restore that here.
       if (newInput.pushLayer) {
+         Layer newLayer;
          if (newInput.includeLayer == null)
-            currentLayer = system.lastLayer;
+            newLayer = system.lastLayer;
          else
-            currentLayer = newInput.includeLayer;
-         updateCurrentLayer();
+            newLayer = newInput.includeLayer;
+         updateCurrentLayer(newLayer);
+         currentLayerUpdated();
       }
    }
 
