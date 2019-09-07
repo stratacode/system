@@ -62,6 +62,19 @@ public class BindingContext implements IScopeEventListener {
       return (BindingContext) PTypeUtil.getThreadLocal("bindingContext");
    }
 
+   public static BindingContext queueEvents() {
+      BindingContext ctx = new BindingContext(IListener.SyncType.QUEUED);
+      BindingContext oldBindCtx = BindingContext.getBindingContext();
+      BindingContext.setBindingContext(ctx);
+      return oldBindCtx;
+   }
+
+   public static void flushQueue(BindingContext oldBindCtx) {
+      BindingContext ctx = BindingContext.getBindingContext();
+      BindingContext.setBindingContext(oldBindCtx);
+      ctx.dispatchEvents(null);
+   }
+
    private IListener.SyncType defaultSyncType;
    // TODO: rename this as "currentSyncType" or contextSyncType?  There's already a defaultSyncType at the BindingManager level and it seems like we don't use these two consistently all of the time.
    public IListener.SyncType getDefaultSyncType() {
