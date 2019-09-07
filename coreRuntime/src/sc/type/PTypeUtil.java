@@ -567,4 +567,9 @@ public class PTypeUtil {
 
    public static void releaseLocks(List<Object> locks, String traceInfo) {
    }
+
+   /** Hook for diagnostics for JS to compare against 'undefined' */
+   public static boolean isUndefined(Object o) {
+      return false;
+   }
 }
