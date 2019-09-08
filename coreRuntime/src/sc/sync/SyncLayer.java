@@ -481,8 +481,10 @@ public class SyncLayer {
                ArrayList<String> toCull = new ArrayList<String>();
 
                // If these new changes conflict with submitted values, need to reset them.
-               // TODO: perhaps enable this via a mode.  You might want the latest user's changes to be put into the
-               // deviations from the server as an alternative.
+               // TODO: perhaps we need various modes or a hook point to define the behavior here.
+               // First need to determine if this change is a conflict or just a stream of changes to the same value
+               // that are coming in asynchronously. For conflicts, have a few modes plus a hook for the client application
+               // to resolve it with custom logic.
                HashMap<String,Object> pendingChangeMap = pendingValues.get(changedObj);
                if (pendingChangeMap != null) {
                   for (Map.Entry<String,Object> changedPropEnt:changeMap.entrySet()) {
@@ -493,11 +495,13 @@ public class SyncLayer {
                         Object pendingValue = pendingChangeMap.get(propName);
                         if (!DynUtil.equalObjects(changedValue, pendingValue)) {
                            // Reset the old property
+                           if (SyncManager.trace)
+                              System.out.println("Warning: change in SyncLayer: " + this + " during sync for: " + changedObj + "." + propName + " - will be delivered on next sync");
 
-                           // TODO: put in a logging message here?
-                           DynUtil.setProperty(changedObj, propName, pendingValue);
-
-                           toCull.add(propName);
+                           // TODO: this logic where we reset it back to the value we just sync'd does not work in the case where we're really just like
+                           // to send a streaming set of changes to the client (like from a test script)
+                           //DynUtil.setProperty(changedObj, propName, pendingValue);
+                           //toCull.add(propName);
                         }
                      }
                   }
