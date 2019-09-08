@@ -703,6 +703,21 @@ public class VariableBinding extends DestinationListener {
       }
       else if (!activated)
          applyBinding(true);
+      else {
+         // If all of our children are valid, mark this binding as valid again
+         for (int i = 0; i < boundProps.length; i++) {
+            Object boundProp = boundProps[i];
+            if (boundProp instanceof DestinationListener) {
+               if (!((DestinationListener) boundProp).isValid())
+                  return false;
+            }
+         }
+         valid = true;
+         // TODO: if this is a child binding, should we mark the parent binding valid too? This happens when a property changes in a child
+         // binding of ours but it did not result in the child's value changing. This binding was marked invalid when the original message
+         // was propagated through and so needs to be marked valid again as part of the chain. Otherwise, we don't propagate the invalid
+         // state to the child the next time this binding is invalidated and fail to re-validate the child.
+      }
       return changed;
    }
 
