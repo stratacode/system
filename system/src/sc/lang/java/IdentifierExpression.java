@@ -1463,9 +1463,13 @@ public class IdentifierExpression extends ArgumentsExpression {
             meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments(), expr.getLayeredSystem());
          if (meth != null) {
             boundTypes[ix] = meth;
-            idTypes[ix] = IdentifierType.RemoteMethodInvocation;
-            if (meth instanceof AbstractMethodDefinition) {
-               ((AbstractMethodDefinition) meth).addRemoteRuntime(sys.getRuntimeName());
+            if (ModelUtil.isLocalDefinedMethod(sys, meth))
+               idTypes[ix] = IdentifierType.MethodInvocation;
+            else {
+               idTypes[ix] = IdentifierType.RemoteMethodInvocation;
+               if (meth instanceof AbstractMethodDefinition) {
+                  ((AbstractMethodDefinition) meth).addRemoteRuntime(sys.getRuntimeName());
+               }
             }
             return meth;
          }

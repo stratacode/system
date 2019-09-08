@@ -140,6 +140,10 @@ public class EditorContext extends ClientEditorContext {
       selectedInstances.put(ModelUtil.getTypeName(type), inst);
    }
 
+   // This method is defined in the JS version of EditorContext. For incremental compiles though we might bind to this version but it's
+   // part of the sc.jar that's in the classpath of the remote compile. This annotation avoids the error that results in that case.
+   @sc.obj.Remote(localRuntimes = "java,js")
+   @sc.obj.Exec(runtimes="java,js")
    public List<InstanceWrapper> getInstancesOfType(Object type, int max, boolean addNull, String nullLabelName, boolean selectToCreate) {
       if (type instanceof ClientTypeDeclaration)
          type = ((ClientTypeDeclaration) type).getOriginal();
@@ -1636,10 +1640,13 @@ public class EditorContext extends ClientEditorContext {
 
    public void pushCurrentType(BodyTypeDeclaration type, Object inst) {
       BodyTypeDeclaration  enclType = type.getEnclosingType();
-      if (enclType != null)
+      if (enclType != null) {
+         //System.out.println("*** Pushing enclType!");
          pushCurrentType(enclType);
+      }
 
       currentTypes.add(type);
+      //System.out.println("*** Pushing currentType: " + type.typeName + " size=" + currentTypes.size());
       execContext.pushStaticFrame(type);
       if (inst != null) {
          execContext.popCurrentObject(); // pop off the null for the static frame and add the current instance
@@ -1672,6 +1679,13 @@ public class EditorContext extends ClientEditorContext {
    /** Called when the editor sets the type */
    @Bindable(manual=true)
    public void setCurrentType(BodyTypeDeclaration type) {
+      /*
+      if (type != null)
+         System.out.println("*** In setCurrentType: " + type.typeName);
+      else
+         System.out.println("*** In setCurrentType with null");
+       */
+
       if (type != null)
          setCurrentLayer(type.getLayer());
       clearPendingModel();

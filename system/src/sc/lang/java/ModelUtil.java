@@ -9094,9 +9094,9 @@ public class ModelUtil {
             }
          }
          if (!StringUtil.isEmpty(localRts)) {
-            String[] remoteArr = StringUtil.split(remoteRts, ',');
-            for (int i = 0; i < remoteArr.length; i++) {
-               if (remoteArr[i].equals(runtimeName)) {
+            String[] localArr = StringUtil.split(localRts, ',');
+            for (int i = 0; i < localArr.length; i++) {
+               if (localArr[i].equals(runtimeName)) {
                   if (alreadyMatched)
                      System.out.println("Warning: method " + methObj + " has conflicting definitions in remoteRuntime and localRuntime for: " + runtimeName + " - ignoring @Remote definition");
                   remote = false;
@@ -9108,6 +9108,32 @@ public class ModelUtil {
       }
       else
          return false;
+   }
+
+   /**
+    * Returns true if the given method is declared to be local for the specified runtime - overrides the default detection of
+    * a remote method call for those cases where there really is a method in the local runtime even if the system does not find
+    * it.
+    */
+   static boolean isLocalDefinedMethod(LayeredSystem sys, Object methObj) {
+      Object remoteAnnot = getAnnotation(methObj, "sc.obj.Remote");
+      if (remoteAnnot != null) {
+         String localRts = (String) getAnnotationValue(remoteAnnot, "localRuntimes");
+         boolean local = false;
+         String runtimeName = sys.getRuntimeName();
+         if (!StringUtil.isEmpty(localRts)) {
+            local = false;
+            String[] localArr = StringUtil.split(localRts, ',');
+            for (int i = 0; i < localArr.length; i++) {
+               if (localArr[i].equals(runtimeName)) {
+                  local = true;
+                  break;
+               }
+            }
+            return local;
+         }
+      }
+      return false;
    }
 
    public static Map<String, Object> getAnnotations(Object def) {

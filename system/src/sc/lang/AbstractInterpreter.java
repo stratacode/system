@@ -723,6 +723,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          Object parentObj = getCurrentObjectWithDefault();
          currentTypes.add(type);
 
+         //System.out.println("*** Added currentType: " + type.typeName + " size=" + currentTypes.size());
+
          DeclarationType declType = type.getDeclarationType();
 
          boolean definesCurrentObject = type.getDefinesCurrentObject();
@@ -912,8 +914,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                execContext.popCurrentObject();
                execContext.popStaticFrame();
             }
-            else if (oldType.getDeclarationType() != DeclarationType.UNKNOWN)
+            else if (oldType.getDeclarationType() != DeclarationType.UNKNOWN) {
                execContext.popStaticFrame();
+            }
             if (currentTypes.size() == startTypeIndex)
                clearPendingModel();
             origIndent--;
