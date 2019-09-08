@@ -11403,8 +11403,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             System.err.println("*** Invalid attempt to add active model into inactive index");
          if (model.getLayeredSystem() != this)
             System.err.println("*** Invalid attempt to add model from another system to index");
-         if (model instanceof JavaModel && ((JavaModel) model).temporary)
-            System.err.println("*** Adding temporary model to the cache");
+         // For the IDE, adding temporary types to the inactive cache should be avoided. But it is necessary for the styleFile method used for documentation although it's
+         // possible types might conflict in this cache.
+         if (options.verbose && model instanceof JavaModel && ((JavaModel) model).temporary)
+            verbose("Adding temporary model to the cache: " + model.getSrcFile());
          ILanguageModel oldModel = inactiveModelIndex.put(absName, model);
          if (oldModel != null && model instanceof JavaModel && oldModel != model) {
             if (layer != null)
