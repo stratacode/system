@@ -39,7 +39,9 @@ public class TypeIndexEntry implements Serializable {
       }
       else if (other instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration ot = (BodyTypeDeclaration) other;
-         if (ot.getFullTypeName().equals(typeName) && ot.getLayer().getLayerName().equals(layerName))
+         String otherTypeName = ot.getFullTypeName();
+         Layer otherLayer = ot.getLayer();
+         if (StringUtil.equalStrings(otherTypeName, typeName) && otherLayer != null && otherLayer.getLayerName().equals(layerName))
             return true;
       }
       return false;
