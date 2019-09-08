@@ -9698,7 +9698,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ctd.setComment(getComment());
          ctd.setAnnotations(getAnnotations());
          ctd.setModifierFlags(getModifierFlags());
-         ctd.setModifiedType(getModifiedType());
+         BodyTypeDeclaration modType = getModifiedType();
+         // Skip over the types in any layers which are hidden
+         while (modType != null) {
+            Layer modLayer = modType.getLayer();
+            if (modLayer != null && modLayer.hidden) {
+               modType = modType.getModifiedType();
+            }
+            else
+               break;
+         }
+         ctd.setModifiedType(modType);
          /*
          if (modifiers != null) {
             ArrayList<String> clientMods = new ArrayList<String>(modifiers.size());
