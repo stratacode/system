@@ -969,7 +969,7 @@ public class SyncLayer {
          ArrayList<String> toCompNames = startObjNames != null ? startObjNames : newObjNames;
 
          // The current object changed - need to reset it.  This is awkward both here and in the output probably but we are treating the dep changes as a special case.
-         if (!currentObjNames.equals(toCompNames)) {
+         if (!currentObjNames.equals(toCompNames) || !equalStrings(changeCtx.lastPackageName, origPackage)) {
             // In this case, we just do the switch back and so do not need the original 'switch code' used to switch the types originally
             switchSB = null;
             switchObjStart = -1;
