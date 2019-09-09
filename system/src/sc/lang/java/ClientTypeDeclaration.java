@@ -144,9 +144,9 @@ public class ClientTypeDeclaration extends TypeDeclaration implements IChangeabl
       extendsTypeName = ftn;
    }
 
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
       if (orig != null)
-         return orig.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
+         return orig.getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
       if (!includeAssigns || includeModified)
          System.err.println("*** unimplemented option in ClientTypeDeclaration");
       return getDeclaredProperties();

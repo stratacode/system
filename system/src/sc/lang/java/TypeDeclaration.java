@@ -947,14 +947,14 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return result;
    }
 
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
-      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
-      if (includeInherited) {
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
+      if (editorProperties) {
          if (getInheritProperties()) {
             Object extType = getExtendsTypeDeclaration();
             if (extType != null) {
                if (ModelUtil.getExportProperties(getLayeredSystem(), extType)) {
-                  Object[] extRes = ModelUtil.getDeclaredProperties(extType, modifier, includeAssigns, includeModified, includeInherited);
+                  Object[] extRes = ModelUtil.getDeclaredProperties(extType, modifier, includeAssigns, includeModified, editorProperties);
                   List<Object> extProps;
                   if (extRes != null)
                      extProps = Arrays.asList(extRes);
@@ -1245,10 +1245,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
-   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean includeInherited) {
-      List<Object> result = super.getAllInnerTypes(modifier, thisClassOnly, includeInherited);
+   public List<Object> getAllInnerTypes(String modifier, boolean thisClassOnly, boolean editorProperties) {
+      List<Object> result = super.getAllInnerTypes(modifier, thisClassOnly, editorProperties);
 
-      if (!thisClassOnly || (includeInherited && getInheritProperties())) {
+      if (!thisClassOnly || (editorProperties && getInheritProperties())) {
          // Only init the type info if we are looking for the implements types.  In updateType we do not want to init the type just to do the update since
          // the update happens during the 'reinitialize' process, which is too soon to accurately resolve types.  We need to reinit the other types first.
          initTypeInfo();
@@ -1258,7 +1258,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          if (implementsBoundTypes != null) {
             for (Object impl : implementsBoundTypes) {
                if (!thisClassOnly || ModelUtil.getExportProperties(sys, impl)) {
-                  Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly, includeInherited);
+                  Object[] implResult = ModelUtil.getAllInnerTypes(impl, modifier, thisClassOnly, editorProperties);
                   if (implResult != null && implResult.length > 0) {
                      if (result == null)
                         result = new ArrayList<Object>();

@@ -126,8 +126,8 @@ public class EnumDeclaration extends TypeDeclaration {
    }
 
    /** For this type only we add the enum constants as properties */
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
-      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      List<Object> res = super.getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
 
       if (body != null) {
          for (int i = 0; i < body.size(); i++) {

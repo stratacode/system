@@ -291,6 +291,8 @@ public class ModelUtil {
    }
 
    public static Object getGenericComponentType(Object genParam) {
+      if (ModelUtil.hasTypeParameters(genParam))
+         genParam = ModelUtil.getParamTypeBaseType(genParam);
       if (genParam instanceof GenericArrayType)
          return ((GenericArrayType) genParam).getGenericComponentType();
       else if (genParam instanceof ArrayTypeDeclaration)
@@ -3776,8 +3778,10 @@ public class ModelUtil {
       else {
          java.lang.annotation.Annotation lannot = (java.lang.annotation.Annotation) annotObj;
 
-         Class cl = lannot.getClass();
-         Method[] annotValues = cl.getDeclaredMethods();
+         //Class cl = lannot.getClass();
+         Class annotCl = lannot.annotationType();
+         //Method[] annotValues = cl.getDeclaredMethods();
+         Method[] annotValues = annotCl.getDeclaredMethods();
 
          SemanticNodeList<AnnotationValue> values = new SemanticNodeList<AnnotationValue>(annotValues.length);
          for (int i = 0; i < annotValues.length; i++) {
@@ -3786,11 +3790,14 @@ public class ModelUtil {
                continue;
             String name = annotValues[i].getName();
             // TODO: find some better way to eliminate the Object class methods from the annotation class.  Presumably it does not change often but should put this in a static table at least or better yet, find some way to get it from the runtime.
-            if (name.equals("equals") || name.equals("toString") || name.equals("hashCode") || name.equals("annotationType") || name.equals("isProxyClass") || name.equals("wait") || name.equals("getClass") || name.equals("notify") || name.equals("notifyAll"))
-               continue;
+            //if (name.equals("equals") || name.equals("toString") || name.equals("hashCode") || name.equals("annotationType") || name.equals("isProxyClass") || name.equals("wait") || name.equals("getClass") || name.equals("notify") || name.equals("notifyAll"))
+            //   continue;
             AnnotationValue av = new AnnotationValue();
             av.identifier = name;
             av.elementValue = PTypeUtil.invokeMethod(lannot, annotValues[i], (Object[])null);
+            Object defaultValue = annotMeth.getDefaultValue();
+            if (DynUtil.equalObjects(av.elementValue, defaultValue))
+               continue;
             values.add(av);
          }
          return values;
@@ -6324,7 +6331,7 @@ public class ModelUtil {
 
    public static Object[] getProperties(Object typeObj, String modifier, boolean includeAssigns) {
       if (typeObj instanceof Class) {
-         // Need to convert this to an Object[] from an IBeanMapper[] so that it can be modified downstream
+        // Need to convert this to an Object[] from an IBeanMapper[] so that it can be modified downstream
          return new ArrayList<Object>(Arrays.asList(TypeUtil.getProperties((Class) typeObj, modifier))).toArray();
       }
       else if (typeObj instanceof ITypeDeclaration) {
@@ -9184,7 +9191,7 @@ public class ModelUtil {
             Annotation myAnnot = Annotation.createFromElement(annot);
             Annotation.addToAnnotationsMap(res, myAnnot);
          }
-         return res;
+         return res.size() == 0 ? null : res;
       }
       return null;
    }

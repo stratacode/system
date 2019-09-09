@@ -1959,8 +1959,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return modProps;
    }
 
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
-      List<Object> declProps = super.getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      List<Object> declProps = super.getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
       if (isEnumeratedType()) {
          if (body != null) {
             for (int i = 0; i < body.size(); i++) {

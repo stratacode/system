@@ -3821,7 +3821,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    /** Returns the set of layers which extend this layer in the same order as they originally appeared in the list */
-   @Constant public List<Layer> getDependentLayers() {
+   @Constant public List<Layer> getUsedByLayers() {
       List<Layer> theLayers = layeredSystem.layers;
       List<Layer> res = new ArrayList<Layer>();
       for (int i = layerPosition + 1; i < theLayers.size(); i++) {
@@ -3832,7 +3832,16 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return res;
    }
 
-   /** Returns the set of layers which this layer depends on - including all layers for the build layer and the current layer */
+   /** Returns the set of layers which extend this layer in the same order as they originally appeared in the list */
+   @Constant public List<String> getUsedByLayerNames() {
+      List<Layer> usedByLayers = getUsedByLayers();
+      List<String> res = new ArrayList<String>();
+      for (Layer l:usedByLayers)
+         res.add(l.getLayerName());
+      return res;
+   }
+
+   /** Returns a String identifying the set of layers which this layer depends on - including all layers for the build layer and the current layer */
    private String getDependentLayerNames() {
       StringBuilder sb = new StringBuilder();
       boolean first = true;
@@ -4130,7 +4139,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       sb.append(layerPosition);
       sb.append("]");
 
-      List depLayers = getDependentLayers();
+      List depLayers = getUsedByLayers();
       if (depLayers != null) {
          sb.append(" used by: ");
          sb.append(depLayers);

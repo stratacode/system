@@ -1037,7 +1037,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    public String getPropertyMetadata() {
       if (updateTemplate)
          return "";
-      List<Object> props = type.getDeclaredProperties();
+      List<Object> props = type.getDeclaredProperties("public", true, false, false);
       StringBuilder sb = null;
       TreeSet<String> visited = new TreeSet<String>();
       if (props != null) {

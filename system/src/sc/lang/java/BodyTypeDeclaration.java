@@ -2067,8 +2067,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    /**
     * Returns the list of properties with the given modifiers or null if there aren't any.
     */
-   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
       if (body == null)
+         return null;
+
+      Layer layer = getLayer();
+      if (editorProperties && layer != null && layer.hidden)
          return null;
 
       List<Object> props = new ArrayList<Object>();

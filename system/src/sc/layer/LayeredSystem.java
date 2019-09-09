@@ -4214,10 +4214,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                  new SyncProperties(null, null,
                          new Object[]{"packagePrefix", "defaultModifier", "dynamic", "hidden", "compiledOnly", "transparent",
                                  "baseLayerNames", "layerName", "layerPathName", "layerBaseName", "layerDirName", "layerUniqueName",
-                                 "layerPosition", "codeType", "dependentLayers"},
+                                 "layerPosition", "codeType", "usedByLayerNames"},
                          null, SyncPropOptions.SYNC_INIT,  globalScopeId));
-         for (Layer l:layers)
-            l.initSync();
+         for (Layer l:layers) {
+            if (!l.hidden)
+               l.initSync();
+         }
 
          if (allLayerIndex != null) {
             initLayerIndexSync();
@@ -14414,7 +14416,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   TypeIndexEntry subTypeIndexEntry = subTypeEnt.getValue();
 
                   if (type.isLayerType) {
-                     Layer subLayer = getActiveOrInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true, true);
+                     Layer subLayer = cachedOnly ? lookupInactiveLayer(subTypeName, true, true) : getInactiveLayerByPath(subTypeName.replace('.', '/'), null, openLayers, true);
                      if (subLayer != null && subLayer.model != null)
                         result.add(subLayer.model.getModelTypeDeclaration());
                   }
