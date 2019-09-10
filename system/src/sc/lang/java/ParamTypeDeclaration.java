@@ -395,6 +395,13 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return parameterizePropList(baseProps);
    }
 
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      if (baseType instanceof BodyTypeDeclaration) {
+         return ((BodyTypeDeclaration) baseType).getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
+      }
+      return getAllProperties(modifier, includeAssigns);
+   }
+
    public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       Object[] baseFields = ModelUtil.getFields(baseType, modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
       return parameterizePropList(baseFields);

@@ -145,6 +145,10 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return getCmdObject().getAllProperties(modifier, includeAssigns);
    }
 
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      return getAllProperties(modifier, includeAssigns);
+   }
+
    public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       return getCmdObject().getAllFields(modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
    }

@@ -194,6 +194,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return Arrays.asList(baseProps);
    }
 
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      return getAllProperties(modifier, includeAssigns);
+   }
+
    public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       Object[] baseFields = ModelUtil.getFields(baseType, modifier, hasModifier, dynamicOnly, includeObjs, includeAssigns, includeModified);
       if (baseFields == null)

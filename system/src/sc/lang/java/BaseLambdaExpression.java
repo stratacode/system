@@ -824,6 +824,10 @@ public abstract class BaseLambdaExpression extends Expression {
          return null;
       }
 
+      public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+         return null;
+      }
+
       @Override
       public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
          return null;
@@ -1154,6 +1158,10 @@ public abstract class BaseLambdaExpression extends Expression {
 
       @Override
       public List<Object> getAllProperties(String modifier, boolean includeAssigns) {
+         return null;
+      }
+
+      public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
          return null;
       }
 

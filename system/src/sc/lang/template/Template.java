@@ -314,6 +314,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return Arrays.asList(props);
    }
 
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      if (rootType instanceof BodyTypeDeclaration)
+         return ((BodyTypeDeclaration) rootType).getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
+      return getAllProperties(modifier, includeAssigns);
+   }
+
    public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       if (rootType == null)
          return null;

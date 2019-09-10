@@ -83,6 +83,8 @@ public interface ITypeDeclaration {
 
    List<Object> getAllProperties(String modifier, boolean includeAssigns);
 
+   List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties);
+
    /** Returns all of the fields based on the flags.  If modifier is not null then we only return those with have or don't have the modifier based on hasModifier.
     * If dynamicOnly is true, we only return dynamic fields.  If includeObjs is true, we return inner objects which have instance fields in this type.  If includeAssigns
     * is true, we return any property assignments we find along the way.  If includeModified is true, when we resolve objects we'll return the most specific type for

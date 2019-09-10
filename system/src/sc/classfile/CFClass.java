@@ -714,6 +714,11 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return res;
    }
 
+   public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
+      // TODO: implement the rest of the behavior?  This is not yet done for Class types either
+      return getAllProperties(modifier, includeAssigns);
+   }
+
    public List<Object> getAllFields(String modifier, boolean hasModifier, boolean dynamicOnly, boolean includeObjs, boolean includeAssigns, boolean includeModified) {
       CFField[] fields = classFile.fields;
       if (fields == null)

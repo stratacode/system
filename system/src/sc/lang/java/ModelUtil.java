@@ -6343,14 +6343,18 @@ public class ModelUtil {
       throw new UnsupportedOperationException();
    }
 
-   public static Object[] getDeclaredProperties(Object typeObj, String modifier, boolean includeAssigns, boolean includeModified, boolean includeInherited) {
+   public static Object[] getDeclaredProperties(Object typeObj, String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
       if (typeObj instanceof ParamTypeDeclaration)
          typeObj = ((ParamTypeDeclaration) typeObj).getBaseType();
       if (typeObj instanceof Class) {
          return RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
       }
       else if (typeObj instanceof BodyTypeDeclaration) {
-         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, includeAssigns, includeModified, includeInherited);
+         List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
+         return props == null ? null : props.toArray(new Object[props.size()]);
+      }
+      else if (typeObj instanceof ITypeDeclaration) {
+         List<Object> props = ((ITypeDeclaration) typeObj).getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);
          return props == null ? null : props.toArray(new Object[props.size()]);
       }
       throw new UnsupportedOperationException();
