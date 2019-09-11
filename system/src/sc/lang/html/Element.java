@@ -4046,7 +4046,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   // Otherwise need to move it into its new location.
                   else {
                      Element toMove = tags.get(curIx);
-                     tags.add(i, toMove);
+                     if (i == tags.size())
+                        tags.add(toMove);
+                     else if (i > tags.size())
+                        System.err.println("*** Invalid tag move index: " + i + " > " + tags.size());
+                     else
+                        tags.add(i, toMove);
                      toMove.setRepeatIndex(i);
                      moveElement(toMove, curIx, i);
                   }
