@@ -6411,12 +6411,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       if (updateMode == TypeUpdateMode.Replace) {
-         if (newType instanceof ModifyDeclaration) {
-            ModifyDeclaration newModType = (ModifyDeclaration) newType;
+         if (this instanceof ModifyDeclaration) {
+            ModifyDeclaration oldModType = (ModifyDeclaration) this;
             // If we're updating a type that's been modified, make sure the modifying type points to the new type
-            BodyTypeDeclaration modifiedType = newModType.getModifiedType();
+            // We use to call getModifiedType() on the new type not the old type for some reason. We also don't want to do any resolving here because
+            // the IDE is not in a state in which it can resolve types and it seems like we only need to do this update if it's already been resolved.
+            BodyTypeDeclaration modifiedType = oldModType.modifyTypeDecl;
             // Enum constants won't have a modified type so nothing to update here
-            if (modifiedType != null && !newModType.modifyInherited) {
+            if (modifiedType != null && !oldModType.modifyInherited) {
                if (!ModelUtil.sameTypes(modifiedType, newType))
                   System.out.println("*** Error - updateType called with mismatching type");
                else

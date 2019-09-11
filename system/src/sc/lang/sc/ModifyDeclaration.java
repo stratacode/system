@@ -29,7 +29,7 @@ import java.util.*;
 public class ModifyDeclaration extends TypeDeclaration {
    public SemanticNodeList<JavaType> extendsTypes;
 
-   transient private BodyTypeDeclaration modifyTypeDecl;
+   transient public BodyTypeDeclaration modifyTypeDecl;
    transient private Object modifyClass;
    transient Object[] extendsBoundTypes;
    transient private boolean typeInitialized = false;
@@ -162,7 +162,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                      // If we are in the same layer, we are just about to replace the type as part of updateType
                      // Just don't update replacedByType in this case since we'll set that later on anyway.
                      else if (modReplacedByType.getLayer() != getLayer()) {
-                        if (modReplacedByType.removed || modReplacedByType.getLayer().excluded)
+                        Layer modReplacedByLayer = modReplacedByType.getLayer();
+                        if (modReplacedByType.removed || modReplacedByLayer == null || modReplacedByLayer.excluded)
                            modifyTypeDecl.replacedByType = null;
                         else {
                            // For layer components we might get the wrong type here - we use the baseLayers to do teh resolution so we may not find the
