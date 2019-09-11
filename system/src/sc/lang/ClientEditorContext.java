@@ -6,6 +6,7 @@ package sc.lang;
 
 import sc.bind.Bindable;
 import sc.bind.Bind;
+import sc.dyn.DynUtil;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.JavaModel;
 import sc.layer.Layer;
@@ -196,20 +197,55 @@ public abstract class ClientEditorContext {
       currentLayers = l == null ? Collections.emptyList() : l.getSelectedLayers();
    }
 
-   public void addCurrentLayer(Layer l) {
-      if (currentLayers == null)
-         updateCurrentLayer(l);
-      else {
-         for (int i = 0; i < currentLayers.size(); i++) {
-            Layer current = currentLayers.get(i);
-            if (current == l)
-               return;
-            if (current.getLayerPosition() > l.getLayerPosition()) {
-               currentLayers.add(i, l);
-               return;
+   /** Toggles the state of the current layer - if it's current, remove it. Otherwise add it. */
+   public void layerSelected(Layer l, boolean addToSelection) {
+      if (currentLayers == null) {
+         setCurrentLayer(l);
+      }
+      else if (!addToSelection) {
+         if (currentLayers.get(0) == l) {
+            List<Layer> newLayers = l.getSelectedLayers();
+            if (!DynUtil.equalObjects(newLayers, currentLayers)) {
+               currentLayers = newLayers;
+               Bind.sendChangedEvent(this, "currentLayers");
             }
          }
-         currentLayers.add(l);
+         else {
+            setCurrentLayer(l);
+         }
+      }
+      else {
+         boolean handled = false;
+         int insertPos = -1;
+         ArrayList<Layer> newCurrentLayers = new ArrayList<Layer>(currentLayers);
+         for (int i = 0; i < currentLayers.size(); i++) {
+            Layer current = currentLayers.get(i);
+            if (current == l) {
+               // Both addToSelection and normal should remove the element - or should one of them just ignore the selection?
+               newCurrentLayers.remove(i);
+               handled = true;
+               break;
+            }
+            if (current.getLayerPosition() < l.getLayerPosition()) {
+               insertPos = i;
+               break;
+            }
+         }
+         if (!handled) {
+            if (insertPos != -1)
+               newCurrentLayers.add(insertPos, l);
+            else
+               newCurrentLayers.add(l);
+         }
+         Layer newCurrentLayer = newCurrentLayers.size() == 0 ? null : newCurrentLayers.get(0);
+         if (newCurrentLayer != currentLayer) {
+            currentLayer = newCurrentLayer;
+            updateLayerPrefix();
+            Bind.sendChangedEvent(this, "currentLayer");
+         }
+         // Because we don't have access to sc.util.ArrayList which implements IChangeable and sends it's own events in add, set, etc.
+         // we will just rebuild the list each time since it's pretty small.
+         currentLayers = newCurrentLayers;
          Bind.sendChangedEvent(this, "currentLayers");
       }
    }
@@ -219,13 +255,17 @@ public abstract class ClientEditorContext {
       // TODO: should we try to preserve imports here and only switch the layer of the pending model if there's no type?
       if (currentLayer != newLayer) {
          updateCurrentLayer(newLayer);
-         if (currentLayer != null)
-            layerPrefix = currentLayer.packagePrefix;
-         else
-            layerPrefix = null;
+         updateLayerPrefix();
          Bind.sendChangedEvent(this, "currentLayer");
          Bind.sendChangedEvent(this, "currentLayers");
       }
+   }
+
+   private void updateLayerPrefix() {
+      if (currentLayer != null)
+         layerPrefix = currentLayer.packagePrefix;
+      else
+         layerPrefix = null;
    }
 
 }
