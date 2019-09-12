@@ -11084,13 +11084,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          //}
       }
 
-      // Skip layer files for now.  For one, they don't go into the modelIndex so we get here each time.
+      // Skip activated layer files for now.
       if (oldModel instanceof JavaModel && ((JavaModel) oldModel).isLayerModel) {
          Layer layer = oldModel.getLayer();
-         if (!layer.newLayer) {
+         if (!layer.newLayer && layer.activated) {
             System.err.println("*** Warning: layer file changed - not refreshing the changes");
          }
-         return null;
+         // Skipping this case but we do need to refresh inactive layers for the IDE
+         if (layer.activated)
+            return null;
       }
 
       if (options.verbose) {
@@ -11125,8 +11127,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (!newModel.hasErrors) {
             if (oldModel != null && oldModel instanceof JavaModel) {
                JavaModel oldJavaModel = (JavaModel) oldModel;
-               if (oldJavaModel.isLayerModel) // Can't update layers for now
+               if (oldJavaModel.isLayerModel) { // Can't update layers for now
+                  Layer layer = oldJavaModel.layer;
+                  boolean layerChanged = (oldModel.getLastModifiedTime() != newModel.getLastModifiedTime() || !oldModel.sameModel(newModel)) && layer.updateModel(newModel);
+                  if (layerChanged)
+                     verbose("Layer model changed: " + srcEnt);
                   return null;
+               }
 
                // We need to mark the model as changed before we start it, so that the JSRuntime and other hooks can
                // detect changed types as they are started.
