@@ -42,6 +42,8 @@ public class EditorContext extends ClientEditorContext {
 
    static protected CommandSCLanguage cmdlang = CommandSCLanguage.INSTANCE;
 
+   public static int MaxCompletions = 20;
+
    /** Global flag set to true when this context should interpret property changes as editing the types, rather than just editing the instances or current instance */
    public boolean edit = true;
 
@@ -1501,7 +1503,7 @@ public class EditorContext extends ClientEditorContext {
       if (command.trim().length() == 0) {
          Object curObj = getCurrentType(true);
          if (curObj != null) {
-            ModelUtil.suggestMembers(getModel(), curObj, "", collector, true, true, true, true, 20);
+            ModelUtil.suggestMembers(getModel(), curObj, "", collector, true, true, true, true, MaxCompletions);
             convertCollectorToCandidates(collector, candidates);
             return command.length() + (ctxText != null ? ctxText.length() - command.length() : 0);
          }
@@ -1768,6 +1770,33 @@ public class EditorContext extends ClientEditorContext {
          }
       }
       return pos;
+   }
+
+   public int completeText(String text, CompletionTypes completionType, List candidates, JavaModel fileModel, Object currentType) {
+      int relPos;
+      candidates.clear();
+      if (completionType == CompletionTypes.ExistingLayer) {
+         relPos = completeExistingLayer(text, 0, candidates);
+      }
+      else if (completionType == CompletionTypes.EntireFile) {
+         // We are passing in two versions of the text to complete.  One which is from the beginning of the file
+         // and the other which is just the last token.  We can use the first approach either to find the specific
+         // AST node which failed to parse, then complete that, or we can use that approach just to find the context
+         // of the current type and then use that to complete the text.
+         String completeText = text;
+         text = getStatementCompleteStart(text);
+         relPos = complete(text, 0, candidates, completeText, fileModel, currentType);
+      }
+      else if (completionType == CompletionTypes.ApplicationType) {
+         relPos = completeType(text, candidates);
+      }
+      else if (completionType == CompletionTypes.CreateInstanceType) {
+         relPos = completeCreateInstanceType(text, candidates);
+      }
+      else {
+         relPos = complete(text, 0, candidates, null, null, currentType);
+      }
+      return relPos;
    }
 
    public void initSync() {
