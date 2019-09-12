@@ -3622,7 +3622,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
       addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex"}, null);
       addTagAttributes("option", "element", new String[] {"selected", "value", "disabled"}, null);
-      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete"}, null);
+      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete", "list"}, null);
       addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size"}, null);
       addTagAttributes("button", "input", emptyArgs, null);
       addTagAttributes("span", "element", emptyArgs, null);
@@ -3660,6 +3660,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("legend", "element", emptyArgs, null);
       addTagAttributes("label", "element", new String[] {"for", "form"}, null);
       addTagAttributes("abbr", "element", new String[] {"title"}, null);
+      addTagAttributes("datalist", "element", emptyArgs, null);
       // One per document so no worrying about merging or allocating unique ids for them
       singletonTagNames.add("head");
       singletonTagNames.add("body");
@@ -4046,10 +4047,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   // Otherwise need to move it into its new location.
                   else {
                      Element toMove = tags.get(curIx);
-                     if (i == tags.size())
+                     if (i >= tags.size()) // Just put it at the end - we'll insert elements to put it into its correct position
                         tags.add(toMove);
-                     else if (i > tags.size())
-                        System.err.println("*** Invalid tag move index: " + i + " > " + tags.size());
                      else
                         tags.add(i, toMove);
                      toMove.setRepeatIndex(i);

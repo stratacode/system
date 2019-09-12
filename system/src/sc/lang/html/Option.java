@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.lang.java.TypeDeclaration;
 import sc.type.IBeanMapper;
 
 import java.util.Map;
@@ -29,6 +30,12 @@ public class Option<T> extends HTMLElement {
    }
    public Option(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
+   }
+   public Option(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, repeatVar, repeatIx);
+   }
+   public Option(Element parent, Object repeatVar, int repeatIx) {
+      super(parent, repeatVar, repeatIx);
    }
 
    private boolean selected;

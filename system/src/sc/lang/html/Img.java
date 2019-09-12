@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.lang.java.TypeDeclaration;
 
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class Img extends HTMLElement {
@@ -17,6 +18,12 @@ public class Img extends HTMLElement {
    }
    public Img(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
+   }
+   public Img(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, repeatVar, repeatIx);
+   }
+   public Img(Element parent, Object repeatVar, int repeatIx) {
+      super(parent, repeatVar, repeatIx);
    }
 
    private Object src;
