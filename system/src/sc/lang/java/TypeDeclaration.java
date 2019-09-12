@@ -1553,6 +1553,20 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (!useRuntimeReflection)
          transformCompiledType();
 
+      if (body != null) {
+         for (int i = 0; i < body.size(); i++) {
+            Statement st = body.get(i);
+            // Excluded types are handled elsewhere
+            if (st instanceof TypeDeclaration)
+               continue;
+            // This statement has @Exec and is not included in this runtime
+            if (st.excluded) {
+               body.remove(i);
+               i--;
+            }
+         }
+      }
+
       if (super.transform(runtime))
          any = true;
 

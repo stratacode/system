@@ -9201,6 +9201,8 @@ public class ModelUtil {
    }
 
    public static RuntimeStatus execForRuntime(LayeredSystem refSys, Layer refLayer, Object refTypeOrMember, LayeredSystem runtimeSys) {
+      if (refTypeOrMember instanceof ParamTypedMember)
+         refTypeOrMember = ((ParamTypedMember) refTypeOrMember).member;
       if (refTypeOrMember instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration td = (BodyTypeDeclaration) refTypeOrMember;
          if (td.isExcludedStub) // The stub is included even though it's underlying type has been excluded

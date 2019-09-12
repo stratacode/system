@@ -21,6 +21,11 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public transient Object[] errorArgs;
    public transient int childNestingDepth = -1;
 
+   /**
+    * Has this statement been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime
+    */
+   transient public boolean excluded = false;
+
    public enum RuntimeStatus {
       Enabled, Disabled, Unset
    }
@@ -262,6 +267,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public Statement deepCopy(int options, IdentityHashMap<Object,Object> oldNewMap) {
       Statement res = (Statement) super.deepCopy(options, oldNewMap);
       res.fromStatement = this;
+      res.excluded = excluded;
       if ((options & CopyInitLevels) != 0) {
          res.errorArgs = errorArgs;
       }

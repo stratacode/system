@@ -71,10 +71,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public transient boolean replacedInactive = false; // Set to true when an inactive type has been replaced by a newer version
 
    /**
-    * Has this type been determined not to be included in this runtime - e.g. it's a java only class and this is the js runtime
-    */
-   transient public boolean excluded = false;
-   /**
     * For an excluded type, a framework can designate a 'stub type' to replace an excluded type for a given runtime.
     * In that case, this stores the excludedStub type.  It's included in the list of children and generated according to the
     * needs of the framework.  For SCHTML, we generate a node with the parentNode and id properties set by which is marked
@@ -9785,7 +9781,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.extendsInvalid= extendsInvalid;
          res.extendsOverridden= extendsOverridden;
 
-         res.excluded = excluded;
          if (excludedStub != null) {
             // NOTE: the parentNode for the excludedStub gets set later - when the type is added to it's parent list in setParentNode
             res.excludedStub = excludedStub.deepCopy(options, oldNewMap);

@@ -144,6 +144,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             }
          }
       }
+
+      if (execForRuntime(getLayeredSystem()) == RuntimeStatus.Disabled)
+         excluded = true;
+
       super.start();
    }
 
@@ -1119,7 +1123,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return RuntimeStatus.Unset;
       JavaModel model = getJavaModel();
       Layer refLayer = model == null ? null : model.getLayer();
-      return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, assignedProperty, runtimeSys);
+      RuntimeStatus propStatus = ModelUtil.execForRuntime(getLayeredSystem(), refLayer, this, runtimeSys);
+      if (propStatus == RuntimeStatus.Unset)
+         return ModelUtil.execForRuntime(getLayeredSystem(), refLayer, assignedProperty, runtimeSys);
+      return propStatus;
    }
 
    public JavaType getJavaType() {
