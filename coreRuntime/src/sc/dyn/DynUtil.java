@@ -1470,15 +1470,24 @@ public class DynUtil {
     * Runs at the next opportunity as determined by the ThreadScheduler or the framework scheduler.
     * Higher priority jobs run before lower priority ones
     */
-   public static void invokeLater(Runnable r, int priority) {
+   public static ScheduledJob invokeLater(Runnable r, int priority) {
       IScheduler sched = threadScheduler.get();
       if (sched != null) {
-         sched.invokeLater(r, priority);
-         return;
+         return sched.invokeLater(r, priority);
       }
       if (frameworkScheduler == null)
          throw new IllegalArgumentException("Must set DynUtil.frameworkScheduler before calling invokeLater");
-      frameworkScheduler.invokeLater(r, priority);
+      return frameworkScheduler.invokeLater(r, priority);
+   }
+
+   public static boolean clearInvokeLater(ScheduledJob job) {
+      IScheduler sched = threadScheduler.get();
+      if (sched != null) {
+         return sched.clearInvokeLater(job);
+      }
+      if (frameworkScheduler == null)
+         throw new IllegalArgumentException("Must set DynUtil.frameworkScheduler before calling invokeLater");
+      return frameworkScheduler.clearInvokeLater(job);
    }
 
    public static void execLaterJobs() {

@@ -6,6 +6,7 @@ import sc.obj.ScopeDefinition;
 import java.util.ArrayList;
 import java.util.List;
 
+@sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public class ScheduledJob {
    public Runnable toInvoke;
    /** higher priority jobs run first */
@@ -24,6 +25,10 @@ public class ScheduledJob {
          jobList.add(newJob);
       else
          jobList.add(i, newJob);
+   }
+
+   public static boolean removeJobFromList(List<ScheduledJob> jobList, ScheduledJob toRemove) {
+      return jobList.remove(toRemove);
    }
 
    public static void runJobList(List<ScheduledJob> toRunLater, int minPriority, int maxPriority) {

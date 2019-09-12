@@ -146,11 +146,12 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "Use the global object 'cmd' to control the running application and features for implementing scripts.\n\n" +
            "In supported terminals, use TAB to suggest completions of the current context.\n\n" +
            "Command line modes: Two modes are supported: one for program editing, the other better suited for test scripts or " +
-           "just using the current application. The prompt starts with 'edit:' if you are in edit mode" +
+           "to inspect/control the current application. The prompt starts with 'edit:' if you are in edit mode " +
            "(the default for the command line), and 'scr:' for script mode (the default for test scripts).\n\n" +
            "Enter: 'cmd.edit=false/true;' to switch back and forth.\n\n" +
-           "Using edit mode for writing code from scratch or changing the configured value of a property and applying the change to all" +
-           "instances. If 'a = 3' should just set the current instance's value of a use script mode. Both modes let you add a new field, method or type to a temporary version of the current type or layer. In script mode, those are just temporary fields, methods, types etc. which are available only during the duration of the script rather. " +
+           "Use edit mode to write code from scratch or to change the configured value of a property. Edit mode applies the change to all " +
+           "instances. Script mode on the other hand only selects the current instance of the selected type. " +
+           "Both modes let you add a new field, method or type to a temporary version of the current type or layer. In script mode, those are just temporary fields, methods, types etc. which are available only during the duration of the script rather. " +
            "Use cmd.save(); to save changes made in edit mode but be sure to check the current layer, the current source file, and use" +
            "cmd.print(); or cmd.printChanges(); to check what will be saved to avoid overwriting source code in an undesired way!\n\n" +
            "Navigation on the command line:\n   The command line starts at the current layer, which is by default the last build layer of the main process. There is no current type, but there is a current package, current layer etc. By default, you start out with the last layer of the application or if you use -i editing a temporary layer that extends the application layer." +
@@ -1920,13 +1921,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    protected ArrayList<ScheduledJob> toRunLater = new ArrayList<ScheduledJob>();
 
-   public void invokeLater(Runnable r, int priority) {
+   public ScheduledJob invokeLater(Runnable r, int priority) {
       ScheduledJob job = new ScheduledJob();
       job.priority = priority;
       job.toInvoke = r;
       // TODO: performance check if it's different?  Or maybe check on the other end?
       job.curScopeCtx = CurrentScopeContext.getThreadScopeContext();
       ScheduledJob.addToJobList(toRunLater, job);
+      return job;
+   }
+
+   public boolean clearInvokeLater(ScheduledJob job) {
+      return ScheduledJob.removeJobFromList(toRunLater, job);
    }
 
    public void execLaterJobs() {
