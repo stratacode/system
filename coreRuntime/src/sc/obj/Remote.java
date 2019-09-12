@@ -12,7 +12,9 @@ import java.lang.annotation.Target;
 /**
  * Provides manual control over the detection of remote methods.
  * <p>
- * Place this on a method so that it is treated as a remote method, not a local one, even if it's resolved in the same runtime.  You may want the call to be local from one runtime but remote from another.  Set the remoteRuntimes property to a comma separated list of runtimes that should treat this as a remote call.  Or you can set it be excluding the runtimes that should treat this as local by setting the localRuntimes.  Do not set both of these properties at the same time.
+ * Place this on a method so that it is treated as a remote method, not a local one, even if it's resolved and included in the same runtime.
+ * You may want the call to be local from one runtime but remote from another.  Set the remoteRuntimes property to a comma separated list of runtimes that should treat this as a remote call.
+ * Or you can set it be excluding the runtimes that should treat this as local by setting the localRuntimes.  Do not set both of these properties at the same time.
  * </p>
  */
 @Target({METHOD}) // TODO: should we support this at the layer, type, or field level?
