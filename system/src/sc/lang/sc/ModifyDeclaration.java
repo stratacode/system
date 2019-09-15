@@ -999,9 +999,9 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (annot != null)
          return annot;
 
-      // Then any modified extends
+      // Then any modified extends - not checking for layerTypes since we don't want to inherit annotations (and the layered system might not match for layers)
       Object annotObj;
-      if (extendsBoundTypes != null) {
+      if (extendsBoundTypes != null && !isLayerType) {
          for (Object extBoundType:extendsBoundTypes) {
             if (extBoundType != null) {
                annotObj = ModelUtil.getInheritedAnnotation(getJavaModel().getLayeredSystem(), extBoundType, annotationName, skipCompiled, refLayer, layerResolve);

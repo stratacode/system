@@ -151,17 +151,7 @@ public class LayerFileProcessor extends LayerFileComponent {
       if (fileLayer == null || generatedFile)
          return FileEnabledState.Enabled;
 
-      String filePathType = fileLayer.getSrcPathTypeName(pathName, abs);
-      if (srcPathTypes != null) {
-         for (int i = 0; i < srcPathTypes.length; i++) {
-            boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathType);
-            if (res)
-               return FileEnabledState.Enabled;
-         }
-      }
-      else if (filePathType == null)
-         return FileEnabledState.Enabled;
-      return FileEnabledState.NotEnabled;
+      return fileLayer.processorEnabledForPath(this, pathName, abs);
    }
 
    public FileEnabledState enabledFor(Layer layer) {

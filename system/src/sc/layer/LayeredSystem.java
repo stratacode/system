@@ -4191,7 +4191,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                          new Object[] { "variableName" , "parameterTypeName" },
                          null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
-         SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "cachedModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"},
+         SyncProperties modelProps = new SyncProperties(null, null, new Object[] {"layer", "srcFile", "needsModelText", "needsHTMLModelText", "cachedModelText", "cachedHTMLModelText", "needsGeneratedText", "cachedGeneratedText", "cachedGeneratedJSText", "cachedGeneratedSCText", "cachedGeneratedClientJavaText", "existsInJSRuntime", "layerTypeDeclaration"},
                                              null, SyncPropOptions.SYNC_INIT, globalScopeId);
          SyncManager.addSyncType(JavaModel.class, modelProps);
          SyncManager.addSyncType(SCModel.class, modelProps);

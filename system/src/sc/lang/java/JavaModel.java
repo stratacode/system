@@ -139,10 +139,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    // Set this to false for sync-layers and update-layers, i.e. which do not merge when they are transformed.
    public transient boolean mergeDeclaration = true;
 
-   // When needsModelText is set to true,
+   // Set when needsModelText is set to true,
    private transient String cachedModelText = null;
 
+   // Set when needsHTMLModelText is set to true,
+   private transient String cachedHTMLModelText = null;
+
    private transient boolean needsModelText = false;
+
+   private transient boolean needsHTMLModelText = false;
 
    // When needsGeneratedText is set to true,
    private transient String cachedGeneratedText = null;
@@ -1852,6 +1857,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
 
       newModel.setNeedsModelText(needsModelText);
+      newModel.setNeedsHTMLModelText(needsHTMLModelText);
       newModel.setNeedsGeneratedText(getNeedsGeneratedText());
 
       // If this instance is synchronized, replace it in the sync system with the newModel
@@ -2814,7 +2820,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void refreshModelText() {
-      setCachedModelText(getHTMLModelText());
+      setCachedModelText(getModelText());
+   }
+
+   public void refreshHTMLModelText() {
+      setCachedHTMLModelText(getHTMLModelText());
    }
 
    public void refreshGeneratedText() {
@@ -2826,6 +2836,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public void clearModelText() {
       setCachedModelText(null);
+   }
+
+   public void clearHTMLModelText() {
+      setCachedHTMLModelText(null);
    }
 
    public void clearGeneratedText() {
@@ -2844,6 +2858,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          refreshModelText();
       else
          clearModelText();
+      if (needsHTMLModelText)
+         refreshHTMLModelText();
+      else
+         clearHTMLModelText();
       if (getNeedsGeneratedText())
          refreshGeneratedText();
       else
@@ -2852,6 +2870,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       Bind.sendChangedEvent(this, "cachedGeneratedJSText");
       Bind.sendChangedEvent(this, "cachedGeneratedText");
       Bind.sendChangedEvent(this, "cachedModelText");
+      Bind.sendChangedEvent(this, "cachedHTMLModelText");
       Bind.sendChangedEvent(this, "cachedGeneratedSCText");
       Bind.sendChangedEvent(this, "cachedGeneratedClientJavaText");
       if (types != null && !removed) {
@@ -2991,7 +3010,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       // good to find a cleaner way to differentiate properties we set which are part of the previous state versus the recorded state.
       SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.RecordingChanges);
       if (val)
-         setCachedModelText(getHTMLModelText());
+         setCachedModelText(getModelText());
       else
          setCachedModelText(null);
       SyncManager.setSyncState(oldState);
@@ -2999,6 +3018,23 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public boolean getNeedsModelText() {
       return needsModelText;
+   }
+
+   @Bindable(manual=true)
+   public void setNeedsHTMLModelText(boolean val) {
+      needsHTMLModelText = val;
+      // We need to explicit tell the sync system this is to be recorded for the case where we are applying changes.  We use nestedBindingCount currently but it would
+      // good to find a cleaner way to differentiate properties we set which are part of the previous state versus the recorded state.
+      SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.RecordingChanges);
+      if (val)
+         setCachedHTMLModelText(getHTMLModelText());
+      else
+         setCachedHTMLModelText(null);
+      SyncManager.setSyncState(oldState);
+   }
+
+   public boolean getNeedsHTMLModelText() {
+      return needsHTMLModelText;
    }
 
    @Bindable(manual=true)
@@ -3017,9 +3053,19 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       Bind.sendChangedEvent(this, "cachedModelText");
    }
 
-   @sc.obj.HTMLSettings(returnsHTML=true)
    public String getCachedModelText() {
       return cachedModelText;
+   }
+
+   @Bindable(manual=true)
+   public void setCachedHTMLModelText(String str) {
+      cachedHTMLModelText = str;
+      Bind.sendChangedEvent(this, "cachedHTMLModelText");
+   }
+
+   @sc.obj.HTMLSettings(returnsHTML=true)
+   public String getCachedHTMLModelText() {
+      return cachedHTMLModelText;
    }
 
    @Bindable(manual=true)

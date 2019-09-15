@@ -342,7 +342,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    // Cached list of top level src directories - usually just the layer's directory path
    private List<String> topLevelSrcDirs;
 
-   /** Maintains an optional list of mappings between a path prefix */
+   /**
+    * Layers can call addSrcPath to register a source path directory that supports file types, and has a buildPrefix - for where
+    * any files generated from the source files are place.
+    */
    private List<SrcPathType> srcPathTypes;
 
    // Cached list of all directories in this layer that contain source
@@ -1856,6 +1859,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       boolean relative;
       /** The name of the path-type - e.g. 'web' or 'testFiles' */
       String pathTypeName;
+      /** Optionally inherit file processors from an existing type but using this new buildPrefix  */
+      String fromPathTypeName;
       /**
        * The build prefix to use when building files of this type.  The value which is used is relative to the buildLayer, allowing you to
        * reorganize files found in base-layers by adding a new layer and changing the buildPrefix for that file type..
@@ -1867,9 +1872,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             return "<null src path type>";
          if (srcPath == null && buildPrefix == null)
             return pathTypeName;
-         String buildPrefixStr = buildPrefix == null ? "" : '@' + buildPrefix;
+         String buildPrefixStr = buildPrefix == null ? "" : '@' + buildPrefix + (fromPathTypeName == null ? "" : " inherits from: " + fromPathTypeName);
          String srcPathStr = srcPath == null ? "" : ':' + srcPath;
          return pathTypeName + srcPathStr + buildPrefixStr;
+      }
+
+      public boolean inheritsFrom(Layer l, String pathTypeName) {
+         if (StringUtil.equalStrings(pathTypeName, fromPathTypeName))
+            return true;
+         if (fromPathTypeName != null) {
+            SrcPathType fromPathType = l.getSrcPathTypeByName(fromPathTypeName, true);
+            if (fromPathType != null) {
+               if (fromPathType.fromPathTypeName != null)
+                  return inheritsFrom(l, fromPathType.fromPathTypeName);
+            }
+         }
+         return false;
       }
    }
 
@@ -4434,19 +4452,23 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void addSrcPath(String srcPath, String srcPathType) {
-      addSrcPath(srcPath, srcPathType, null);
+      addSrcPath(srcPath, srcPathType, null, null);
    }
 
    public void setPathTypeBuildPrefix(String pathTypeName, String buildPrefix) {
-      addSrcPath(null, pathTypeName, buildPrefix);
+      addSrcPath(null, pathTypeName, buildPrefix, null);
    }
 
    /**
-    * Adds a new src path directory using the supplied srcPathType.  The srcPathType specifies rules for processing src files found there.
+    * Adds a new src directory to be searched for source files to an existing srcPathType or optionally creates a new srcPathType
+    * when called with a srcPathType, buildPrefix, and fromPathType.
+    * The srcPathType is a name that defines rules for processing src files in paths of that type.
     * For example for src files in the web directory, the srcPathType is 'web'.  If you want your files to be treated as ordinary source files
-    * use null for the srcPathType.  Each type can have an optional buildPrefix
+    * like Java files using the default build dir use null for the srcPathType.  Each srcPathType has an optional buildPrefix - prepended
+    * onto the path name of the file, relative to the srcPath directory.
+    * Specify a fromPathType to inherit the processors from a previous type, but to set a new buildPrefix for a given srcPath directory.
     */
-   public void addSrcPath(String srcPath, String srcPathType, String buildPrefix) {
+   public void addSrcPath(String srcPath, String srcPathType, String buildPrefix, String fromPathType) {
       boolean abs;
       // A null srcPath just sets the buildPrefix
       if (srcPath != null) {
@@ -4467,6 +4489,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          type.srcPath = srcPath;
          type.buildPrefix = buildPrefix;
          type.relative = !abs;
+         type.fromPathTypeName = fromPathType;
          if (srcPathTypes == null)
             srcPathTypes = new ArrayList<SrcPathType>();
          srcPathTypes.add(type);
@@ -4918,6 +4941,27 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             first = opAppend(sb, " syncMode=" + syncMode.toString(), first);
       }
       return first;
+   }
+
+   IFileProcessor.FileEnabledState processorEnabledForPath(IFileProcessor proc, String pathName, boolean abs) {
+      String[] srcPathTypes = proc.getSrcPathTypes();
+
+      SrcPathType filePathType = getSrcPathType(pathName, abs);
+      if (srcPathTypes != null) {
+         String filePathTypeName = filePathType == null ? null : filePathType.pathTypeName;
+         for (int i = 0; i < srcPathTypes.length; i++) {
+            String procSrcTypeName = srcPathTypes[i];
+            boolean res = StringUtil.equalStrings(srcPathTypes[i], filePathTypeName);
+            if (res)
+               return IFileProcessor.FileEnabledState.Enabled;
+            if (filePathType != null && filePathType.inheritsFrom(this, procSrcTypeName)) {
+               return IFileProcessor.FileEnabledState.Enabled;
+            }
+         }
+      }
+      else if (filePathType == null)
+         return IFileProcessor.FileEnabledState.Enabled;
+      return IFileProcessor.FileEnabledState.NotEnabled;
    }
 }
 

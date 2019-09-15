@@ -1,6 +1,7 @@
 package sc.layer;
 
 import sc.util.FileUtil;
+import sc.util.StringUtil;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -78,13 +79,21 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
          relFileName = relFileName.substring(skipSrcPathPrefix.length() + 1);
 
       String pathTypeName = srcEnt.layer.getSrcPathTypeName(srcEnt.absFileName, true);
-      String prefix = templatePrefix == null ? buildLayer.getSrcPathBuildPrefix(pathTypeName) : templatePrefix;
+      String pathBuildPrefix = buildLayer.getSrcPathBuildPrefix(pathTypeName);
+      //String prefix = templatePrefix == null ? pathBuildPrefix : templatePrefix;
+      String prefix = pathBuildPrefix == null ? templatePrefix : pathBuildPrefix;
 
+      /*
       if (pathTypeName != null && srcEnt.layer != null) {
+         // TODO: this seems like a property other than buildPrefix. Maybe SrcPathType becomes a component and
+         // SrcPathEntry is how you add a new path name.  The current method acts like addSrcPathTypeAndEntry(...)
          String remPrefix = srcEnt.layer.getSrcPathBuildPrefix(pathTypeName);
-         if (remPrefix != null && relFileName != null && relFileName.startsWith(remPrefix))
+         if (remPrefix != null && relFileName != null && relFileName.startsWith(remPrefix)) {
+            System.out.println("*** removing buildPrefix from: " + relFileName + " for type: " + pathTypeName);
             relFileName = relFileName.substring(remPrefix.length() + 1);
+         }
       }
+      */
 
       /*
       if (pathMapTable != null) {

@@ -63,6 +63,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public static boolean trace = false, verbose = false;
    private final static sc.type.IBeanMapper _startTagTxtProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "startTagTxt");
    private final static sc.type.IBeanMapper _innerHTMLProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "innerHTML");
+   private final static sc.type.IBeanMapper _changedCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Element.class, "changedCount");
 
    /** When a tag is invisible, instead of rendering the tag, we render the 'alt' child if there is one */
    private final static String ALT_ID = "alt";
@@ -120,6 +121,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient boolean needsSuper = false;
    private transient boolean needsBody = true;
+
+   private transient int bodyFieldIx = 0;
 
    private transient boolean convertingToObject = false;
 
@@ -2536,6 +2539,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return extRes;
    }
 
+   private Element getModifiedElement() {
+      if (tagObject instanceof ModifyDeclaration) {
+         ModifyDeclaration modType = (ModifyDeclaration) tagObject;
+         if (modType.modifyTypeDecl instanceof TypeDeclaration) {
+            Element modElem = ((TypeDeclaration) modType.modifyTypeDecl).element;
+            if (modElem != null)
+               return modElem;
+         }
+      }
+      return null;
+   }
+
    /** Called during transform to set properties specific to the java version of the StrataCode.
     * Used to modify the generated Java based on the merged version of the type, not know in convertToObject.  Specifically because the
     * exec attribute can affect the tag properties, but is not know until transform type because we create the tagObject during init.
@@ -3192,7 +3207,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                          else if (att.name.equals("repeat") || repeatWrapper != null) {
                             Object valuePropType =  ModelUtil.getEnclosingType(att.valueProp);
                             // The repeat and wrap attributes are set on the tag but are applied to the repeatWrapper class, not the tag class
-                            if (att.name.equals("repeat") || att.name.equals("wrap") ||
+                            // Also look for attributes that resolve to the repeatWrapper class only.
+                            if (att.name.equals("repeat") || att.name.equals("wrap") || att.name.equals("changedCount") ||
                                 (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
                                repeatWrapper.addBodyStatementIndent(pa);
                             else
@@ -3250,6 +3266,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             SemanticNodeList<Object> mods = new SemanticNodeList<Object>();
             mods.add("public");
             int resCt = 0;
+            if (isModify) {
+               // Since this element is being built from the same class, need to start the count at where the base type left off
+               // or we end up using the same fields and stomping on the content of the base class
+               Element modElem = getModifiedElement();
+               if (modElem != null)
+                  resCt = modElem.bodyFieldIx;
+            }
 
             // TODO: test this and put it back in!  It should work and reduces the code a bit
             // As an optimization, omit the outputStartTag method when it's a really simple case.
@@ -3324,7 +3347,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      displayWarning("Use of addBefore/addAfter with bodyMerge='append' - not appending to eliminate duplicate content");
                }
 
-               addToOutputMethod(tagType, outputBodyMethod.body, template, doOutputBody, uniqueChildren, resCt, true);
+               bodyFieldIx = addToOutputMethod(tagType, outputBodyMethod.body, template, doOutputBody, uniqueChildren, resCt, true);
 
                if (bodyMerge == MergeMode.Prepend) {
                   if (uniqueChildren == children) {
@@ -3654,7 +3677,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("strong", "element", emptyArgs, null);
       addTagAttributes("header", "element", emptyArgs, null);
       addTagAttributes("footer", "element", emptyArgs, null);
-      addTagAttributes("meta", "element", emptyArgs, null);
+      addTagAttributes("meta", "element", new String[] {"charset", "content", "name"}, null);
       addTagAttributes("iframe", "element", new String[] {"src", "width", "height", "name", "sandbox", "seamless"}, new String[] {"src"});
       addTagAttributes("fieldset", "element", emptyArgs, null);
       addTagAttributes("legend", "element", emptyArgs, null);
@@ -3739,6 +3762,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("refreshBindings");
       behaviorAttributes.add("wrap");
       behaviorAttributes.add("bodyOnly");
+      behaviorAttributes.add("changedCount");
       behaviorAttributes.add(ALT_ID);
 
       // For select only
@@ -5562,4 +5586,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return null;
    }
 
+   private int changedCount;
+   @Bindable(manual=true) public Object getChangedCount() {
+      return changedCount;
+   }
+   @Bindable(manual=true) public void setChangedCount(int _changedCount) {
+      changedCount = _changedCount;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _changedCountProp, _changedCount);
+   }
 }
