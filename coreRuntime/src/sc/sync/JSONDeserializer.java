@@ -65,7 +65,7 @@ public class JSONDeserializer {
             // The default is an object definition - simply "objectName": { "prop": val }
             else {
                setCurrentObjByName(cmdName.toString());
-               parseSubs();
+               parseSubs(false);
                popCurrentObj();
             }
             parseCmdClose();
@@ -179,7 +179,7 @@ public class JSONDeserializer {
       return sz == 0 ? null : curObjs.get(sz-1);
    }
 
-   public void parseSubs() {
+   public void parseSubs(boolean isMap) {
       if (!parser.parseCharToken('{')) {
          throw new IllegalArgumentException("Expecting object definition at: " + parser);
       }
@@ -215,13 +215,13 @@ public class JSONDeserializer {
                   // Collect the object value as a HashMap in case it's a Map property.  We'll get an error when we try to set it if it's not a map property
                   HashMap mapVal = new HashMap();
                   pushCurrentObj(mapVal, nextNameStr);
-                  parseSubs();
+                  parseSubs(true);
                   popCurrentObj();
                   propVal = mapVal;
                }
                else {
                   pushCurrentObj(inst, nextNameStr);
-                  parseSubs();
+                  parseSubs(false);
                   popCurrentObj();
                   isProp = false;
                }
@@ -234,7 +234,7 @@ public class JSONDeserializer {
                      boolean skipSet = false;
                      if (!mgr.syncDestination.clientDestination) {
                         objType = DynUtil.getSType(curObj);
-                        if (!mgr.isSynced(objType, nextNameStr)) {
+                        if (!isMap && !mgr.isSynced(objType, nextNameStr)) {
                            System.err.println("Not allowed to set unsynchronized property from json: " + DynUtil.getTypeName(objType, true) + "." + nextNameStr);
                            boolean isSynced = !mgr.isSynced(objType, nextNameStr);
                            skipSet = true;
