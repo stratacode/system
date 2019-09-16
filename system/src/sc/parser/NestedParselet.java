@@ -9,6 +9,7 @@ import sc.dyn.IDynObject;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.ITypeDeclaration;
+import sc.lang.java.IdentifierExpression;
 import sc.type.RTypeUtil;
 import sc.type.BeanMapper;
 import sc.util.FileUtil;
@@ -2488,8 +2489,18 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
 
          Parselet p = parselets.get(pix);
-         if (!(childParseRes instanceof IParseNode))
+         if (!(childParseRes instanceof IParseNode)) {
+            // If this is an element like 'expression' which has been generated as a string, we still
+            // need to skip an array element here to keep the list remaining value in sync with the parse node tree
+            if (parameterMapping != null && childParseRes != null) {
+               switch (parameterMapping[pix]) {
+                  case ARRAY:
+                     ix++;
+                     break;
+               }
+            }
             continue;
+         }
          if (parameterMapping != null) {
             IParseNode childParseNode = (IParseNode) childParseRes;
             switch (parameterMapping[pix]) {
