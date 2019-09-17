@@ -493,9 +493,27 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return true;
    }
 
+   private int shallowIndexOf(Object find) {
+      //int ix = indexOf(toReplace);
+      int sz = size();
+      for (int i = 0; i < sz; i++) {
+         Object elem = get(i);
+         if (elem == find) {
+            return i;
+         }
+      }
+      return -1;
+   }
+
    /** Find the supplied node in our list, and replace it with the other one */
    public int replaceChild(Object toReplace, Object other) {
-      int ix = indexOf(toReplace);
+      //int ix = indexOf(toReplace);
+      // Don't want to do 'equals' here which turns into 'deepEquals' in SemanticNode because we might find a different version of the
+      // same statement and replace the wrong instance.
+      // TODO: should we revisit having 'equals' map to deepEquals in semantic node? It seems like a separate operation might be more
+      // robust and less error prone.
+      int ix = shallowIndexOf(toReplace);
+
       if (ix == -1) {
          return -1;
       }
