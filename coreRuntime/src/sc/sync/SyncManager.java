@@ -2446,7 +2446,6 @@ public class SyncManager {
    }
 
    public static void addSyncType(Object type, SyncProperties props) {
-      SyncProperties old = null;
       // If no specific destination is given, register it for all destinations
       if (props.destName == null) {
          for (SyncManager mgr:syncManagers) {
@@ -2464,9 +2463,61 @@ public class SyncManager {
       }
    }
 
+   public static void replaceSyncType(Object oldType, Object newType, SyncProperties props) {
+      // If no specific destination is given, register it for all destinations
+      if (props.destName == null) {
+         for (SyncManager mgr:syncManagers) {
+            mgr.doReplaceSyncType(oldType, newType, props);
+         }
+         // Keep track of all global sync types added in case the SyncManager has not yet been created
+         globalSyncTypes.remove(oldType);
+         globalSyncTypes.put(newType, props);
+      }
+      else {
+         SyncManager syncMgr = getSyncManager(props.destName);
+         if (syncMgr == null) {
+            throw new IllegalArgumentException("*** No sync destination registered for: " + props.destName);
+         }
+         syncMgr.doReplaceSyncType(oldType, newType, props);
+      }
+   }
+
+   private void doReplaceSyncType(Object oldType, Object newType, SyncProperties newProps) {
+      SyncProperties oldProps = syncTypes.remove(oldType);
+      if (oldProps == null) {
+         System.err.println("*** replace sync type - no sync properties for old type:" + oldType);
+      }
+
+      // In some cases we've updated a type in the chain - so the sync properties have changed but the type is the same type
+      SyncProperties otherOld = syncTypes.put(newType, newProps);
+
+      if (oldProps == null && otherOld != null)
+         oldProps = otherOld;
+
+      if (verbose)
+         System.out.println("Replacing sync type: " + DynUtil.getTypeName(newType, false));
+
+      updateSyncProperties(newType, oldProps, newProps);
+   }
+
    private void addNewSyncType(Object type, SyncProperties syncProps) {
       SyncProperties old = syncTypes.put(type, syncProps);
-      if (old != null && old != type && !old.equals(type)) {
+      updateSyncProperties(type, old, syncProps);
+
+      if (verbose && old == null) {
+         System.out.println("New synchronized type: " + DynUtil.getInstanceName(type) + " properties: " + syncProps);
+      }
+
+      // TODO: do we need to support static synchronized properties? We could basically call addSyncInst here with the type as the inst
+      // but there's the issue of how to support sharing and synchronization. Using a separate instance to hold the
+      // static properties lets you put that object into different scopes etc. Maybe there's a use case in server-to-server synchronization?
+      if (syncProps.staticProps != null && old == null) {
+         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + syncProps);
+      }
+   }
+
+   private void updateSyncProperties(Object type, SyncProperties old, SyncProperties syncProps) {
+      if (old != null && old != syncProps && !old.equals(syncProps)) {
          SyncContext ctx = syncProps.defaultScopeId == -1 ? getDefaultSyncContext() : getSyncContext(syncProps.defaultScopeId, false);
          if (ctx != null) {
             // TODO: only considering new properties added to the sync type - this would happen if we updated the type to add a field for example.
@@ -2480,19 +2531,10 @@ public class SyncManager {
                      ctx.initPropertyListeners(null, ent.getKey(), ii, newProps, false, syncProps, false, true, null);
                   }
                }
+               if (verbose)
+                  System.out.println("Added listeners for new sync'd properties: " + Arrays.asList(newProps));
             }
          }
-      }
-
-      if (verbose && old == null) {
-         System.out.println("New synchronized type: " + DynUtil.getInstanceName(type) + " properties: " + syncProps);
-      }
-
-      // TODO: do we need to support static synchronized properties? We could basically call addSyncInst here with the type as the inst
-      // but there's the issue of how to support sharing and synchronization. Using a separate instance to hold the
-      // static properties lets you put that object into different scopes etc. Maybe there's a use case in server-to-server synchronization?
-      if (syncProps.staticProps != null && old == null) {
-         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + syncProps);
       }
    }
 

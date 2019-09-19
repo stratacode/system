@@ -4,6 +4,7 @@
 
 package sc.sync;
 
+import sc.dyn.DynUtil;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 
@@ -57,5 +58,20 @@ public class SyncPropOptions {
       if ((flags & SYNC_STATIC) != 0)
          sb.append(" (static)");
       return sb.toString();
+   }
+
+   public int hashCode() {
+      return propName == null ? 0 : propName.hashCode();
+   }
+
+   public boolean equals(Object other) {
+      if (!(other instanceof SyncPropOptions))
+         return false;
+      SyncPropOptions op = (SyncPropOptions) other;
+      if (op.flags != flags)
+         return false;
+      if (DynUtil.equalObjects(op.propName, propName))
+         return false;
+      return true;
    }
 }
