@@ -1132,4 +1132,11 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return ModelUtil.typeIsVoid(getTypeDeclaration());
    }
 
+   public boolean getNotFoundError() {
+      if (super.getNotFoundError())
+         return true;
+      if (replacedByStatement != null)
+         return replacedByStatement.getNotFoundError();
+      return false;
+   }
 }

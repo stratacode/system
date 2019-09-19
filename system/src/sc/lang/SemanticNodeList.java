@@ -897,4 +897,8 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       }
       out.currentListId = saveCurrentListId;
    }
+
+   public ParseRange getNodeErrorRange() {
+      return null;
+   }
 }

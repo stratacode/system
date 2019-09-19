@@ -20,6 +20,13 @@ public class PrimitiveType extends JavaType {
       return res;
    }
 
+   public static PrimitiveType createArray(String typeName, int ndim) {
+      PrimitiveType res = new PrimitiveType();
+      res.typeName = typeName;
+      res.arrayDimensions = getDimsStr(ndim);
+      return res;
+   }
+
    public Class getRuntimeBaseClass() {
       if (typeName == null) {
          System.out.println("*** Error - invalid primitive type");
@@ -135,7 +142,7 @@ public class PrimitiveType extends JavaType {
 
    @Override
    public String toGenerateString() {
-      return typeName;
+      return typeName + (arrayDimensions == null ? "" : arrayDimensions);
    }
 
    @Override

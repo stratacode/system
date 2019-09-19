@@ -700,7 +700,7 @@ public class TransformUtil {
       }
 
       Template res = TransformUtil.parseTemplate(templateBuf.toString(), params, false, null);
-      res.setSrcFile(new SrcEntry(null, resourcePath, resourcePath, resourcePath));
+      res.setSrcFile(new SrcEntry(null, resourcePath, resourcePath, resourcePath, null));
       templateResourceCache.put(templateResourceTypeName, res);
       return res;
    }

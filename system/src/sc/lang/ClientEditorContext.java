@@ -23,8 +23,10 @@ public abstract class ClientEditorContext {
    public LayeredSystem system;
 
    JavaModel pendingModel = null;
-   LinkedHashSet<JavaModel> changedModels = new LinkedHashSet<JavaModel>();
-   LinkedHashMap<SrcEntry, Object> errorModels = new LinkedHashMap<SrcEntry, Object>();
+   @Bindable(manual=true)
+   public LinkedHashSet<JavaModel> changedModels = new LinkedHashSet<JavaModel>();
+   @Bindable(manual=true)
+   public LinkedHashMap<SrcEntry, List<ModelError>> errorModels = new LinkedHashMap<SrcEntry, List<ModelError>>();
 
    // TODO: shouldn't the command line handle runtime types as well?
    ArrayList<BodyTypeDeclaration> currentTypes = new ArrayList<BodyTypeDeclaration>();
@@ -38,7 +40,17 @@ public abstract class ClientEditorContext {
 
    public String layerPrefix;
 
-   HashMap<SrcEntry,MemoryEditSession> memSessions = new HashMap<SrcEntry, MemoryEditSession>();
+   @Bindable(manual=true)
+   HashMap<SrcEntry,MemoryEditSession> memSessions = null;
+
+   public void setMemSessions(HashMap<SrcEntry,MemoryEditSession> msMap) {
+      this.memSessions = msMap;
+      Bind.sendChangedEvent(this, "memSessions");
+   }
+
+   public HashMap<SrcEntry,MemoryEditSession> getMemSessions() {
+      return this.memSessions;
+   }
 
    private boolean memorySessionChanged = false;
 
@@ -58,62 +70,77 @@ public abstract class ClientEditorContext {
    }
 
    public boolean hasAnyMemoryEditSession(boolean memorySessionChanged) {
-      return memorySessionChanged || memSessions.size() > 0;
+      return memorySessionChanged || (memSessions != null && memSessions.size() > 0);
    }
 
-   public String getModelText(JavaModel model) {
+   /** Returns the current modelText to display. The extra modelText param is for receiving data binding events on the client */
+   public String getModelText(JavaModel model, String modelText) {
       MemoryEditSession mes = getMemorySession(model.getSrcFile());
       if (mes == null)
-         return model.getModelText();
-      return mes.text;
+         return modelText;
+      return mes.getText();
    }
 
    public String getMemoryEditSessionText(SrcEntry ent) {
-      MemoryEditSession mes = memSessions.get(ent);
+      MemoryEditSession mes = memSessions == null ? null : memSessions.get(ent);
       if (mes == null)
          return null;
-      return mes.text;
+      return mes.getText();
    }
 
    public int getMemoryEditCaretPosition(SrcEntry ent) {
-      MemoryEditSession mes = memSessions.get(ent);
+      MemoryEditSession mes = memSessions == null ? null : memSessions.get(ent);
       if (mes == null)
          return -1;
-      return mes.caretPosition;
+      return mes.getCaretPosition();
    }
 
    public String getMemoryEditSessionOrigText(SrcEntry ent) {
-      MemoryEditSession mes = memSessions.get(ent);
+      MemoryEditSession mes = memSessions == null ? null : memSessions.get(ent);
       if (mes == null)
          return null;
-      return mes.origText;
+      return mes.getOrigText();
    }
 
    public MemoryEditSession getMemorySession(SrcEntry ent) {
-      return memSessions.get(ent);
+      return memSessions == null ? null : memSessions.get(ent);
    }
 
    public void changeMemoryEditSession(String text, JavaModel model, int caretPos) {
       SrcEntry ent = model.getSrcFile();
-      MemoryEditSession sess = memSessions.get(ent);
+      MemoryEditSession sess = null;
+      HashMap<SrcEntry, MemoryEditSession> newMemSessions = null;
+      if (memSessions == null) {
+         newMemSessions = new HashMap<SrcEntry,MemoryEditSession>();
+      }
+      else
+         sess = memSessions.get(ent);
       if (sess == null) {
          sess = new MemoryEditSession();
-         sess.origText = model.toLanguageString();
-         memSessions.put(ent, sess);
+         sess.setOrigText(model.toLanguageString());
+         if (newMemSessions == null)
+            newMemSessions = new HashMap<SrcEntry,MemoryEditSession>(memSessions);
+         newMemSessions.put(ent, sess);
       }
-      sess.text = text;
+      sess.setText(text);
       sess.model = model;
-      sess.caretPosition = caretPos;
+      sess.setCaretPosition(caretPos);
       setMemorySessionChanged(true);
-   }
 
+      if (newMemSessions != null) {
+         memSessions = newMemSessions;
+         Bind.sendChange(this, "memSessions", memSessions);
+      }
+   }
 
    public void cancelMemorySessionChanges() {
       boolean anySaved = false;
+      if (memSessions == null)
+         return;
       for (MemoryEditSession mes:memSessions.values()) {
-         mes.text = mes.origText;
-         if (mes.saved) {
-            mes.model.saveModelTextToFile(mes.origText);
+         mes.setText(mes.getOrigText());
+         if (mes.getSaved()) {
+            mes.model.saveModelTextToFile(mes.getOrigText());
             anySaved = true;
          }
          // Need to refresh the editor anyway even if the model itself did not changed
@@ -123,10 +150,12 @@ public abstract class ClientEditorContext {
       if (anySaved)
          doRefresh();
       else
-         memSessions.clear();
+         memSessions = new HashMap<SrcEntry,MemoryEditSession>();
 
       if (memSessions.size() == 0)
          setMemorySessionChanged(false);
+
+      Bind.sendChange(this, "memSessions", memSessions);
    }
 
    abstract void doRefresh();
@@ -150,16 +179,16 @@ public abstract class ClientEditorContext {
    public String getErrors(JavaModel model, int changedValue) {
       if (model == null)
          return "<null model>";
-      Object errorObj = errorModels.get(model.getSrcFile());
-      if (errorObj instanceof JavaModel) {
-         return ((JavaModel) errorObj).errorMessages.toString();
-      }
-      else if (errorObj instanceof String) {
-         return (String) errorObj;
-      }
-      else if (errorObj == null)
+      List<ModelError> errors = errorModels.get(model.getSrcFile());
+      if (errors == null)
          return null;
-      return "???";
+      StringBuilder sb = new StringBuilder();
+      for (ModelError error:errors) {
+         if (sb.length() > 0)
+            sb.append("\n");
+         sb.append(error.error);
+      }
+      return sb.toString();
    }
 
    @Bindable(manual=true)

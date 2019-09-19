@@ -7,10 +7,7 @@ package sc.lang;
 import sc.binf.ModelOutStream;
 import sc.js.JSSettings;
 import sc.obj.EditorSettings;
-import sc.parser.IParseNode;
-import sc.parser.IStyleAdapter;
-import sc.parser.Language;
-import sc.parser.Parselet;
+import sc.parser.*;
 
 import java.util.IdentityHashMap;
 
@@ -68,6 +65,9 @@ public interface ISemanticNode {
 
    /** Returns null or an error string for this node */
    public String getNodeErrorText();
+
+   /** Returns null to mark the entire node - otherwise return a range that's more convenient for marking */
+   public ParseRange getNodeErrorRange();
 
    /** Returns true if this is a special "not found" error */
    public boolean getNotFoundError();

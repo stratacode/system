@@ -1151,4 +1151,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
          out.writeValue(val);
       }
    }
+
+   public ParseRange getNodeErrorRange() {
+      return null;
+   }
 }

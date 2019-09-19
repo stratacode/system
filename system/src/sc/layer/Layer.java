@@ -342,6 +342,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    // Cached list of top level src directories - usually just the layer's directory path
    private List<String> topLevelSrcDirs;
 
+   /** parallel list to topLevelSrcDirs that specifies the 'rootName' to identify a source root outside of the layer dir with a simple name */
+   private List<String> srcRootNames = null;
+
    /**
     * Layers can call addSrcPath to register a source path directory that supports file types, and has a buildPrefix - for where
     * any files generated from the source files are place.
@@ -350,6 +353,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    // Cached list of all directories in this layer that contain source
    private List<String> srcDirs = new ArrayList<String>();
+   private List<String> srcDirRootNames = null; // If there are multiple external source roots, a parallel array to srcDirs that stores the names of the root dir for each srcDir in the tree
 
    private Map<String, TreeSet<String>> relSrcIndex = new TreeMap<String, TreeSet<String>>();
 
@@ -639,7 +643,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          relFilePath = subPath + ".class";
          File res = findClassFile(relFilePath, false);
          if (res != null)
-            return new SrcEntry(this, res.getPath(), relFilePath, prependPackage);
+            return new SrcEntry(this, res.getPath(), relFilePath, prependPackage, null);
       }
       return null;
    }
@@ -917,11 +921,34 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          warn("No srcPath entries for layer: ", this.toString());
       }
       else {
+         TreeSet<String> srcDirNames = new TreeSet<String>();
+         int ct = 0;
          for (String topLevelSrcDir : topLevelSrcDirs) {
+            String srcRootName = null;
             if (!FileUtil.isAbsolutePath(topLevelSrcDir))
                topLevelSrcDir = FileUtil.concat(layerPathName, topLevelSrcDir);
-            SrcEntry newSrcEnt = new SrcEntry(this, topLevelSrcDir, "", "");
+            else {
+               if (!topLevelSrcDir.startsWith(layerPathName)) {
+                  String dirName = FileUtil.getFileName(topLevelSrcDir);
+                  String srcName = dirName;
+                  int ix = 1;
+                  while (srcDirNames.contains(srcName))
+                     srcName = dirName+(ix++);
+                  srcRootName = srcName;
+                  srcDirNames.add(srcRootName);
+               }
+            }
+            SrcEntry newSrcEnt = new SrcEntry(this, topLevelSrcDir, "", "", srcRootName);
             bd.addSrcEntry(-1, newSrcEnt);
+            if (srcRootName != null) {
+               if (srcRootNames == null) {
+                  srcRootNames = new ArrayList<String>();
+                  for (int j = 0; j < ct; j++)
+                     srcRootNames.add(null);
+               }
+               srcRootNames.add(srcRootName);
+            }
+            ct++;
          }
       }
    }
@@ -1646,11 +1673,13 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (dir.contains("${"))
             System.err.println("Layer: " + getLayerName() + ": Unrecognized variable in srcPath: " + dir);
          File dirFile = new File(dir);
-         if (!addSrcFilesToCache(dirFile, "", replacedTypes)) {
+         if (!addSrcFilesToCache(dirFile, "", replacedTypes, srcRootNames == null ? null : srcRootNames.get(i))) {
             // For hierarchical projects it's easier to specify all possible src dirs, even if some do not exist.  This is thus a warning, not an error
             warn("Missing src dir: " + dir);
             // Actually remove this so it does not end up in the index
             topLevelSrcDirs.remove(i);
+            if (srcRootNames != null)
+               srcRootNames.remove(i);
             i--;
          }
       }
@@ -1678,7 +1707,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                if (!f.isDirectory())
                   System.err.println("*** Unable to open preCompiledSrcPath directory: " + preCompiledDir);
                else
-                  addSrcFilesToCache(f, "", replacedTypes);
+                  addSrcFilesToCache(f, "", replacedTypes, null);
             }
          }
       }
@@ -1720,10 +1749,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          System.err.println(sb);
    }
 
-   private boolean addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes) {
+   private boolean addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes, String rootName) {
       String srcDirPath = dir.getPath();
-      if (!srcDirs.contains(srcDirPath))
+      if (!srcDirs.contains(srcDirPath)) {
          srcDirs.add(srcDirPath);
+         if (srcDirRootNames == null && rootName != null) {
+            srcDirRootNames = new ArrayList<String>(srcDirs.size());
+            for (int i = 0; i < srcDirs.size()-1; i++)
+               srcDirRootNames.add(null);
+         }
+         if (srcDirRootNames != null)
+            srcDirRootNames.add(rootName);
+      }
 
       String[] files = dir.list();
       if (files == null) {
@@ -1778,7 +1815,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
          else if (!excludedFile(fn, prefix)) {
             if (f.isDirectory()) {
-               if (!addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes)) {
+               if (!addSrcFilesToCache(f, FileUtil.concat(prefix, f.getName()), replacedTypes, rootName)) {
                   warn("Invalid child src directory: " + f);
                }
             }
@@ -2863,6 +2900,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       //if (topLevelSrcDirs == null)
       //   initSrcDirs();
       if (topLevelSrcDirs != null) {
+         int ix = 0;
          for (String dir : topLevelSrcDirs) {
             if (absFileName.startsWith(dir)) {
                checkIfStarted();
@@ -2872,8 +2910,9 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   rest = rest.substring(1);
                File f = srcDirCache.get(rest);
                if (f != null)
-                  return new SrcEntry(this, absFileName, rest);
+                  return new SrcEntry(this, absFileName, rest, true, srcRootNames == null ? null : srcRootNames.get(ix));
             }
+            ix++;
          }
       }
       // else - we can get here in some cases where we are not started... e.g. looking for source files in separate layers when we are not a separate layer.
@@ -2902,6 +2941,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (f != null) {
          String path = f.getPath();
          String ext = FileUtil.getExtension(path);
+         // TODO: need a new index to get the srcRootName for this srcEntry? Right now we only use it for directories so it's probably ok?
          return new SrcEntry(this, path, srcName + "." + ext, prependPackage);
       }
       else if (srcDirZipFiles != null) {
@@ -3457,7 +3497,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (srcDir.startsWith(layerPathName) && (pathLen = layerPathName.length()) + 1 < srcDir.length()) {
             relDir = srcDir.substring(pathLen+1);
          }
-         refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo, active);
+         refreshDir(srcDir, relDir, lastRefreshTime, ctx, changedModels, updateInfo, active, srcDirRootNames == null ? null : srcDirRootNames.get(i));
       }
    }
 
@@ -3480,7 +3520,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public void refreshDir(String srcDir, String relDir, long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active) {
+   public void refreshDir(String srcDir, String relDir, long lastRefreshTime, ExecutionContext ctx, List<ModelUpdate> changedModels, UpdateInstanceInfo updateInfo, boolean active, String srcRootName) {
       File f = new File(srcDir);
       long newTime = -1;
       String prefix = relDir == null ? "" : relDir;
@@ -3494,7 +3534,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       if (lastRefreshTime == -1 || (newTime = f.lastModified()) > lastRefreshTime) {
          // First update the src cache to pick up any new files, refresh any models we find in there when ctx is not null
-         addSrcFilesToCache(f, prefix, null);
+         addSrcFilesToCache(f, prefix, null, srcRootName);
          findRemovedFiles(changedModels);
       }
 
@@ -3506,11 +3546,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (subF.isDirectory()) {
             if (!excludedFile(subF.getName(), prefix)) {
                // Refresh anything that might have changed
-               refreshDir(path, FileUtil.concat(relDir, subF.getName()), lastRefreshTime, ctx, changedModels, updateInfo, active);
+               refreshDir(path, FileUtil.concat(relDir, subF.getName()), lastRefreshTime, ctx, changedModels, updateInfo, active, srcRootName);
             }
          }
          else if (Language.isParseable(path) || (proc = layeredSystem.getFileProcessorForFileName(path, this, BuildPhase.Process)) != null) {
-            SrcEntry srcEnt = new SrcEntry(this, srcDir, relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
+            SrcEntry srcEnt = new SrcEntry(this, srcDir, relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage(), srcRootName);
             ILanguageModel oldModel = layeredSystem.getLanguageModel(srcEnt, active, null, active);
             long newLastModTime = new File(srcEnt.absFileName).lastModified();
             if (oldModel == null) {
@@ -4896,8 +4936,11 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    }
 
    public void removeSrcDir(String srcDir, List<ModelUpdate> changedModels) {
-      if (topLevelSrcDirs.contains(srcDir)) {
+      int srcDirIx = topLevelSrcDirs.indexOf(srcDir);
+      if (srcDirIx != -1) {
          topLevelSrcDirs.remove(srcDir);
+         if (srcRootNames != null)
+            srcRootNames.remove(srcDirIx);
       }
       findRemovedFiles(changedModels);
    }

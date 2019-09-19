@@ -7272,7 +7272,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                         IFileProcessor proc = curSys.getFileProcessorForFileName(path, newLayer, BuildPhase.Process);
                         if (proc != null) {
-                           SrcEntry srcEnt = new SrcEntry(newLayer, relDir == null ? newLayer.layerPathName : FileUtil.concat(newLayer.layerPathName, relDir), relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage());
+                           // TODO: not restoring the srcRootName here... should we have a way to look it up or store it in the index? Right now, it's not really used in the inactive model - just for incremental builds
+                           SrcEntry srcEnt = new SrcEntry(newLayer, relDir == null ? newLayer.layerPathName : FileUtil.concat(newLayer.layerPathName, relDir), relDir == null ? "" : relDir, subF.getName(), proc == null || proc.getPrependLayerPackage(), null);
                            String typeName = srcEnt.getTypeName();
                            TypeDeclaration newType = (TypeDeclaration) curSys.getSrcTypeDeclaration(typeName, newLayer.getNextLayer(), true, false, true, newLayer, curTypeIndexEntry != null && curTypeIndexEntry.isLayerType);
                            if (newType != null) {
@@ -8127,7 +8128,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             // If the layer is buildSeparate, we do not include it even for common build dirs... it will depend in that case on the lang files and
             // we do not want that part of the deployed project.
             // Using the "modifiedByLayer" to detect any dependency on that layer, whether direct or indirect - i.e. we might be example.todo.data which extends html.schtml but not jetty.schtml, but if it's in front of us in the stack, we need to build it because our compiled code will depend on it.
-            if (!layer.buildSeparate && ((options.useCommonBuildDir && genLayer == commonBuildLayer) || (layer == buildLayer || /* layer == lastCompiledLayer || */ genLayer == layer || modifiedByLayers(startedLayers, layer)) || ((genLayer == buildLayer /*|| genLayer == lastCompiledLayer*/) /*&& (options.buildAllLayers || !bd.generatedLayers.contains(layer)) */))) {
+            if (!layer.buildSeparate && ((options.useCommonBuildDir && genLayer == commonBuildLayer) || (layer == buildLayer ||
+                 /* layer == lastCompiledLayer || */ genLayer == layer || modifiedByLayers(startedLayers, layer)) ||
+                 ((genLayer == buildLayer /*|| genLayer == lastCompiledLayer*/) /*&& (options.buildAllLayers || !bd.generatedLayers.contains(layer)) */))) {
                // Do we generate a layer more than once?   The first time we generate it, we add it to generatedLayers.
                // If this is the final build layer or it's the commond build layer we need to generate all of the files
                // again for accuracy.  It's possible that a type extends a type which was modified in a layer after the
@@ -8153,7 +8156,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
          startedLayers.add(genLayer);
-         SrcEntry layerSrcEnt = new SrcEntry(genLayer, genLayer.layerPathName, "", "");
+         SrcEntry layerSrcEnt = new SrcEntry(genLayer, genLayer.layerPathName, "", "", null);
          bd.addSrcEntry(-1, layerSrcEnt);
       }
 
@@ -8215,7 +8218,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       HashSet<String> allGeneratedTypes = new HashSet<String>();
 
       // For each directory or src file we need to look at.  Top level directories are put into this list before we begin.
-      // As we find a sub-directory we insert it into the list from inside the loop.
+      // As we find a sub-directory we insert it into the bd.srcEnts list from inside the loop.
       // This loop will find all of the files that have changed across all srcDirs.  It builds a SrcDirEnt for each
       // directory containing source files, and for each of those a 'toGenerate' list - the models in that file that
       // have changed, or depend on a file which has changed (for incremental builds).
@@ -8224,9 +8227,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          String srcDirName = srcEnt.absFileName;
          String srcPath = srcEnt.relFileName;
          LinkedHashSet<SrcEntry> toGenerate = new LinkedHashSet<SrcEntry>();
+         String srcRootPath = srcEnt.srcRootName == null ? "" : "--" + srcEnt.srcRootName;
+         String srcRootName = srcEnt.srcRootName;
 
          File srcDir = new File(srcDirName);
-         File depFile = new File(genLayer.buildSrcDir, FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath, srcEnt.layer.getLayerName().replace('.', '-') + "-" + phase.getDependenciesFile()));
+         File depFile = new File(genLayer.buildSrcDir, FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath, srcEnt.layer.getLayerName().replace('.', '-') + srcRootPath + "-" + phase.getDependenciesFile()));
          boolean depsChanged = false;
 
          DependencyFile deps;
@@ -8245,7 +8250,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // No dependencies or the layer def file changed - just add all of the files in this directory for generation
          if (!incrCompile || !depFileExists || (lastBuildTime = depFile.lastModified()) == 0 ||
                  (lastBuildTime < srcEnt.layer.getLastModifiedTime())) {
-            addAllFiles(srcEnt.layer, toGenerate, allGenerated, allGeneratedTypes, srcDir, srcDirName, srcPath, phase, bd);
+            addAllFiles(srcEnt.layer, toGenerate, allGenerated, allGeneratedTypes, srcDir, srcDirName, srcPath, phase, bd, srcRootName);
             // Do a clean build the first time.  The second and subsequent times we need to load the existing deps file because we do not stop and restart all components even when build all is true.
             if (!systemCompiled || !depFileExists)
                deps = DependencyFile.create();
@@ -8261,7 +8266,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // Failed to read dependencies
             if (deps == null) {
-               addAllFiles(srcEnt.layer, toGenerate, allGenerated, allGeneratedTypes, srcDir, srcDirName, srcPath, phase, bd);
+               addAllFiles(srcEnt.layer, toGenerate, allGenerated, allGeneratedTypes, srcDir, srcDirName, srcPath, phase, bd, srcRootName);
                deps = new DependencyFile();
                deps.depList = new ArrayList<DependencyEntry>();
                depsChanged = true;
@@ -8298,14 +8303,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      if (deps.getDependencies(newFile) == null) {
                         if (new File(newFile).isDirectory()) {
                            // Pick up new directories that were added
-                           SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, newFile, proc == null || proc.getPrependLayerPackage());
+                           SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, newFile, proc == null || proc.getPrependLayerPackage(), srcRootName);
                            bd.addSrcEntry(i+1, newSrcEnt);
                            deps.addDirectory(newFile);
                            depsChanged = true;
                         }
                         else if (needsGeneration(newPath, srcEnt.layer, phase) &&
                                 !srcEnt.layer.layerBaseName.equals(newFile) && !srcEnt.layer.excludedFile(newFile, srcDirName)) {
-                           SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, newFile, proc == null || proc.getPrependLayerPackage());
+                           SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, newFile, proc == null || proc.getPrependLayerPackage(), srcRootName);
                            if (!allGenerated.contains(newSrcEnt)) {
                               addToGenerateList(toGenerate, newSrcEnt, newSrcEnt.getTypeName());
                               allGenerated.add(newSrcEnt);
@@ -8324,7 +8329,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                   // We have a directory - add that to be processed next
                   if (ent.isDirectory) {
-                     SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, srcFileName);
+                     SrcEntry newSrcEnt = new SrcEntry(srcEnt.layer, srcDirName, srcPath, srcFileName, srcRootName);
                      bd.addSrcEntry(i+1, newSrcEnt);
                   }
                   else {
@@ -8555,7 +8560,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            }
                         }
                      }
-                     SrcEntry newSrcEnt = new SrcEntry(ent.layer, srcDirName, srcPath, srcFileName, proc == null || proc.getPrependLayerPackage());
+                     SrcEntry newSrcEnt = new SrcEntry(ent.layer, srcDirName, srcPath, srcFileName, proc == null || proc.getPrependLayerPackage(), srcRootName);
                      String srcTypeName = newSrcEnt.getTypeName();
 
                      if (!needsGenerate && bd.errorFiles.contains(newSrcEnt)) {
@@ -8593,7 +8598,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                      }
                      else if (needsCompile) {
                         SrcEntry newCompEnt = new SrcEntry(ent.layer, FileUtil.concat(genLayer.buildSrcDir,
-                                FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath)), srcPath, srcFileName);
+                                FileUtil.concat(srcEnt.layer.getPackagePath(), srcPath)), srcPath, srcFileName, srcRootName);
                         bd.toCompile.add(newCompEnt);
                      }
 
@@ -9861,7 +9866,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return deps;
    }
 
-   public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, Set<SrcEntry> allGenerated, Set<String> allGeneratedTypes, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd) {
+   public void addAllFiles(Layer layer, Set<SrcEntry> toGenerate, Set<SrcEntry> allGenerated, Set<String> allGeneratedTypes, File srcDir, String srcDirName, String srcPath, BuildPhase phase, BuildState bd, String srcRootName) {
       String [] fileNames = srcDir.list();
       if (fileNames == null) {
          error("Invalid src directory: " + srcDir);
@@ -9874,7 +9879,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          IFileProcessor proc = getFileProcessorForFileName(FileUtil.concat(srcPath, fileName), FileUtil.concat(srcDirName, fileName), layer, phase, false, false);
          if (proc != null && !fileName.equals(layer.layerBaseName)) {
             SrcEntry prevEnt;
-            SrcEntry newSrcEnt = new SrcEntry(layer, srcDirName, srcPath,  fileName, proc.getPrependLayerPackage());
+            SrcEntry newSrcEnt = new SrcEntry(layer, srcDirName, srcPath,  fileName, proc.getPrependLayerPackage(), srcRootName);
             String srcTypeName = newSrcEnt.getTypeName();
             // Just in case we've previously skipped over a file for this type, need to add the most specific one.
             if ((prevEnt = bd.unchangedFiles.get(srcTypeName)) != null) {
@@ -9889,7 +9894,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else {
             File subFile = new File(srcDirName, fileName);
             if (subFile.isDirectory()) {
-               SrcEntry newSrcDirEnt = new SrcEntry(layer, srcDirName, srcPath, fileName, proc == null || proc.getPrependLayerPackage());
+               SrcEntry newSrcDirEnt = new SrcEntry(layer, srcDirName, srcPath, fileName, proc == null || proc.getPrependLayerPackage(), srcRootName);
                if (!allGenerated.contains(newSrcDirEnt)) {
                   toGenerate.add(newSrcDirEnt); // Adding the directory here
                   allGenerated.add(newSrcDirEnt);
@@ -11123,6 +11128,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          JavaModel newModel = (JavaModel) result;
          if (!newModel.isInitialized()) {
             ParseUtil.initComponent(newModel);
+         }
+         // For activated models, any errors stop the updating of the current type
+         if (activated && !newModel.isStarted()) {
+            ParseUtil.startComponent(newModel);
+            ParseUtil.validateComponent(newModel);
          }
          if (!newModel.hasErrors) {
             if (oldModel != null && oldModel instanceof JavaModel) {

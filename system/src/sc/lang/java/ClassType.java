@@ -179,8 +179,9 @@ public class ClassType extends JavaType {
    public String getGenericTypeName(Object resultType, boolean includeDims) {
       StringBuilder sb = new StringBuilder();
       sb.append(getFullBaseTypeName());
-      if (typeArguments != null) {  // TODO: Should this be getResolvedTypeArguments?
-         sb.append(typeArguments.toLanguageString(JavaLanguage.getJavaLanguage().optTypeArguments));
+      SemanticNodeList<JavaType> typeArgs = getResolvedTypeArguments();
+      if (typeArgs != null) {
+         sb.append(typeArgs.toLanguageString(JavaLanguage.getJavaLanguage().optTypeArguments));
       }
       if (includeDims && arrayDimensions != null)
          sb.append(arrayDimensions);
@@ -339,7 +340,7 @@ public class ClassType extends JavaType {
    }
 
    /** Our type arguments are always stored on the last node of a chained type */
-   public List<JavaType> getResolvedTypeArguments() {
+   public SemanticNodeList<JavaType> getResolvedTypeArguments() {
       if (!isInitialized())
          init();
       if (!isStarted() && type == null)

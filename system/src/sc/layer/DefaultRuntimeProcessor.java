@@ -28,6 +28,8 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
 
    boolean useContextClassLoader = true;
 
+   boolean useLocalSyncManager = true;
+
    ArrayList<String> syncProcessNames;
 
    public DefaultRuntimeProcessor(String rtName, boolean useContextClassLoader) {
@@ -190,6 +192,10 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
 
    public boolean usesThisClasspath() {
       return true;
+   }
+
+   public boolean usesLocalSyncManager() {
+      return useLocalSyncManager;
    }
 
    public boolean equals(String runtimeName) {

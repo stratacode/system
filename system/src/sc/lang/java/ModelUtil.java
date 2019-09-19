@@ -8749,6 +8749,8 @@ public class ModelUtil {
       if (type instanceof BodyTypeDeclaration) {
          BodyTypeDeclaration td = ((BodyTypeDeclaration) type);
          JavaModel model = td.getJavaModel();
+         if (model == null)
+            return;
          if (!model.isStarted() && !td.isStarted()) {
             if (validate)
                ParseUtil.initAndStartComponent(model);

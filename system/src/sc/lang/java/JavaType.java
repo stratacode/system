@@ -83,7 +83,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    }
 
    /** Only for ClassType - returns the type arguments (if any) or null */
-   public List<JavaType> getResolvedTypeArguments() {
+   public SemanticNodeList<JavaType> getResolvedTypeArguments() {
       return null;
    }
 
@@ -292,6 +292,17 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
          Class cl = (Class) dstPropType;
          if (cl.isPrimitive()) {
             return ClassType.createPrimitiveWrapper(cl.getName().replace('$', '.'));
+         }
+         else if (cl.isArray()) {
+            int ndim = 1;
+            Class compType = cl.getComponentType();
+            while (compType.isArray()) {
+               ndim++;
+               compType = compType.getComponentType();
+            }
+            JavaType res = compType.isPrimitive() ? PrimitiveType.create(compType.getName()) : ClassType.create(ModelUtil.getTypeName(compType));
+            res.arrayDimensions = getDimsStr(ndim);
+            return res;
          }
          return ClassType.create(StringUtil.split(cl.getName().replace('$', '.'), '.'));
       }

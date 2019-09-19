@@ -3186,11 +3186,13 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return null;
    }
 
-
-
    // TODO: remove this in favor of loadClassesInRuntime?
    /** This runtime is not using the standard system class loader - so runtime types do not look in the class loader */
    public boolean usesThisClasspath() {
+      return false;
+   }
+
+   public boolean usesLocalSyncManager() {
       return false;
    }
 

@@ -16,6 +16,7 @@ import sc.lang.template.TemplateDeclaration;
 import sc.layer.SrcEntry;
 import sc.obj.IComponent;
 import sc.layer.LayeredSystem;
+import sc.parser.ParseRange;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.util.IdentityHashSet;
@@ -2050,5 +2051,15 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
+   public ParseRange getNodeErrorRange() {
+      if (parseNode != null) {
+         int startIx = parseNode.indexOf(typeName);
+         if (startIx != -1) {
+            startIx = startIx + parseNode.getStartIndex();
+            return new ParseRange(startIx, startIx + typeName.length());
+         }
+      }
+      return null;
+   }
 
 }

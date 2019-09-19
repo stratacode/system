@@ -259,6 +259,7 @@ public class EditorContext extends ClientEditorContext {
          model.unsavedModel = true;
          if (changedModels.size() == 1)
             Bind.sendEvent(IListener.VALUE_CHANGED, this, needsSaveProperty);
+         Bind.sendChangedEvent(this, "changedModels");
       }
    }
 
@@ -279,6 +280,7 @@ public class EditorContext extends ClientEditorContext {
       }
       changedModels.clear();
       Bind.sendEvent(IListener.VALUE_CHANGED, this, needsSaveProperty);
+      Bind.sendChangedEvent(this, "changedModels");
    }
 
    void saveModel(JavaModel model) {
@@ -1028,6 +1030,7 @@ public class EditorContext extends ClientEditorContext {
          changedModels.remove(model);
          JavaModel origModel = model;
          model.unsavedModel = false;
+         boolean errorModelsChanged = false;
          SrcEntry srcFile = model.getSrcFile();
          if (srcFile.canRead()) {
             // TODO: we are using execContext here even if model != pendingModel?   Shouldn't we be building an execContext from model
@@ -1064,14 +1067,19 @@ public class EditorContext extends ClientEditorContext {
                   newModel.refreshBaseLayers(execContext);
                }
                else {
-                  errorModels.put(srcFile, newModel);
+                  errorModels.put(srcFile, newModel.errorMessages);
+                  errorModelsChanged = true;
                }
             }
             else if (modelObj instanceof ModelParseError) {
-               String errorStr = ((ModelParseError)modelObj).parseError.errorStringWithLineNumbers(new File(srcFile.absFileName));
-               errorModels.put(srcFile, errorStr);
+               ParseError parseError = ((ModelParseError)modelObj).parseError;
+               String errorStr = parseError.errorStringWithLineNumbers(new File(srcFile.absFileName));
+               errorModels.put(srcFile, new ArrayList<ModelError>(Collections.singletonList(new ModelError(errorStr, parseError.startIndex, parseError.endIndex, false))));
+               errorModelsChanged = true;
             }
          }
+         if (errorModelsChanged)
+            Bind.sendChangedEvent(this, "errorModels");
       }
    }
 
@@ -1109,7 +1117,6 @@ public class EditorContext extends ClientEditorContext {
    public void setNeedsSave(boolean x) {
       throw new UnsupportedOperationException();
    }
-
 
    public String getImportedPropertyType(Object type) {
       if (type == null)
@@ -1191,26 +1198,32 @@ public class EditorContext extends ClientEditorContext {
       SystemRefreshInfo info = refresh();
       List<Layer.ModelUpdate> changedModels = info.changedModels;
       if (changedModels != null) {
+         boolean errorModelsChanged = false;
+         HashMap<SrcEntry,MemoryEditSession> newMemSessions = null;
+         LinkedHashMap<SrcEntry,List<ModelError>> copyErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>(errorModels);
          for (Layer.ModelUpdate modelUpdate:changedModels) {
             Object modelObj = modelUpdate.changedModel;
             if (modelObj != null) { // Could not parse the model
                if (modelObj instanceof ModelParseError) {
                   ModelParseError err = (ModelParseError) modelObj;
                   String errorStr = err.parseError.errorStringWithLineNumbers(new File(err.srcFile.absFileName));
-                  errorModels.put(err.srcFile, errorStr);
+                  copyErrorModels.put(err.srcFile, new ArrayList<ModelError>(Collections.singletonList(new ModelError(errorStr, err.parseError.startIndex, err.parseError.endIndex, false))));
+                  errorModelsChanged = true;
                }
                else if (modelObj instanceof JavaModel) {
                   JavaModel model = (JavaModel) modelObj;
                   if (model.hasErrors()) {
-                     errorModels.put(model.getSrcFile(), model);
+                     copyErrorModels.put(model.getSrcFile(), model.errorMessages);
                      MemoryEditSession sess = memSessions.get(model.getSrcFile());
                      if (sess != null && sess.model != null)
                         sess.model.markChanged();
                   }
                   else {
-                     memSessions.remove(model.getSrcFile());
-                     errorModels.remove(model.getSrcFile());
+                     newMemSessions = new HashMap<SrcEntry,MemoryEditSession>(memSessions);
+                     newMemSessions.remove(model.getSrcFile());
+                     copyErrorModels.remove(model.getSrcFile());
                   }
+                  errorModelsChanged = true;
                }
                setErrorsChanged(errorsChanged + 1);
             }
@@ -1218,16 +1231,26 @@ public class EditorContext extends ClientEditorContext {
 
             }
          }
+         if (errorModelsChanged) {
+            errorModels = copyErrorModels;
+            Bind.sendChangedEvent(this, "errorModels");
+         }
+         if (newMemSessions != null) {
+            memSessions = newMemSessions;
+            Bind.sendChangedEvent(this, "memSessions");
+         }
       }
    }
 
    public void commitMemorySessionChanges() {
+      if (memSessions == null)
+         return;
       // For now, just save all of the files, then refresh from the files.  We could only refresh the memory models but
       // that's a lot more code.
       // TODO: deal with file write errors here
       for (MemoryEditSession mes:memSessions.values()) {
-         mes.saved = true;
-         mes.model.saveModelTextToFile(mes.text);
+         mes.setSaved(true);
+         mes.model.saveModelTextToFile(mes.getText());
       }
       doRefresh();
 
@@ -1805,12 +1828,17 @@ public class EditorContext extends ClientEditorContext {
       syncInited = true;
       // Manually adding these (roughly based on the generated code from js/layer/lang/EditorContext.java - so we sync the same properties
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null, new Object[]{"currentLayer", "currentLayers", "currentType", "needsSave", "canUndo", "canRedo", "createInstTypeNames", "system"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
+      SyncManager.addSyncType(getClass(), new sc.sync.SyncProperties(null, null,
+              new Object[]{"currentLayer", "currentLayers", "currentType", "needsSave", "canUndo", "canRedo",
+                            "createInstTypeNames", "system", "memSessions", "changedModels", "errorModels", "memorySessionChanged"},
+              null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
-      SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null, new Object[] {"origText", "text", "model", "saved", "caretPosition"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
+      SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null,
+              new Object[] {"origText", "text", "model", "saved", "caretPosition", "cancelled"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
       SyncManager.addSyncInst(this, true, true, null, null);
 
       SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+      SyncManager.addSyncType(ModelError.class, new SyncProperties(null, null, new Object[] {"error", "startIndex", "endIndex", "notFound"}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
    }
 
    /** Rebuilds the system */

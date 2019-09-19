@@ -4652,7 +4652,8 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
       }
 
-      if (obj == null && idSize == 1) {
+      // Need the currentType to override the currentObject's type so that a field editor will match currentPropertyType which may be an inner type of the current type
+      if (obj == null && idSize == 1 && currentType == null) {
          obj = ctx.getCurrentObject();
       }
 
@@ -5882,5 +5883,59 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    public void setParentNode(ISemanticNode node) {
       super.setParentNode(node);
+   }
+
+   public ParseRange getNodeErrorRange() {
+      Object[] eargs = errorArgs;
+      if (eargs == null && replacedByStatement != null)
+         eargs = replacedByStatement.errorArgs;
+      if (eargs != null && parseNode != null && identifiers != null) {
+         for (Object ea:eargs) {
+            if (ea instanceof ErrorRangeInfo) {
+               ErrorRangeInfo eri = (ErrorRangeInfo) ea;
+
+               IParseNode pn = parseNode;
+               if (fromStatement != null)
+                  pn = fromStatement.getParseNode();
+
+               int startIx = pn.getStartIndex();
+
+               int searchStart = 0;
+
+               int identSz = identifiers.size();
+               for (int i = 0; i < eri.fromIx; i++) {
+                  if (i >= identSz)
+                     break;
+                  String ident = identifiers.get(i).toString();
+                  int fix = pn.indexOf(ident, searchStart);
+                  if (fix == -1) {
+                     break;
+                  }
+                  int identLen = ident.length();
+                  int skip = fix - searchStart;
+                  startIx += skip + identLen;
+                  searchStart += skip + identLen;
+               }
+               String ident = identifiers.get(eri.fromIx).toString();
+               int fix = pn.indexOf(ident, searchStart);
+               startIx += fix - searchStart;
+               int endIx = startIx + ident.length();
+               if (eri.toIx != eri.fromIx) {
+                  for (int i = eri.fromIx; i < eri.toIx; i++) {
+                     if (i >= identSz)
+                        break;
+                     ident = identifiers.get(i).toString();
+                     fix = pn.indexOf(ident, searchStart);
+                     int identLen = ident.length();
+                     int skip = fix - searchStart;
+                     endIx += skip + identLen;
+                     searchStart += identLen + skip;
+                  }
+               }
+               return new ParseRange(startIx, endIx);
+            }
+         }
+      }
+      return super.getNodeErrorRange();
    }
 }

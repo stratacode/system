@@ -63,6 +63,8 @@ public interface IRuntimeProcessor {
 
    public boolean usesThisClasspath();
 
+   public boolean usesLocalSyncManager();
+
    public UpdateInstanceInfo newUpdateInstanceInfo();
 
    /** Called just before building the second time to clear out state from a previous build */

@@ -1133,4 +1133,15 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       Object def = getAssignedProperty();
       return def == null ? null : ModelUtil.getJavaTypeFromDefinition(getLayeredSystem(), def, getEnclosingType());
    }
+
+   public ParseRange getNodeErrorRange() {
+      if (parseNode != null && propertyName != null) {
+         int startIx = parseNode.indexOf(propertyName);
+         if (startIx != -1) {
+            startIx = startIx + parseNode.getStartIndex();
+            return new ParseRange(startIx, startIx + propertyName.length());
+         }
+      }
+      return null;
+   }
 }

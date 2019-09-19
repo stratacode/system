@@ -21,34 +21,41 @@ public class SrcEntry implements Cloneable {
    public String relFileName;  /* The file name relative to the layer's root directory */
    public String baseFileName; /* The name of the file within its directory */
    public boolean prependPackage = true; /* Does this type prepend its layer's package name to the type name */
+   public String srcRootName; /* For src paths outside of the layer directory, the name of the source root directory. for layer source paths, it should be null */
 
    public transient byte[] hash = null;
 
    public SrcEntry() {
    }
 
-   public SrcEntry(Layer lyr, String absDir, String relDir, String baseName) {
-      this(lyr, absDir, relDir, baseName, true);
+   public SrcEntry(Layer lyr, String absDir, String relDir, String baseName, String srcRootName) {
+      this(lyr, absDir, relDir, baseName, true, srcRootName);
    }
 
-   public SrcEntry(Layer lyr, String absDir, String relDir, String baseName, boolean prepend) {
+   public SrcEntry(Layer lyr, String absDir, String relDir, String baseName, boolean prepend, String srcRootName) {
       layer = lyr;
       absFileName = FileUtil.concat(absDir, baseName);
       relFileName = relDir.length() == 0 ? baseName : FileUtil.concat(relDir,baseName);
       baseFileName = baseName;
       prependPackage = prepend;
+      this.srcRootName = srcRootName;
    }
 
    public SrcEntry(Layer lyr, String absFile, String relFile) {
-      this(lyr, absFile, relFile, true);
+      this(lyr, absFile, relFile, true, null);
    }
 
    public SrcEntry(Layer lyr, String absFile, String relFile, boolean prepend) {
+      this(lyr, absFile, relFile, prepend, null);
+   }
+
+   public SrcEntry(Layer lyr, String absFile, String relFile, boolean prepend, String srcRootName) {
       layer = lyr;
       absFileName = absFile;
       relFileName = relFile;
       baseFileName = FileUtil.getFileName(relFileName);
       prependPackage = prepend;
+      this.srcRootName = srcRootName;
    }
 
    public int hashCode() {
@@ -98,11 +105,11 @@ public class SrcEntry implements Cloneable {
    }
 
    public String toString() {
-      return relFileName + " layer: " + (layer == null ? "<null>" : layer);
+      return relFileName + " layer: " + (layer == null ? "<null>" : layer + (srcRootName == null ? "" : "(" + srcRootName + "}"));
    }
 
    public String toShortString() {
-      return relFileName + " layer: " + (layer == null ? "<null>" : layer.getLayerName());
+      return relFileName + " layer: " + (layer == null ? "<null>" : layer.getLayerName()) + (srcRootName == null ? "" : "(" + srcRootName + ")");
    }
 
    public boolean canRead() {

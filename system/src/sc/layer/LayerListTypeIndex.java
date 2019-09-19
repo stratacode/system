@@ -328,7 +328,7 @@ public class LayerListTypeIndex {
 
    public void layerTypeIndexChanged(boolean namesChanged, String typeName, TypeIndexEntry newEntry) {
       reverseIndexValid = false;
-      if (namesChanged) {
+      if (namesChanged && sys != null) {
          sys.addAllNamesForIndexEntry(typeName, newEntry);
       }
    }

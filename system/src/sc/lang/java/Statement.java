@@ -133,11 +133,14 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public void displayRangeError(int fromIx, int toIx, boolean notFound, String...args) {
-      displayTypeError(args);
-      if (errorArgs != null) {
+      if (errorArgs == null) {
+         errorArgs = args;
+         // Set error args so getNotFoundError() works inside of reportError
          ArrayList<Object> eargs = new ArrayList<Object>(Arrays.asList(errorArgs));
          eargs.add(new ErrorRangeInfo(fromIx, toIx, notFound));
          errorArgs = eargs.toArray();
+
+         super.displayTypeError(args);
       }
    }
 
@@ -755,5 +758,21 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    }
 
    public void evalRemoteExprs(ExecutionContext ctx) {
+   }
+
+   public ParseRange getNodeErrorRange() {
+      if (fromStatement != null) {
+         ParseRange range = fromStatement.getNodeErrorRange();
+         if (range != null)
+            return range;
+         IParseNode fromPN = fromStatement.getParseNode();
+         if (fromPN != null) {
+            int startIx = fromPN.getStartIndex();
+            if (startIx != -1) {
+               return new ParseRange(startIx, startIx + fromPN.length());
+            }
+         }
+      }
+      return super.getNodeErrorRange();
    }
 }

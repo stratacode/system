@@ -46,13 +46,36 @@ public class UpdateInstanceInfo {
       protected BodyTypeDeclaration oldType;
       void updateTypes(ExecutionContext ctx) {
          oldType.updateStaticValues(newType);
-         Iterator insts = newType.getLayeredSystem().getInstancesOfType(newType.getFullTypeName());
+         BodyTypeDeclaration newRoot = newType.getModifiedByRoot();
+         if (!newRoot.getFullTypeName().equals(newType.getFullTypeName()))
+            System.out.println("*** Error - should be the same type!");
+         LayeredSystem sys = newType.getLayeredSystem();
+         Iterator insts = sys.getInstancesOfType(newType.getFullTypeName());
          while (insts.hasNext()) {
             Object inst = insts.next();
             if (inst instanceof IDynObject) {
                IDynObject dynInst = (IDynObject) inst;
-               dynInst.setDynType(newType); // Forces the type to recompute the field mapping using "getOldInstFields"
+               dynInst.setDynType(newRoot); // Forces the type to recompute the field mapping using "getOldInstFields"
             }
+         }
+
+         if (sys.runtimeProcessor == null || sys.runtimeProcessor.usesLocalSyncManager()) {
+            List<SyncProperties> newSyncPropList = newRoot.getSyncProperties();
+            if (newSyncPropList != null) {
+               for (SyncProperties newSyncProps:newSyncPropList) {
+                  // Using oldType here instead of oldType.getModifiedByRoot() since we've replaced the links in the chain that would let us get back to the
+                  // original old type. It might not have changed...
+                  SyncManager.replaceSyncType(oldType, newRoot, newSyncProps);
+               }
+            }
+         }
+
+         ClientTypeDeclaration oldClientTD = oldType.clientTypeDeclaration;
+         if (oldClientTD != null) {
+            if (!newType.isStarted())
+               System.err.println("*** Should be started before refreshing the client type declaration");
+            newType.clientTypeDeclaration = oldClientTD;
+            newType.refreshClientTypeDeclaration();
          }
       }
       void updateInstances(ExecutionContext ctx) {
@@ -67,7 +90,7 @@ public class UpdateInstanceInfo {
 
          LayeredSystem sys = newType.getLayeredSystem();
          for (ITypeChangeListener tcl:sys.getTypeChangeListeners()) {
-            // We are only notifing if the type being updated is a dynamic type.  We don't yet have a way to replace the class itself though this might
+            // We are only notifying if the type being updated is a dynamic type.  We don't yet have a way to replace the class itself though this might
             // be a place where we could integrate another class-patching strategy.
             if (newType.isDynamicType() || newType.isDynamicNew())
                tcl.updateType(oldType, newType);

@@ -507,4 +507,8 @@ public class InterfaceDeclaration extends TypeDeclaration {
    public AccessLevel getDefaultAccessLevel() {
       return AccessLevel.Public;
    }
+
+   public boolean useDefaultModifier() {
+      return true;
+   }
 }

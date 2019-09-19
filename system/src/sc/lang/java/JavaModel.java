@@ -362,6 +362,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
    }
 
+   public String getErrorMessagesAsString() {
+      StringBuilder sb = new StringBuilder();
+      if (errorMessages == null || errorMessages.size() == 0)
+         return null;
+      for (ModelError err:errorMessages) {
+         if (sb.length() > 0)
+            sb.append("\n");
+         sb.append(err.error);
+      }
+      return sb.toString();
+   }
+
    private static class WildcardImport {
       public String typeName;
       public WildcardImport(String tn) {
@@ -2718,7 +2730,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    transient IMessageHandler errorHandler = null;
-   public transient StringBuilder errorMessages = null;
+   public transient List<ModelError> errorMessages = null;
    public transient StringBuilder warningMessages = null;
 
    public void setErrorHandler(IMessageHandler errorHandler) {
@@ -2737,8 +2749,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       }
       else {
          if (errorMessages == null)
-            errorMessages = new StringBuilder();
-         errorMessages.append(error);
+            errorMessages = new ArrayList<ModelError>();
+         errorMessages.add(createModelError(error, source));
       }
       hasErrors = true;
       if (layeredSystem != null) {
@@ -2754,6 +2766,22 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       System.err.println(error);
    }
 
+   private ModelError createModelError(String error, ISemanticNode source) {
+      IParseNode pn = source.getParseNode();
+      ParseRange errRange = source.getNodeErrorRange();
+      int startIndex = -1;
+      int endIndex = -1;
+      if (errRange != null) {
+         startIndex = errRange.startIx;
+         endIndex = errRange.endIx;
+      }
+      else if (pn != null) {
+         startIndex = pn.getStartIndex();
+         endIndex = startIndex + pn.length();
+      }
+      return new ModelError(error, startIndex, endIndex, source.getNotFoundError());
+   }
+
    public void reportWarning(String error, ISemanticNode source) {
       boolean treatWarningsAsErrors = layeredSystem != null && layeredSystem.options.treatWarningsAsErrors;
       if (treatWarningsAsErrors)
@@ -2765,8 +2793,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       else {
          if (treatWarningsAsErrors) {
             if (errorMessages == null)
-               errorMessages = new StringBuilder();
-            errorMessages.append(error);
+               errorMessages = new ArrayList<ModelError>();
+            errorMessages.add(createModelError(error, source));
          }
          else {
             if (warningMessages == null)
@@ -3039,11 +3067,15 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    @Bindable(manual=true)
    public String getModelText() {
-      return toLanguageString((getLanguage()).getStartParselet()).toString();
+      if (parseNode == null)
+         restoreParseNode();
+      return toLanguageString((getLanguage()).getStartParselet());
    }
 
    @Bindable(manual=true)
    public String getHTMLModelText() {
+      if (parseNode == null)
+         restoreParseNode();
       return ParseUtil.styleSemanticValue(this, ((getLanguage()).getStartParselet())).toString();
    }
 

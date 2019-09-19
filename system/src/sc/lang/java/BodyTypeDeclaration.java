@@ -247,7 +247,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public transient Set<Object> dependentTypes = null;
 
-   private ClientTypeDeclaration clientTypeDeclaration;
+   public transient ClientTypeDeclaration clientTypeDeclaration;
 
    /**
     * Contains the version of the type which we transformed.
@@ -6346,7 +6346,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
             // else find all referencing instances.  use dynChildManager to remove the child and null out the slot
             else {
-               updatePropertyForType(oldInnerType, ctx, InitInstanceType.Remove, updateInstances, info);
+               newType.updatePropertyForType(oldInnerType, ctx, InitInstanceType.Remove, updateInstances, info);
             }
          }
          oldInnerType.removeType();
@@ -6688,8 +6688,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
 
-      /* If there are connected clients listening to this model, they will be synchronized on the clientTypeDeclaration - some of the fields in that may have changed but for now, just refresh the entire thing and reuse the instance */
-      if (updateMode == TypeUpdateMode.Replace && clientTypeDeclaration != null) {
+      /* If there are connected clients listening to this model, they will be synchronized on the clientTypeDeclaration
+         - some of the fields in that may have changed but for now, just refresh the entire thing and reuse the instance
+         but we can only do the refreshClientTypeDeclaration if the type has been started. Otherwise we do this in the
+         post-process of the UpdateType in the info passed. */
+      if (info == null && updateMode == TypeUpdateMode.Replace && clientTypeDeclaration != null) {
          newType.clientTypeDeclaration = clientTypeDeclaration;
          newType.refreshClientTypeDeclaration();
       }
