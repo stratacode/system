@@ -82,11 +82,7 @@ public class JSONParser {
       int len;
       if (val != null && (len = val.length()) > 4) {
          if (isRefPrefix(val, 0)) {
-            String objName = val.subSequence(4, len).toString();
-            Object obj = dser.resolveObject(objName, false); // TODO - this dependency makes JSONParser unusable outside of the sync system but could be easily removed
-            if (obj == null)
-               System.err.println("No object: " + objName + " for reference in JSON: " + this);
-            return obj;
+            return resolveRefString(val, len);
          }
          // When the string value starts with 'ref:' we insert a \ as the first char so just need to strip this off.
          else if (val.charAt(0) == '\\' && len > 5 && isRefPrefix(val, 1))
@@ -94,6 +90,14 @@ public class JSONParser {
       }
       val = CTypeUtil.unescapeJavaString(val);
       return val;
+   }
+
+   Object resolveRefString(CharSequence val, int valLen) {
+      String objName = val.subSequence(4, valLen).toString();
+      Object obj = dser.resolveObject(objName, false); // TODO - this dependency makes JSONParser unusable outside of the sync system but could be easily removed
+      if (obj == null)
+         System.err.println("No object: " + objName + " for reference in JSON: " + this);
+      return obj;
    }
 
    // Parses: "string":

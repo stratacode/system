@@ -17,6 +17,8 @@ import java.util.*;
 
 import static sc.sync.JSONParser.eqs;
 
+import static sc.sync.JSONFormat.ExprPrefixes.isRefPrefix;
+
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
 @Sync(syncMode= SyncMode.Disabled)
 public class JSONDeserializer {
@@ -205,6 +207,14 @@ public class JSONDeserializer {
             boolean isProp = true;
             Object curObj = getCurObj();
             String nextNameStr = nextName.toString();
+            Object nextNameKey = nextNameStr;
+            int nextNameLen = nextNameStr.length();
+            if (isMap && nextNameLen > 4) {
+               if (isRefPrefix(nextNameStr, 0)) {
+                  // Maps can have an object value in place of the string key
+                  nextNameKey = parser.resolveRefString(nextNameStr, nextNameLen);
+               }
+            }
             if (!hasObjValue) {
                propVal = parser.parseJSONValue();
             }
@@ -252,7 +262,7 @@ public class JSONDeserializer {
                            }
                         }
                         if (curObj instanceof Map) // TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
-                           ((Map) curObj).put(nextNameStr, propVal);
+                           ((Map) curObj).put(nextNameKey, propVal);
                         else
                            DynUtil.setPropertyValue(curObj, nextNameStr, propVal);
                      }
