@@ -213,6 +213,9 @@ public class JSONDeserializer {
                if (isRefPrefix(nextNameStr, 0)) {
                   // Maps can have an object value in place of the string key
                   nextNameKey = parser.resolveRefString(nextNameStr, nextNameLen);
+                  if (nextNameKey == null) {
+                     System.out.println("*** Failed to resolve map key reference: " + nextNameStr);
+                  }
                }
             }
             if (!hasObjValue) {
@@ -261,8 +264,9 @@ public class JSONDeserializer {
                               propVal = SyncHandler.convertRemoteType(propVal, propType);
                            }
                         }
-                        if (curObj instanceof Map) // TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
+                        if (curObj instanceof Map) {// TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
                            ((Map) curObj).put(nextNameKey, propVal);
+                        }
                         else
                            DynUtil.setPropertyValue(curObj, nextNameStr, propVal);
                      }
