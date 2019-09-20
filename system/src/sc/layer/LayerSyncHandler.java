@@ -63,6 +63,14 @@ public class LayerSyncHandler extends SyncHandler {
          return btd.getClientTypeDeclaration();
       }
 
+      // These need to have constructor args since they are used in HashMap's as keys and equals/hashCode needs to be
+      // implemented right when it's registered in the map.
+      if (inst instanceof SrcEntry) {
+         SrcEntry ent = (SrcEntry) inst;
+         SyncManager.addSyncInst(ent, true, true, null, null, ent.layer, ent.absFileName, ent.relFileName);
+         return inst;
+      }
+
       return super.replaceInstance(inst);
    }
 

@@ -76,7 +76,7 @@ public abstract class ClientEditorContext {
    /** Returns the current modelText to display. The extra modelText param is for receiving data binding events on the client */
    public String getModelText(JavaModel model, String modelText) {
       MemoryEditSession mes = getMemorySession(model.getSrcFile());
-      if (mes == null)
+      if (mes == null || mes.getText() == null)
          return modelText;
       return mes.getText();
    }
@@ -93,6 +93,28 @@ public abstract class ClientEditorContext {
       if (mes == null)
          return -1;
       return mes.getCaretPosition();
+   }
+
+   public void setMemoryEditCaretPosition(JavaModel model, int cp) {
+      SrcEntry ent = model.getSrcFile();
+      MemoryEditSession mes = memSessions == null ? null : memSessions.get(ent);
+      HashMap<SrcEntry, MemoryEditSession> newMemSessions = null;
+      if (mes == null) {
+         mes = new MemoryEditSession();
+         newMemSessions = new HashMap<SrcEntry,MemoryEditSession>();
+         if (memSessions != null)
+            newMemSessions.putAll(memSessions);
+         // Because we use the SrcEntry as a hashMap key and it's manually synchronized, need to specify it's constructor args
+         // in this call to ensure the args are set before the entry is put into the hashMap.
+         newMemSessions.put(ent, mes);
+      }
+      mes.model = model;
+      mes.setCaretPosition(cp);
+
+      if (newMemSessions != null) {
+         memSessions = newMemSessions;
+         Bind.sendChange(this, "memSessions", memSessions);
+      }
    }
 
    public String getMemoryEditSessionOrigText(SrcEntry ent) {
@@ -117,11 +139,12 @@ public abstract class ClientEditorContext {
          sess = memSessions.get(ent);
       if (sess == null) {
          sess = new MemoryEditSession();
-         sess.setOrigText(model.toLanguageString());
          if (newMemSessions == null)
             newMemSessions = new HashMap<SrcEntry,MemoryEditSession>(memSessions);
          newMemSessions.put(ent, sess);
       }
+      if (sess.getOrigText() == null)
+         sess.setOrigText(model.toLanguageString());
       sess.setText(text);
       sess.model = model;
       sess.setCaretPosition(caretPos);

@@ -248,6 +248,12 @@ public class EditorContext extends ClientEditorContext {
    }
 
    synchronized void addChangedModel(JavaModel model) {
+      LayeredSystem modelSys = model.getLayeredSystem();
+      // TODO: do we need to monitor changes for the js and other layered systems? Right now, the management UI
+      // only interacts with the java_Server runtime and the desktop only it's runtime.
+      if (modelSys != system) {
+         return;
+      }
       // TODO: need to synchronize around this method?
       model.validateSavedModel(false);
 
@@ -1249,8 +1255,11 @@ public class EditorContext extends ClientEditorContext {
       // that's a lot more code.
       // TODO: deal with file write errors here
       for (MemoryEditSession mes:memSessions.values()) {
-         mes.setSaved(true);
-         mes.model.saveModelTextToFile(mes.getText());
+         String text = mes.getText();
+         if (text != null) {
+            mes.setSaved(true);
+            mes.model.saveModelTextToFile(mes.getText());
+         }
       }
       doRefresh();
 
@@ -1839,6 +1848,9 @@ public class EditorContext extends ClientEditorContext {
 
       SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
       SyncManager.addSyncType(ModelError.class, new SyncProperties(null, null, new Object[] {"error", "startIndex", "endIndex", "notFound"}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+
+      // Needed to add constructor args right before we sync a new instance
+      SyncManager.addSyncHandler(SrcEntry.class, LayerSyncHandler.class);
    }
 
    /** Rebuilds the system */
