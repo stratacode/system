@@ -243,6 +243,11 @@ public class UpdateInstanceInfo {
       boolean found = false;
       if (oldActions != null) {
          for (UpdateAction oldAction:oldActions) {
+            // We have different UpdateTypes for different layers with the same type name - be careful not to
+            // update the wrong one.
+            if (oldAction.newType.getLayer() != newType.getLayer()) {
+               continue;
+            }
             if (oldAction instanceof UpdateType)
                found = true;
             oldAction.newType = newType;
