@@ -2174,6 +2174,22 @@ public class SyncManager {
                }
             }
          }
+         refreshSyncPropertiesForChildren(syncObj, syncGroup);
+      }
+
+      public void refreshSyncPropertiesForChildren(Object syncObj, String syncGroup) {
+         if (childSyncInsts != null) {
+            Set<InstInfo> childInstInfos = childSyncInsts.get(syncObj);
+            if (childInstInfos != null) {
+               for (InstInfo childInstInfo:childInstInfos) {
+                  if (childInstInfo.syncContext == this)
+                     System.err.println("*** Invalid childInstInfo!");
+                  else {
+                     childInstInfo.syncContext.refreshSyncProperties(syncObj, syncGroup);
+                  }
+               }
+            }
+         }
       }
 
       public Object[] getNewArgs(Object changedObj) {
@@ -2567,6 +2583,7 @@ public class SyncManager {
 
       public boolean valueInvalidated(Object obj, Object prop, Object eventDetail, boolean apply) {
          ctx.refreshSyncProperties(syncObj, syncGroup);
+         ctx.refreshSyncPropertiesForChildren(syncObj, syncGroup);
          return true;
       }
    }
