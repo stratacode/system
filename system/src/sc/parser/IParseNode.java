@@ -7,6 +7,7 @@ package sc.parser;
 import sc.lang.ISemanticNode;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 /**
  * The core interface for the parse-tree which is built by the parselets.  This tree maps one-to-one to productions
@@ -134,6 +135,9 @@ public interface IParseNode extends CharSequence, IParseResult {
    boolean isIncomplete();
 
    int getNodeCount();
+
+   /** For incremental parses, return the list of errors detected and continued in the parse-stream (useful for syntax highlighting) */
+   void addParseErrors(List<ParseError> errors, int max);
 }
 
 

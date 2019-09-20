@@ -7,6 +7,7 @@ package sc.parser;
 import sc.lang.ISemanticNode;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 public class ParseNode extends AbstractParseNode {
    public Object value;
@@ -418,5 +419,13 @@ public class ParseNode extends AbstractParseNode {
          return false;
       return value.equals(opn.value);
    }
+
+   public void addParseErrors(List<ParseError> errors, int max) {
+      if (value instanceof ParseError)
+         errors.add((ParseError) value);
+      else if (value instanceof IParseNode)
+         ((IParseNode) value).addParseErrors(errors, max);
+   }
+
 }
 

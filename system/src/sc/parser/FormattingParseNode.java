@@ -7,6 +7,7 @@ package sc.parser;
 import sc.lang.ISemanticNode;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 /**
  * For newline and indentation formatting of languages.
@@ -112,5 +113,8 @@ public abstract class FormattingParseNode extends AbstractParseNode {
 
    public boolean isGeneratedTree() {
       return true; // These formatting nodes only live in generated models
+   }
+
+   public void addParseErrors(List<ParseError> res, int max) {
    }
 }

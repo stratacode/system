@@ -1036,7 +1036,7 @@ public class EditorContext extends ClientEditorContext {
          changedModels.remove(model);
          JavaModel origModel = model;
          model.unsavedModel = false;
-         boolean errorModelsChanged = false;
+         LinkedHashMap<SrcEntry,List<ModelError>> copyErrorModels = null;
          SrcEntry srcFile = model.getSrcFile();
          if (srcFile.canRead()) {
             // TODO: we are using execContext here even if model != pendingModel?   Shouldn't we be building an execContext from model
@@ -1073,20 +1073,26 @@ public class EditorContext extends ClientEditorContext {
                   newModel.refreshBaseLayers(execContext);
                }
                else {
-                  errorModels.put(srcFile, newModel.errorMessages);
-                  errorModelsChanged = true;
+                  copyErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>(errorModels);
+                  copyErrorModels.put(srcFile, newModel.errorMessages);
                }
             }
             else if (modelObj instanceof ModelParseError) {
                ParseError parseError = ((ModelParseError)modelObj).parseError;
-               String errorStr = parseError.errorStringWithLineNumbers(new File(srcFile.absFileName));
-               errorModels.put(srcFile, new ArrayList<ModelError>(Collections.singletonList(new ModelError(errorStr, parseError.startIndex, parseError.endIndex, false))));
-               errorModelsChanged = true;
+               copyErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>(errorModels);
+               copyErrorModels.put(srcFile, convertFromParseError(parseError, srcFile));
             }
          }
-         if (errorModelsChanged)
+         if (copyErrorModels != null) {
+            errorModels = copyErrorModels;
             Bind.sendChangedEvent(this, "errorModels");
+         }
       }
+   }
+
+   private List<ModelError> convertFromParseError(ParseError parseError, SrcEntry srcFile) {
+      String errorStr = parseError.errorStringWithLineNumbers(new File(srcFile.absFileName));
+      return new ArrayList<ModelError>(Collections.singletonList(new ModelError(errorStr, parseError.startIndex, parseError.endIndex, false)));
    }
 
    public boolean modelChanged(JavaModel model) {
@@ -1212,8 +1218,7 @@ public class EditorContext extends ClientEditorContext {
             if (modelObj != null) { // Could not parse the model
                if (modelObj instanceof ModelParseError) {
                   ModelParseError err = (ModelParseError) modelObj;
-                  String errorStr = err.parseError.errorStringWithLineNumbers(new File(err.srcFile.absFileName));
-                  copyErrorModels.put(err.srcFile, new ArrayList<ModelError>(Collections.singletonList(new ModelError(errorStr, err.parseError.startIndex, err.parseError.endIndex, false))));
+                  copyErrorModels.put(err.srcFile, convertFromParseError(err.parseError, err.srcFile));
                   errorModelsChanged = true;
                }
                else if (modelObj instanceof JavaModel) {
@@ -1242,8 +1247,7 @@ public class EditorContext extends ClientEditorContext {
             Bind.sendChangedEvent(this, "errorModels");
          }
          if (newMemSessions != null) {
-            memSessions = newMemSessions;
-            Bind.sendChangedEvent(this, "memSessions");
+            setMemSessions(newMemSessions);
          }
       }
    }
@@ -1265,6 +1269,58 @@ public class EditorContext extends ClientEditorContext {
 
       if (memSessions.size() == 0)
          setMemorySessionChanged(false);
+   }
+
+   public void refreshMemorySessionErrors() {
+      if (memSessions == null)
+         return;
+      // For now, just save all of the files, then refresh from the files.  We could only refresh the memory models but
+      // that's a lot more code.
+      // TODO: deal with file write errors here
+      LinkedHashMap<SrcEntry, List<ModelError>> newErrorModels = null;
+      for (MemoryEditSession mes:memSessions.values()) {
+         String text = mes.getText();
+         SrcEntry srcEntry = mes.model.getSrcFile();
+         if (text != null && mes.getStaleErrors()) {
+            Object parseRes = system.parseSrcBuffer(srcEntry, true, text, true, true);
+            List<ModelError> newErrs = null;
+            if (parseRes instanceof ParseError) {
+               newErrs = convertFromParseError((ParseError) parseRes, srcEntry);
+            }
+            else if (parseRes instanceof JavaModel) {
+               JavaModel model = (JavaModel) parseRes;
+               ParseUtil.initAndStartComponent(model);
+               IParseNode modelPN = model.getParseNode();
+               List<ParseError> parseErrors = ParseUtil.getParseNodeErrors(modelPN, 10);
+               boolean hasModelErrors = model.hasErrors();
+               if (hasModelErrors || parseErrors != null) {
+                  newErrs = new ArrayList<ModelError>();
+                  if (hasModelErrors)
+                     newErrs.addAll(model.errorMessages);
+                  if (parseErrors != null) {
+                     for (ParseError pe:parseErrors)
+                        newErrs.addAll(convertFromParseError(pe, srcEntry));
+                  }
+               }
+               else if (errorModels.get(srcEntry) != null) {
+                  if (newErrorModels == null)
+                     newErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>();
+                  newErrorModels.remove(srcEntry);
+               }
+            }
+
+            if (newErrs != null) {
+               if (newErrorModels == null)
+                  newErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>();
+               newErrorModels.put(srcEntry, newErrs);
+            }
+            mes.setStaleErrors(false);
+         }
+      }
+      if (newErrorModels != null) {
+         errorModels = newErrorModels;
+         Bind.sendChangedEvent(this, "errorModels");
+      }
    }
 
    private static void convertCollectorToCandidates(Set<String> collector, List<String> candidates) {

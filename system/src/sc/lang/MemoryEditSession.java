@@ -5,6 +5,7 @@
 package sc.lang;
 
 import sc.bind.Bind;
+import sc.dyn.DynUtil;
 import sc.lang.java.JavaModel;
 
 // @sc.obj.Sync(onDemand=true) - done by API in EditorContext.initSync
@@ -12,8 +13,12 @@ public class MemoryEditSession implements sc.obj.IObjectId {
    public JavaModel model;
    public boolean cancelled; // Set to true when this edit session has been reverted
 
+   EditorContext ctx;
+
    private String text;
    public void setText(String t) {
+      if (text == null || !text.equals(t))
+         setStaleErrors(true);
       text = t;
       Bind.sendChangedEvent(this, "text");
    }
@@ -46,6 +51,22 @@ public class MemoryEditSession implements sc.obj.IObjectId {
    }
    public boolean getSaved() {
       return saved;
+   }
+
+   private boolean staleErrors; // Have we saved this since origText was set - not synchronized and only used on the server now
+   public void setStaleErrors(boolean s) {
+      if (s && !staleErrors && ctx != null) {
+         DynUtil.invokeLater(new Runnable() {
+            public void run() {
+               ctx.refreshMemorySessionErrors();
+            }
+         }, 0);
+      }
+      staleErrors = s;
+      Bind.sendChangedEvent(this, "staleErrors");
+   }
+   public boolean getStaleErrors() {
+      return staleErrors;
    }
 
    public String getObjectId() {

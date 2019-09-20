@@ -7,6 +7,7 @@ package sc.parser;
 import sc.util.StringUtil;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 /**
  * Represents an error in the parse-node tree that was parsed.  The errorText may be the empty string if
@@ -183,5 +184,9 @@ public class ErrorParseNode extends AbstractParseNode {
 
       // TODO: compare the parseErrors here?
       return false;
+   }
+
+   public void addParseErrors(List<ParseError> res, int max) {
+      res.add(error);
    }
 }

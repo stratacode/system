@@ -15,6 +15,7 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeSet;
 
@@ -455,6 +456,12 @@ public class ParseUtil  {
          }
       }
       return parentNode;
+   }
+
+   public static List<ParseError> getParseNodeErrors(IParseNode pnode, int max) {
+      ArrayList<ParseError> errors = new ArrayList<ParseError>();
+      pnode.addParseErrors(errors, max);
+      return errors.size() == 0 ? null : errors;
    }
 
    public static String getInputString(File file, int startIndex, int i) {

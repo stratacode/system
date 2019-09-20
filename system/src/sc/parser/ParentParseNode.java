@@ -1342,6 +1342,26 @@ public class ParentParseNode extends AbstractParseNode {
       }
       return true;
    }
+
+   public void addParseErrors(List<ParseError> res, int max) {
+      if (children != null) {
+         int len = children.size();
+         for (int i = 0; i < len; i++) {
+            Object child = children.get(i);
+            if (child instanceof ParseError) {
+               res.add((ParseError) child);
+            }
+            else if (child instanceof ErrorParseNode) {
+               res.add(((ErrorParseNode) child).error);
+            }
+            else if (child instanceof IParseNode) {
+               ((IParseNode) child).addParseErrors(res, max);
+            }
+            if (res.size() >= max)
+               return;
+         }
+      }
+   }
 }
 
 

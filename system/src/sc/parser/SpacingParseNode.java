@@ -16,6 +16,7 @@ import sc.lang.java.Statement;
 import sc.util.FileUtil;
 
 import java.util.IdentityHashMap;
+import java.util.List;
 
 public class SpacingParseNode extends FormattingParseNode {
    Parselet parselet;

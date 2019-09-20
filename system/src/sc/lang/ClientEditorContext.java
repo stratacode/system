@@ -45,6 +45,11 @@ public abstract class ClientEditorContext {
 
    public void setMemSessions(HashMap<SrcEntry,MemoryEditSession> msMap) {
       this.memSessions = msMap;
+      if (msMap != null) {
+         for (MemoryEditSession mes:msMap.values()) {
+            mes.ctx = (EditorContext) this;
+         }
+      }
       Bind.sendChangedEvent(this, "memSessions");
    }
 
@@ -112,8 +117,7 @@ public abstract class ClientEditorContext {
       mes.setCaretPosition(cp);
 
       if (newMemSessions != null) {
-         memSessions = newMemSessions;
-         Bind.sendChange(this, "memSessions", memSessions);
+         setMemSessions(newMemSessions);
       }
    }
 
@@ -151,8 +155,7 @@ public abstract class ClientEditorContext {
       setMemorySessionChanged(true);
 
       if (newMemSessions != null) {
-         memSessions = newMemSessions;
-         Bind.sendChange(this, "memSessions", memSessions);
+         setMemSessions(newMemSessions);
       }
    }
 
