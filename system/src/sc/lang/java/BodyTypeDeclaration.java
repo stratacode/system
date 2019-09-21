@@ -1830,11 +1830,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res = res + innerTypeSep + useTypeName;
       }
       else {
-         throw new UnsupportedOperationException();
+         System.err.println("*** Unrecognized parent node of type: " + pnode + " returning type name: " + useTypeName);
+         res = useTypeName;
       }
       return res;
    }
-
 
    // For sync to JS
    public void setFullTypeName() {

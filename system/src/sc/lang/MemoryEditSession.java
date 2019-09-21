@@ -15,6 +15,9 @@ public class MemoryEditSession implements sc.obj.IObjectId {
 
    EditorContext ctx;
 
+   // Most current parse of the text (only on the server and not sync'd)
+   Object lastParseRes;
+
    private String text;
    public void setText(String t) {
       if (text == null || !text.equals(t))

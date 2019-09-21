@@ -422,9 +422,9 @@ public class ParseUtil  {
 
             IParseNode childNode = (IParseNode) child;
             // This child starts after the requested offset
-            if (childNode.getStartIndex() > offset) {
+            if (childNode.getStartIndex() >= offset) {
                if (lastChild != null)
-                  return lastChild;
+                  break;
                else
                   return parentNode;
             }

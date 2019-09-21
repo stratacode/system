@@ -1315,6 +1315,7 @@ public class EditorContext extends ClientEditorContext {
                newErrorModels.put(srcEntry, newErrs);
             }
             mes.setStaleErrors(false);
+            mes.lastParseRes = parseRes;
          }
       }
       if (newErrorModels != null) {
@@ -1858,6 +1859,40 @@ public class EditorContext extends ClientEditorContext {
          }
       }
       return pos;
+   }
+
+   @Remote(remoteRuntimes="js")
+   public List<String> getSuggestionsForPos(SrcEntry srcEnt, int cursorPos) {
+      if (memSessions == null)
+         return null;
+
+      MemoryEditSession mes = memSessions.get(srcEnt);
+      if (mes == null || mes.getText() == null)
+         return null;
+
+      Set<String> candidates = new HashSet<String>();
+      String fileText = mes.getText();
+      //String prefix = fileText.length() > cursorPos ? fileText.substring(0,cursorPos) : fileText;
+      //String command = getStatementCompleteStart(prefix);
+
+      Object parseRes = mes.lastParseRes;
+      if (parseRes instanceof ISemanticNode)
+         parseRes = ((ISemanticNode) parseRes).getParseNode();
+      if (parseRes instanceof IParseNode) {
+         IParseNode cursorPN = ParseUtil.findClosestParseNode((IParseNode) parseRes, cursorPos);
+         Object semValue = cursorPN.getSemanticValue();
+         // If we match identifiers.0 we need to go up to the Identifier
+         if (semValue instanceof SemanticNodeList)
+            semValue = ((SemanticNodeList) semValue).getParentNode();
+         if (semValue instanceof JavaSemanticNode) {
+            JavaSemanticNode semNode = (JavaSemanticNode) semValue;
+            TypeDeclaration currentType = semNode.getEnclosingType();
+            semNode.suggestCompletions("", currentType, null, "", cursorPos, candidates, null, 100);
+         }
+         System.out.println("***");
+
+      }
+      return new ArrayList<String>(candidates);
    }
 
    public int completeText(String text, CompletionTypes completionType, List candidates, JavaModel fileModel, Object currentType) {

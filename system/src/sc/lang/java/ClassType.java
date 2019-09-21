@@ -961,7 +961,11 @@ public class ClassType extends JavaType {
          typeName = "";
       }
 
-      boolean includeProps = parentNode instanceof CastExpression;
+      // TODO: this was the old version before changing to includeProps=true
+      //boolean includeProps = parentNode instanceof CastExpression;
+      // Although ClassType in many cases does not match properties, it will show up as the parse match for a value
+      // in a class body which could be a type or a property
+      boolean includeProps = true;
 
       ModelUtil.suggestTypes(model, prefix, typeName, candidates, true, false, max);
       if (currentType != null)
