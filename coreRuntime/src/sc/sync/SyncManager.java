@@ -443,6 +443,30 @@ public class SyncManager {
          return (ii != null && ii.fixedObject);
       }
 
+      private boolean isPrimitiveClass(Class valClass) {
+         return PTypeUtil.isStringOrChar(valClass) || PTypeUtil.isPrimitive(valClass) || PTypeUtil.isANumber(valClass) || valClass == Boolean.class || valClass == Boolean.TYPE;
+      }
+
+      private boolean isNonReference(Object val) {
+         Class valClass = val.getClass();
+         boolean primType = isPrimitiveClass(valClass);
+         if (primType)
+            return true;
+         if (DynUtil.isEnumConstant(val) || isFixedObject(val))
+            return true;
+         if (PTypeUtil.isArray(valClass)) {
+            Object compType = PTypeUtil.getComponentType(valClass);
+            if (compType instanceof Class && isPrimitiveClass((Class) compType))
+               return true;
+         }
+         if (val instanceof Collection) {
+            int len = DynUtil.getArrayLength(val);
+            if (len == 0 || isNonReference(DynUtil.getArrayElement(val, 0)))
+               return true;
+         }
+         return false;
+      }
+
       public void addChangedValue(List<SyncLayer.SyncChange> depChanges, Object obj, String propName, Object val, String syncGroup, SyncLayer syncLayer) {
          SyncLayer changedLayer = syncLayer == null ? getChangedSyncLayer(syncGroup) : syncLayer;
          if (verboseValues || (verbose && !needsSync)) {
@@ -463,10 +487,9 @@ public class SyncManager {
                   if (val == null)
                      safeDepChange = true;
                   else {
-                     Class valClass = val.getClass();
                      // TODO: we could find a faster way to do this logic, or switch it and only look for references which are being added to the stream since it's only 'forward references' we are trying to avoid here.
                      // we also could just support deserializing forward references
-                     if (PTypeUtil.isStringOrChar(valClass) || PTypeUtil.isPrimitive(valClass) || PTypeUtil.isANumber(valClass) || valClass == Boolean.class || valClass == Boolean.TYPE || DynUtil.isEnumConstant(val) || isFixedObject(val))
+                     if (isNonReference(val))
                         safeDepChange = true;
                   }
                }
@@ -2247,34 +2270,42 @@ public class SyncManager {
 
       /** Returns the object instance with the given name - for runtime lookup. */
       public Object resolveObject(String currentPackage, String name, boolean create, boolean unwrap) {
-         Object inst = getObjectByName(name, unwrap);
-         String fullPathName = null;
-         if (inst == null && currentPackage != null)
-            inst = getObjectByName(fullPathName = CTypeUtil.prefixPath(currentPackage, name), unwrap);
-         if (inst == null) {
-            inst = ScopeDefinition.resolveName(name, true, true);
-            if (inst == null && fullPathName != null) {
-               inst = ScopeDefinition.resolveName(fullPathName, true, true);
+         // If we are ApplyingChanges and resolve an object for the first time, the state needs to be set back to RecordingChanges
+         // or we assume the initial state of the new component is already on the other side
+         SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.RecordingChanges);
+         try {
+            Object inst = getObjectByName(name, unwrap);
+            String fullPathName = null;
+            if (inst == null && currentPackage != null)
+               inst = getObjectByName(fullPathName = CTypeUtil.prefixPath(currentPackage, name), unwrap);
+            if (inst == null) {
+               inst = ScopeDefinition.resolveName(name, true, true);
+               if (inst == null && fullPathName != null) {
+                  inst = ScopeDefinition.resolveName(fullPathName, true, true);
+               }
+            }
+            if (inst != null) {
+               /* TODO: security: also would need to check if there are any remote methods on this type... but does it matter?   We will
+                  check if the property or method itself is synchronized so maybe it's ok to allow the object to be resolved?  It does potentially give away
+                  internal information if we don't do this though.
+               if (!syncDestination.clientDestination && getSyncPropertiesForInst(inst) == null) {
+                  System.err.println("Resolve instance not allowed for: " + inst + " type: " + DynUtil.getSType(inst) + " for sync context: " + this);
+               }
+               */
+               return inst;
+            }
+            // Check framework specific name spaces - e.g. we want to lazily create tag objects from the server nodes created in the DOM space
+            if (frameworkNameContexts != null) {
+               for (INameContext resolver:frameworkNameContexts) {
+                  inst = resolver.resolveName(name, create, true);
+                  if (inst != null)
+                     return inst;
+               }
+               return null;
             }
          }
-         if (inst != null) {
-            /* TODO: security: also would need to check if there are any remote methods on this type... but does it matter?   We will
-               check if the property or method itself is synchronized so maybe it's ok to allow the object to be resolved?  It does potentially give away
-               internal information if we don't do this though.
-            if (!syncDestination.clientDestination && getSyncPropertiesForInst(inst) == null) {
-               System.err.println("Resolve instance not allowed for: " + inst + " type: " + DynUtil.getSType(inst) + " for sync context: " + this);
-            }
-            */
-            return inst;
-         }
-         // Check framework specific name spaces - e.g. we want to lazily create tag objects from the server nodes created in the DOM space
-         if (frameworkNameContexts != null) {
-            for (INameContext resolver:frameworkNameContexts) {
-               inst = resolver.resolveName(name, create, true);
-               if (inst != null)
-                  return inst;
-            }
-            return null;
+         finally {
+            SyncManager.setSyncState(oldState);
          }
          return null;
       }
@@ -3603,4 +3634,5 @@ public class SyncManager {
          globalSyncTypeNames = new HashSet<String>();
       globalSyncTypeNames.add(typeName);
    }
+
 }
