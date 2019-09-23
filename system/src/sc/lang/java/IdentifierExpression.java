@@ -4647,7 +4647,10 @@ public class IdentifierExpression extends ArgumentsExpression {
 
          // For "a.b" we complete 'b' using the type of a
          if (idSize > 1) {
-            if (boundTypes != null)
+            Object[] bts = boundTypes;
+            if (bts == null && replacedByStatement instanceof IdentifierExpression)
+               obj = ((IdentifierExpression) replacedByStatement).getTypeForIdentifier(idSize-2);
+            else if (bts != null)
                obj = getTypeForIdentifier(idSize-2);
          }
       }
