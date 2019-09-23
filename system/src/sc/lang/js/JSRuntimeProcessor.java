@@ -138,9 +138,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
              "%>var _inst;\n" +
              "sc_DynUtil_c.addDynObject(\"<%= javaTypeName %>\", _inst = new <%= typeName %>());\n<% " +
           "} " +
+          // The call to initChildren used to be outside of the "begin/flush sync queue" but then we end up treating initialization config property changes
+          // as real changes to be sent back to the server. This way, we'll treat the entire init sequence as "applying changes" rather than "recording" so need
+          // to be careful that any real init code that needs to change stuff is invoked from code that sets the state back to Recording first.
           "if (needsSync) { %>" +
-             "sc_SyncManager_c.flushSyncQueue();\n" +
              "sc_SyncManager_c.initChildren(_inst);\n" +
+             "sc_SyncManager_c.flushSyncQueue();\n" +
           "<% } %>\n";
 
    public String mainTemplate = "<%= typeName %>" + typeNameSuffix + ".main([]);\n";
@@ -3466,11 +3469,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          return true;
       }
 
-      public void typeChanged(BodyTypeDeclaration type) {
-         JavaModel model = type.getJavaModel();
+      public void typeChanged(BodyTypeDeclaration oldType, BodyTypeDeclaration newType) {
+         JavaModel model = newType.getJavaModel();
          // Once this model is changed in the modelStream, it will cause the type and instances to be updated when this is
          // pushed to the client.  No need to touch modType in this case.
-         TypeDeclaration modType = getOrCreateModifyDeclaration(type.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
+         TypeDeclaration modType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());
       }
 
       public boolean needsChangedMethods() {
