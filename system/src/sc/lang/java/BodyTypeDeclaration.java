@@ -1725,8 +1725,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Class getCompiledClass(boolean init) {
-      if (init && !isStarted())
+      if (init && !isStarted()) {
+         if (replaced && replacedByType != null) { // TODO: should there be a warning here to help find and fix types which were not updated properly during the updateType operation?
+            return replacedByType.getCompiledClass(init);
+         }
          ParseUtil.realInitAndStartComponent(this);
+      }
       String typeName = getCompiledClassName();
       // Inner classes, or those defined in methods may not have a type name and so no way to look them up
       // externally.
