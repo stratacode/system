@@ -342,7 +342,7 @@ public class JSONDeserializer {
             //   bindCtx.dispatchEvents(null);
 
             if (returnVal != null) {
-               syncCtx.registerObjName(returnVal, callId, false, false, false);
+               //syncCtx.registerObjName(returnVal, callId, false, false, false);
             }
             syncCtx.addMethodResult(isType ? null : curObj, isType ? curType : null, callId, returnVal, exceptionStr);
          }
