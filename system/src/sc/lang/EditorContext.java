@@ -1862,7 +1862,7 @@ public class EditorContext extends ClientEditorContext {
    }
 
    @Remote(remoteRuntimes="js")
-   public List<String> getSuggestionsForPos(SrcEntry srcEnt, int cursorPos) {
+   public CompletionResult getSuggestionsForPos(SrcEntry srcEnt, int cursorPos) {
       if (memSessions == null)
          return null;
 
@@ -1874,6 +1874,8 @@ public class EditorContext extends ClientEditorContext {
       String fileText = mes.getText();
       //String prefix = fileText.length() > cursorPos ? fileText.substring(0,cursorPos) : fileText;
       //String command = getStatementCompleteStart(prefix);
+
+      int relPos = -1;
 
       Object parseRes = mes.lastParseRes;
       if (parseRes instanceof ISemanticNode)
@@ -1887,12 +1889,14 @@ public class EditorContext extends ClientEditorContext {
          if (semValue instanceof JavaSemanticNode) {
             JavaSemanticNode semNode = (JavaSemanticNode) semValue;
             TypeDeclaration currentType = semNode.getEnclosingType();
-            semNode.suggestCompletions("", currentType, null, "", cursorPos, candidates, null, 100);
+            relPos = semNode.suggestCompletions("", currentType, null, "", cursorPos, candidates, null, 100);
          }
-         System.out.println("***");
-
       }
-      return new ArrayList<String>(candidates);
+
+      CompletionResult res = new CompletionResult();
+      res.suggestions = new ArrayList<String>(candidates);
+      res.completeStart = relPos;
+      return res;
    }
 
    public int completeText(String text, CompletionTypes completionType, List candidates, JavaModel fileModel, Object currentType) {
@@ -1939,6 +1943,8 @@ public class EditorContext extends ClientEditorContext {
 
       SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
       SyncManager.addSyncType(ModelError.class, new SyncProperties(null, null, new Object[] {"error", "startIndex", "endIndex", "notFound"}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+
+      SyncManager.addSyncType(CompletionResult.class, new SyncProperties(null, null, new Object[] {"completeStart", "suggestions"}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
 
       // Needed to add constructor args right before we sync a new instance
       SyncManager.addSyncHandler(SrcEntry.class, LayerSyncHandler.class);
