@@ -646,7 +646,25 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
             }
             else {
                LayeredSystem sys = model.getLayeredSystem();
-               Layer layer = sys.buildLayer;
+               Layer buildLayer = sys.buildLayer;
+               if (buildLayer == null)
+                  return null;
+               Layer layer = null;
+               Layer modelLayer = model.getLayer();
+               if (modelLayer == null)
+                  return null;
+               // If the build layer extends the layer where this reference exists, we'll use that since it's the most specific.
+               // If not, it won't be able to find the definitions so we need to pick the last layer in the stack which extends
+               // the layer which this model is defined in.
+               if (buildLayer.extendsOrIsLayer(modelLayer))
+                  layer = buildLayer;
+               for (int i = sys.layers.size()-1; i >= 0; i--) {
+                  Layer nextLayer = sys.layers.get(i);
+                  if (nextLayer.extendsOrIsLayer(modelLayer)) {
+                     layer = nextLayer;
+                     break;
+                  }
+               }
                if (layer == null)
                   return null;
                Expression expr =  (Expression) ((IParseNode) evalRes).getSemanticValue();
