@@ -6513,8 +6513,9 @@ public class ModelUtil {
             continue;
          if (byName) {
             String name = ModelUtil.getPropertyName(cprop);
-            if (StringUtil.equalStrings(name, ModelUtil.getPropertyName(prop)))
+            if (StringUtil.equalStrings(name, ModelUtil.getPropertyName(prop))) {
                return i;
+            }
          }
          else {
             if (prop == cprop)
@@ -6917,7 +6918,8 @@ public class ModelUtil {
       else if (def instanceof ParamTypedMember) {
          return getPreviousDefinition(((ParamTypedMember) def).getMemberObject());
       }
-      throw new UnsupportedOperationException();
+      // A compiled definition
+      return null;
    }
 
    public static Object parseCommandString(Language cmdLang, String command, Parselet start) {
