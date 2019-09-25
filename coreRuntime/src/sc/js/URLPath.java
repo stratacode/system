@@ -80,13 +80,119 @@ public class URLPath implements Comparable {
       return app;
    }
 
-   // TODO: this only works for the most rudimentary cases and should do escaping etc.
-   public static String addQueryParam(String url, String param, String value) {
+   // TODO: do we need to encode string values into UTF8 here or maybe it should be done downstream?
+   public static String addQueryParam(String url, String param, Object value) {
+      String veqStr = getValueEqualsString(value);
+      if (veqStr == null)
+         return url;
+      char sep;
       if (url.contains("?"))
-         url = url + "&" + param + "=" + value;
+         sep = '&';
       else
-         url = url + "?" + param + "=" + value;
+         sep = '?';
+      return url + sep + param + veqStr;
+   }
+
+   // TODO: add more data types? should we do List<Type>
+   public static String getValueEqualsString(Object value) {
+      if (value instanceof Boolean) {
+         Boolean bval = (Boolean) value;
+         if (bval)
+            return "";
+         else
+            return null;
+      }
+      if (value instanceof String || value instanceof Number || value instanceof Character)
+         return "=" + value;
+      else
+         throw new IllegalArgumentException("Unsupported query parameter type: " + value);
+   }
+
+   public static String setQueryParam(String url, String param, Object value) {
+      int qix = url.indexOf("?");
+      if (qix != -1) {
+         int nameIx = url.indexOf(param, qix+1);
+         if (nameIx == -1)
+            return value == null ? url : addQueryParam(url, param, value);
+
+         String newValueEqualsStr = getValueEqualsString(value);
+         if (newValueEqualsStr == null)
+            return removeQueryParam(url, param);
+
+         // Replace the value
+         int nameEnd = nameIx + param.length();
+         int valEndIx = findValEndInQueryString(url, nameEnd);
+         return url.substring(0, nameEnd) + newValueEqualsStr + url.substring(valEndIx);
+      }
+      else if (value != null)
+         return addQueryParam(url, param, value);
       return url;
+   }
+
+   public static String removeQueryParam(String url, String param) {
+      int qix = url.indexOf("?");
+      if (qix != -1) {
+         int nameIx = url.indexOf(param, qix+1);
+         if (nameIx == -1)
+            return url;
+         int nameEnd = nameIx + param.length();
+         int valEndIx = findValEndInQueryString(url, nameEnd);
+         String start = url.substring(0, nameIx);
+         String rem = url.substring(valEndIx);
+         if (rem.length() > 0) {
+            if (start.endsWith("?") || start.endsWith("&")) {
+               if (rem.startsWith("&"))
+                  rem = rem.substring(1);
+               return start + rem;
+            }
+            return start + "?" + rem;
+         }
+         else if (start.endsWith("&") || start.endsWith("?"))
+            start = start.substring(0, start.length()-1);
+         return start;
+      }
+      return url;
+   }
+
+   private static int findNameInQueryString(String url, int qix, String param) {
+      int nameIx = url.indexOf(param, qix+1);
+      if (nameIx == -1)
+         return -1;
+      char before = url.charAt(nameIx-1);
+      if (before != '?' && before != '&')
+         return -1;
+      int plen = param.length();
+      int afterIx = nameIx + plen;
+      char after = afterIx == url.length() ? '&' : url.charAt(afterIx);
+      if (after == '=' || after == '&') {
+         return nameIx;
+      }
+      return -1;
+   }
+
+   private static int findValEndInQueryString(String url, int nameEnd) {
+      int sepIx = url.indexOf("&", nameEnd);
+      if (sepIx == -1) {
+         return url.length();
+      }
+      return sepIx;
+   }
+
+   /** Returns Boolean.TRUE for present with no value, otherwise a String */
+   public static Object getQueryParam(String url, String param) {
+      int qix = url.indexOf("?");
+      if (qix != -1) {
+         int nameIx = findNameInQueryString(url, qix, param);
+         if (nameIx == -1)
+            return null;
+
+         int nameEnd = nameIx + param.length();
+         int valEndIx = findValEndInQueryString(url, nameEnd);
+         if (valEndIx == nameEnd) // Just paramName& so we return a boolean of true for that situation
+            return Boolean.TRUE;
+         return url.substring(nameEnd+1, valEndIx);
+      }
+      return null;
    }
 
    public String toString() {
