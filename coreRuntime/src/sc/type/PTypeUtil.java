@@ -13,6 +13,7 @@ import sc.dyn.CompReverseMethodMapper;
 import sc.bind.MethodBinding;
 import sc.dyn.IReverseMethodMapper;
 import sc.js.JSSettings;
+import sc.obj.ISystemExitListener;
 
 /** A version of the PTypeUtil class with minimum dependencies on core Java features.  Originally, this class was built for
  * the GWT integration to separate out methods which did not exist in that runtime.  It now is primarily used to separate
@@ -495,6 +496,12 @@ public class PTypeUtil {
 
    public static void postHttpRequest(String url, String postData, String contentType, IResponseListener listener) {
       // TODO: maybe implement this or clean this API up.  Can we emulate XmlHttpRrequest in Java and so use that one API?
+      throw new UnsupportedOperationException();
+   }
+
+   // Same as postHttpRequest - this feature is part of newer browsers used to notify the server the browser is closing but
+   // could be easily implemented in other runtimes using an exit listener a synchronous Http request
+   public static void sendBeacon(String url, String postData) {
       throw new UnsupportedOperationException();
    }
 

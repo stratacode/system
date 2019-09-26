@@ -977,6 +977,12 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
+   // Same as postHttpRequest - this feature is part of newer browsers used to notify the server the browser is closing but
+   // could be easily implemented in other runtimes using an exit listener a synchronous Http request
+   public static void sendBeacon(String url, String postData) {
+      throw new UnsupportedOperationException();
+   }
+
    public static boolean isObject(Object obj) {
       return obj != null && isObjectType(obj.getClass());
    }
