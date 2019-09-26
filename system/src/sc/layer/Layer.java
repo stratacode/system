@@ -4186,6 +4186,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          sb.append("dynamic ");
       if (hidden)
          sb.append("hidden ");
+      if (defaultModifier != null) {
+         sb.append(defaultModifier);
+         sb.append(" ");
+      }
       sb.append(toString());
 
       if (codeType != null) {
