@@ -6,6 +6,7 @@ package sc.obj;
 
 import sc.dyn.DynUtil;
 import sc.sync.SyncManager;
+import sc.util.PerfMon;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -38,6 +39,11 @@ public abstract class ScopeContext {
 
    public abstract String getId();
 
+   // Like the above but with more info - used as the title for ScopeContext in management UIs
+   public String getTraceId() {
+      return getId();
+   }
+
    // NOTE: returns the underlying map which is storing the values for efficiency.
    public abstract Map<String,Object> getValues();
 
@@ -49,11 +55,11 @@ public abstract class ScopeContext {
 
    private boolean destroyed = false;
 
+   // Debug only
+   private long createTime = System.currentTimeMillis();
+
    // Used for synchronizing the set/get of eventListener
    public final Object eventListenerLock = new Object();
-
-   // Set to true for scopes for which a client is listening for change events (e.g. the "window scope" for a browser window based application)
-   public boolean supportsChangeEvents = false;
 
    // Used for receiving cross-scope binding events
    public IScopeEventListener eventListener = null;
@@ -193,6 +199,29 @@ public abstract class ScopeContext {
          }
       }
       return null;
+   }
+
+   public HashSet<ScopeContext> getChildContexts() {
+      return childContexts;
+   }
+
+   public String getTraceInfo() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("createTime = " + PerfMon.getTimeDelta(createTime) + "\n");
+      sb.append("current context = " + isCurrent() + "\n");
+      sb.append("refreshPending = " + refreshPending + "\n");
+      if (destroyed)
+         sb.append("*** warning - scopeContext has been destroyed!\n");
+      if (parentContexts != null) {
+         for (int i = 0; i < parentContexts.size(); i++) {
+            ScopeContext parCtx = parentContexts.get(i);
+            sb.append("parent = " + parCtx + "\n");
+         }
+      }
+      if (childContexts != null) {
+         sb.append("numChildren = " + childContexts.size() + "\n");
+      }
+      return sb.toString();
    }
 
 }

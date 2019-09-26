@@ -47,9 +47,12 @@ public class Window implements IObjectId {
 
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp};
 
+   public static int DefaultWidth = 700;
+   public static int DefaultHeight = 500;
+
    // TODO - we could have the client set these via an XMLHTTP request but the whole point is to render CSS and HTML
    // up front properly.  We could at least choose different values for different user-agents.
-   private int innerWidth = 700, innerHeight = 500;
+   private int innerWidth = DefaultWidth, innerHeight = DefaultHeight;
 
    @Bindable(manual=true)
    public int getInnerWidth() {

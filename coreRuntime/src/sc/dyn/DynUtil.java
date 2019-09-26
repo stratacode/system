@@ -1788,4 +1788,11 @@ public class DynUtil {
       }
       return res;
    }
+
+   public static void addSystemExitListener(ISystemExitListener sys) {
+      if (dynamicSystem != null)
+         dynamicSystem.addSystemExitListener(sys);
+      else // TODO: add a hook for this so it can be implemented for each runtime
+         throw new UnsupportedOperationException();
+   }
 }

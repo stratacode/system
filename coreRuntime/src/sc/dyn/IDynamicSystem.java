@@ -5,6 +5,7 @@
 package sc.dyn;
 
 import sc.bind.BindingContext;
+import sc.obj.ISystemExitListener;
 import sc.obj.ScopeDefinition;
 import sc.type.IBeanMapper;
 
@@ -169,4 +170,6 @@ public interface IDynamicSystem {
    ScopeDefinition getScopeByName(String scopeName);
 
    boolean needsSync(Object type);
+
+   void addSystemExitListener(ISystemExitListener listener);
 }
