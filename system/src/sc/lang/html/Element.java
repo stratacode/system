@@ -4033,7 +4033,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      }
                      // The current guy is in the list but later on
                      else {
-                        Element elemToMove = tags.remove(curIx);
+                        Element elemToMove = tags.get(curIx);
                         // Try to delete our way to the old guy so this stays incremental.  But at this point we also delete all the way to the old guy so the move is as short as possible (and to batch the removes in case this ever is used with transitions)
                         int delIx;
                         boolean needsMove = false;
@@ -4054,6 +4054,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         if (needsMove) {
                            renumberIx = i;
                            elemToMove.setRepeatIndex(i);
+                           tags.remove(curIx);
                            tags.add(i, elemToMove);
                            moveElement(elemToMove, curIx, i);
                         }
