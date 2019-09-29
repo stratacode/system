@@ -275,10 +275,15 @@ public abstract class ScopeDefinition {
       return false;
    }
 
+   public String getDescription() {
+      return "Scope: " + getExternalName();
+   }
+
    /** Initialize the scopes that are always available */
    public static void initScopes() {
       GlobalScopeDefinition.getGlobalScopeDefinition();
       AppGlobalScopeDefinition.getAppGlobalScopeDefinition();
       RequestScopeDefinition.getRequestScopeDefinition();
    }
+
 }

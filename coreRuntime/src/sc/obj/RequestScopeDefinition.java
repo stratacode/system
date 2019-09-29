@@ -61,4 +61,8 @@ public class RequestScopeDefinition extends ScopeDefinition {
    public boolean isTemporary() {
       return true;
    }
+
+   public String getDescription() {
+      return "Stores info only available for the duration of the current request.";
+   }
 }

@@ -249,9 +249,20 @@ public class SyncManager {
       //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
       Map<Object,String> objectIds;
 
+      // For when auto-id generation is necessary, store the number for each type name created in this context
+      Map<String,Integer> typeIdCounts;
+
       SyncLayer initialSyncLayer = new SyncLayer(this);
       {
          initialSyncLayer.initialLayer = true;
+      }
+
+      void initIdMaps() {
+         if (objectIds == null) {
+            // TODO: use WeakIdentityHashMap and remove the IdentityWrapper keys we use here?  Same with objectIds in DynUtil.
+            objectIds = new HashMap<Object,String>();
+            typeIdCounts = new TreeMap<String,Integer>();
+         }
       }
 
       public SyncContext(String name) {
@@ -667,7 +678,8 @@ public class SyncManager {
             String ctStr = objName.substring(usix + ID_INDEX_SEPARATOR.length());
             try {
                int ct = Integer.parseInt(ctStr);
-               int val = DynUtil.getTypeIdCount(typeName);
+               initIdMaps();
+               int val = DynUtil.getTypeIdCount(typeName, typeIdCounts);
                if (val <= ct)
                   DynUtil.updateTypeIdCount(typeName, ct + 1);
             }
@@ -932,7 +944,8 @@ public class SyncManager {
             String outerName = getParentExistingName(obj);
             if (outerName != null)
                return outerName;
-            return DynUtil.getObjectName(obj);
+            initIdMaps();
+            return DynUtil.getObjectName(obj, objectIds, typeIdCounts);
          }
          // If the instance was created as an inner instance of an object, we need to use
          // the parent object's name so we can find the enclosing instance of the new guy.
@@ -940,7 +953,7 @@ public class SyncManager {
             String baseName;
             boolean hasFixedId;
             if (obj instanceof IObjectId) {
-               baseName = DynUtil.getInstanceId(obj);
+               baseName = ((IObjectId) obj).getObjectId();
                // Null from getObjectId means that there's no name yet - need to delay synchronizing this object
                if (baseName == null)
                   return null;
@@ -973,7 +986,12 @@ public class SyncManager {
       private final static String ID_INDEX_SEPARATOR = "__";
 
       public String findObjectId(Object obj, String typeName) {
-         return DynUtil.getObjectId(obj, null, typeName);
+         if (obj instanceof IObjectId) {
+            return ((IObjectId) obj).getObjectId();
+         }
+
+         initIdMaps();
+         return DynUtil.getObjectId(obj, null, typeName, objectIds, typeIdCounts);
       }
 
       // After a successful sync, everything is registered.  Don't touch the parent context since it is shared with other clients
@@ -1913,7 +1931,7 @@ public class SyncManager {
             // particular destination should go.
             else {
                System.err.println("*** Synchronized ref to unsync'd type: " + DynUtil.getTypeName(DynUtil.getTypeOfObj(changedObj), false) + (varName != null ? " from: " + varName : "") +
-                      " instance: " + DynUtil.getInstanceId(changedObj) + ": value will be null on the other side");
+                      " instance: " + DynUtil.getInstanceName(changedObj) + ": value will be null on the other side");
             }
          }
          return null;
@@ -3196,13 +3214,9 @@ public class SyncManager {
       ctx.removeSyncInst(inst, syncProps);
    }
 
-   public static SyncResult sendSync() {
-      return sendSync(null, false);
-   }
-
    /** Start a synchronize operation for all destinations. Types which have registered a custom sync group are not synchronized. */
-   public static SyncResult sendSync(boolean resetSync) {
-      return sendSync(null, resetSync);
+   public static SyncResult sendSyncToAll() {
+      return sendSyncToAll(null, false, false);
    }
 
    public static void setInitialSync(String destName, String appId, int scopeId, boolean val) {
@@ -3236,7 +3250,7 @@ public class SyncManager {
       boolean anyChanges = false;
       for (SyncManager syncManager:syncManagers) {
          // TODO: validate that language and syncDestination.receiveLanguage match?
-         if (syncManager.syncDestination.applySyncLayer(data, language, false, detail))
+         if (syncManager.syncDestination.applySyncLayer(data, language, null, false, detail))
             anyChanges = true;
       }
       return anyChanges;
@@ -3351,11 +3365,11 @@ public class SyncManager {
     * Does a global sync across all destinations for all current sync contexts.  If you use SYNC_ALL as the sync group
     * it will synchronize all sync groups.  Specifying a null syncGroup will choose the default sync group only.
     */
-   public static SyncResult sendSync(String syncGroup, boolean resetSync) {
+   public static SyncResult sendSyncToAll(String syncGroup, boolean sendReset, boolean markAsSentOnly) {
       boolean anyChanges = false;
       String errorMessage = null;
       for (String destName:syncManagersByDest.keySet()) {
-         SyncResult res = sendSync(destName, syncGroup, resetSync, null, null);
+         SyncResult res = sendSync(destName, syncGroup, sendReset, markAsSentOnly, null, null);
          anyChanges = anyChanges || res.anyChanges;
          if (errorMessage == null)
             errorMessage = res.errorMessage;
@@ -3377,17 +3391,17 @@ public class SyncManager {
       return syncScope;
    }
 
-   public static SyncResult sendSync(String destName, String syncGroup, boolean resetSync, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public static SyncResult sendSync(String destName, String syncGroup, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
       ScopeDefinition syncScope = getDefaultScope();
       if (syncScope == null)
          throw new IllegalArgumentException("*** No active scopes to sync");
       else
-         return sendSync(destName, syncGroup, syncScope.scopeId, resetSync, codeUpdates, syncTypeFilter);
+         return sendSync(destName, syncGroup, syncScope.scopeId, sendReset, markAsSentOnly, codeUpdates, syncTypeFilter);
    }
 
-   public static SyncResult sendSync(String destName, String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public static SyncResult sendSync(String destName, String syncGroup, int scopeId, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
-      return syncMgr.sendSync(syncGroup, scopeId, resetSync, codeUpdates, syncTypeFilter);
+      return syncMgr.sendSync(syncGroup, scopeId, sendReset, markAsSentOnly, codeUpdates, syncTypeFilter);
    }
 
    private SyncContext getFirstParentSyncContext(int scopeId, boolean create) {
@@ -3410,7 +3424,7 @@ public class SyncManager {
       return null;
    }
 
-   public SyncResult sendSync(String syncGroup, int scopeId, boolean resetSync, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public SyncResult sendSync(String syncGroup, int scopeId, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
       SyncContext ctx = getSyncContext(scopeId, false);
       if (ctx == null) {  // If the default scope does not have a context, check for a sync context on the parent scope
          ctx = getFirstParentSyncContext(scopeId, false);
@@ -3418,7 +3432,11 @@ public class SyncManager {
 
       if (ctx != null) {
          ArrayList<SyncLayer> toSend = ctx.getChangedSyncLayers(syncGroup);
-         return syncDestination.sendSync(ctx, toSend, syncGroup, resetSync, codeUpdates, syncTypeFilter);
+
+         if (sendReset) // On the client this happens when the server has lost the session or never kept the info in the first place
+            return syncDestination.sendResetSync(ctx, toSend);
+
+         return syncDestination.sendSync(ctx, toSend, syncGroup, markAsSentOnly, codeUpdates, syncTypeFilter);
       }
       else if (verbose) {
          System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));

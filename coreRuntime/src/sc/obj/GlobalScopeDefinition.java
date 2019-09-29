@@ -64,4 +64,8 @@ public class GlobalScopeDefinition extends ScopeDefinition {
    IObjectId getDummyObjectId() {
       return null;
    }
+
+   public String getDescription() {
+      return "The root lifecycle - one instance per process.";
+   }
 }

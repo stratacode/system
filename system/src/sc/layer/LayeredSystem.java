@@ -699,6 +699,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             clearActiveLayers(true);
             activatedLayerNames = activatedDynLayerNames = null;
          }
+         else {
+            if (layers.size() == 0) {
+               boolean foundLayers = false;
+               if (peerSystems != null) {
+                  for (int i = 0; i < peerSystems.size(); i++) {
+                     LayeredSystem peerSys = peerSystems.get(i);
+                     if (peerSys.layers.size() != 0)
+                        foundLayers = true;
+                  }
+               }
+               if (!foundLayers) {
+                  System.err.println("*** found no active layers after activate!");
+               }
+            }
+         }
       }
    }
 
@@ -3622,7 +3637,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return -1;
    }
 
-   public boolean applySyncLayer(String language, String destName, String scopeName, String codeString, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+   public boolean applySyncLayer(String language, String destName, String scopeName, String codeString, boolean applyRemoteReset, boolean allowCodeEval, BindingContext ctx) {
       if (language.equals("js")) {
          throw new IllegalArgumentException("javascript layers - only supported in the browser");
       }
@@ -3635,7 +3650,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (stream != null) {
             boolean trace = SyncManager.trace;
             long startTime = trace ? System.currentTimeMillis() : 0;
-            stream.updateRuntime(destName, "window", isReset);
+            stream.updateRuntime(destName, scopeName, applyRemoteReset);
             if (SyncManager.trace)
                System.out.println("Applied sync layer to system in: " + StringUtil.formatFloat((System.currentTimeMillis() - startTime)/1000.0) + " secs");
          }
@@ -13513,7 +13528,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return ModelUtil.isObjectType(DynUtil.getSType(obj)) && !(obj instanceof Layer);
    }
 
-   public String getObjectName(Object obj) {
+   public String getObjectName(Object obj, Map<Object,String> objectIds, Map<String,Integer> typeIdCounts) {
       String objName = objectNameIndex.get(obj);
       Object outer = DynUtil.getOuterObject(obj);
       if (objName == null) {
@@ -13521,19 +13536,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Object typeObj = DynUtil.getSType(obj);
             if (ModelUtil.isObjectType(typeObj))
                return ModelUtil.getTypeName(typeObj);
-            return DynUtil.getInstanceId(obj);
+            return DynUtil.getInstanceId(objectIds, typeIdCounts, obj);
          }
          // If the instance was created as an inner instance of an object, we need to use
          // the parent object's name so we can find the enclosing instance of the new guy.
          else {
-            String outerName = getObjectName(outer);
+            String outerName = getObjectName(outer, objectIds, typeIdCounts);
             String typeClassName = ModelUtil.getClassName(DynUtil.getType(obj));
             String objTypeName = outerName + "." + typeClassName;
             if (ModelUtil.isObjectType(DynUtil.getSType(obj))) {
                return objTypeName;
             }
             if (obj instanceof IObjectId)
-               return outerName + "." + DynUtil.getInstanceId(obj);
+               return outerName + "." + DynUtil.getInstanceId(objectIds, typeIdCounts, obj);
 
             // Let the parent provide the name for the child - used for repeating components or others that
             // will have dynamically created child objects
@@ -13542,13 +13557,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (childName != null)
                   return outerName + "." + childName;
             }
-            return DynUtil.getObjectId(obj, null, objTypeName);
+            return DynUtil.getObjectId(obj, null, objTypeName, objectIds, typeIdCounts);
          }
       }
       if (outer == null) // Top level object - objectNameIndex stores the component type name.
          return objName;
       else {
-         return getObjectName(outer) + "." + objName;
+         return getObjectName(outer, objectIds, typeIdCounts) + "." + objName;
       }
    }
 

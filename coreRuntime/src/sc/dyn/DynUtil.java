@@ -49,7 +49,6 @@ public class DynUtil {
    // A table which stores the automatically assigned id for a given object instance.
    //static Map<Object,String> objectIds = (Map<Object,String>) PTypeUtil.getWeakHashMap();
    // This used to be WeakHashMap but we use IdentityWrapper as a key most of the time which causes this to get gc'd too quickly
-   // TODO: Can we use the WeakIdentityHashMap in sc.util?  It would need to be moved into coreRuntime  Right now, this is a memory leak unless we restrict it's use to objects that use dispose
    static Map<Object,String> objectIds = new HashMap<Object,String>();
 
    public static void clearObjectIds() {
@@ -683,10 +682,14 @@ public class DynUtil {
          dynamicSystem.addDynInnerObject(typeName, innerObj, outerObj);
    }
 
-   // In JS, this will return a property we store on the object.
    public static String getObjectName(Object obj) {
+      return getObjectName(obj, objectIds, typeIdCounts);
+   }
+
+   // In JS, this will return a property we store on the object.
+   public static String getObjectName(Object obj, Map<Object,String> idMap, Map<String,Integer> typeIdCounts) {
       if (dynamicSystem != null)
-         return dynamicSystem.getObjectName(obj);
+         return dynamicSystem.getObjectName(obj, idMap, typeIdCounts);
       return null;
    }
 
@@ -870,8 +873,12 @@ public class DynUtil {
       return sb.toString();
    }
 
-   /** Returns a unique id for the given object.  Types return the type name.  The id will otherwise by type-id__integer */
    public static String getInstanceId(Object obj) {
+      return getInstanceId(objectIds, typeIdCounts, obj);
+   }
+
+   /** Returns a unique id for the given object.  Types return the type name.  The id will otherwise by type-id__integer */
+   public static String getInstanceId(Map<Object,String> idMap, Map<String,Integer> typeIdCounts, Object obj) {
       if (obj == null)
          return null;
       if (obj instanceof Class)
@@ -880,7 +887,7 @@ public class DynUtil {
          // Type declarations put in the layer after the type name.  Need to strip that out.
          String s = DynUtil.getInnerTypeName(obj);
          // NOTE: sc_type_ is hard-coded elsewhere - search for it to find all usages.  Need to turn this into an id because we may have mroe than one type for the same type name.
-         return getObjectId(obj, obj, "sc_type_" + s.replace('.', '_'));
+         return getObjectId(obj, obj, "sc_type_" + s.replace('.', '_'), idMap, typeIdCounts);
       }
       else {
          if (obj instanceof IObjectId) {
@@ -899,20 +906,24 @@ public class DynUtil {
             return DynUtil.getTypeName(type, false) + "." + obj.toString();
          }
 
-         return getObjectId(obj, type, null);
+         return getObjectId(obj, type, null, idMap, typeIdCounts);
       }
    }
 
    public static String getObjectId(Object obj, Object type, String typeName) {
-      String objId = objectIds.get(new IdentityWrapper(obj));
+      return getObjectId(obj, type, typeName, objectIds, typeIdCounts);
+   }
+
+   public static String getObjectId(Object obj, Object type, String typeName, Map<Object,String> idMap, Map<String,Integer> typeIdCount) {
+      String objId = idMap.get(new IdentityWrapper(obj));
       if (objId != null)
          return objId;
 
       if (typeName == null)
          typeName = DynUtil.getTypeName(type, true);
-      String typeIdStr = "__" + getTypeIdCount(typeName);
+      String typeIdStr = "__" + getTypeIdCount(typeName, typeIdCount);
       String id = cleanTypeName(typeName) + typeIdStr;
-      objectIds.put(new IdentityWrapper(obj), id);
+      idMap.put(new IdentityWrapper(obj), id);
       return id;
    }
 
@@ -920,7 +931,7 @@ public class DynUtil {
       objectIds.put(new IdentityWrapper(obj), name);
    }
 
-   public static Integer getTypeIdCount(String typeName) {
+   public static Integer getTypeIdCount(String typeName, Map<String,Integer> typeIdCounts) {
       Integer typeId = typeIdCounts.get(typeName);
       if (typeId == null) {
          typeIdCounts.put(typeName, 1);
@@ -967,7 +978,7 @@ public class DynUtil {
             else if (obj.getClass().isArray()) {
                return TypeUtil.getArrayName(obj);
             }
-            else if (isObject(obj) && (res = getObjectName(obj)) != null)
+            else if (isObject(obj) && (res = getObjectName(obj, objectIds, typeIdCounts)) != null)
                return res;
 
             String objId = objectIds.get(new IdentityWrapper(obj));
@@ -1358,9 +1369,9 @@ public class DynUtil {
       return evalRemoteScript(null, script);
    }
 
-   public static boolean applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx) {
+   public static boolean applySyncLayer(String lang, String destName, String scopeName, String code, boolean applyRemoteReset, boolean allowCodeEval, BindingContext ctx) {
       if (dynamicSystem != null)
-         return dynamicSystem.applySyncLayer(lang, destName, scopeName, code, isReset, allowCodeEval, ctx);
+         return dynamicSystem.applySyncLayer(lang, destName, scopeName, code, applyRemoteReset, allowCodeEval, ctx);
       else
          throw new UnsupportedOperationException(("Attempt to evalCode without a dynamic runtime"));
    }

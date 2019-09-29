@@ -74,4 +74,8 @@ public class AppGlobalScopeDefinition extends ScopeDefinition {
          return ctx;
       }
    }
+
+   public String getDescription() {
+      return "Stores information shared by all instances of this application in this app server. The application id is usually the path part of the URL.";
+   }
 }

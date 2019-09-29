@@ -223,5 +223,4 @@ public abstract class ScopeContext {
       }
       return sb.toString();
    }
-
 }

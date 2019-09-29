@@ -187,8 +187,11 @@ public class SyncLayer {
       String paramSig;
       RemoteResult result;
 
-      SyncMethodCall(Object obj, Object type, String instName, String methName, Object retType, String paramSig, Object...args) {
+      SyncManager.SyncContext syncContext;
+
+      SyncMethodCall(SyncManager.SyncContext syncContext, Object obj, Object type, String instName, String methName, Object retType, String paramSig, Object...args) {
          super(obj, type);
+         this.syncContext = syncContext;
          if (instName == null)
             instName = DynUtil.getTypeName(type, false);
          this.instName = instName;
@@ -198,18 +201,17 @@ public class SyncLayer {
          this.args = args;
       }
 
-      // Explicitly not implementing equals and hashCode here since these are never replaced - they should use object identity
-
       public String getCallId() {
          if (callId == null) {
             String name = CTypeUtil.getClassName(instName) + "_" + methName;
-            Integer count = DynUtil.getTypeIdCount(name);
+            syncContext.initIdMaps();
+            Integer count = DynUtil.getTypeIdCount(name, syncContext.typeIdCounts);
             callId = name + "_" + count;
          }
          return callId;
       }
 
-      // Method calls are always distinct
+      // Method calls are always distinct - not replaced so don't match any other instances here
       public int hashCode() {
          return System.identityHashCode(this);
       }
@@ -400,7 +402,7 @@ public class SyncLayer {
    }
 
    public RemoteResult invokeRemote(Object obj, Object type, String methName, Object retType, String paramSig, Object[] args) {
-      SyncMethodCall change = new SyncMethodCall(obj, type, obj == null ? null : syncContext.findObjectName(obj), methName, retType, paramSig, args);
+      SyncMethodCall change = new SyncMethodCall(syncContext, obj, type, obj == null ? null : syncContext.findObjectName(obj), methName, retType, paramSig, args);
       addSyncChange(change);
       RemoteResult res = new RemoteResult();
       res.callId = change.getCallId();

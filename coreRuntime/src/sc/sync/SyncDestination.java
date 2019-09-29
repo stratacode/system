@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.bind.IListener;
+import sc.obj.ScopeDefinition;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 import sc.type.IResponseListener;
@@ -99,15 +100,17 @@ public abstract class SyncDestination {
     * The detail is for debug messages - in what context is the applySyncLayer being performed (e.g. init, response)
     * Returns true if any changes were applied.
     */
-   public boolean applySyncLayer(String input, String receiveLanguage, boolean resetSync, String detail) {
+   public boolean applySyncLayer(String input, String receiveLanguage, ScopeDefinition syncScope, boolean applyingRemoteReset, String detail) {
       SyncManager.SyncState oldSyncState = SyncManager.getSyncState();
 
-      // After we've resolved all of the objects which are referenced on the client, we do a "reset" since this will line us
-      // up with the state that's on the client.
+      // applyingRemoteReset is true when this received layer is restoring sync'd state from a new client - either
+      // we lost the session or are using request scope components.
+      // After we've resolved all of the objects which are referenced on the client, we call sendSync with 'markAsSentOnly=true'
+      // to skip the send of stuff we already sent when we initialized this client.
       // TODO: maybe the client should send two different layers during a reset - for the committed and uncommitted changes.
       // That way, all of the committed changes would be applied before the resetSync.  As it is now, those changes will be applied after this sendSync call.
-      if (resetSync) {
-         SyncManager.sendSync(name, null, true, null, null);
+      if (applyingRemoteReset) {
+         SyncManager.sendSync(name, null, false, true, null, null);
       }
 
       // Queuing up events so they are all fired after the sync has completed
@@ -159,7 +162,7 @@ public abstract class SyncDestination {
             SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
             SerializerFormat format = SerializerFormat.getFormat(receiveLanguage);
             if (format != null) {
-               if (format.applySyncLayer(name, defaultScope, layerDef, resetSync, allowCodeEval, ctx))
+               if (format.applySyncLayer(name, syncScope == null ? defaultScope : syncScope.name, layerDef, applyingRemoteReset, allowCodeEval, ctx))
                   anyChanges = true;
             }
             else
@@ -223,8 +226,10 @@ public abstract class SyncDestination {
 
       public void completeSync(Integer errorCode, String message) {
          updateInProgress(false, anyChanges);
-         for (SyncLayer syncLayer:syncLayers) {
-            syncLayer.completeSync(clientContext, errorCode, message);
+         if (syncLayers != null) {
+            for (SyncLayer syncLayer:syncLayers) {
+               syncLayer.completeSync(clientContext, errorCode, message);
+            }
          }
          postCompleteSync();
       }
@@ -236,7 +241,7 @@ public abstract class SyncDestination {
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
          try {
-            applySyncLayer(responseText, null, false, "response");
+            applySyncLayer(responseText, null, null, false, "response");
          }
          finally {
             SyncManager.setCurrentSyncLayers(null);
@@ -249,26 +254,8 @@ public abstract class SyncDestination {
          // to the server to reset it's data to what we have.
          if (errorCode == 205) {
             setConnected(true);
-            CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null, null);
-            if (SyncManager.trace) {
-               if (initSync.length() == 0) {
-                  System.out.println("No initial sync for reset");
-               }
-               else
-                  System.out.println("Initial sync for reset: " + initSync);
-            }
-            StringBuilder sb = new StringBuilder();
-            sb.append(initSync.toString());
-            // TODO: Remove this?   Right now, this works because we sync the properties which manage the fetched state - so the fetched changes get pushed automatically.
-            // We've serialized all of the client's changes in the resync, including changes in the requests which had an error.
-            // But if there were any fetch properties, those will just be lost so we need to collect them and add them to the end
-            // of the resync.
-            /*
-            for (SyncLayer sl:syncLayers) {
-               sb.append(sl.serialize(clientContext, null, true));
-            }
-            */
-            writeToDestination(sb.toString(), null, this, "reset=true", null);
+            ArrayList<SyncLayer> toSend = clientContext.getChangedSyncLayers(null);
+            SyncResult res = sendResetSync(clientContext, toSend);
          }
          // Server went away and told us it wasn't coming back so turn off realTime and we are now disconnected
          else if (errorCode == 410) {
@@ -300,9 +287,50 @@ public abstract class SyncDestination {
             }
             completeSync(errorCode, error == null ? null : error.toString());
             if (!serverError)
-               applySyncLayer((String) error, null, false, "error response");
+               applySyncLayer((String) error, null, null, false, "error response");
          }
       }
+   }
+
+   public SyncResult sendResetSync(SyncManager.SyncContext clientContext, ArrayList<SyncLayer> layers) {
+      String errorMessage = null;
+      boolean anyChanges;
+      boolean complete = false;
+      try {
+         // Although we are sending the initial sync layers - for the client, the changes since the initial sync, not just pending changes we still need to mark these
+         // changed layers as pending since they are included in the initial sync. When we get the response, we need to clear them out so they don't trigger another sync
+         for (SyncLayer layer:layers) {
+            layer.markSyncPending();
+         }
+
+         CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null, null);
+         if (SyncManager.trace) {
+            if (initSync.length() == 0) {
+               System.out.println("No initial sync for reset");
+            }
+            else
+               System.out.println("Initial sync for reset: " + initSync);
+         }
+         StringBuilder sb = new StringBuilder();
+         sb.append(initSync.toString());
+         // TODO: Remove this?   Right now, this works because we sync the properties which manage the fetched state - so the fetched changes get pushed automatically.
+         // We've serialized all of the client's changes in the resync, including changes in the requests which had an error.
+         // But if there were any fetch properties, those will just be lost so we need to collect them and add them to the end
+         // of the resync.
+               /*
+               for (SyncLayer sl:syncLayers) {
+                  sb.append(sl.serialize(clientContext, null, true));
+               }
+               */
+         anyChanges = sb.length() > 0;
+         updateInProgress(true, anyChanges);
+         writeToDestination(sb.toString(), null, new SyncListener(layers, anyChanges), "reset=true", null);
+         complete = true;
+      }
+      finally {
+         completeSync(layers, complete, errorMessage);
+      }
+      return new SyncResult(anyChanges, errorMessage);
    }
 
    public void updateInProgress(boolean start, boolean anyChanges) {
@@ -317,13 +345,22 @@ public abstract class SyncDestination {
       else {
          numWaitsInProgress += incr;
       }
+
+      if (numSendsInProgress < 0 || numSendsInProgress > 10 || numWaitsInProgress < 0 || numWaitsInProgress > 10) {
+         System.err.println("*** Warning: sync destination - invalid parameters: numSends=" + numSendsInProgress + " numWaits" + numWaitsInProgress);
+      }
    }
 
    /** Called after we've finished the entire sync.  For client destinations, this is the hook to see if we need to start another sync to obtain real-time changes */
    public void postCompleteSync() {
    }
 
-   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean resetSync, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   /**
+    * Use markAsSentOnly = true to not send any changes made yet on this connection. It's used as an optimization
+    * during the client-side 'reset' to avoid resending changes queued up during page initialization - since, the client
+    * will have received those changes on it's initial request.
+    */
+   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
       SyncSerializer lastSer = null;
       HashSet<String> createdTypes = new HashSet<String>();
       // Going in sorted order - e.g. global, then session.
@@ -346,12 +383,12 @@ public abstract class SyncDestination {
          if (SyncManager.trace) {
             // For scn, want easy way to debug the sc version, not the JS code
             String debugDef = lastSer == null ? "" : lastSer.getDebugOutput().toString();
-            if (resetSync)
-               System.out.println("Reset sync for " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
+            if (markAsSentOnly)
+               System.out.println("Marking changes as sent for " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
             else if (layerDef.trim().length() > 0)
                System.out.println("Sending sync from " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
          }
-         if (!resetSync) {
+         if (!markAsSentOnly) {
             updateInProgress(true, anyChanges);
             writeToDestination(layerDef, syncGroup, new SyncListener(layers, anyChanges), null, codeUpdates);
          }
@@ -369,16 +406,20 @@ public abstract class SyncDestination {
          exc.printStackTrace();
       }
       finally {
-         if (!complete && errorMessage == null)
-            errorMessage = "Sync failed.";
-         SyncManager.SyncContext clientContext = layers.get(layers.size()-1).syncContext;
-         for (SyncLayer syncLayer:layers) {
-            syncLayer.completeSync(clientContext, errorMessage == null ? null : SYNC_FAILED_ERROR, errorMessage);
-         }
-         if (errorMessage != null)
-            System.err.println("*** Sync failed: " + errorMessage);
+         completeSync(layers, complete, errorMessage);
       }
       return new SyncResult(anyChanges, errorMessage);
+   }
+
+   private void completeSync(ArrayList<SyncLayer> layers, boolean complete, String errorMessage) {
+      if (!complete && errorMessage == null)
+         errorMessage = "Sync failed.";
+      SyncManager.SyncContext clientContext = layers.get(layers.size()-1).syncContext;
+      for (SyncLayer syncLayer:layers) {
+         syncLayer.completeSync(clientContext, errorMessage == null ? null : SYNC_FAILED_ERROR, errorMessage);
+      }
+      if (errorMessage != null)
+         System.err.println("*** Sync failed: " + errorMessage);
    }
 
    public int getDefaultSyncPropOptions() {

@@ -10,6 +10,7 @@ import sc.obj.ScopeDefinition;
 import sc.type.IBeanMapper;
 
 import java.util.Iterator;
+import java.util.Map;
 
 /** A simple interface to bind the interpreter to the static type system. */
 public interface IDynamicSystem {
@@ -123,7 +124,7 @@ public interface IDynamicSystem {
 
    boolean isObjectType(Object type);
 
-   String getObjectName(Object obj);
+   String getObjectName(Object obj, Map<Object,String>idMap, Map<String,Integer> typeIdCounts);
 
    boolean isRootedObject(Object obj);
 
@@ -153,7 +154,7 @@ public interface IDynamicSystem {
 
    int getLayerPosition(Object type);
 
-   boolean applySyncLayer(String lang, String destName, String scopeName, String code, boolean isReset, boolean allowCodeEval, BindingContext ctx);
+   boolean applySyncLayer(String lang, String destName, String scopeName, String code, boolean applyRemoteReset, boolean allowCodeEval, BindingContext ctx);
 
    Object newInnerInstance(Object typeObj, Object outerObj, String constrSig, Object[] params);
 
