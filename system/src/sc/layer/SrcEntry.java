@@ -105,7 +105,7 @@ public class SrcEntry implements Cloneable {
    }
 
    public String toString() {
-      return relFileName + " layer: " + (layer == null ? "<null>" : layer + (srcRootName == null ? "" : "(" + srcRootName + "}"));
+      return (srcRootName == null ? "" : "*" + srcRootName + "/") + relFileName + " layer: " + (layer == null ? "<null>" : layer);
    }
 
    public String toShortString() {
