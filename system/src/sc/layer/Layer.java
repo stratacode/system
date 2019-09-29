@@ -159,7 +159,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** True if this layer just sets annotations and does not generate classes */
    public boolean annotationLayer;
 
-   /** True if this layer is designed as a declarative layer */
+   /**
+    * True if this layer configures it's base layers as it's primary goal.  It affects how layers
+    * are sorted, so that this layer is placed as close to it's base layers as dependencies will allow.
+    */
    public boolean configLayer;
 
    private Map<String,ImportDeclaration> importsByName;
@@ -2615,6 +2618,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          ct--;
       if (codeType == CodeType.Framework)
          ct--;
+      // Helps to place config layers close to the layers they are configuring so downstream layers see a consistent view of those types and makes the layer stack easier to read
       if (configLayer)
          ct--;
 
@@ -4186,6 +4190,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          sb.append("dynamic ");
       if (hidden)
          sb.append("hidden ");
+      if (configLayer)
+         sb.append("configLayer ");
       if (defaultModifier != null) {
          sb.append(defaultModifier);
          sb.append(" ");
