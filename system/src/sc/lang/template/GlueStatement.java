@@ -140,11 +140,17 @@ public class GlueStatement extends Statement implements ITemplateDeclWrapper {
       return chunkCt;
    }
 
-   public void refreshBoundTypes(int flags) {
-      if (declarations != null)
-         for (Object d:declarations)
-            if (d instanceof Statement)
-               ((Statement) d).refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
+      if (declarations != null) {
+         for (Object d:declarations) {
+            if (d instanceof Statement) {
+               if (((Statement) d).refreshBoundTypes(flags))
+                  res = true;
+            }
+         }
+      }
+      return res;
    }
 
    public void addChildBodyStatements(List<Object> statements) {

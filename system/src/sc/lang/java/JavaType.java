@@ -367,7 +367,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return dimsStr == null ? baseSig : dimsStr + baseSig;
    }
 
-   public abstract void refreshBoundType(int flags);
+   public abstract boolean refreshBoundType(int flags);
 
    public void setTypeDeclaration(Object typeObj) {
       throw new IllegalArgumentException("Invalid set type");

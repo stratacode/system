@@ -61,11 +61,15 @@ public class VariableStatement extends TypedDefinition implements IClassBodyStat
       return false;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
-      if (definitions != null)
-         for (VariableDefinition v:definitions)
-            v.refreshBoundType(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
+      if (definitions != null) {
+         for (VariableDefinition v:definitions) {
+            if (v.refreshBoundType(flags))
+               res = true;
+         }
+      }
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

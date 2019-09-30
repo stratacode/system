@@ -241,10 +241,13 @@ public class ArrayInitializer extends Expression {
       return ai;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (initializers != null)
          for (Expression ex:initializers)
-            ex.refreshBoundTypes(flags);
+            if (ex.refreshBoundTypes(flags))
+               res = true;
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

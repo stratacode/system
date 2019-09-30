@@ -10,7 +10,8 @@ public class IncompleteStatement extends Statement {
    public ClassType type;
 
    @Override
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      return false;
    }
 
    @Override

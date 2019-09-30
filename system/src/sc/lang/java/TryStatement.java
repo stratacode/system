@@ -61,15 +61,23 @@ public class TryStatement extends Statement implements IBlockStatement {
       return res;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (block != null && block.statements != null)
-         for (Statement st : block.statements)
-            st.refreshBoundTypes(flags);
+         for (Statement st : block.statements) {
+            if (st.refreshBoundTypes(flags))
+               res = true;
+         }
       if (catchStatements != null)
-         for (CatchStatement cs : catchStatements)
-            cs.refreshBoundTypes(flags);
-      if (finallyStatement != null)
-         finallyStatement.refreshBoundTypes(flags);
+         for (CatchStatement cs : catchStatements) {
+            if (cs.refreshBoundTypes(flags))
+               res = true;
+         }
+      if (finallyStatement != null) {
+         if (finallyStatement.refreshBoundTypes(flags))
+            res = true;
+      }
+      return res;
    }
 
    public void addChildBodyStatements(List<Object> sts) {

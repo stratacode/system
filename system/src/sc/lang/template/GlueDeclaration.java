@@ -36,11 +36,15 @@ public class GlueDeclaration extends Statement implements ITemplateDeclWrapper {
       return ix;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (declarations != null)
          for (Object o:declarations)
-            if (o instanceof Statement)
-               ((Statement) o).refreshBoundTypes(flags);
+            if (o instanceof Statement) {
+               if (((Statement) o).refreshBoundTypes(flags))
+                  res = true;
+            }
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

@@ -70,23 +70,31 @@ public class ForControlStatement extends ForStatement {
       return ExecResult.Next;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       if (forInit != null) {
          for (Definition d:forInit) {
-            if (d instanceof VariableStatement)
-               ((VariableStatement) d).refreshBoundTypes(flags);
-            else if (d instanceof Expression)
-               ((Expression) d).refreshBoundTypes(flags);
+            if (d instanceof VariableStatement) {
+               if (((VariableStatement) d).refreshBoundTypes(flags))
+                  res = true;
+            }
+            else if (d instanceof Expression) {
+               if (((Expression) d).refreshBoundTypes(flags))
+                  res = true;
+            }
          }
       }
       if (repeat != null) {
-         for (Statement st:repeat)
-            st.refreshBoundTypes(flags);
+         for (Statement st:repeat) {
+            if (st.refreshBoundTypes(flags))
+               res = true;
+         }
       }
       if (condition != null) {
-         condition.refreshBoundTypes(flags);
+         if (condition.refreshBoundTypes(flags))
+            res = true;
       }
+      return res;
    }
 
    public Statement transformToJS() {

@@ -29,9 +29,11 @@ public abstract class ExpressionStatement extends Statement {
       return expression != null ? expression.getConstrArgs() : null;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (expression != null)
-         expression.refreshBoundTypes(flags);
+         res = expression.refreshBoundTypes(flags);
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

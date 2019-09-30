@@ -24,11 +24,14 @@ public class AssertStatement extends Statement {
       return ExecResult.Next;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (expression != null)
-         expression.refreshBoundTypes(flags);
+         res = expression.refreshBoundTypes(flags);
       if (otherExpression != null)
-         otherExpression.refreshBoundTypes(flags);
+         if (otherExpression.refreshBoundTypes(flags))
+            res = true;
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

@@ -128,12 +128,17 @@ public class ForVarStatement extends ForStatement implements IVariable {
       return ExecResult.Next;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
-      if (type != null)
-         type.refreshBoundType(flags);
-      if (expression != null)
-         expression.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
+      if (type != null) {
+         if (type.refreshBoundType(flags))
+            res = true;
+      }
+      if (expression != null) {
+         if (expression.refreshBoundTypes(flags))
+            res = true;
+      }
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

@@ -8,7 +8,7 @@ import java.util.Set;
 
 /** Marker class used for ; in EnumDeclaration to separate constanats from definitions */
 public class EmptyStatement extends Statement {
-   public void refreshBoundTypes(int flags) {}
+   public boolean refreshBoundTypes(int flags) { return false; }
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {}
    public void setAccessTimeForRefs(long time) {}
    public Statement transformToJS() { return this; }

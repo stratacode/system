@@ -80,10 +80,13 @@ public class CastExpression extends ChainedExpression {
          expression.setBindingInfo(bindingDirection, bindingStatement, true);
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
-      if (type != null)
-         type.refreshBoundType(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
+      if (type != null) {
+         if (type.refreshBoundType(flags))
+            res = true;
+      }
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

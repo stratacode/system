@@ -66,12 +66,15 @@ public class GlueExpression extends Expression {
       return true;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (expressions != null) {
          for (Object expr:expressions)
             if (expr instanceof Expression)
-               ((Expression) expr).refreshBoundTypes(flags);
+               if (((Expression) expr).refreshBoundTypes(flags))
+                  res = true;
       }
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

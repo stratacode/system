@@ -13,9 +13,11 @@ public class LabelStatement extends Statement implements IStatementWrapper {
    public String labelName;
    public Statement statement;
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (statement != null)
-         statement.refreshBoundTypes(flags);
+         res = statement.refreshBoundTypes(flags);
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

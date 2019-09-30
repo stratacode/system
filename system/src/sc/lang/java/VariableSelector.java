@@ -79,10 +79,13 @@ public class VariableSelector extends Selector {
       info.visitList(arguments, ctx);
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
+      boolean res = false;
       if (arguments != null)
          for (Expression expr:arguments)
-            expr.refreshBoundTypes(flags);
+            if (expr.refreshBoundTypes(flags))
+               res = true;
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

@@ -1323,12 +1323,17 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (modType != null && getLayeredSystem().options.clonedTransform) {
          // Need to start at the most specific model if we are going to do the transform
          BodyTypeDeclaration modResolvedType = modType.resolve(true);
-         JavaModel modModel = modResolvedType.getJavaModel();
-         if (modModel.nonTransformedModel == null && modModel.mergeDeclaration) {
-            modType = modType.transformedType;
-            if (modType == null) {
-               // We are the first to need the transformed model for this type.  We do always transform the modified model at the top-level but if there's an extended model which is modified by a sub-type, we won't have transformed that.
-               modModel.cloneTransformedModel();
+         JavaModel modResolvedModel = modResolvedType.getJavaModel();
+         JavaModel modModel = modType.getJavaModel();
+         if (modResolvedModel.nonTransformedModel == null && modResolvedModel.mergeDeclaration) {
+            if (modType.transformedType == null) {
+               // We are the first to need the transformed model for this type.  At this point we just clone the transformed model, starting
+               // at the most specific one. It will transform any modified models and during the 'deepCopy' operation, will set the modifyTypeDecl's
+               // transformedType. If it's not set properly, it's possible our modifyTypeDecl refers to a stale (i.e. stopped and maybe restarted?) type.
+               // Types should have refreshBoundTypes() called after they refresh. Also, that will return any changed models that need to be transformed
+               // in the next buildLayer.
+               modResolvedModel.cloneTransformedModel();
+
                if (modifyTypeDecl.replaced) {
                   BodyTypeDeclaration newDecl = modifyTypeDecl.resolve(false);
                   if (newDecl == this)
@@ -1344,6 +1349,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                   modType = modifyTypeDecl;
                }
             }
+            else
+               modType = modType.transformedType;
          }
       }
       return modType;
@@ -2423,10 +2430,10 @@ public class ModifyDeclaration extends TypeDeclaration {
       return compiledOnly || (modifyTypeDecl != null && modifyTypeDecl.getCompiledOnly());
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
       if (isLayerType)
-         return;
-      super.refreshBoundTypes(flags);
+         return false;
+      boolean res = super.refreshBoundTypes(flags);
       JavaModel m = getJavaModel();
       if (modifyTypeDecl != null && ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0)) {
          BodyTypeDeclaration oldModify = modifyTypeDecl;
@@ -2441,9 +2448,13 @@ public class ModifyDeclaration extends TypeDeclaration {
             else
                startExtendedType(modifyTypeDecl, "modified");
             checkModify();
+
+            if (oldModify != modifyTypeDecl)
+               res = true;
          }
          else {
-            modifyTypeDecl.refreshBoundTypes(flags);
+            if (modifyTypeDecl.refreshBoundTypes(flags))
+               res = true;
          }
          if (needsSubType() && oldModify != modifyTypeDecl)
             m.layeredSystem.addSubType((TypeDeclaration) modifyTypeDecl, this);
@@ -2476,7 +2487,8 @@ public class ModifyDeclaration extends TypeDeclaration {
          }
          int ix = 0;
          for (JavaType t:extendsTypes) {
-            t.refreshBoundType(flags);
+            if (t.refreshBoundType(flags))
+               res = true;
 
             if (extendsBoundTypes != null) {
                extendsBoundTypes[ix] = t.getTypeDeclaration();
@@ -2491,6 +2503,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                m.layeredSystem.addSubType((TypeDeclaration) newExtType, this);
          }
       }
+      return res;
    }
 
 

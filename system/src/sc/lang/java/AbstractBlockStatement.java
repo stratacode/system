@@ -252,11 +252,14 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       }
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (statements != null) {
          for (Statement st:statements)
-            st.refreshBoundTypes(flags);
+            if (st.refreshBoundTypes(flags))
+               res = true;
       }
+      return res;
    }
 
 

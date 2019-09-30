@@ -90,13 +90,16 @@ public class BoundType extends JavaType {
       return sb.toString();
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
+      boolean res = false;
       if (baseType != null)
-         baseType.refreshBoundType(flags);
+         res = baseType.refreshBoundType(flags);
       if (boundTypes != null) {
          for (JavaType bt:boundTypes)
-            bt.refreshBoundType(flags);
+            if (bt.refreshBoundType(flags))
+               res = true;
       }
+      return res;
    }
 
    public String toGenerateString() {

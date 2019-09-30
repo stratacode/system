@@ -6,13 +6,18 @@ package sc.layer.deps;
 
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.layer.Layer;
 import sc.layer.LayerUtil;
+import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.lifecycle.ILifecycle;
 import sc.parser.IString;
 import sc.parser.PString;
+import sc.parser.ParseError;
+import sc.parser.ParseUtil;
 import sc.util.FileUtil;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +25,10 @@ import java.util.Map;
 
 public class DependencyFile extends SemanticNode implements ILifecycle {
    public List<DependencyEntry> depList;
+
+   public boolean depsChanged = false;
+
+   public File file;
 
    public transient Map<String,DependencyEntry> depsByName = new HashMap<String,DependencyEntry>();
 
@@ -126,6 +135,55 @@ public class DependencyFile extends SemanticNode implements ILifecycle {
    public static DependencyFile create() {
       DependencyFile deps = new DependencyFile();
       deps.depList = new ArrayList<DependencyEntry>();
+      return deps;
+   }
+
+   public static DependencyFile readDependencies(LayeredSystem sys, File depFile, SrcEntry srcEnt) {
+      Object result;
+      DependencyFile deps = null;
+      try {
+         result = DependenciesLanguage.INSTANCE.parse(depFile);
+         if (result instanceof ParseError) {
+            System.err.println("*** Ignoring corrupt dependencies file: " + depFile + " " +
+                    ((ParseError) result).errorStringWithLineNumbers(depFile));
+            return null;
+         }
+         else
+            deps = (DependencyFile) ParseUtil.getParseResult(result);
+
+         for (DependencyEntry dent: deps.depList) {
+            dent.layer = srcEnt.layer;
+            if (!dent.isDirectory && dent.fileDeps != null) {
+               for (LayerDependencies layerEnt: dent.fileDeps) {
+                  Layer currentLayer = sys.getLayerByName(layerEnt.layerName);
+                  // Something in the layers we are using changed so recompute all
+                  if (currentLayer == null) {
+                     System.err.println("Warning: layer: " + layerEnt.layerName + " referenced in dependencies: " + depFile + " but is no longer a system layer.");
+                     continue;
+                  }
+
+                  // We keep these sorted by the layer position for clarity in reading
+                  layerEnt.position = currentLayer.layerPosition;
+                  for (IString dependent:layerEnt.fileList) {
+                     String dependentStr = dependent.toString();
+                     File absSrcFile = currentLayer.findSrcFile(dependentStr, true);
+                     if (absSrcFile == null)
+                        dent.invalid = true;
+                     else {
+                        if (dent.srcEntries == null)
+                           dent.srcEntries = new ArrayList<SrcEntry>();
+                        dent.srcEntries.add(new SrcEntry(currentLayer, absSrcFile.getPath(), dependentStr));
+                     }
+                  }
+               }
+            }
+         }
+      }
+      catch (IllegalArgumentException exc) {
+         System.err.println("*** Error reading dependencies: " + exc);
+      }
+      if (deps != null)
+         deps.file = depFile;
       return deps;
    }
 }

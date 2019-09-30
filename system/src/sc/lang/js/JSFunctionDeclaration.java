@@ -39,8 +39,8 @@ public class JSFunctionDeclaration extends Expression {
    }
 
    @Override
-   public void refreshBoundTypes(int flags) {
-
+   public boolean refreshBoundTypes(int flags) {
+      return false;
    }
 
    @Override

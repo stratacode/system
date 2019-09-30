@@ -166,11 +166,14 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       }
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       if (variableDefinitions != null)
-         for (VariableDefinition v:variableDefinitions)
-            v.refreshBoundType(flags);
+         for (VariableDefinition v:variableDefinitions) {
+            if (v.refreshBoundType(flags))
+               res = true;
+         }
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

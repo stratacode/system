@@ -18,11 +18,14 @@ public class SynchronizedStatement extends Statement implements IStatementWrappe
       }
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (expression != null)
-         expression.refreshBoundTypes(flags);
+         res = expression.refreshBoundTypes(flags);
       if (statement != null)
-         statement.refreshBoundTypes(flags);
+         if (statement.refreshBoundTypes(flags))
+            res = true;
+      return res;
    }
 
    public void addChildBodyStatements(List<Object> sts) {

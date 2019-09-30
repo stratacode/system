@@ -214,11 +214,13 @@ public class ArrayElementExpression extends IdentifierExpression {
       //arrayDimensions.styleNode(adapter);
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       if (arrayDimensions != null)
          for (Expression ex:arrayDimensions)
-            ex.refreshBoundTypes(flags);
+            if (ex.refreshBoundTypes(flags))
+               res = true;
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

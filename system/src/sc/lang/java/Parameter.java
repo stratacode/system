@@ -191,11 +191,14 @@ public class Parameter extends AbstractVariable implements IVariable, IObjectId 
       return names;
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
+      boolean res = false;
       if (type != null)
-         type.refreshBoundType(flags);
+         res = type.refreshBoundType(flags);
       if (nextParameter != null)
-         nextParameter.refreshBoundType(flags);
+         if (nextParameter.refreshBoundType(flags))
+            res = true;
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

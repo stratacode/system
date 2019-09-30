@@ -5000,27 +5000,32 @@ public class IdentifierExpression extends ArgumentsExpression {
       return callsSuper(true) ? arguments.toArray(new Expression[arguments.size()]) : null;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       if (boundTypes != null) {
          for (int i = 0; i < boundTypes.length; i++) {
+            Object obt = boundTypes[i];
             // For super expressions we need just resolve the entire thing from scratch.
             if (idTypes[i] == IdentifierType.SuperExpression) {
                reresolveTypeReference();
-               return;
+               return res;
             }
-            else if (boundTypes[i] != null) {
-               boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), boundTypes[i], flags);
+            else if (obt != null) {
+               Object bt = boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), obt, flags);
+               if (obt != bt)
+                  res = true;
             }
             if (boundTypes == null) {
                System.err.println("*** refreshBoundTypes - cleared out boundTypes?");
-               return;
+               return res;
             }
          }
       }
       // Is this used anyplace?
       if (innerCreator != null)
-         innerCreator.refreshBoundTypes(flags);
+         if (innerCreator.refreshBoundTypes(flags))
+            res = true;
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

@@ -740,20 +740,25 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return this;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       if (parameters != null)
          parameters.refreshBoundType(flags);
       if (throwsTypes != null)
          for (JavaType t:throwsTypes)
             t.refreshBoundType(flags);
 
-      if (body != null)
-         body.refreshBoundTypes(flags);
+      if (body != null) {
+         if (body.refreshBoundTypes(flags))
+            res = true;
+      }
+
 
       if (typeParameters != null)
          for (TypeParameter tp:typeParameters)
             tp.refreshBoundType(flags);
+
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

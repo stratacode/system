@@ -11,9 +11,12 @@ public abstract class TypedDefinition extends Statement {
 
    public abstract boolean isProperty();
 
-   public void refreshBoundTypes(int flags) {
-      if (type != null)
-         type.refreshBoundType(flags);
+   public boolean refreshBoundTypes(int flags) {
+      if (type != null) {
+         if (type.refreshBoundType(flags))
+            return true;
+      }
+      return false;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

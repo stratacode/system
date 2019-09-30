@@ -607,9 +607,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       Bind.sendChangedEvent(this, null);
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
+      boolean res = false;
       if (initializer != null)
-         initializer.refreshBoundTypes(flags);
+         res = initializer.refreshBoundTypes(flags);
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

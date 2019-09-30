@@ -767,8 +767,8 @@ public class NewExpression extends IdentifierExpression {
          throw new IllegalArgumentException("No parse tree new expression's semantic node");
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
 
       if (arrayDimensions != null) {
          for (Expression ad:arrayDimensions) {
@@ -786,11 +786,16 @@ public class NewExpression extends IdentifierExpression {
 
       if (classBody != null)
          for (Statement cb:classBody)
-            cb.refreshBoundTypes(flags);
+            if (cb.refreshBoundTypes(flags))
+               res = true;
 
       if (boundType != null) {
+         Object obt = boundType;
          boundType = ModelUtil.refreshBoundType(getLayeredSystem(), boundType, flags);
+         if (obt != boundType)
+            res = true;
       }
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

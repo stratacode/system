@@ -681,10 +681,11 @@ public class ClassType extends JavaType {
       return any;
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
       if (chained)
-         return;
+         return false;
 
+      Object oldType = type;
       if (type != FAILED_TO_INIT_SENTINEL) {
          if (type instanceof TypeDeclaration) {
             TypeDeclaration td = (TypeDeclaration) type;
@@ -704,6 +705,7 @@ public class ClassType extends JavaType {
                initType(itype.getLayeredSystem(), itype, this, null, true, false, null);
          }
       }
+      return oldType != type;
    }
 
    public String toSafeLanguageString() {

@@ -1087,7 +1087,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          System.err.println("*** Error - re-adding replaced type");
          return;
       }
-      definedTypesByName.put(typeName, type);
+      TypeDeclaration old = definedTypesByName.put(typeName, type);
+      if (old != null && old != type) {
+         if (type.hasBeenStopped)
+            System.out.println("*** Warning - replacing a type with a type that's been stopped - often due to a stale reference being restarted: " + typeName);
+      }
       // Not using the typeIndex for layer models or sync models which use a custom resolver.  Maybe we just need to check
       // the custom resolver before the typeIndex, but with this, we register a Layer type which ends up extending itself.
       if (!isLayerModel && customResolver == null) {

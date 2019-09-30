@@ -218,10 +218,12 @@ public class ClassValueExpression extends Expression {
       return relPos;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      Object obt = boundType;
       if (boundType != null) {
          boundType = ModelUtil.refreshBoundType(getLayeredSystem(), boundType, flags);
       }
+      return obt != boundType;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

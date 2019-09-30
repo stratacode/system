@@ -132,7 +132,9 @@ public class PrimitiveType extends JavaType {
       return null;
    }
 
-   public void refreshBoundType(int flags) {}
+   public boolean refreshBoundType(int flags) {
+      return false;
+   }
 
    public void setAccessTime(long time) {}
 

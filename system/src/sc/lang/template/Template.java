@@ -669,6 +669,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    public void reinitialize() {
       /* NOTE: not using JavaModel for now but these could be reconciled */
       Object oldRootType = rootType;
+
       if (started) {
          stop();
 

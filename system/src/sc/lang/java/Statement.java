@@ -205,7 +205,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
    public void clearDynFields(Object inst, ExecutionContext ctx) {
    }
 
-   public abstract void refreshBoundTypes(int flags);
+   public abstract boolean refreshBoundTypes(int flags);
 
    public abstract void addDependentTypes(Set<Object> types, DepTypeCtx mode);
 

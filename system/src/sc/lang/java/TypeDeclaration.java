@@ -1701,16 +1701,19 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       super.initDynStatements(inst, ctx, mode);
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       if (implementsTypes != null)
-         for (JavaType jt:implementsTypes)
-            jt.refreshBoundType(flags);
+         for (JavaType jt:implementsTypes) {
+            if (jt.refreshBoundType(flags))
+               res = true;
+         }
       if (implementsBoundTypes != null) {
          JavaModel m = getJavaModel();
          for (int i = 0; i < implementsBoundTypes.length; i++) {
             Object implType = ModelUtil.refreshBoundType(getLayeredSystem(), implementsBoundTypes[i], flags);
             if (implType != implementsBoundTypes[i]) {
+               res = true;
                implementsBoundTypes[i] = implType;
                if (implType instanceof TypeDeclaration) {
                   m.layeredSystem.addSubType((TypeDeclaration) implType, this);
@@ -1722,6 +1725,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (transformedType != null)
          transformedType.refreshBoundTypes();
       */
+      return res;
    }
 
    protected boolean isInterfaceField(Statement st) {

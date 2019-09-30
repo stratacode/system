@@ -59,9 +59,11 @@ public class WhileStatement extends ExpressionStatement implements IStatementWra
       return true;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (statement != null)
-         statement.refreshBoundTypes(flags);
+         res = statement.refreshBoundTypes(flags);
+      return res;
    }
 
    public void addChildBodyStatements(List<Object> sts) {

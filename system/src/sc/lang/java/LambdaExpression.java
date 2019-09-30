@@ -35,12 +35,15 @@ public class LambdaExpression extends BaseLambdaExpression implements IStatement
       return "lambda expression";
    }
 
-   @Override
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (lambdaParams instanceof Parameter)
-         ((Parameter) lambdaParams).refreshBoundType(flags);
+         if (((Parameter) lambdaParams).refreshBoundType(flags))
+            res = true;
       if (lambdaBody instanceof BlockStatement)
-         lambdaBody.refreshBoundTypes(flags);
+         if (lambdaBody.refreshBoundTypes(flags))
+            res = true;
+      return res;
    }
 
    @Override

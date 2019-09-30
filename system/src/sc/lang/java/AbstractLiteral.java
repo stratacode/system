@@ -160,7 +160,9 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
       return true;
    }
 
-   public void refreshBoundTypes(int flags) {}
+   public boolean refreshBoundTypes(int flags) {
+      return false;
+   }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {}
 

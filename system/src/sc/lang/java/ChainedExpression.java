@@ -54,9 +54,10 @@ public abstract class ChainedExpression extends Expression {
       info.visit(expression, ctx);
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
       if (expression != null)
-         expression.refreshBoundTypes(flags);
+         return expression.refreshBoundTypes(flags);
+      return false;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

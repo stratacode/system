@@ -2455,10 +2455,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return model.getLayeredSystem();
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
       dependentTypes = null; // Reset this so we do not maintain references to types that may get loaded
       memberCache = null; // Not sure if we need to do this but maybe something will hang around in there that points to a parent that was replaced?
 
+      boolean res = false;
       // If we are refreshing after a layer has been closed/open and that layer happened to be modifying this type
       // we need to clear out that replacedByType so it is not used later
       if ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0) {
@@ -2472,17 +2473,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       if (isLayerType)
-         return;
+         return false;
       if (body != null) {
          for (Statement st : body) {
-            st.refreshBoundTypes(flags);
+            if (st.refreshBoundTypes(flags))
+               res = true;
          }
       }
       if (hiddenBody != null) {
          for (Statement st : hiddenBody) {
-            st.refreshBoundTypes(flags);
+            if (st.refreshBoundTypes(flags))
+               res = true;
          }
       }
+      return res;
    }
 
    public Object refreshBoundType(Object boundType) {
@@ -10097,6 +10101,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (proc != null && (getExecMode() & sys.runtimeProcessor.getExecMode()) != 0 && layer != null && layer.activated && isRealType())
             proc.stop(this);
       }
+
       hasBeenStopped = true; // Note: for debugging only - nice to know when a type has been stopped to find bugs
       memberCache = null;
       membersByName = null;

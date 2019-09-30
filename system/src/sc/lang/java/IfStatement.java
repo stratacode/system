@@ -53,13 +53,17 @@ public class IfStatement extends NonIndentedStatement {
       return true;
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (expression != null)
-         expression.refreshBoundTypes(flags);
+         res = expression.refreshBoundTypes(flags);
       if (trueStatement != null)
-         trueStatement.refreshBoundTypes(flags);
+         if (trueStatement.refreshBoundTypes(flags))
+            res = true;
       if (falseStatement != null)
-         falseStatement.refreshBoundTypes(flags);
+         if (falseStatement.refreshBoundTypes(flags))
+            res = true;
+      return res;
    }
 
    public void addChildBodyStatements(List<Object> sts) {

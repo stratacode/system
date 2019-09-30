@@ -1551,10 +1551,28 @@ public class ClassDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
-      if (extendsType != null)
-         extendsType.refreshBoundType(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
+      if (extendsType != null) {
+         if (extendsType.refreshBoundType(flags))
+            res = true;
+         Object newExtendsType = extendsType.getTypeDeclaration();
+         // If a type we depend upon changes after the refresh, need to retransform this type
+         if (newExtendsType != extendsBoundType) {
+            extendsBoundType = newExtendsType;
+            res = true;
+            JavaModel model = getJavaModel();
+            if (model.transformedModel != null) {
+               model.clearTransformed();
+               // need to add this model to the build state if we are in the preInitChangedModels code
+            }
+         }
+      }
+      // After we've updated extendsBoundType we can refresh the types of the children (otherwise, a super.x) in here would
+      // resolve to a sale type
+      if (super.refreshBoundTypes(flags))
+         res = true;
+      return res;
    }
 
    public int suggestCompletions(String prefix, Object currentType, ExecutionContext ctx, String command, int cursor, Set<String> candidates, Object continuation, int max) {

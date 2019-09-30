@@ -341,14 +341,16 @@ public class InterfaceDeclaration extends TypeDeclaration {
       return any;
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
       JavaModel m = getJavaModel();
       if (extendsTypes != null) {
          for (JavaType jt:extendsTypes) {
             Object oldType = jt.getTypeDeclaration();
-            jt.refreshBoundType(flags);
+            if (jt.refreshBoundType(flags))
+               res = true;
             if (oldType != jt.getTypeDeclaration()) {
+               res = true;
                if (oldType instanceof TypeDeclaration)
                   m.layeredSystem.addSubType((TypeDeclaration) oldType, this);
             }
@@ -359,6 +361,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
          for (int i = 0; i < extendsBoundTypes.length; i++) {
             Object extType = ModelUtil.refreshBoundType(getLayeredSystem(), extendsBoundTypes[i], flags);
             if (extType != extendsBoundTypes[i]) {
+               res = true;
                extendsBoundTypes[i] = extType;
                if (extType instanceof TypeDeclaration) {
                   m.layeredSystem.addSubType((TypeDeclaration) extType, this);
@@ -366,6 +369,7 @@ public class InterfaceDeclaration extends TypeDeclaration {
             }
          }
       }
+      return res;
    }
 
    public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {

@@ -52,11 +52,14 @@ public class CatchStatement extends NonIndentedStatement implements IBlockStatem
       }
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (parameters != null)
-         parameters.refreshBoundType(flags);
+         res = parameters.refreshBoundType(flags);
       if (statements != null)
-         statements.refreshBoundTypes(flags);
+         if (statements.refreshBoundTypes(flags))
+            res = true;
+      return res;
    }
 
    public void addChildBodyStatements(List<Object> sts) {

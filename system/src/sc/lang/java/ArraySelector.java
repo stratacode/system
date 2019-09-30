@@ -44,9 +44,11 @@ public class ArraySelector extends Selector {
       expression.changeExpressionsThis(td, outer, newName);
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
+      boolean res = false;
       if (expression != null)
-         expression.refreshBoundTypes(flags);
+         res = expression.refreshBoundTypes(flags);
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {

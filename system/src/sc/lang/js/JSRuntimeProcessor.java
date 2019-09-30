@@ -2600,7 +2600,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    private void initAndStartType(Object depType) {
       if (depType instanceof BodyTypeDeclaration) {
-         JavaModel model = ((BodyTypeDeclaration) depType).getJavaModel();
+         BodyTypeDeclaration btd = ((BodyTypeDeclaration) depType);
+         if (btd.hasBeenStopped && !btd.isStarted()) // Are we restarting a stale reference
+            System.err.println("*** Restarting a stopped type for JS - is this a stale reference?");
+         JavaModel model = btd.getJavaModel();
          if (!model.isStarted()) {
             ParseUtil.realInitAndStartComponent(model);
             return;

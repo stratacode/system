@@ -304,9 +304,10 @@ public class ExtendsType extends JavaType {
       return getSignatureCode() + (typeArgument == null ? "" : typeArgument.getSignature(false));
    }
 
-   public void refreshBoundType(int flags) {
+   public boolean refreshBoundType(int flags) {
       if (typeArgument != null)
-         typeArgument.refreshBoundType(flags);
+         return typeArgument.refreshBoundType(flags);
+      return false;
    }
 
    @Override

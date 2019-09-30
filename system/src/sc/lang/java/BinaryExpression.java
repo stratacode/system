@@ -665,17 +665,22 @@ public class BinaryExpression extends Expression {
       getRhsExpr().markFixedSuper();
    }
 
-   public void refreshBoundTypes(int flags) {
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = false;
       if (lhs != null)
-         lhs.refreshBoundTypes(flags);
+         res = lhs.refreshBoundTypes(flags);
       if (rhs instanceof JavaType) {
-         ((JavaType) rhs).refreshBoundType(flags);
+         if (((JavaType) rhs).refreshBoundType(flags))
+            res = true;
+
       }
       else {
          Expression rhsExpr = getRhsExpr();
          if (rhsExpr != null)
-            rhsExpr.refreshBoundTypes(flags);
+            if (rhsExpr.refreshBoundTypes(flags))
+               res = true;
       }
+      return res;
    }
 
    public int transformTemplate(int ix, boolean statefulContext) {

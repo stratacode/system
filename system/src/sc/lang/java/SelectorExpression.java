@@ -878,14 +878,23 @@ public class SelectorExpression extends ChainedExpression {
       }
    }
 
-   public void refreshBoundTypes(int flags) {
-      super.refreshBoundTypes(flags);
-      for (Selector sel:selectors)
-         sel.refreshBoundType(flags);
-      if (boundTypes != null) {
-         for (int i = 0; i < boundTypes.length; i++)
-            boundTypes[i] = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), boundTypes[i], flags);
+   public boolean refreshBoundTypes(int flags) {
+      boolean res = super.refreshBoundTypes(flags);
+      for (Selector sel:selectors) {
+         if (sel.refreshBoundType(flags))
+            res = true;
       }
+      if (boundTypes != null) {
+         for (int i = 0; i < boundTypes.length; i++) {
+            Object obt = boundTypes[i];
+            Object nbt = ModelUtil.refreshBoundIdentifierType(getLayeredSystem(), obt, flags);
+            if (obt != nbt) {
+               boundTypes[i] = nbt;
+               res = true;
+            }
+         }
+      }
+      return res;
    }
 
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
