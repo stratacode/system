@@ -1679,7 +1679,8 @@ public class ModifyDeclaration extends TypeDeclaration {
          // For the layer models, need to start the model file before we init the instance or else
          // all of the declarations in the model won't be started when we need to eval them.
          if (m.isLayerModel) {
-            ((Layer) inst).layerPosition = -1;
+            Layer newLayer = (Layer) inst;
+            newLayer.layerPosition = -1;
             ParseUtil.startComponent(m);
          }
       }
@@ -2433,7 +2434,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public boolean refreshBoundTypes(int flags) {
       if (isLayerType)
          return false;
-      boolean res = super.refreshBoundTypes(flags);
+      boolean res = false;
       JavaModel m = getJavaModel();
       if (modifyTypeDecl != null && ((flags & ModelUtil.REFRESH_TYPEDEFS) != 0)) {
          BodyTypeDeclaration oldModify = modifyTypeDecl;
@@ -2503,6 +2504,10 @@ public class ModifyDeclaration extends TypeDeclaration {
                m.layeredSystem.addSubType((TypeDeclaration) newExtType, this);
          }
       }
+      // Need to refresh the body after we've refreshed the extends and other types since otherwise we could re-resolve
+      // a stale reference like for a super.outputBody(..) call.
+      if (super.refreshBoundTypes(flags))
+         res = true;
       return res;
    }
 
