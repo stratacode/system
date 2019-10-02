@@ -29,6 +29,7 @@ class BuildState {
    List<SrcEntry> errorFiles = new ArrayList<SrcEntry>();
    long buildTime = System.currentTimeMillis();
    LinkedHashSet<SrcDirEntry> srcDirs = new LinkedHashSet<SrcDirEntry>();
+   // TODO: is there ever more than one entry in this list? Should we just accumulate all changes to the same dir in the same SrcDirEntry (addChangedModel would need to be updated)
    HashMap<String,ArrayList<SrcDirEntry>> srcDirsByPath = new HashMap<String,ArrayList<SrcDirEntry>>();
 
    // Models which contribute to typeGroup dependencies, e.g. @MainInit, must be processed
@@ -126,8 +127,9 @@ class BuildState {
          }
       }
       LinkedHashSet<SrcEntry> toGenerate = new LinkedHashSet<SrcEntry>();
-      toGenerate.add(srcEnt);
-      File depFile = BuildState.getDependenciesFile(genLayer, srcEnt, phase);
+      LayeredSystem sys = changedModel.getLayeredSystem();
+      sys.addToGenerateList(toGenerate, srcEnt, changedModel.getModelTypeName());
+      File depFile = BuildState.getDependenciesFile(genLayer, srcDir, phase);
       DependencyFile deps = DependencyFile.readDependencies(changedModel.getLayeredSystem(), depFile, srcDir);
       if (deps == null) {
          deps = DependencyFile.create();
