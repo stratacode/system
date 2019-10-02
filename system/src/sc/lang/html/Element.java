@@ -2718,8 +2718,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
          if (ModelUtil.isCompiledClass(extTypeDecl)) {
             Object newExtTypeDecl = ModelUtil.resolveSrcTypeDeclaration(javaModel.getLayeredSystem(), extTypeDecl, false, true, tagLayer);
-            if (newExtTypeDecl instanceof BodyTypeDeclaration)
+            if (newExtTypeDecl instanceof BodyTypeDeclaration) {
                extTypeDecl = newExtTypeDecl;
+               extendsTypeDecl = extTypeDecl; // Cache the source type for later on when we call getExtendsElement()
+            }
          }
 
          if (existing != null && ModelUtil.isCompiledClass(existing)) {
