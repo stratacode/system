@@ -644,7 +644,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             removeExcludedLayers(true);
 
             // Init the runtimes, using the excluded layers as a guide
-            initRuntimes(dynLayers, true, false, true);
+            initRuntimes(dynLayers, true, false, true, false);
 
             ArrayList<IProcessDefinition> procs = new ArrayList<IProcessDefinition>();
             ArrayList<IRuntimeProcessor> runtimes = new ArrayList<IRuntimeProcessor>();
@@ -1508,7 +1508,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (useProcessDefinition == null) {
          if (!reusingDefaultRuntime)
             removeExcludedLayers(true);
-         initRuntimes(explicitDynLayers, true, false, true);
+         initRuntimes(explicitDynLayers, true, false, true, true);
          if (!reusingDefaultRuntime)
             removeExcludedLayers(false);
       }
@@ -1629,7 +1629,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void initRuntimes(List<String> explicitDynLayers, boolean active, boolean openLayer, boolean specifiedOnly) {
+   private void initRuntimes(List<String> explicitDynLayers, boolean active, boolean openLayer, boolean specifiedOnly, boolean updateDefaultRuntime) {
       LayeredSystem curSys = getCurrent();
       // If we have activated some layers and still don't have any runtimes, we create the default runtime
       if (runtimes == null && layers.size() != 0)
@@ -1656,8 +1656,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                // make the main layered system point to this process.
                if (processDefinition == null && proc != null)
                   updateProcessDefinition(proc);
-               removeExcludedLayers(true);
-               removeExcludedLayers = true;
+
+               // Do not do this for the IDE in activeLayers since we have already marked the excluded layers and will remove them after we
+               // gather the full list of processes
+               if (updateDefaultRuntime) {
+                  removeExcludedLayers(true);
+                  removeExcludedLayers = true;
+               }
                continue;
             }
 
@@ -6096,14 +6101,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Provide skipExcluded = false unless you want to return null if the layer is excluded */
    public Layer lookupInactiveLayer(String layerName, boolean checkPeers, boolean skipExcluded) {
       Layer res = inactiveLayerIndex.get(layerName);
-      if (res != null && (!skipExcluded || !res.excluded))
+      if (res != null && (!skipExcluded || !res.excluded)) {
+         if (!res.initCompleted)
+            System.err.println("*** Layer: " + res + " did not fully initialize!");
          return res;
+      }
       if (checkPeers && peerSystems != null) {
          for (int i = 0; i < peerSystems.size(); i++) {
             LayeredSystem peer = peerSystems.get(i);
             Layer peerRes = peer.lookupInactiveLayer(layerName, false, skipExcluded);
-            if (peerRes != null)
+            if (peerRes != null) {
+               if (!peerRes.initCompleted)
+                  System.err.println("*** Layer: " + peerRes + " did not fully initialize!");
                return peerRes;
+            }
          }
       }
       return null;
@@ -9883,7 +9894,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
    }
 
-   private void addToGenerateList(Set<SrcEntry> toGenerate, SrcEntry newSrcEnt, String typeName) {
+   void addToGenerateList(Set<SrcEntry> toGenerate, SrcEntry newSrcEnt, String typeName) {
       toGenerate.add(newSrcEnt);
       changedTypes.add(typeName);
    }
@@ -13597,15 +13608,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // For inactive layers, we may have already loaded it.  To avoid reloading the layer model, just get it out of the index rather than reparsing it.
       if (lpi != null && !lpi.activate) {
          model = (JavaModel) inactiveModelIndex.get(defFile.absFileName);
-         if (model != null)
-            return model.layer;
+         if (model != null) {
+            if (model.layer.initCompleted)
+               return model.layer;
+         }
          // If this layer has already been disabled return the disabled layer
          /* This causes us to get the wrong layered system for a styled file in the compile doc - and was being called even when we had created an android layered system */
+         /*
          Layer disabledLayer = null; // lookupDisabledLayer(expectedName);
          if (disabledLayer != null)
             return disabledLayer;
+          */
       }
-      model = parseLayerModel(defFile, expectedName, true, lpi.activate);
+      if (model == null)
+         model = parseLayerModel(defFile, expectedName, true, lpi.activate);
 
       if (model == null) {
          // There's a layer definition file that cannot be parsed - just create a stub layer that represents that file
@@ -13691,7 +13707,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      if (modelType != null && !modelType.typeName.equals(expectedName)) {
+      if (!modelType.typeName.equals(expectedName)) {
          //if (layerPrefix != null)
          //   return null;
          String errMessage = "Layer definition file: " + model.getSrcFile().absFileName + " expected to modify type name: " + expectedName + " but found: " + modelType.typeName + " instead";
@@ -13811,11 +13827,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          layer.baseLayers = baseLayers;
          layer.initLayerModel(model, lpi, layerDirName, inLayerDir, baseIsDynamic, markDyn);
 
+         layer.initCompleted = true;
+
          return layer;
       }
       catch (RuntimeException exc) {
          if (externalModelIndex != null && externalModelIndex.isCancelledException(exc)) {
-            System.err.println("*** Rethrowing ProcessCanceledException - caught during loadLayerObject");
+            System.err.println("*** Rethrowing ProcessCanceledException - caught during loadLayerObject: " + defFile + " system: " + getProcessIdent());
             throw exc;
          }
          if (!lpi.activate) {
@@ -14834,7 +14852,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // We just created a new layer so now go and re-init the runtimes in case it is the first layer in
       // a new runtime or this layer needs to move to the runtime before it's started.
       if (!peerMode) {
-         initRuntimes(null, false, openLayer, true);
+         initRuntimes(null, false, openLayer, true, true);
       }
 
       removeExcludedLayers(false);

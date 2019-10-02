@@ -388,6 +388,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    /** Set to true if a base layer or start method failed to start */
    public boolean initFailed = false;
 
+   public boolean initCompleted = false; // For debug - possibly remove this but to help track down errors when the layer failed to initialize due to an IDE's cancelled exception
+
    private long lastModified = 0;
 
    public boolean needsIndexRefresh = false;   // If you generate files into the srcPath set this to true so they get picked up
