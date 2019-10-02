@@ -213,6 +213,7 @@ public class UpdateInstanceInfo {
       prop.overriddenAssign = overriddenAssign;
       prop.initType = initType;
       actionsToPerform.add(prop);
+      addToTypeIndex(newType, prop);
    }
 
    public AddField newAddField() {
@@ -224,6 +225,7 @@ public class UpdateInstanceInfo {
       af.newType = newType;
       af.varDef = varDef;
       actionsToPerform.add(af);
+      addToTypeIndex(newType, af);
    }
 
    public ExecBlock newExecBlock() {
@@ -235,6 +237,17 @@ public class UpdateInstanceInfo {
       eb.newType = newType;
       eb.blockStatement = blockStatement;
       actionsToPerform.add(eb);
+      addToTypeIndex(newType, eb);
+   }
+
+   private void addToTypeIndex(BodyTypeDeclaration newType, UpdateAction action) {
+      String typeName = newType.getFullTypeName();
+      List<UpdateAction> oldActions = actionsByType.get(typeName);
+      if (oldActions == null) {
+         oldActions = new ArrayList<UpdateAction>();
+         actionsByType.put(typeName, oldActions);
+      }
+      oldActions.add(action);
    }
 
    public void typeChanged(BodyTypeDeclaration oldType, BodyTypeDeclaration newType) {
@@ -275,6 +288,7 @@ public class UpdateInstanceInfo {
       NewType nt = new NewType();
       nt.newType = newType;
       actionsToPerform.add(nt);
+      addToTypeIndex(newType, nt);
    }
 
    public void typeRemoved(BodyTypeDeclaration oldType) {
