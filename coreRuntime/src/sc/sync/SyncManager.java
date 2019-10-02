@@ -1598,13 +1598,17 @@ public class SyncManager {
                   }
 
                   if (toUse != null && !toUse.hasExactChangedValue(inst, propName, curVal)) {
-                     /*
-                     if (depChanges != null)
-                        SyncLayer.addDepChangedValue(depChanges, inst, propName, curVal, false);
-                     else
-                     */
-                        toUse.addChangedValue(inst, propName, curVal);
+                     toUse.addChangedValue(inst, propName, curVal);
                      changeAdded = true;
+                  }
+
+                  // These changes have to be sent in the current sync layer, as well as recorded in the initial sync in case we do a reset
+                  if (initial && !initialSync) {
+                     toUse = initialSyncLayer;
+                     if (toUse != null && !toUse.hasExactChangedValue(inst, propName, curVal)) {
+                        toUse.addChangedValue(inst, propName, curVal);
+                        changeAdded = true;
+                     }
                   }
                }
             }
