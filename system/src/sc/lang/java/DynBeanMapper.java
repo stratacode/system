@@ -120,11 +120,11 @@ public class DynBeanMapper extends AbstractBeanMapper {
          if ((attMask & IS_STATIC) == 0) {
             if ((attMask & GET_IS_FIELD) != 0) {
                // TODO: should cache the offset someplace to avoid the proeprty name/lookup
-               if ((attMask & GET_IS_DYN) != 0 && !getField) {
+               if ((attMask & GET_IS_DYN) != 0) {
                   if (!(parent instanceof IDynObject))
                      System.out.println("*** not a dynamic object");
                   IDynObject dynObj = (IDynObject) parent;
-                  return dynObj.getProperty(getPropertyName(), false);
+                  return dynObj.getProperty(getPropertyName(), getField);
                }
                else {
                   return ((Field) getSelector).get(parent);
