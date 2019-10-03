@@ -1210,6 +1210,9 @@ public class ParseUtil  {
       // Set the path for finding src files.   By default this is relative to the layer's dir so need to make it absolute
       sysLayer.srcPath = FileUtil.makePathAbsolute(srcPath);
 
+      // Marks that the initialization of this layer is complete
+      sysLayer.initCompleted = true;
+
       // Adds it to the index
       sys.registerInactiveLayer(sysLayer);
       // Go through the init phase of all layers
