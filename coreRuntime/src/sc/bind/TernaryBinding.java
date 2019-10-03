@@ -104,12 +104,12 @@ public class TernaryBinding extends AbstractMethodBinding {
    }
 
    /** When we are invalidated, do not run any children of the ternary. */
-   public void invalidateBinding(Object obj, boolean sendEvent, boolean includeParams) {
+   public void invalidateBinding(Object obj, boolean sendEvent, int event, boolean includeParams) {
       if (valid && direction.doForward()) {
          boundParams[1].activate(false, obj, false);
          boundParams[2].activate(false, obj, false);
       }
-      super.invalidateBinding(obj, sendEvent, includeParams);
+      super.invalidateBinding(obj, sendEvent, event, includeParams);
    }
 
    public boolean isReversible() {

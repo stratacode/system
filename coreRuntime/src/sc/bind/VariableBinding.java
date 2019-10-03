@@ -342,7 +342,7 @@ public class VariableBinding extends DestinationListener {
       if ((dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp)) || (srcProp == null && reverseOnly() && srcObject == boundValues[boundValues.length-1])) {
          if (direction.doReverse()) {
             if (sync == SyncType.ON_DEMAND) {
-               invalidate(true);
+               invalidate(true, VALUE_INVALIDATED);
             }
          }
          return true;
@@ -365,7 +365,7 @@ public class VariableBinding extends DestinationListener {
             // If we are applying (and thus not already invalidating) first invalidate the parent binding
             if (direction.doForward()) {
                if (apply)
-                  invalidateBinding(null, false, false);
+                  invalidateBinding(null, false, VALUE_INVALIDATED, false);
                // Then invalidate it
                bindingInvalidated(apply);
             }
@@ -539,10 +539,10 @@ public class VariableBinding extends DestinationListener {
 
    protected void bindingInvalidated(boolean apply) {
       if (sync == SyncType.ON_DEMAND) {
-         invalidate(true);
+         invalidate(true, VALUE_INVALIDATED);
       }
       else {
-         invalidateBinding(null, false, false);
+         invalidateBinding(null, true,  VALUE_INVALIDATED, false);
       }
    }
 
@@ -651,12 +651,12 @@ public class VariableBinding extends DestinationListener {
       return bindingParent;
    }
 
-   private void invalidate(boolean sendEvent) {
+   private void invalidate(boolean sendEvent, int event) {
       if (dstObj == dstProp || dstProp instanceof IBinding)
-         ((IBinding) dstProp).invalidateBinding(dstObj, sendEvent, false);
+         ((IBinding) dstProp).invalidateBinding(dstObj, sendEvent, event, false);
       else if (sendEvent) {
          if (dstProp instanceof String)
-            Bind.sendEvent(IListener.VALUE_CHANGED, dstObj, (String) dstProp);
+            Bind.sendEvent(event, dstObj, (String) dstProp);
       }
       valid = false;
    }
@@ -689,8 +689,8 @@ public class VariableBinding extends DestinationListener {
       return null;
    }
 
-   public void invalidateBinding(Object obj, boolean sendEvent, boolean includeParams) {
-      invalidate(sendEvent);
+   public void invalidateBinding(Object obj, boolean sendEvent, int event, boolean includeParams) {
+      invalidate(sendEvent, event);
    }
 
    public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
@@ -848,7 +848,7 @@ public class VariableBinding extends DestinationListener {
       if (!activated)
          return 0;
       if (direction.doForward() && !direction.doReverse()) {
-         invalidate(false);
+         invalidate(false, 0);
          if (applyBinding(true)) {
             return 1;
          }

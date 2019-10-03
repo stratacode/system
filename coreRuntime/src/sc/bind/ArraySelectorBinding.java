@@ -59,7 +59,7 @@ public class ArraySelectorBinding extends AbstractListener implements IBinding {
    public void removeBindingListener(Object eventObject, IListener listener, int event) {
    }
 
-   public void invalidateBinding(Object object, boolean sendEvent, boolean includeParams) {
+   public void invalidateBinding(Object object, boolean sendEvent, int event, boolean includeParams) {
       valid = false;
    }
 

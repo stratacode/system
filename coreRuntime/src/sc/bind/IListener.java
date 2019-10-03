@@ -18,7 +18,7 @@ import java.util.List;
 @JSSettings(jsLibFiles = "js/sccore.js")
 public interface IListener {
    public enum SyncType {
-      IMMEDIATE, ON_DEMAND, QUEUED
+      IMMEDIATE, ON_DEMAND, QUEUED, QUEUE_VALIDATE_EVENTS;
    }
 
    static final int VALUE_INVALIDATED = 1 << 0;

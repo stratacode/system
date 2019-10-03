@@ -94,9 +94,11 @@ public abstract class SyncDestination {
    public abstract StringBuilder translateSyncLayer(String layerDef);
 
    /**
-    * Applies the changes received from the sync layers received from the remote definition.  When we receive JS, we'll just eval the returned Javascript.
-    * When receiving SC or json, we'll parse the layer definition and apply it as a set of changes to the instances.
-    * The receiveLanguage may be specified or if null, we look for SYNC_LAYER_START and get the receive language out of the text
+    * Applies the changes received from the sync layers received from the remote definition. Called on both the client and server to apply received
+    * changes and handles different formats.
+    * When receiving JS on the client, eval the returned Javascript.
+    * When receiving SC or json, parse the layer definition and apply it as a set of changes to the instances.
+    * The receiveLanguage may be specified or if null, looks for SYNC_LAYER_START to find the receive language in the text received.
     * The detail is for debug messages - in what context is the applySyncLayer being performed (e.g. init, response)
     * Returns true if any changes were applied.
     */
@@ -113,8 +115,15 @@ public abstract class SyncDestination {
          SyncManager.sendSync(name, null, false, true, null, null);
       }
 
-      // Queuing up events so they are all fired after the sync has completed
-      BindingContext ctx = new BindingContext(IListener.SyncType.QUEUED);
+      // We'll queue only the validate events. That way, listeners still receive invalidate events while deserializing the stream.
+      // This helps for a use case involving properties that dynamically expose new component trees for synchronization that are
+      // based on properties set earlier in the sync. If we don't deliver the events, we don't know the list value to use for
+      // creating the components which are set later on. So basically that component needs to flush out current events, sync it's
+      // repeat value, then turn the queue back on again. We do want to queue events to batch up changes, eliminating costly or
+      // invalid intermediate results caused when trying to send the events using syncType=immediate. The list components are
+      // framework components so they can do a little more work. They listen for the immediate invalidate events to mark their
+      // state as invalid. When an attempt is made to resolve a child, it will flush the events, then validate it's children.
+      BindingContext ctx = new BindingContext(IListener.SyncType.QUEUE_VALIDATE_EVENTS);
       BindingContext oldBindCtx = BindingContext.getBindingContext();
       BindingContext.setBindingContext(ctx);
 

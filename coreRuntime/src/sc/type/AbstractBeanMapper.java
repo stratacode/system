@@ -24,9 +24,9 @@ public abstract class AbstractBeanMapper implements IBeanMapper, IBinding, Clone
          Bind.removeListener(eventObject, this, listener, event);
    }
 
-   public void invalidateBinding(Object obj, boolean sendEvent, boolean includeParams) {
+   public void invalidateBinding(Object obj, boolean sendEvent, int event, boolean includeParams) {
       if (sendEvent && !isConstant())
-         Bind.sendEvent(IListener.VALUE_CHANGED, obj, this);
+         Bind.sendEvent(event, obj, this);
    }
 
    public boolean applyBinding(Object obj, Object val, IBinding src, boolean refresh, boolean pendingChild0) {

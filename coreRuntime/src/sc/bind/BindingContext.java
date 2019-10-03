@@ -62,8 +62,9 @@ public class BindingContext implements IScopeEventListener {
       return (BindingContext) PTypeUtil.getThreadLocal("bindingContext");
    }
 
-   public static BindingContext queueEvents() {
-      BindingContext ctx = new BindingContext(IListener.SyncType.QUEUED);
+   // Begin queueing either all events, or queue only the validate events. Send the invalidate events immediately.
+   public static BindingContext queueEvents(boolean onlyQueueValidate) {
+      BindingContext ctx = new BindingContext(onlyQueueValidate ? IListener.SyncType.QUEUE_VALIDATE_EVENTS : IListener.SyncType.QUEUED);
       BindingContext oldBindCtx = BindingContext.getBindingContext();
       BindingContext.setBindingContext(ctx);
       return oldBindCtx;
@@ -286,5 +287,19 @@ public class BindingContext implements IScopeEventListener {
     */
    public void startContext() {
       dispatchEvents(null);
+   }
+
+   public boolean queueEnabledForEvent(int event) {
+      if (event == IListener.VALUE_CHANGED)
+         System.out.println("*** Warning - should be called with validate or invalidate only - not both flags set");
+      switch (defaultSyncType) {
+         case QUEUED:
+            return true;
+         case QUEUE_VALIDATE_EVENTS:
+            return event == IListener.VALUE_VALIDATED;
+         case IMMEDIATE:
+            return false;
+      }
+      return false;
    }
 }

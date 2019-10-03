@@ -191,19 +191,19 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       //}
    }
 
-   public void invalidateBinding(Object object, boolean sendEvent, boolean invalidateParams) {
+   public void invalidateBinding(Object object, boolean sendEvent, int event, boolean invalidateParams) {
       valid = false;
       if (dstProp instanceof IBinding)
-         ((IBinding) dstProp).invalidateBinding(dstObj, sendEvent, false);
+         ((IBinding) dstProp).invalidateBinding(dstObj, sendEvent, event, false);
       // This option walks down the chain and is used when we call 'refreshBinding' - we need to invalidate all of the parameters in the call chain so that we re-evaluate them.  Otherwise, we assume they are valid and only go one level deep.
       if (invalidateParams) {
          for (IBinding param:boundParams) {
-            param.invalidateBinding(object, sendEvent, true);
+            param.invalidateBinding(object, sendEvent, event, true);
          }
       }
       else if (dstProp instanceof String) {
          if (sendEvent)
-            Bind.sendEvent(VALUE_CHANGED, dstObj, (String) dstProp);
+            Bind.sendEvent(event, dstObj, (String) dstProp);
       }
    }
 
@@ -388,7 +388,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
       if (direction.doForward() && !direction.doReverse()) {
          if (srcProp == null) {
             valid = false;
-            invalidateBinding(null, false, false);
+            invalidateBinding(null, false, VALUE_INVALIDATED, false);
          }
          return true;
       }
@@ -465,7 +465,7 @@ public abstract class AbstractMethodBinding extends DestinationListener {
          return 0;
 
       if (direction.doForward() && !direction.doReverse() && !isRefreshDisabled()) {
-         invalidateBinding(null, false, true);
+         invalidateBinding(null, false, 0, true);
          if (applyBinding(null, null, null, true, false))
             return 1;
          return 0;

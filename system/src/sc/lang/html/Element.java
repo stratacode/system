@@ -5572,6 +5572,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public Object getChildForName(String name) {
+      if (!isRepeatTag())
+         return null;
+
+      if (!repeatTagsValid) {
+         BindingContext bindCtx = BindingContext.getBindingContext();
+         if (bindCtx != null) {
+            SyncManager.flushSyncQueue();
+            bindCtx.dispatchEvents(null);
+         }
+         refreshRepeat(true);
+      }
+
       if (repeatTags == null)
          return null;
       int uix = name.lastIndexOf('_');

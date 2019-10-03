@@ -207,7 +207,7 @@ public class SelectorBinding extends DestinationListener {
       if (dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp)) {
          if (direction.doReverse()) {
             if (sync == SyncType.ON_DEMAND) {
-               invalidate(true);
+               invalidate(true, VALUE_INVALIDATED);
             }
          }
          return true; // ??? do we need to cache another value here so this is accurate
@@ -243,11 +243,11 @@ public class SelectorBinding extends DestinationListener {
 
          if (changed) {
             if (sync == SyncType.ON_DEMAND) {
-               invalidate(true);
+               invalidate(true, VALUE_INVALIDATED);
             }
             else {
                if (!apply)
-                  invalidateBinding(null, false, false);
+                  invalidateBinding(null, true, VALUE_INVALIDATED, false);
             }
          }
       }
@@ -391,11 +391,11 @@ public class SelectorBinding extends DestinationListener {
    }
 
    // Should only be used with ON_DEMAND sync'ing which only works when dstObj is IBindable
-   private void invalidate(boolean sendEvent) {
+   private void invalidate(boolean sendEvent, int event) {
       if (dstProp == dstObj || dstProp instanceof IBinding)
-         ((IBinding) dstProp).invalidateBinding(dstObj, sendEvent, false);
+         ((IBinding) dstProp).invalidateBinding(dstObj, sendEvent, event, false);
       else if (sendEvent && dstProp instanceof String)
-         Bind.sendEvent(IListener.VALUE_CHANGED, dstObj, (String) dstProp);
+         Bind.sendEvent(event, dstObj, (String) dstProp);
       valid = false;
    }
 
@@ -421,8 +421,8 @@ public class SelectorBinding extends DestinationListener {
       return null;
    }
 
-   public void invalidateBinding(Object obj, boolean sendEvent, boolean includeParams) {
-      invalidate(sendEvent);
+   public void invalidateBinding(Object obj, boolean sendEvent, int event, boolean includeParams) {
+      invalidate(sendEvent, event);
    }
 
    /**

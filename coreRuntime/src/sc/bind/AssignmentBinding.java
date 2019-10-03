@@ -71,17 +71,17 @@ public class AssignmentBinding extends DestinationListener {
    }
 
    // Should only be used with ON_DEMAND sync'ing which only works when dstObj is IBindable
-   private void invalidate(boolean sendEvent) {
+   private void invalidate(boolean sendEvent, int event) {
       if (dstObj == dstProp || dstProp instanceof IBinding)
-         ((IBinding)dstProp).invalidateBinding(dstObj, sendEvent, false);
+         ((IBinding)dstProp).invalidateBinding(dstObj, sendEvent, event, false);
       else
-          Bind.sendEvent(VALUE_CHANGED_MASK, dstObj, dstProp);
+          Bind.sendEvent(event, dstObj, dstProp);
 
       valid = false;
    }
 
-   public void invalidateBinding(Object object, boolean sendEvent, boolean includeParams) {
-      invalidate(sendEvent);
+   public void invalidateBinding(Object object, boolean sendEvent, int event, boolean includeParams) {
+      invalidate(sendEvent, event);
    }
 
    public boolean applyBinding(Object obj, Object value, IBinding src, boolean refresh, boolean pendingChild) {
@@ -313,7 +313,7 @@ public class AssignmentBinding extends DestinationListener {
       if (dstObj == srcObject && PBindUtil.equalProps(dstProp, srcProp)) {
          if (direction.doReverse()) {
             if (sync == SyncType.ON_DEMAND) {
-               invalidate(true);
+               invalidate(true, VALUE_INVALIDATED);
             }
          }
          return true;
@@ -330,7 +330,7 @@ public class AssignmentBinding extends DestinationListener {
          if (srcProp == null) {
             // If we are applying (and thus not already invalidating) first invalidate the parent binding
             if (apply)
-               invalidateBinding(null, false, false);
+               invalidateBinding(null, false, 0, false);
             // Then apply it
             bindingInvalidated(apply);
             return true;
@@ -345,10 +345,10 @@ public class AssignmentBinding extends DestinationListener {
 
    protected void bindingInvalidated(boolean apply) {
       if (sync == SyncType.ON_DEMAND) {
-         invalidate(true);
+         invalidate(true, VALUE_INVALIDATED);
       }
       else {
-         invalidateBinding(null, false, false);
+         invalidateBinding(null, true, VALUE_INVALIDATED, false);
       }
    }
 
