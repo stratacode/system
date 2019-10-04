@@ -7,10 +7,7 @@ package sc.obj;
 import sc.dyn.DynUtil;
 import sc.type.PTypeUtil;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Used to define, save and restore the list of scope contexts used in a given operation.
@@ -388,8 +385,14 @@ public class CurrentScopeContext {
       if (ScopeDefinition.verbose)
          System.out.println("Adding type: " + typeName + " to sync type filter for: " + reason);
 
-      if (syncTypeFilter != null) // null means no filtering in this context
-         syncTypeFilter.add(typeName);
+      if (syncTypeFilter != null) {// null means no filtering in this context
+         if (syncTypeFilter instanceof HashSet)
+            syncTypeFilter.add(typeName);
+         else {
+            syncTypeFilter = new HashSet<String>(syncTypeFilter);
+            syncTypeFilter.add(typeName);
+         }
+      }
    }
 
 }
