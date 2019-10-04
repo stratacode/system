@@ -2388,7 +2388,7 @@ public class SyncManager {
 
       public boolean matchesTypeFilter(Set<String> syncTypeFilter, String typeName) {
          if (syncTypeFilter == null)
-            return true; // Disabled
+            return true; // Warning! - a null syncTypeFilter means the filter is disabled. The client trusts the server with no filter so this is a common use case
          if (syncTypeFilter.contains(typeName))
             return true;
          return globalSyncTypeNames != null && globalSyncTypeNames.contains(typeName);
