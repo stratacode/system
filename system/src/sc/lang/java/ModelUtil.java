@@ -21,6 +21,7 @@ import sc.lang.template.TemplateStatement;
 import sc.layer.*;
 import sc.obj.*;
 import sc.sync.SyncDestination;
+import sc.sync.SyncManager;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -9313,7 +9314,8 @@ public class ModelUtil {
             return true;
       }
       String typeName = ModelUtil.getTypeName(type);
-      return LayeredSystem.globalSyncTypeNames.contains(typeName);
+      // TODO: is this needed anymore? We now use the SyncTypeFilter annotation instead of global type names
+      return SyncManager.globalSyncTypeNames.contains(typeName);
    }
 
    public static Set<String> getJSSyncTypes(LayeredSystem sys, Object type) {
@@ -9335,9 +9337,13 @@ public class ModelUtil {
             ctx.visited = new IdentityHashSet<Object>();
             Set<Object> syncTypes = jsTypeDecl.getDependentTypes(ctx);
             if (syncTypes.size() > 0) {
-               syncTypeNames = new HashSet<String>(syncTypes.size());
+               if (syncTypeNames == null)
+                  syncTypeNames = new HashSet<String>(syncTypes.size());
                for (Object syncType:syncTypes) {
-                  syncTypeNames.add(ModelUtil.getTypeName(syncType));
+                  if (syncType instanceof String)
+                     syncTypeNames.add((String) syncType);
+                  else
+                     syncTypeNames.add(ModelUtil.getTypeName(syncType));
                }
             }
             if (jsTypeDecl.getSyncProperties() != null) {
@@ -9359,8 +9365,10 @@ public class ModelUtil {
                syncTypeNames.add(ModelUtil.getTypeName(methType));
             }
          }
-         return syncTypeNames;
+         if (syncTypeNames != null)
+            return syncTypeNames;
       }
+      // Returning the empty set here - which means no sync types at all, not null which means to disable the filter
       return Collections.emptySet();
    }
 

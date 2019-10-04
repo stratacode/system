@@ -4124,31 +4124,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return cmd != null;
    }
 
-   /**
-    * For each addSyncType calls in the initSync method, we need to pre-register the type names which will be
-    * synchronized automatically.  This is for the syncTypeFilter - so we can identify which types are
-    * synchronized during code-processing - long before initSync is called which requires the sync manager to
-    * be initialized.
-    */
-   public static HashSet<String> globalSyncTypeNames = new HashSet<String>(Arrays.asList("sc.layer.LayeredSystem",
-           "sc.layer.Options", "sc.lang.sc.ModifyDeclaration", "sc.lang.java.EnumDeclaration",
-           "sc.lang.java.InterfaceDeclaration", "sc.lang.java.AnnotationTypeDeclaration", "sc.lang.java.EnumConstant",
-           "sc.lang.java.ClassDeclaration", "sc.lang.java.ClientTypeDeclaration", "sc.lang.java.VariableDefinition",
-           "sc.lang.sc.PropertyAssignment", "sc.lang.java.JavaModel", "sc.lang.sc.SCModel",  "sc.lang.template.Template",
-           "sc.layer.SrcEntry", "sc.lang.java.ParamTypedMember", "sc.lang.java.ParamTypeDeclaration",
-           "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition", "sc.lang.java.ConstructorDefinition",
-           "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer", "sc.lang.java.Parameter",
-           // From EditorContext (JLineInterpreter is replaced with EditorContext on the client so is implicitly sync'd)
-           "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession", "sc.sync.ClassSyncWrapper", "sc.lang.InstanceWrapper", "sc.lang.CompletionResult"));
 
-   // Called by any clients who need to use the LayeredSystem as a sync object.  Because this class is not compiled by StrataCode, we define the sync mappings
-   // explicitly through the apis.
+   // Clients that use the LayeredSystem as a sync object for metadata, or to edit the currently running program should call initSync() at startup.
+   // It defines sync mappings for the metadata classes using the sync apis. If we always compiled StrataCode with StrataCode we could use the annotations to register them
+   // during code processing time.
+   //
+   // NOTE: if you add a class here, you probably need to also add it to the SyncTypeFilter annotation on EditorContext in both server and client versions. When that type
+   // is included in a program, it will automatically make these types available to synchronization as well.
    public void initSync() {
-      // We don't pick these types up reliably because the compiled types are used for incremental compiles so just add them all to the global filter whenever the sync system is initialized.
-      if (SyncManager.globalSyncTypeNames == null)
-         SyncManager.globalSyncTypeNames = new HashSet<String>();
-      SyncManager.globalSyncTypeNames.addAll(globalSyncTypeNames);
-
       syncInited = true;
       SyncManager.SyncState old = SyncManager.getOldSyncState();
       try {

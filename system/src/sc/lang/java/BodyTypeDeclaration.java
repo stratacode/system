@@ -8220,6 +8220,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (scopeProcessor != null) {
          scopeProcessor.addDependentTypes(this, types, mode);
       }
+      if (mode.mode == DepTypeMode.SyncTypes) {
+         Object annot = ModelUtil.getAnnotation(this, "sc.obj.SyncTypeFilter");
+         if (annot != null) {
+            String[] filterTypeNames = (String[]) ModelUtil.getAnnotationValue(annot, "typeNames");
+            if (filterTypeNames != null) {
+               // Note: adding type names directly here - the caller will have to look for Strings type names or Object types
+               for (String ftn:filterTypeNames)
+                  types.add(ftn);
+            }
+         }
+      }
    }
 
    public void setAccessTimeForRefs(long time) {

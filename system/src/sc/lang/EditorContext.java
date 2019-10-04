@@ -11,10 +11,7 @@ import sc.dyn.DynUtil;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.SCModel;
 import sc.layer.*;
-import sc.obj.GlobalScopeDefinition;
-import sc.obj.Remote;
-import sc.obj.Scope;
-import sc.obj.ScopeDefinition;
+import sc.obj.*;
 import sc.parser.*;
 import sc.sync.SyncManager;
 import sc.sync.SyncPropOptions;
@@ -34,6 +31,17 @@ import java.util.*;
 // Labelling this scope so bindings to this type know they are shared
 @Scope(name="global")
 @sc.obj.Exec(runtimes="default")
+@SyncTypeFilter(typeNames={"sc.layer.LayeredSystem",
+        "sc.layer.Options", "sc.lang.sc.ModifyDeclaration", "sc.lang.java.EnumDeclaration",
+        "sc.lang.java.InterfaceDeclaration", "sc.lang.java.AnnotationTypeDeclaration", "sc.lang.java.EnumConstant",
+        "sc.lang.java.ClassDeclaration", "sc.lang.java.ClientTypeDeclaration", "sc.lang.java.VariableDefinition",
+        "sc.lang.sc.PropertyAssignment", "sc.lang.java.JavaModel", "sc.lang.sc.SCModel",  "sc.lang.template.Template",
+        "sc.layer.SrcEntry", "sc.lang.java.ParamTypedMember", "sc.lang.java.ParamTypeDeclaration",
+        "java.lang.reflect.Field", "sc.lang.reflect.Method", "sc.lang.java.MethodDefinition", "sc.lang.java.ConstructorDefinition",
+        "sc.type.BeanMapper", "sc.type.BeanIndexMapper", "sc.layer.Layer", "sc.lang.java.Parameter",
+        // From EditorContext (JLineInterpreter is replaced with EditorContext on the client so is implicitly sync'd)
+        "sc.lang.JLineInterpreter", "sc.lang.EditorContext", "sc.lang.MemoryEditSession", "sc.sync.ClassSyncWrapper",
+        "sc.lang.InstanceWrapper", "sc.lang.CompletionResult"})
 public class EditorContext extends ClientEditorContext {
    static IBeanMapper canUndoProperty = TypeUtil.getPropertyMapping(EditorContext.class, "canUndo");
    static IBeanMapper canRedoProperty = TypeUtil.getPropertyMapping(EditorContext.class, "canRedo");
