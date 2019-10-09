@@ -1145,6 +1145,8 @@ public class Bind {
                else
                   deliverToCurrent = true;
             }
+            else
+               deliverToCurrent = true;
          }
          if (!deliverToCurrent)
             return;
