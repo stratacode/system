@@ -2745,6 +2745,8 @@ public class ModelUtil {
       if (definition instanceof IDefinition) {
          return ((IDefinition) definition).getAnnotation(annotationName);
       }
+      else if (definition instanceof VariableDefinition)
+         return getAnnotation(((VariableDefinition) definition).getDefinition(), annotationName);
       else {
          Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
@@ -2755,6 +2757,10 @@ public class ModelUtil {
             }
             else
                System.err.println("*** Using auto-imported sc.obj annoatation: " + annotationName);
+         }
+
+         if (definition instanceof ParameterizedType) {
+            definition = ((ParameterizedType) definition).getRawType();
          }
 
          java.lang.annotation.Annotation jlannot;
@@ -2784,11 +2790,9 @@ public class ModelUtil {
             }
             return null;
          }
-         else if (definition instanceof VariableDefinition)
-            return getAnnotation(((VariableDefinition) definition).getDefinition(), annotationName);
-         else if (definition instanceof ParamTypedMember)
-            return getAnnotation(((ParamTypedMember) definition).getMemberObject(), annotationName);
          else if (definition instanceof java.lang.Enum || definition instanceof ITypeDeclaration || ModelUtil.isTypeVariable(definition))
+            return null;
+         else if (definition instanceof PrimitiveType)
             return null;
          else
             throw new UnsupportedOperationException();
@@ -9315,6 +9319,8 @@ public class ModelUtil {
       }
       String typeName = ModelUtil.getTypeName(type);
       // TODO: is this needed anymore? We now use the SyncTypeFilter annotation instead of global type names
+      if (SyncManager.globalSyncTypeNames == null)
+         return false;
       return SyncManager.globalSyncTypeNames.contains(typeName);
    }
 
@@ -9436,5 +9442,17 @@ public class ModelUtil {
       }
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static void addSyncTypeFilterTypes(Object type, Set<Object> types) {
+      Object annot = ModelUtil.getAnnotation(type, "sc.obj.SyncTypeFilter");
+      if (annot != null) {
+         String[] filterTypeNames = (String[]) ModelUtil.getAnnotationValue(annot, "typeNames");
+         if (filterTypeNames != null) {
+            // Note: adding type names directly here - the caller will have to look for Strings type names or Object types
+            for (String ftn:filterTypeNames)
+               types.add(ftn);
+         }
+      }
    }
 }

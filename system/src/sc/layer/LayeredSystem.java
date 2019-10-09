@@ -4583,7 +4583,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   // These object references also need to get reloaded into the new class loader scheme
                   buildInfo.reload();
 
-                  if (options.verbose && !options.testVerifyMode)
+                  if (options.info && !options.testVerifyMode)
                      System.out.println("Build of the " + getRuntimeName() + " runtime completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
                   if (options.verbose && Parser.ENABLE_STATS) {
                      System.out.println("Parser stats: tested: " + Parser.testedNodes + " matched: " + Parser.matchedNodes);

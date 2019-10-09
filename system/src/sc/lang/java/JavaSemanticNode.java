@@ -685,12 +685,25 @@ public abstract class JavaSemanticNode extends SemanticNode {
       if (ctx.mode == DepTypeMode.SyncTypes) {
          if (ModelUtil.isSyncEnabled(type))
             types.add(type);
+
+         if (!(type instanceof BodyTypeDeclaration)) {
+            ModelUtil.addSyncTypeFilterTypes(type, types);
+         }
       }
       // The remote method types are added from the AbstractMethodDefinition which is remote
       else if (ctx.mode == DepTypeMode.RemoteMethodTypes)
          return;
-      else if (ctx.mode == DepTypeMode.All)
-         types.add(type);
+      else if (ctx.mode == DepTypeMode.All) {
+         while (ModelUtil.isArray(type)) {
+            type = ModelUtil.getArrayComponentType(type);
+            if (type == null)
+               break;
+         }
+         if (type instanceof WrappedTypeDeclaration)
+            type = ((WrappedTypeDeclaration) type).baseType;
+         if (type != null && !ModelUtil.isPrimitive(type) && !(type instanceof TypeParameter))
+            types.add(type);
+      }
       else
          System.err.println("** Unrecognized DepTypeMode");
    }

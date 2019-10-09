@@ -8197,6 +8197,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
+   /**
+    * Adds to the 'types' array any types or type names required for the specified mode. The mode determines which
+    * dependent types to return - i.e. all, recursive or not, sync types, etc.
+    */
    public void addDependentTypes(Set<Object> types, DepTypeCtx mode) {
       if (body != null) {
          for (Statement s : body) {
@@ -8221,15 +8225,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          scopeProcessor.addDependentTypes(this, types, mode);
       }
       if (mode.mode == DepTypeMode.SyncTypes) {
-         Object annot = ModelUtil.getAnnotation(this, "sc.obj.SyncTypeFilter");
-         if (annot != null) {
-            String[] filterTypeNames = (String[]) ModelUtil.getAnnotationValue(annot, "typeNames");
-            if (filterTypeNames != null) {
-               // Note: adding type names directly here - the caller will have to look for Strings type names or Object types
-               for (String ftn:filterTypeNames)
-                  types.add(ftn);
-            }
-         }
+         ModelUtil.addSyncTypeFilterTypes(this, types);
       }
    }
 
