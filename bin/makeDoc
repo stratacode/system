@@ -5,10 +5,10 @@ SC=/jjv/StrataCode
 cd $SC
 
 # Bunch of examples whose build output is referenced from the source.
-scc -c example/simpleComponent
-scc -c example/simple js/schtml
-scc -c example/unitConverter/model
-scc -c example/todo/clientOnly
+scc -a -c example/simpleComponent
+scc -a -c example/simple js/schtml
+scc -a -c example/unitConverter/model
+scc -a -c example/todo/clientOnly
 
 # Argh - two build files we want included as source for the static doc web site
 # so we can run the TodoSample.  Would be nice to have a way to generate 
