@@ -686,6 +686,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             //if (!options.buildAllFiles)
             //   options.buildAllFiles = true;
 
+            // Make sure hte layers are started - otherwise, the layers view does not work sin
+            if (layers.size() > 0)
+               startLayers(layers, false);
+
+            for (int i = 0; i < peerSystems.size(); i++) {
+               LayeredSystem peerSys = peerSystems.get(i);
+               if (peerSys.layers.size() > 0)
+                  peerSys.startLayers(peerSys.layers, false);
+            }
+
          }
          completed = true;
       }
@@ -10290,7 +10300,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   ArrayList<JavaModel> clonedModels = null;
 
                   if (options.clonedParseModel && peerSystems != null && !isLayer && model instanceof JavaModel && checkPeers && srcEnt.layer != null) {
-                     for (LayeredSystem peerSys : peerSystems) {
+                     for (int i = 0; i < peerSystems.size(); i++) {
+                        LayeredSystem peerSys = peerSystems.get(i);
                         Layer peerLayer = peerSys.getLayerByName(srcEnt.layer.layerUniqueName);
                         // does this layer exist in the peer runtime
                         if (peerLayer != null) {

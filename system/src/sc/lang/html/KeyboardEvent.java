@@ -10,6 +10,7 @@ public class KeyboardEvent extends Event {
    public boolean ctrlKey;
    public boolean metaKey;
    public boolean shiftKey;
+   public boolean repeat;
 
    public String key;
 }

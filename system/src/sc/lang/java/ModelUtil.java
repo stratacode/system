@@ -6026,7 +6026,10 @@ public class ModelUtil {
          obj = ((ParamTypedMember) obj).member;
       }
       if (obj instanceof VariableDefinition) {
-         return ((VariableDefinition) obj).shadowedByMethod;
+         VariableDefinition varDef = (VariableDefinition) obj;
+         // TODO: Not sure why this was not validated yet at this point during an incremental compile but this is the easiest fix
+         varDef.ensureValidated();
+         return varDef.shadowedByMethod;
       }
       return false;
    }
@@ -8772,6 +8775,25 @@ public class ModelUtil {
          }
          else {
             ParseUtil.realInitAndStartComponent(model);
+         }
+      }
+      else if (type instanceof VariableDefinition) {
+         VariableDefinition varDef = ((VariableDefinition) type);
+         if (!varDef.isValidated()) {
+            JavaModel model = varDef.getJavaModel();
+            // It's best to validate from the top-down
+            if (model != null && !model.isValidated()) {
+               if (validate)
+                  ParseUtil.initAndStartComponent(model);
+               else
+                  ParseUtil.realInitAndStartComponent(model);
+            }
+            else {
+               if (validate)
+                  ParseUtil.initAndStartComponent(varDef);
+               else
+                  ParseUtil.realInitAndStartComponent(varDef);
+            }
          }
       }
       else {

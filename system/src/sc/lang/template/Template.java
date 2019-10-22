@@ -91,6 +91,15 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             }
          }
       }
+      // Look for parameters like "out" even here at the top-level since there will be a default method
+      if (mtype.contains(MemberType.Variable)) {
+         Parameter param = getDefaultOutputParameters();
+         while (param != null) {
+            if (param.variableName.equals(name))
+               return param;
+            param = param.nextParameter;
+         }
+      }
       return super.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
    }
 
@@ -880,7 +889,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    }
 
    public String getOutputMethodTemplate() {
-      return "public StringBuilder output() { StringBuilder out = new StringBuilder(); return out; }";
+      // TODO: the variables defined here - "out" and "ctx" should match what's in getDefaultOutputArgs()
+      return "public StringBuilder output() { StringBuilder out = new StringBuilder(); sc.lang.html.OutputCtx ctx = new sc.lang.html.OutputCtx(); return out; }";
    }
 
    private void initOutputMethod() {
@@ -1427,6 +1437,8 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          if (outputMethod == null) {
             sb = new StringBuilder();
             ctx.defineVariable("out", sb);
+            OutputCtx octx = new OutputCtx();
+            ctx.defineVariable("ctx", octx);
          }
 
          if (createInstance && rootType != null && ctx.getCurrentObject() == null) {

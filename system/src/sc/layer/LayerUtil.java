@@ -202,7 +202,14 @@ public class LayerUtil implements LayerConstants {
          return restoreWithoutPNStream(lang, srcEnt, parseFile, parseFileName, parseLastModified, deserModel);
       }
       catch (IllegalArgumentException exc) {
-         return restoreWithoutPNStream(lang, srcEnt, parseFile, parseFileName, parseLastModified, deserModel);
+         sys.info("Error restoring model with pn stream: " + srcEnt + " return: " + restored);
+         try {
+            return restoreWithoutPNStream(lang, srcEnt, parseFile, parseFileName, parseLastModified, deserModel);
+         }
+         catch (IllegalArgumentException iexc) {
+            sys.info("Error restoring model without pn stream: " + srcEnt + " return: " + restored);
+            return null;
+         }
       }
       finally {
          PerfMon.end("restoreModel");

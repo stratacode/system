@@ -54,6 +54,7 @@ public class Options {
    @Constant public boolean info = true;
    /** Controls whether java files compiled by this system debuggable */
    @Constant public boolean debug = true;
+   /** Should compiled classes be parsed using CFClass instead of the default which is to use the class loader */
    @Constant public boolean crossCompile = false;
    /** Change to the buildDir before running the command */
    @Constant public boolean runFromBuildDir = false;

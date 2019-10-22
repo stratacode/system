@@ -7,8 +7,12 @@ package sc.layer;
 import java.util.EnumSet;
 
 /**
- * A way to categorize code in a layer by it's complexity.  Declarative is used to target configuration or rules, application
- * layers that contain normal application code, and framework for those layers that are implementing interfaces used by application
+ * The top-level categorization of layers by type. When a layer contains more than one, either don't set it or choose Application. While
+ * this is mainly used for navigation in the IDE and management UI and so optional, but Framework layers are put below others in the layer stack.
+ * TODO: now we also have configLayer a property in the Layer that also affects sorting and overlaps with these settings here. Do we need
+ * a better way to designate 'runnable' layers - like those that only specify dependencies? Or maybe that's a separate property like configLayer.
+ * also need a way to see if layers are compatible and maybe to suggest 'option' layers for when you include one layer - see all of the options
+ * it can be used with to choose another layer. Maybe a wizard that starts at the frameworks, and works down to find a run configuration?
  */
 public enum CodeType {
    Model, UI, Style, Application, Persist, Framework, Admin, Deploy;

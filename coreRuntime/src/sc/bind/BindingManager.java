@@ -32,9 +32,9 @@ public class BindingManager {
       }
 
       if (ctx != null && ctx.queueEnabledForEvent(event))
-         ctx.queueEvent(event, obj, prop, listener, eventDetail);
+         ctx.queueEvent(event, obj, prop, listener, eventDetail, null);
       else
-         Bind.dispatchEvent(event, obj, prop, listener, eventDetail);
+         Bind.dispatchEvent(event, obj, prop, listener, eventDetail, null);
    }
 
    public IListener.SyncType getDefaultSyncType() {

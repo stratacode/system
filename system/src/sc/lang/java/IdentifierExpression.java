@@ -12,6 +12,7 @@ import sc.dyn.IDynObject;
 import sc.lang.*;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSUtil;
+import sc.lang.sc.CmdScriptModel;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
 import sc.layer.Layer;
@@ -812,7 +813,11 @@ public class IdentifierExpression extends ArgumentsExpression {
             if (bindingDirection == null && getEnclosingTag() == null) {
                LayeredSystem sys = getLayeredSystem();
 
-               if (sys.runtimeProcessor != null && !sys.runtimeProcessor.supportsSyncRemoteCalls()) {
+               JavaModel model = getJavaModel();
+
+               // If we are in a CmdScriptModel that gets loaded into the JS runtime it might think it can't run
+               // these methods but technically they are always started on the server.
+               if (sys.runtimeProcessor != null && !sys.runtimeProcessor.supportsSyncRemoteCalls() && !(model instanceof CmdScriptModel) ) {
                   Object boundType = boundTypes == null ? null : boundTypes[i];
                   Layer remoteLayer = boundType == null ? null : ModelUtil.getLayerForMember(sys, boundType);
                   String remoteIdent;

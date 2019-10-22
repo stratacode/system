@@ -23,18 +23,31 @@ import java.lang.annotation.Target;
 @Target({TYPE,FIELD,METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Bindable {
+   /** Set to true for properties that do their own 'sendEvent' calls, or to just eliminate warnings about unbinding properties when another means is used to refresh the binding */
    boolean manual() default false;
-   boolean inactive() default false; // Set this to true to initially disable the binding.  It can be enabled via an api later - Bind.activate()
-   boolean trace() default false;  // Set to enable selective tracing - each time the binding is initialized, set, retrieved, destroyed
-   boolean verbose() default false; // Set to enable init, set, destroy events only
-   boolean crossScope() default false; // Set to true for those bindings where the changeEvents might come from some other thread operating in another context.  Adds extra thread-local lookup for the init and apply calls plus any necessary context switching overhead
-   boolean skipNull() default false; // Set to true to eliminate a null value being passed to a method as part of the binding
-   boolean queued() default false; // Set to true to force queued mode (default depends on BindingContext)
-   boolean immediate() default false; // Set to true to force immediate mode (default depends on BindingContext)
-   // TODO: the history, origin, delay, and doLater are not implemented yet
-   boolean history() default false;  // Set to true to enable recording of the history of values.  APIs for diagnostics.  When combined
-   boolean origin() default false;  // For trace or history include the origin - the stack trace and bindings leading up to this change.  If neither are set, both are enabled by default so origin=true by itself will provide the most diagnostics on this property.
-   int delay() default -1;  // Set to 0 does the same thing as doLater=true.  Set to some number of milliseconds to run this binding with a delay.
-   boolean doLater() default false; // Set to true to run this binding in a doLater
+   /** Set this to true to initially disable the binding.  It can be enabled via an api later - Bind.activate() */
+   boolean inactive() default false;
+   /** Set to enable selective tracing - each time the binding is initialized, set, retrieved, destroyed */
+   boolean trace() default false;
+   /** Set to enable verbose events on this binding - i.e. a message for init, set, destroy operations */
+   boolean verbose() default false;
+   /** Set to true for those bindings where the changeEvents might come from some other thread operating in another context.  Adds extra thread-local lookup for the init and apply calls plus any necessary context switching overhead */
+   boolean crossScope() default false;
+   /** Set to true to eliminate a null value being passed to a method as part of the binding */
+   boolean skipNull() default false;
+   /** Set to true to force queued mode (default depends on BindingContext) */
+   boolean queued() default false;
+   /** Set to true to force immediate mode (default depends on BindingContext) */
+   boolean immediate() default false;
+   /** Set to true to enable recording of the history of values.  APIs for diagnostics.  When combined (TODO - not implemented!) */
+   boolean history() default false;
+   /** For trace or history include the origin - the stack trace and bindings leading up to this change.  If neither are set, both are enabled by default so origin=true by itself will provide the most diagnostics on this property. TODO: not implemented */
+   boolean origin() default false;
+   /** Set to 0 does the same thing as doLater=true.  Set to some number of milliseconds to run this binding with a delay. - TODO not implemented */
+   int delay() default -1;
+   /** Set to true to run this binding in a doLater - TODO not implemented */
+   boolean doLater() default false;
    // disabled? - to force an error
+   /** Should this binding not send a change event when setX is called with the same value. */
+   boolean sameValueCheck() default false;
 }

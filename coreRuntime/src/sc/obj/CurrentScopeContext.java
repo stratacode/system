@@ -395,4 +395,23 @@ public class CurrentScopeContext {
       }
    }
 
+   public boolean sameContexts(CurrentScopeContext other) {
+      if (other == this)
+         return true;
+      if (scopeContexts != null) {
+         if (other.scopeContexts != null) {
+            int sz = scopeContexts.size();
+            if (sz == other.scopeContexts.size()) {
+               for (int i = 0; i < sz; i++) {
+                  ScopeContext scopeCtx = scopeContexts.get(i);
+                  if (scopeCtx != other.scopeContexts.get(i))
+                     return false;
+               }
+               return true;
+            }
+         }
+      }
+      return false;
+   }
+
 }

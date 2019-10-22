@@ -3142,7 +3142,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       Object jsMethSettings = ModelUtil.getAnnotation(methObj, "sc.js.JSMethodSettings");
       if (jsMethSettings != null) {
          String replaceWith = (String) ModelUtil.getAnnotationValue(jsMethSettings, "replaceWith");
-         if (replaceWith != null && replaceWith.length() > 0) {
+         if (replaceWith != null && replaceWith.length() > 0 && !replaceWith.equals(name)) {
             RTypeUtil.addMethodAlias(ModelUtil.getTypeName(ModelUtil.getEnclosingType(methObj)), name, replaceWith);
             return replaceWith;
          }

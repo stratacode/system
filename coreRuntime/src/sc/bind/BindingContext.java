@@ -6,6 +6,7 @@ package sc.bind;
 
 import sc.dyn.DynUtil;
 import sc.js.JSSettings;
+import sc.obj.CurrentScopeContext;
 import sc.obj.IScopeEventListener;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
@@ -100,19 +101,18 @@ public class BindingContext implements IScopeEventListener {
    }
    */
 
-   public void queueEvent(int eventFlag, Object obj, IBeanMapper prop, IListener listener, Object eventDetail) {
-      BindingEvent newEvent = new BindingEvent(eventFlag, obj, prop, listener, eventDetail);
+   public void queueEvent(int eventFlag, Object obj, IBeanMapper prop, IListener listener, Object eventDetail, CurrentScopeContext origCtx) {
+      BindingEvent newEvent = new BindingEvent(eventFlag, obj, prop, listener, eventDetail, origCtx);
       BindingEvent oldEvent;
       BindingEvent prevEvent = null;
 
-      if (Bind.trace)
-         Bind.logMessage("Queuing event: ", obj, prop, eventDetail);
-
       synchronized (this) {
          for (oldEvent = queuedEvents; oldEvent != null; oldEvent = oldEvent.next) {
+            double newPriority = newEvent.listener.getPriority();
+            double oldPriority = oldEvent.listener.getPriority();
             // Higher priority numbers are at the top of the list - no need to check for dependencies in this case.   For the same priority, keep the order the same as when the events occurred.
             // It's particularly important that we deliver the invalidate event before the validate event.
-            if (newEvent.listener.getPriority() > oldEvent.listener.getPriority()) {
+            if (newPriority > oldPriority) {
                if (prevEvent == null) {
                   newEvent.next = queuedEvents;
                   queuedEvents = newEvent;
@@ -123,8 +123,18 @@ public class BindingContext implements IScopeEventListener {
                }
                break;
             }
+            else if (newPriority == oldPriority) {
+               if (newEvent.sameEvent(oldEvent)) {
+                  if (Bind.trace)
+                     Bind.logMessage("Ignoring duplicate event: ", obj, prop, eventDetail);
+                  return;
+               }
+            }
             prevEvent = oldEvent;
          }
+         if (Bind.trace)
+            Bind.logMessage("Queuing event: ", obj, prop, eventDetail);
+
          if (oldEvent == null) {
             if (prevEvent == null) {
                newEvent.next = queuedEvents;

@@ -730,21 +730,27 @@ public class TransformUtil {
                    */
            "<% if (overrideGetSet) { %>\n" +
            "      return <%=superGetName%>;\n" +
-           "<% } \n" +
+           "<% }\n" +
            "   else { %>\n" +
            "      return <%=lowerPropertyName%>;\n" +
            "<% } %>\n" +
            "   }\n" +
            "   <%=setModifiers%> void set<%=upperPropertyName%>(<%=setTypeName%><%=arrayDimensions%> _<%=lowerPropertyName%>) {\n" +
-           "<% if (overrideGetSet) { %>\n" +
+           "<% if (sameValueCheck) { %>" +
+           "      boolean _valChanged = !sc.dyn.DynUtil.equalObjects(_<%=lowerPropertyName%>, <%=lowerPropertyName%>);\n" +
+           "<% }\n" +
+           "if (overrideGetSet) { %>\n" +
            "      <%=superSetName%>(_<%=lowerPropertyName%>);\n" +
-           "<% } \n" +
+           "<% }\n" +
            "   else { %>\n" +
            "      <%=lowerPropertyName%> = _<%=lowerPropertyName%>;\n" +
-           "<% } \n" +
-           "   if (bindable && sendEvent) { %>\n" +
+           "<% }\n" +
+           "if (sameValueCheck) { %>" +
+           "      if (_valChanged)\n   " +
+           "<% }\n" +
+           "if (bindable && sendEvent) { %>" +
            "      sc.bind.Bind.sendChange(<%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, _<%=lowerPropertyName%>);\n" +
-           "<% } %>\n" +
+           "<% } %>" +
            "   }\n" +
            "<% if (initializer.length() > 0) { %>\n" +
            "   <% if (!bindable && overrideField) { %>\n" +
@@ -945,6 +951,14 @@ public class TransformUtil {
       params.propertyTypeName = field.type.getGenericTypeName(typeDeclaration, false);
       params.overrideField = false;
       params.omitField = false; // Always generate the field here since we replace this one with the generated get/set call
+
+      if (params.sendEvent) {
+         Object sameValueCheckObj = ModelUtil.getAnnotationValue(field, "sc.bind.Bindable", "sameValueCheck");
+         if (sameValueCheckObj != null)
+            params.sameValueCheck = (Boolean) sameValueCheckObj;
+         else
+            params.sameValueCheck = false;
+      }
 
       if (variableDefinition.initializer == null)
          params.initializer = "";

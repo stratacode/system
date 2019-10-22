@@ -1477,6 +1477,8 @@ public class RTypeUtil {
    }
 
    public static void addMethodAlias(String typeName, String name, String replaceWith) {
+      if (name.equals(replaceWith))
+         throw new IllegalArgumentException("Method alias that's the same as the name not allowed");
       Map<String,String> aliasMap = methodAliases.get(typeName);
       if (aliasMap == null) {
          aliasMap = new TreeMap<String,String>();

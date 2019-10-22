@@ -31,6 +31,7 @@ public class PropertyDefinitionParameters {
    public boolean sendEvent = true;
    public String preReturn;
    public String postReturn;
+   public boolean sameValueCheck;
    public boolean useIndexSetForArrays = true;
 
    public static PropertyDefinitionParameters create(String propName) {
@@ -72,6 +73,7 @@ public class PropertyDefinitionParameters {
       setModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, true, true, false, false, true, JavaSemanticNode.MemberType.SetMethod), TransformUtil.fieldOnlyModifiers);
       if (getNeedsIndexedSetter())
          setIndexedModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, false, true, false, false, true, JavaSemanticNode.MemberType.SetIndexed), TransformUtil.fieldOnlyModifiers);
+
    }
 
    public boolean getNeedsIndexedSetter() {

@@ -10,6 +10,7 @@ import sc.obj.CompilerSettings;
 import sc.obj.CurrentScopeContext;
 import sc.obj.ScopeContext;
 import sc.obj.ScopeDefinition;
+import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 import sc.type.TypeUtil;
@@ -19,8 +20,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This is the main set of interfaces to the data binding system.  It contains static methods which you
- * can use to create bindings on objects and properties from the API perspective.  These static methods are used
+ * This is the main entry point for 'data binding'. It contains static methods which you
+ * can use to create bindings on objects and properties from the API.  These static methods are used
  * in the generated code to implement all bindings so it's easy to find examples by looking at the generated source.
  * To create a simple binding use the
  * Bind.bind() method.  You provide the destination object (i.e. the lhs), the name or property mapper for the destination property,
@@ -484,6 +485,11 @@ public class Bind {
          for (int i = 0; i < bindings.size(); i++)
             bindings.get(i).accessBinding();
       }
+      // If necessary, register each object in the sync system. Although we also access any objects reachable by
+      // bindings, not guaranteed to reach all children that way.
+      String scopeName = DynUtil.getScopeName(dstObj);
+      if (scopeName != null)
+         SyncManager.accessSyncInst(dstObj, scopeName);
 
       // We'll also remove all of the bindings on any child objects so this method becomes a simple way to dispose of
       // a declarative tree.
@@ -1115,13 +1121,17 @@ public class Bind {
       return bindState.nestedLevel;
    }
 
-   static void dispatchEvent(int event, Object obj, IBeanMapper prop, IListener listener, Object eventDetail) {
+   static void dispatchEvent(int event, Object obj, IBeanMapper prop, IListener listener, Object eventDetail, CurrentScopeContext origCtx) {
       if (listener.isCrossScope()) {
          CurrentScopeContext curScopeCtx = CurrentScopeContext.getCurrentScopeContext();
          List<CurrentScopeContext> listenerCtxs = listener.getCurrentScopeContexts();
          boolean deliverToCurrent = false;
          int ct = 0;
          for (CurrentScopeContext listenerCtx:listenerCtxs) {
+            // Once an event has been queued once, it has an origCtx - where this event originated. This keeps us from sending it back to the source after it's been queued
+            if (origCtx != null && origCtx.sameContexts(listenerCtx))
+               continue;
+
             if (listenerCtx != curScopeCtx) {
                ScopeContext listenerEventScopeCtx = listenerCtx.getEventScopeContext();
                ScopeContext curEventScopeCtx = curScopeCtx.getEventScopeContext();
@@ -1138,8 +1148,8 @@ public class Bind {
                   }
                   if (ScopeDefinition.trace || trace)
                      System.out.println("Bind - cross scope event: " + DynUtil.getInstanceName(obj) + "." + (prop == null ? "<default-event>" : prop.getPropertyName()) + " - Queuing event from: " + curScopeCtx + " to: " + listenerEventScopeCtx + " in: " + listenerCtx);
-                  bctx.queueEvent(event, obj, prop, listener, eventDetail);
-                  listenerEventScopeCtx.scopeChanged();
+                  bctx.queueEvent(event, obj, prop, listener, eventDetail, curScopeCtx);
+                  listenerEventScopeCtx.scopeChanged(); // This schedules a 'notify()' call on the listeners in a doLater and so does not need a doLater step itself... we want to batch up all events delivered in one sync so they are batched to the remote side in one sync.
                   ct++;
                }
                else
