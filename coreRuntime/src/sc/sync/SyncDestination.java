@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.bind.IListener;
+import sc.dyn.DynUtil;
 import sc.obj.ScopeDefinition;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
@@ -395,7 +396,7 @@ public abstract class SyncDestination {
             if (markAsSentOnly)
                System.out.println("Marking changes as sent for " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
             else if (layerDef.trim().length() > 0)
-               System.out.println("Sending sync from " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
+               System.out.println("Sending sync from " + parentContext + " thread:" + DynUtil.getCurrentThreadString() + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
          }
          if (!markAsSentOnly) {
             updateInProgress(true, anyChanges);
