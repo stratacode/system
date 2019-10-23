@@ -1152,7 +1152,7 @@ public class ClassType extends JavaType {
          ix++;
       }
       if (cloneArgs != null && type != null && type != FAILED_TO_INIT_SENTINEL) {
-         JavaType res = createTypeFromTypeParams(type, cloneArgs.toArray(new JavaType[cloneArgs.size()]));
+         JavaType res = createTypeFromTypeParams(type, cloneArgs.toArray(new JavaType[cloneArgs.size()]), null);
          res.parentNode = parentNode;
          return res;
       }

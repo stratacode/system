@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.layer.LayeredSystem;
+import sc.type.CTypeUtil;
 import sc.type.Type;
 import sc.util.StringUtil;
 
@@ -132,8 +133,15 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return compType;
    }
 
-   public static JavaType createTypeFromTypeParams(Object type, JavaType[] typeParams) {
-      return createFromTypeParams(ModelUtil.getTypeName(type), typeParams, type);
+   public static JavaType createTypeFromTypeParams(Object type, JavaType[] typeParams, JavaModel model) {
+      String typeName = ModelUtil.getTypeName(type);
+      if (model != null) {
+         String className = CTypeUtil.getClassName(typeName);
+         Object importedType = model.findTypeDeclaration(className, true);
+         if (importedType != null && ModelUtil.getTypeName(importedType).equals(typeName))
+            typeName = className;
+      }
+      return createFromTypeParams(typeName, typeParams, type);
    }
 
    public static JavaType createFromTypeParams(String typeName, JavaType[] typeParams, Object typeDecl) {
@@ -152,6 +160,10 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
    static int typeParamRecurseCheck = 0;
 
    public static JavaType createFromParamType(LayeredSystem sys, Object type, ITypeParamContext ctx, Object definedInType) {
+      return createFromParamType(sys, type, ctx, definedInType, null);
+   }
+
+   public static JavaType createFromParamType(LayeredSystem sys, Object type, ITypeParamContext ctx, Object definedInType, JavaModel model) {
       JavaType[] typeParamsArr = null;
       JavaType newType;
       Object typeCtx = ctx instanceof ITypeDeclaration ? (ITypeDeclaration) ctx : ctx != null ? ctx.getDefinedInType() : definedInType;
@@ -276,7 +288,7 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
             newType.initType(null, null, null, ctx, true, false, type);
          return newType;
       }
-      newType = createTypeFromTypeParams(type, typeParamsArr);
+      newType = createTypeFromTypeParams(type, typeParamsArr, model);
       if (sys != null) {
          newType.initType(sys, typeCtx, null, ctx, true, false, type);
       }

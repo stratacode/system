@@ -1296,7 +1296,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    }
 
    public Parameter getDefaultOutputParameters() {
-      return Parameter.create(getLayeredSystem(), new Object[] {StringBuilder.class, OutputCtx.class}, new String[] {"out", "ctx"}, null, getModelTypeDeclaration());
+      return Parameter.create(getLayeredSystem(), new Object[] {StringBuilder.class, OutputCtx.class}, new String[] {"out", "ctx"}, null, getModelTypeDeclaration(), this);
    }
 
    public static Statement getExprStringOutputStatement(String exprStr) {

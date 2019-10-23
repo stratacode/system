@@ -400,6 +400,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return null;
    }
 
+
    /**
     * From "a.b.c" to:
     *    Bind.bind(<enclosingObject or class>, boundFieldName,
@@ -418,7 +419,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       String bindingType = getBindingTypeName();
       if (bindingType == null)
          return;
-      IdentifierExpression bind = IdentifierExpression.create("sc", "bind", "Bind", bindingType);
+      IdentifierExpression bind;
+      bind = createImportedMethod("sc.bind.Bind", bindingType);
       SemanticNodeList<Expression> bindArgs = new SemanticNodeList<Expression>(5);
 
       BindDescriptor bd = getBindDescriptor();
@@ -463,7 +465,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                String numberMethod = ModelUtil.getNumberPrefixFromType(bd.dstPropType) + "Value";
                SemanticNodeList<Expression> args = new SemanticNodeList<Expression>(1);
                args.add(bind);
-               bindingExpr = IdentifierExpression.create("sc", "dyn", "DynUtil", numberMethod);
+               bindingExpr = createImportedMethod("sc.dyn.DynUtil", numberMethod);
                bindingExpr.setProperty("arguments", args);
             }
             else if (ModelUtil.isANumber(bd.dstPropType)) {
@@ -680,7 +682,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          // TODO: should we be using ModelUtil.resolveAnnotationReference here for the isConstant test?  Otherwise, we are not guaranteed
          // to get annotation layers, e.g. java.awt.Dimension to properly determine the @Constant annotation.
          String resolveName = ModelUtil.isArrayLength(prop) ?  "getArrayLengthPropertyMapping" : ModelUtil.isConstant(prop) ? "getConstantPropertyMapping" : "resolvePropertyMapping";
-         propExpr = IdentifierExpression.create("sc", "dyn" , "DynUtil", resolveName);
+         propExpr = createImportedMethod( "sc.dyn.DynUtil", resolveName);
          if (dynamicType)
             args.add(StringLiteral.create(ModelUtil.getRuntimeTypeName(type)));
          else {
@@ -726,6 +728,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       String tailName;
       boolean needsClass;
       LayeredSystem sys = getLayeredSystem();
+      JavaModel model = getJavaModel();
       if (sys.needsExtDynType(typeObj)) {
          typeName = ModelUtil.getTypeName(typeObj);
          tailName = "";
@@ -749,6 +752,13 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          tailName = "";
          needsClass = true;
       }
+      String className = CTypeUtil.getClassName(typeName);
+
+      // If possible, switch to the imported name for easier reading of the generated code
+      Object importedType = model.findTypeDeclaration(className, true);
+      if (importedType != null && ModelUtil.getTypeName(importedType).equals(typeName))
+         typeName = className;
+
       /** Check for the @Remote annotation - it can turn remoting on for this runtime even if the method is local. */
       if (!isRemote && methObj != null && ModelUtil.isRemoteMethod(sys, methObj))
          isRemote = true;
@@ -779,7 +789,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          return this;
       if (sys.runtimeProcessor != null)
          methodName = sys.runtimeProcessor.replaceMethodName(sys, methObj, methodName);
-      IdentifierExpression methBindExpr = IdentifierExpression.create("sc", "bind", "Bind", "methodP");
+      IdentifierExpression methBindExpr = createImportedMethod("sc.bind.Bind", "methodP");
       SemanticNodeList<Expression> methBindArgs = new SemanticNodeList<Expression>(2);
       Expression methodClassExpr;
       if (ModelUtil.isDynamicType(typeObj))
@@ -1139,4 +1149,21 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          return replacedByStatement.getNotFoundError();
       return false;
    }
+
+   /**
+    * Provide full type name and method name - returns an IdentifierExpression to use for a method call but where
+    * you need to fill in the arguments later. If possible, an existing import is used to shorten the generated code.
+    */
+   public IdentifierExpression createImportedMethod(String typeName, String methName) {
+      JavaModel model = getJavaModel();
+      String className = CTypeUtil.getClassName(typeName);
+      Object bindType = model == null ? null : model.findTypeDeclaration(className, true);
+      IdentifierExpression bind;
+      if (bindType != null && ModelUtil.getTypeName(bindType).equals(typeName))
+         bind = IdentifierExpression.create(className, methName);
+      else
+         bind = IdentifierExpression.create(typeName, methName);
+      return bind;
+   }
+
 }

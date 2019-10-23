@@ -2868,18 +2868,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (extTypeDecl == null) {
                if (existing == null || !ModelUtil.isAssignableFrom(HTMLElement.class, existing)) {
                   extTypeDecl = HTMLElement.class;
-                  extendsType = JavaType.createTypeFromTypeParams(HTMLElement.class, typeParams);
+                  extendsType = JavaType.createTypeFromTypeParams(HTMLElement.class, typeParams, getJavaModel());
                }
                else
                   extendsType = null;
             }
             else {
-               extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
+               extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams, getJavaModel());
             }
          }
          else {
             if (!canInherit)
-               extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams);
+               extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, typeParams, getJavaModel());
             else {
                String parentPrefix = parentType == null ? null : parentType.getFullTypeName();
                TypeDeclaration rootType = parentType == null ? null : parentType.getRootType();
