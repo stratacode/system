@@ -2974,7 +2974,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   // This is ultimately an optimization because otherwise we generate new classes for each tag instantiation of a base class.
                   // If we can't detect abstract tag objects at runtime though, we will not apply JSSettings like jsModuleFile subTypeOnly correctly
                   // which ignore abstract classes.
-                  tagModifiers.add(Annotation.create("sc.obj.TypeSettings", "dynAbstract", Boolean.TRUE));
+                  tagModifiers.add(Annotation.create(getImportedTypeName("sc.obj.TypeSettings"), "dynAbstract", Boolean.TRUE));
                }
             }
          }

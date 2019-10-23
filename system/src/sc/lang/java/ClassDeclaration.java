@@ -902,7 +902,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
       if (isObject || propertiesAlreadyBindable != null) {
          if (getAnnotation("sc.obj.TypeSettings") == null) {
-            Annotation annot = Annotation.create("sc.obj.TypeSettings");
+            Annotation annot = Annotation.create(getImportedTypeName("sc.obj.TypeSettings"));
             ArrayList<AnnotationValue> annotVals = new ArrayList<AnnotationValue>();
             if (isObject)
                annotVals.add(AnnotationValue.create("objectType", Boolean.TRUE));

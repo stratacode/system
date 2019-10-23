@@ -749,7 +749,7 @@ public class TransformUtil {
            "      if (_valChanged)\n   " +
            "<% }\n" +
            "if (bindable && sendEvent) { %>" +
-           "      sc.bind.Bind.sendChange(<%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, _<%=lowerPropertyName%>);\n" +
+           "      <%=bindClass%>.sendChange(<%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, _<%=lowerPropertyName%>);\n" +
            "<% } %>" +
            "   }\n" +
            "<% if (initializer.length() > 0) { %>\n" +
@@ -763,18 +763,18 @@ public class TransformUtil {
            "<% if (needsIndexedSetter) { %>\n" +
            "   <%=setIndexedModifiers%> void set<%=upperPropertyName%>(int index, <%=setTypeName%> _<%=lowerPropertyName%>Elem) {\n" +
            "      <%=lowerPropertyName%>[index] = _<%=lowerPropertyName%>Elem;\n" +
-           "      sc.bind.Bind.sendEvent(sc.bind.IListener.ARRAY_ELEMENT_CHANGED, <%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, index);\n" +
+           "      <%=bindClass%>.sendEvent(sc.bind.IListener.ARRAY_ELEMENT_CHANGED, <%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, index);\n" +
            "   }\n" +
            "<% } %>";
 
    private final static String PROPERTY_DEFINITION_STATIC =
            "<% if (bindable) { %>\n" +
-           "   public final static sc.type.IBeanMapper <%=propertyMappingName%> = sc.dyn.DynUtil.resolvePropertyMapping(<%=enclosingTypeName%>.class, \"<%=lowerPropertyName%>\");\n" +
+           "   public final static <%=beanMapperClass%> <%=propertyMappingName%> = <%=dynUtilClass%>.resolvePropertyMapping(<%=enclosingTypeName%>.class, \"<%=lowerPropertyName%>\");\n" +
            "<% } %>\n";
 
    private final static String DYN_TYPE_PROP_DEF_STATIC_TEMPLATE =
            "<% if (bindable) { %>\n" +
-           "   public final static sc.type.IBeanMapper <%=propertyMappingName%> = <%=enclosingOuterTypeName%>.resolvePropertyMapping<%= innerName %>(\"<%=lowerPropertyName%>\");\n" +
+           "   public final static <%=beanMapperClass%> <%=propertyMappingName%> = <%=enclosingOuterTypeName%>.resolvePropertyMapping<%= innerName %>(\"<%=lowerPropertyName%>\");\n" +
            "<% } %>\n";
 
    private final static String INTERFACE_GETSET =
@@ -924,8 +924,7 @@ public class TransformUtil {
 
       LayeredSystem sys = typeDeclaration.getLayeredSystem();
 
-      if (sys != null)
-         params.useIndexSetForArrays = sys.useIndexSetForArrays;
+      initImportTypeNames(sys, params, typeDeclaration);
 
       // Skipping interfaces here.  We want to only find implementation methods that we have to rename or contend with if we are converting a field and there are already get/set methods in the same type.
       // This is like the "makeBindable" case but we use declares not defines cause we only want to modify get/set methods if they are defined in this same type.  In the makeBindable case we are really
@@ -953,7 +952,7 @@ public class TransformUtil {
       params.omitField = false; // Always generate the field here since we replace this one with the generated get/set call
 
       if (params.sendEvent) {
-         Object sameValueCheckObj = ModelUtil.getAnnotationValue(field, "sc.bind.Bindable", "sameValueCheck");
+         Object sameValueCheckObj = ModelUtil.getAnnotationValue(field, BINDABLE_ANNOTATION, "sameValueCheck");
          if (sameValueCheckObj != null)
             params.sameValueCheck = (Boolean) sameValueCheckObj;
          else
@@ -1002,6 +1001,28 @@ public class TransformUtil {
       // Need to transform the next guy in the list if there is one since the parent call won't anymore
       if (vix != -1)
          field.variableDefinitions.get(vix).transform(runtime);
+   }
+
+   private static void initImportTypeNames(LayeredSystem sys, PropertyDefinitionParameters params, TypeDeclaration typeDeclaration) {
+      if (sys != null) {
+         params.useIndexSetForArrays = sys.useIndexSetForArrays;
+
+         JavaModel model = typeDeclaration.getJavaModel();
+         if (model != null) {
+            Object type = model.findTypeDeclaration("Bind", true);
+            if (type != null && ModelUtil.getTypeName(type).equals("sc.bind.Bind"))
+               params.bindClass = "Bind";
+            type = model.findTypeDeclaration("Bindable", true);
+            if (type != null && ModelUtil.getTypeName(type).equals(BINDABLE_ANNOTATION))
+               params.bindableClass = "Bindable";
+            type = model.findTypeDeclaration("DynUtil", true);
+            if (type != null && ModelUtil.getTypeName(type).equals("sc.dyn.DynUtil"))
+               params.dynUtilClass = "DynUtil";
+            type = model.findTypeDeclaration("IBeanMapper", true);
+            if (type != null && ModelUtil.getTypeName(type).equals("sc.type.IBeanMapper"))
+               params.beanMapperClass = "IBeanMapper";
+         }
+      }
    }
 
    public static Expression convertToNewExpression(String arrayTypeName, ArrayInitializer arrayInit, String arrayDimensions) {
@@ -1140,6 +1161,8 @@ public class TransformUtil {
             params.superGetName = params.lowerPropertyName;
       }
 
+      initImportTypeNames(typeDeclaration.getLayeredSystem(), params, typeDeclaration);
+
       if (setMethod instanceof MethodDefinition && ((MethodDefinition) setMethod).getEnclosingType() == typeDeclaration) {
          MethodDefinition setMethDef = (MethodDefinition) setMethod;
          params.superSetName = "_bind_" + setMethDef.name;
@@ -1157,16 +1180,16 @@ public class TransformUtil {
 
       if (bindable && ModelUtil.getBindableAnnotation(variableDef == null ? definition : variableDef) == null) {
          // TODO: eliminate two of these?
-         params.setModifiers = "@sc.bind.Bindable(manual=true) " + removeModifiers(params.setModifiers, bindableModifiers);
-         params.getModifiers = "@sc.bind.Bindable(manual=true) " + removeModifiers(params.getModifiers, bindableModifiers);
+         params.setModifiers = "@" + params.bindableClass + "(manual=true) " + removeModifiers(params.setModifiers, bindableModifiers);
+         params.getModifiers = "@" + params.bindableClass + "(manual=true) " + removeModifiers(params.getModifiers, bindableModifiers);
       }
       params.setTypeName = setMethod == null ? params.propertyTypeName : ModelUtil.getGenericSetMethodPropertyTypeName(typeDeclaration, setMethod, false);
-      params.enclosingTypeName = typeDeclaration.getFullTypeName();
+      params.enclosingTypeName = typeDeclaration.getInnerTypeName();
 
       TypeDeclaration rootType = typeDeclaration.getRootType();
       if (rootType == null)
          rootType = typeDeclaration;
-      params.enclosingOuterTypeName = rootType.getFullTypeName();
+      params.enclosingOuterTypeName = rootType.getTypeName();
       params.overrideGetSet = setMethod != null;
       params.isStatic = ModelUtil.hasModifier(definition, "static");
       params.bindable = bindable;

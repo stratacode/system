@@ -11,6 +11,7 @@ import sc.lang.html.Element;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
 import sc.parser.IParseNode;
+import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
 import sc.lang.SemanticNode;
 
@@ -707,4 +708,16 @@ public abstract class JavaSemanticNode extends SemanticNode {
       else
          System.err.println("** Unrecognized DepTypeMode");
    }
+
+   public String getImportedTypeName(String typeName) {
+      JavaModel model = getJavaModel();
+      if (model != null) {
+         String className = CTypeUtil.getClassName(typeName);
+         Object type = model.findTypeDeclaration(className, true);
+         if (type != null && ModelUtil.getTypeName(type).equals(typeName))
+            typeName = className;
+      }
+      return typeName;
+   }
+
 }

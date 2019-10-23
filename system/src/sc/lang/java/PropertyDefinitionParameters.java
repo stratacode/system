@@ -34,6 +34,11 @@ public class PropertyDefinitionParameters {
    public boolean sameValueCheck;
    public boolean useIndexSetForArrays = true;
 
+   public String bindClass = "sc.bind.Bind";
+   public String bindableClass = "sc.bind.Bindable";
+   public String dynUtilClass = "sc.dyn.DynUtil";
+   public String beanMapperClass = "sc.type.IBeanMapper";
+
    public static PropertyDefinitionParameters create(String propName) {
       PropertyDefinitionParameters pdp = new PropertyDefinitionParameters();
 

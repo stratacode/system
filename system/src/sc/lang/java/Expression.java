@@ -420,7 +420,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       if (bindingType == null)
          return;
       IdentifierExpression bind;
-      bind = createImportedMethod("sc.bind.Bind", bindingType);
+      bind = createImportedIdentExpr("sc.bind.Bind", bindingType);
       SemanticNodeList<Expression> bindArgs = new SemanticNodeList<Expression>(5);
 
       BindDescriptor bd = getBindDescriptor();
@@ -454,7 +454,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
       Expression bindingExpr;
       if (!nestedBinding) {
-         bindArgs.add(IdentifierExpression.create("sc","bind","BindingDirection", bindingDirection.toString()));
+         bindArgs.add(createImportedIdentExpr("sc.bind.BindingDirection", bindingDirection.toString()));
 
          addBindFlagsAndOptionsExpr(bindArgs);
 
@@ -465,7 +465,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                String numberMethod = ModelUtil.getNumberPrefixFromType(bd.dstPropType) + "Value";
                SemanticNodeList<Expression> args = new SemanticNodeList<Expression>(1);
                args.add(bind);
-               bindingExpr = createImportedMethod("sc.dyn.DynUtil", numberMethod);
+               bindingExpr = createImportedIdentExpr("sc.dyn.DynUtil", numberMethod);
                bindingExpr.setProperty("arguments", args);
             }
             else if (ModelUtil.isANumber(bd.dstPropType)) {
@@ -596,16 +596,25 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return foundFlags;
    }
 
+   // Need to use Object to represent either IBeanMapper or String when usePropertyMappers is false
+   private String getIBindingClass(LayeredSystem sys, boolean includesProps) {
+      if (sys.usePropertyMappers || !includesProps) {
+         return getImportedTypeName("sc.bind.IBinding");
+      }
+      else
+         return "Object";
+   }
+
    /**
     * When we are transforming a nested expression, this method takes the set of chained expressions
     * and produces an expression to use as the IBinding[] boundParams argument to create the binding.
     */
    public Expression createBindingParameters(boolean includesProps, Expression... bindingParams) {
+      // TODO: this method is almost identical to createBindingArray...
       LayeredSystem sys = getLayeredSystem();
       // IBinding: new IBinding[] { <bindingParams> }
       NewExpression paramBindings = new NewExpression();
-      // Need to use Object to represent either IBeanMappoer or String when usePropertyMappers is false
-      paramBindings.typeIdentifier = sys.usePropertyMappers || !includesProps ? "sc.bind.IBinding" : "Object";
+      paramBindings.typeIdentifier = getIBindingClass(sys, includesProps);
       paramBindings.setProperty("arrayDimensions", new SemanticNodeList(0));
       ArrayInitializer paramInit = new ArrayInitializer();
       SemanticNodeList<Expression> initBindings = new SemanticNodeList<Expression>(bindingParams.length);
@@ -682,7 +691,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          // TODO: should we be using ModelUtil.resolveAnnotationReference here for the isConstant test?  Otherwise, we are not guaranteed
          // to get annotation layers, e.g. java.awt.Dimension to properly determine the @Constant annotation.
          String resolveName = ModelUtil.isArrayLength(prop) ?  "getArrayLengthPropertyMapping" : ModelUtil.isConstant(prop) ? "getConstantPropertyMapping" : "resolvePropertyMapping";
-         propExpr = createImportedMethod( "sc.dyn.DynUtil", resolveName);
+         propExpr = createImportedIdentExpr( "sc.dyn.DynUtil", resolveName);
          if (dynamicType)
             args.add(StringLiteral.create(ModelUtil.getRuntimeTypeName(type)));
          else {
@@ -702,8 +711,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       ArrayInitializer boundProps = new ArrayInitializer();
       if (sys == null) // Something failed to resolve properly?
          return this;
-      // When usePropertyMappers is false and this is potentially a property, it could be a String, not an IBeanMappoer so we need to use Object
-      boundExpr.typeIdentifier = sys.usePropertyMappers || !includesProps ? "sc.bind.IBinding" : "Object";
+      boundExpr.typeIdentifier = getIBindingClass(sys, includesProps);
       boundExpr.setProperty("arrayDimensions", new SemanticNodeList(0));
       // Move the method elements underneath this element.  Elements will get transformed into bind
       // calls when we transform the parent expression
@@ -789,7 +797,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          return this;
       if (sys.runtimeProcessor != null)
          methodName = sys.runtimeProcessor.replaceMethodName(sys, methObj, methodName);
-      IdentifierExpression methBindExpr = createImportedMethod("sc.bind.Bind", "methodP");
+      IdentifierExpression methBindExpr = createImportedIdentExpr("sc.bind.Bind", "methodP");
       SemanticNodeList<Expression> methBindArgs = new SemanticNodeList<Expression>(2);
       Expression methodClassExpr;
       if (ModelUtil.isDynamicType(typeObj))
@@ -1154,7 +1162,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
     * Provide full type name and method name - returns an IdentifierExpression to use for a method call but where
     * you need to fill in the arguments later. If possible, an existing import is used to shorten the generated code.
     */
-   public IdentifierExpression createImportedMethod(String typeName, String methName) {
+   public IdentifierExpression createImportedIdentExpr(String typeName, String methName) {
       JavaModel model = getJavaModel();
       String className = CTypeUtil.getClassName(typeName);
       Object bindType = model == null ? null : model.findTypeDeclaration(className, true);
