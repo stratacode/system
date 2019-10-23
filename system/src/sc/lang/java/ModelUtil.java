@@ -3509,6 +3509,8 @@ public class ModelUtil {
          return getFieldJavaType(sys, ((VariableDefinition) field).getDefinition(), definedInType);
       else if (field instanceof IFieldDefinition)
          return ((IFieldDefinition) field).getJavaType();
+      else if (field instanceof IBeanMapper)
+         return getFieldJavaType(sys, ((IBeanMapper) field).getField(), definedInType);
       else
          throw new UnsupportedOperationException();
    }
