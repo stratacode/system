@@ -138,4 +138,13 @@ public class CastExpression extends ChainedExpression {
       }
       return false;
    }
+
+   // Don't add an extra level of indent for children of a cast
+   public int getChildNestingDepth() {
+      if (childNestingDepth != -1)
+         return childNestingDepth;
+      if (parentNode == null)
+         return 0;
+      return parentNode.getChildNestingDepth();
+   }
 }

@@ -117,7 +117,7 @@ public class TypedMethodExpression extends IdentifierExpression {
       sb.append("> ");
 
       sb.append(typedIdentifier);
-      sb.append(argsToGenerateString(arguments));
+      sb.append(argsToGenerateString(arguments, getNestingDepth()));
       return sb.toString();
    }
 

@@ -1030,7 +1030,7 @@ public class NewExpression extends IdentifierExpression {
          ClassType.appendTypeArguments(sb, typeArguments);
          if (arrayDimensions != null)
             sb.append(dimsToGenerateString());
-         sb.append(argsToGenerateString(arguments));
+         sb.append(argsToGenerateString(arguments, getNestingDepth()));
          if (arrayInitializer != null) {
             sb.append(arrayInitializer.toGenerateString());
          }
@@ -1123,5 +1123,14 @@ public class NewExpression extends IdentifierExpression {
       if (extMatchPrefix.startsWith("new "))
          extMatchPrefix = extMatchPrefix.substring(4);
       return addStatementNodeCompletions(origModel, origNode, extMatchPrefix, offset, dummyIdentifier, candidates, nextNameInPath, max);
+   }
+
+   // Don't add an extra level of indent for children of a new
+   public int getChildNestingDepth() {
+      if (childNestingDepth != -1)
+         return childNestingDepth;
+      if (parentNode == null)
+         return 0;
+      return parentNode.getChildNestingDepth();
    }
 }

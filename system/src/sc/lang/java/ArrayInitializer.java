@@ -12,6 +12,7 @@ import sc.parser.ParseError;
 import sc.parser.ParseUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.SemanticNodeList;
+import sc.util.StringUtil;
 
 import java.lang.reflect.Array;
 import java.util.*;
@@ -343,11 +344,22 @@ public class ArrayInitializer extends Expression {
       sb.append(" ");
       int i = 0;
       if (initializers != null) {
+         int curLineLen = 0;
+         int nestingDepth = getNestingDepth();
          for (Expression expr:initializers) {
-            if (i != 0)
-               sb.append(", ");
-            if (expr != null)
-               sb.append(expr.toGenerateString());
+            String childStr = expr == null ? "" : expr.toGenerateString();
+            int childLen = childStr.length();
+            if (i != 0) {
+               if (curLineLen + childLen + nestingDepth * 3 > 80) {
+                  sb.append(",\n        ");
+                  sb.append(StringUtil.indent(nestingDepth));
+                  curLineLen = 0;
+               }
+               else
+                  sb.append(", ");
+            }
+            sb.append(childStr);
+            curLineLen += childLen;
             i++;
          }
       }
@@ -369,5 +381,14 @@ public class ArrayInitializer extends Expression {
    public int getNumDims() {
       Object type = getTypeDeclaration();
       return type == null ? 1 : ModelUtil.getArrayNumDims(type);
+   }
+
+   // TODO: This is here because of the new Type[] {} case - will it mess up plain old {}?
+   public int getChildNestingDepth() {
+      if (childNestingDepth != -1)
+         return childNestingDepth;
+      if (parentNode == null)
+         return 1;
+      return parentNode.getChildNestingDepth();
    }
 }

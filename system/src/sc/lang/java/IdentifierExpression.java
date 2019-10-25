@@ -5713,15 +5713,26 @@ public class IdentifierExpression extends ArgumentsExpression {
       return false;
    }
 
-   protected static String argsToGenerateString(SemanticNodeList<Expression> args) {
+   protected static String argsToGenerateString(SemanticNodeList<Expression> args, int nestingDepth) {
       StringBuilder sb = new StringBuilder();
       if (args != null) {
          sb.append("(");
          int subIx = 0;
+         int curLineLen = 0;
          for (Expression expr:args) {
-            if (subIx != 0)
-               sb.append(", ");
-            sb.append(expr.toGenerateString());
+            String childStr = expr.toGenerateString();
+            int childLen = childStr.length();
+            if (subIx != 0) {
+               if (curLineLen + childLen + nestingDepth * 3 > 80) {
+                  sb.append(",\n        ");
+                  sb.append(StringUtil.indent(nestingDepth));
+                  curLineLen = 0;
+               }
+               else
+                  sb.append(", ");
+            }
+            curLineLen += childLen;
+            sb.append(childStr);
             subIx++;
          }
          sb.append(")");
@@ -5738,7 +5749,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       else
          sb.append("<no identifiers>");
       if (arguments != null)
-        sb.append(argsToGenerateString(arguments));
+        sb.append(argsToGenerateString(arguments, getNestingDepth()));
       return sb.toString();
    }
 

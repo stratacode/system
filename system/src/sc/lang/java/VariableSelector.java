@@ -111,7 +111,7 @@ public class VariableSelector extends Selector {
       sb.append(".");
       sb.append(identifier);
       if (arguments != null)
-         sb.append(IdentifierExpression.argsToGenerateString(arguments));
+         sb.append(IdentifierExpression.argsToGenerateString(arguments, getNestingDepth()));
       return sb.toString();
    }
 
