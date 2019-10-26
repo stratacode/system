@@ -6790,6 +6790,10 @@ public class ModelUtil {
          BodyTypeDeclaration typeDef = (BodyTypeDeclaration) type;
          JavaModel model = typeDef.getJavaModel();
 
+         // Need to have a parse node in place before we do the update or else we'll restore it later on without the change
+         if (model.parseNode == null)
+            model.restoreParseNode();
+
          MessageHandler handler = new MessageHandler();
          IMessageHandler oldHandler = model.getErrorHandler();
          try {
