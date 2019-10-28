@@ -103,9 +103,21 @@ public class CastExpression extends ChainedExpression {
 
    public Statement transformToJS() {
       expression.transformToJS();
-      Statement repl = ParenExpression.create(expression);
-      parentNode.replaceChild(this, repl);
-      return repl;
+
+      // Because JS does not have an explicit integer type, for a cast to (int) we'll do a Math.floor instead
+      // to strip away any fractional part.
+      if (type instanceof PrimitiveType && ModelUtil.isInteger(((PrimitiveType) type).getRuntimeClass())) {
+         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+         args.add(expression);
+         IdentifierExpression toInt = IdentifierExpression.createMethodCall(args, "Math.floor");
+         parentNode.replaceChild(this, toInt);
+         return toInt;
+      }
+      else {
+         Statement repl = ParenExpression.create(expression);
+         parentNode.replaceChild(this, repl);
+         return repl;
+      }
    }
 
    public String toGenerateString() {

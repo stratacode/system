@@ -109,6 +109,7 @@ public class TypeUtil  {
       catch (IllegalArgumentException exc) {
          System.err.println("*** Error setting: " + selector + " on: " + parent + " value: " + value + " detailed error: " + exc);
          exc.printStackTrace();
+         throw exc;
       }
    }
 

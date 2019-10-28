@@ -55,6 +55,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    private static boolean wasBound = false;
 
+   // Used for serializing only
+   private Boolean writable = null;
+
    public void init() {
       if (initialized)
          return;
@@ -919,5 +922,15 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       return enclosingTypeName;
    }
 
+   public boolean getWritable() {
+      if (writable != null)
+         return writable;
+      Definition def = getDefinition();
+      return def == null || !def.hasModifier("final");
+   }
+
+   public void setWritable(boolean v) {
+      writable = v;
+   }
 }
 

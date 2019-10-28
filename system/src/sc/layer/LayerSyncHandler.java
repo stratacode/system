@@ -55,6 +55,10 @@ public class LayerSyncHandler extends SyncHandler {
          varDef.indexedProperty = ModelUtil.isGetIndexMethod(inst);
          varDef.annotations = ModelUtil.getAnnotations(inst);
          varDef.modifierFlags = ModelUtil.getModifiers(inst);
+         varDef.setWritable(ModelUtil.hasSetMethod(inst));
+         // So getEnclosingType and getLayer will work, we set the parentNode.
+         if (inst instanceof MethodDefinition)
+            varDef.parentNode = ((MethodDefinition) inst).getParentNode();
          return varDef;
       }
 

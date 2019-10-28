@@ -3474,6 +3474,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
       public void typeChanged(BodyTypeDeclaration oldType, BodyTypeDeclaration newType) {
          JavaModel model = newType.getJavaModel();
+         // Don't process changes to types unless they are actually converted to JS
+         if (hasJSLibFiles(newType))
+            return;
          // Once this model is changed in the modelStream, it will cause the type and instances to be updated when this is
          // pushed to the client.  No need to touch modType in this case.
          TypeDeclaration modType = getOrCreateModifyDeclaration(newType.getFullTypeName(), model.getModelTypeName(), model.getPackagePrefix());

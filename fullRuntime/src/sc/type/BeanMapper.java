@@ -111,8 +111,11 @@ public class BeanMapper extends AbstractBeanMapper {
          }
       }
       catch (IllegalArgumentException exc) {
-         System.err.println("*** Error setting: " + setSelector + " on: " + parent + " value: " + value + " detailed error: " + exc);
-         exc.printStackTrace();
+         if (TypeUtil.trace) {
+            System.err.println("*** Error setting: " + setSelector + " on: " + parent + " value: " + value + " detailed error: " + exc);
+            exc.printStackTrace();
+         }
+         throw exc;
       }
       catch (InvocationTargetException ite) {
          if (TypeUtil.trace || !(ite.getCause() instanceof RuntimeException)) {
@@ -124,7 +127,9 @@ public class BeanMapper extends AbstractBeanMapper {
             throw (RuntimeException) ite.getCause();
       }
       catch (IllegalAccessException exc) {
-         System.err.println("*** Error setting: " + setSelector + " on: " + parent + " value: " + value + " threw: " + exc);
+         if (TypeUtil.trace)
+            System.err.println("*** Error setting: " + setSelector + " on: " + parent + " value: " + value + " threw: " + exc);
+         throw new IllegalArgumentException("Illegal access error on: " + parent + ": " + exc);
       }
       catch (NullPointerException exc) {
          if (TypeUtil.trace)

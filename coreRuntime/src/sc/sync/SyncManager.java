@@ -1985,6 +1985,20 @@ public class SyncManager {
             Bind.removeListener(inst, propName, syncListener, IListener.VALUE_CHANGED_MASK);
       }
 
+      void removeSyncInstFromChildCtxs(Object inst, SyncProperties syncProps, boolean listenersOnly) {
+         if (childSyncInsts != null) {
+            Set<InstInfo> children = childSyncInsts.get(inst);
+            if (children != null) {
+               for (InstInfo child:children) {
+                  child.syncContext.removeSyncInstInternal(child, inst, syncProps, listenersOnly, false);
+
+                  // And remove it from the children's children
+                  child.syncContext.removeSyncInstFromChildCtxs(inst, syncProps, listenersOnly);
+               }
+            }
+         }
+      }
+
       void removeSyncInstInternal(InstInfo toRemove, Object inst, SyncProperties syncProps, boolean listenersOnly, boolean removeFromParentList) {
          if (trace)
             System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name + (toRemove.inherited ? " inherited from: " + toRemove.parContext.name : ""));
@@ -2000,14 +2014,7 @@ public class SyncManager {
             }
             removePropertyValueListeners(inst);
 
-            if (childSyncInsts != null) {
-               Set<InstInfo> children = childSyncInsts.get(inst);
-               if (children != null) {
-                  for (InstInfo child:children) {
-                     child.syncContext.removeSyncInstInternal(child, inst, syncProps, listenersOnly, false);
-                  }
-               }
-            }
+            removeSyncInstFromChildCtxs(inst, syncProps, listenersOnly);
          }
          else if (toRemove.inherited && removeFromParentList) {
             if (listenersOnly)
@@ -3472,11 +3479,18 @@ public class SyncManager {
       if (currentSyncLayers != null) {
          if (trace || verbose)
             System.out.println("Processing remote method result: " + callId + " = " + retValue);
-         for (SyncLayer currentSyncLayer:currentSyncLayers) {
-            if (currentSyncLayer.processMethodReturn(callId, retValue, exceptionStr)) {
-               handled = true;
-               break;
+
+         SyncManager.SyncState oldState = SyncManager.setSyncState(SyncManager.SyncState.RecordingChanges);
+         try {
+            for (SyncLayer currentSyncLayer:currentSyncLayers) {
+               if (currentSyncLayer.processMethodReturn(callId, retValue, exceptionStr)) {
+                  handled = true;
+                  break;
+               }
             }
+         }
+         finally {
+            SyncManager.setSyncState(oldState);
          }
       }
       if (!handled) {

@@ -49,4 +49,18 @@ public enum BindingDirection
       return null;
    }
 
+   public static BindingDirection fromOperator(String op) {
+      if (op == null)
+         return null;
+
+      if (op.equals(":="))
+         return FORWARD;
+      else if (op.equals(":=:"))
+         return BIDIRECTIONAL;
+      else if (op.equals("=:"))
+         return REVERSE;
+      else if (op.equals("="))
+         return null;
+      throw new IllegalArgumentException("Invalid binding direction");
+   }
 }

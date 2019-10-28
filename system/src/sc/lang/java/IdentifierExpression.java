@@ -690,6 +690,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (plen != argLen) {
          // If the last guy is not a repeating parameter, it can't match
          if (last < 0 || !ModelUtil.isVarArgs(meth) || /* !ModelUtil.isArray(paramTypes[last]) || */ argLen < last) {
+            // A VariableDefinition that will be turned into a getX() method call
+            if (meth instanceof VariableDefinition && arguments.size() == 0)
+               return;
             rootExpr.displayTypeError("Mismatching parameter types to method invocation.");
             return;
          }
@@ -5919,8 +5922,18 @@ public class IdentifierExpression extends ArgumentsExpression {
                ErrorRangeInfo eri = (ErrorRangeInfo) ea;
 
                IParseNode pn = parseNode;
-               if (fromStatement != null)
+               if (fromStatement != null) {
                   pn = fromStatement.getParseNode();
+                  if (pn == null) {
+                     ISemanticNode model = fromStatement.getRootNode();
+                     if (model instanceof JavaModel) {
+                        ((JavaModel) model).restoreParseNode();
+                     }
+                     pn = fromStatement.getParseNode();
+                  }
+                  if (pn == null) // Failed to restore the parse node for some reason - go back to the other one
+                     pn = parseNode;
+               }
 
                int startIx = pn.getStartIndex();
 

@@ -6814,12 +6814,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (insts != null) {
             while (insts.hasNext()) {
                Object inst = insts.next();
-               try {
-                  initInstance(overriddenAssign, inst, ctx, iit);
-               }
-               catch (IllegalArgumentException exc) {
-                  sys.setStaleCompiledModel(true, "Failed to set property: ", ModelUtil.getPropertyName(overriddenAssign), " on instance: ", DynUtil.getInstanceName(inst) + " for: " + iit);
-               }
+               // TODO: used to catch IllegalArgumentException here and setStaleCompiledModel but it ended up
+               // hiding data type mismatches from the management UI. Maybe if we are doing a refresh we should
+               // mark the model as stale higher up?
+               initInstance(overriddenAssign, inst, ctx, iit);
             }
          }
       }

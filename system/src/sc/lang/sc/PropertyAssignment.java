@@ -812,6 +812,17 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    }
 
    public void updateInitializer(String op, Expression expr) {
+      BindingDirection bindDir = BindingDirection.fromOperator(op);
+      if (expr != null && bindDir != BindingDirection.REVERSE) {
+         Object propType = getPropertyTypeDeclaration();
+         expr.setInferredType(propType, true);
+         Object initType = initializer.getGenericType();
+         if (initType != null && propType != null &&
+                 !ModelUtil.isAssignableFrom(propType, initType, true, null, getLayeredSystem())) {
+            throw new IllegalArgumentException("Type mismatch - assignment to property with type: " + ModelUtil.getTypeName(propType, true, true) + " does not match expression type: " + ModelUtil.getTypeName(initType, true, true) + " for: ");
+         }
+      }
+
       setProperty("operator", op);
       setProperty("initializer", expr);
       if (isInitialized()) {

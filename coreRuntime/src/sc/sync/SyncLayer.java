@@ -446,7 +446,30 @@ public class SyncLayer {
    }
 
    public void removeSyncInst(Object inst) {
-      changedValues.remove(inst);
+      // We might have changes queued up for this object - if so, go through and remove them from the list
+      HashMap<String,Object> vals = changedValues.remove(inst);
+      if (vals != null && syncChangeList != null) {
+         SyncChange prev = null;
+         SyncChange cur = syncChangeList;
+         while (cur != null) {
+            if (cur.obj == inst) {
+               cur = cur.next;
+               if (prev == null)
+                  syncChangeList = cur;
+               else
+                  prev.next = cur;
+            }
+            else {
+               prev = cur;
+               cur = cur.next;
+            }
+         }
+
+         if (prev == null)
+            syncChangeLast = syncChangeList;
+         else
+            syncChangeLast = prev;
+      }
    }
 
    /** Called by the destination just after serializing this sync layer and sending it across the wire. */

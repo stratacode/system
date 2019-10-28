@@ -73,7 +73,7 @@ public class ParseInStream extends BinfInStream {
          case ParseOutStream.SinglePN:
             if (nestedParselet == null) {
                if (!(parselet instanceof NestedParselet))
-                  System.out.println("*** Not a nested parselet in restore!");
+                  throw new IllegalArgumentException("*** Not a nested parselet in restore!");
                nestedParselet = (NestedParselet) parselet;
             }
             if (nextChildParselet == null)
