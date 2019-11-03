@@ -24,7 +24,7 @@ public abstract class ClientEditorContext {
 
    JavaModel pendingModel = null;
    @Bindable(manual=true)
-   public LinkedHashSet<JavaModel> changedModels = new LinkedHashSet<JavaModel>();
+   public LinkedHashMap<String,JavaModel> changedModels = new LinkedHashMap<String,JavaModel>();
    @Bindable(manual=true)
    public LinkedHashMap<SrcEntry, List<ModelError>> errorModels = new LinkedHashMap<SrcEntry, List<ModelError>>();
 
@@ -60,6 +60,7 @@ public abstract class ClientEditorContext {
    private boolean memorySessionChanged = false;
 
    private List<String> createInstTypeNames;
+   private List<String> createInstClassNames;
 
    /** A list of packages that are used to search for a type name - by default, we'll take any exported packages from the layers in the stack as the importPackages */
    ArrayList<String> importPackages = new ArrayList<String>();
@@ -75,7 +76,21 @@ public abstract class ClientEditorContext {
    }
 
    public boolean hasAnyMemoryEditSession(boolean memorySessionChanged) {
-      return memorySessionChanged || (memSessions != null && memSessions.size() > 0);
+      if (memorySessionChanged)
+         return true;
+      if (memSessions == null || memSessions.size() == 0)
+         return false;
+      for (MemoryEditSession sess:memSessions.values()) {
+         String text = sess.getText();
+         String origText = sess.getOrigText();
+         // If text == null, it means we haven't edited it locally yet.  If origText is null,
+         // we just have a caret position.
+         if (text == null || origText == null)
+            continue;
+         if (!sess.getOrigText().equals(text))
+            return true;
+      }
+      return false;
    }
 
    /** Returns the current modelText to display. The extra modelText param is for receiving data binding events on the client */
@@ -113,7 +128,7 @@ public abstract class ClientEditorContext {
          // in this call to ensure the args are set before the entry is put into the hashMap.
          newMemSessions.put(ent, mes);
       }
-      mes.model = model;
+      mes.setModel(model);
       mes.setCaretPosition(cp);
 
       if (newMemSessions != null) {
@@ -150,7 +165,7 @@ public abstract class ClientEditorContext {
       if (sess.getOrigText() == null)
          sess.setOrigText(model.toLanguageString());
       sess.setText(text);
-      sess.model = model;
+      sess.setModel(model);
       sess.setCaretPosition(caretPos);
       setMemorySessionChanged(true);
 
@@ -225,6 +240,19 @@ public abstract class ClientEditorContext {
    public void setCreateInstTypeNames(List<String> nl) {
       createInstTypeNames = nl;
       Bind.sendChangedEvent(this, "createInstTypeNames");
+   }
+
+   @Bindable(manual=true)
+   public List<String> getCreateInstClassNames() {
+      if (createInstClassNames == null) {
+         if (createInstTypeNames == null)
+            return null;
+         createInstClassNames = new ArrayList<String>(createInstTypeNames.size());
+      }
+      for (int i = 0; i < createInstTypeNames.size(); i++) {
+         createInstClassNames.add(CTypeUtil.getClassName(createInstTypeNames.get(i)));
+      }
+      return createInstClassNames;
    }
 
    public boolean isCreateInstType(String typeName) {

@@ -1461,7 +1461,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void printChanges() {
-      for (JavaModel model:changedModels) {
+      for (JavaModel model:changedModels.values()) {
          System.out.println("------: " + model.getSrcFile() + ":");
          System.out.println(model.toLanguageString());
       }

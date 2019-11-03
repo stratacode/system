@@ -57,6 +57,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
    // Used for serializing only
    private Boolean writable = null;
+   public transient boolean methodMetadata = false; // We create these VariableDefinition's for the metadata of a property - they are properties even if they are not part of a FieldDefinition
 
    public void init() {
       if (initialized)
@@ -932,5 +933,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public void setWritable(boolean v) {
       writable = v;
    }
+
+   public boolean isProperty() {
+      return methodMetadata || getDefinition() instanceof FieldDefinition;
+   }
+
 }
 

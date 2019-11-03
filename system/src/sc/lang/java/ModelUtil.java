@@ -2281,7 +2281,7 @@ public class ModelUtil {
       else throw new UnsupportedOperationException();
    }
 
-   public static Object getArrayOrListComponentType(JavaModel model, Object arrayType) {
+   public static Object getArrayOrListComponentType(Object arrayType) {
       if (ModelUtil.isAssignableFrom(Iterable.class, arrayType)) {
          if (ModelUtil.isTypeVariable(arrayType))
             arrayType = ModelUtil.getTypeParameterDefault(arrayType);
@@ -3306,7 +3306,7 @@ public class ModelUtil {
       if (varObj instanceof PropertyAssignment)
          return isField(((PropertyAssignment) varObj).assignedProperty);
       return varObj instanceof Field || (varObj instanceof IBeanMapper && isField(((IBeanMapper) varObj).getPropertyMember())) || varObj instanceof IFieldDefinition ||
-          varObj instanceof FieldDefinition || (varObj instanceof VariableDefinition && (((VariableDefinition) varObj).getDefinition()) instanceof FieldDefinition);
+          varObj instanceof FieldDefinition || (varObj instanceof VariableDefinition && (((VariableDefinition) varObj).isProperty()));
    }
 
    public static boolean hasField(Object varObj) {
@@ -3490,8 +3490,12 @@ public class ModelUtil {
          return ((Field) field).getType();
       else if (field instanceof FieldDefinition)
          return ((FieldDefinition) field).type.getTypeDeclaration();
-      else if (field instanceof VariableDefinition)
-         return getFieldType(((VariableDefinition) field).getDefinition());
+      else if (field instanceof VariableDefinition) {
+         VariableDefinition varDef = ((VariableDefinition) field);
+         if (varDef.frozenTypeDecl != null) // To support the case VariableDefinitions are used for method metadata when there is no definition
+            return varDef.frozenTypeDecl;
+         return getFieldType(varDef.getDefinition());
+      }
       else if (field instanceof IFieldDefinition)
          return ((IFieldDefinition) field).getFieldType();
       else
@@ -6811,7 +6815,7 @@ public class ModelUtil {
                JavaSemanticNode node = (JavaSemanticNode) elem;
 
                // If we inherited the definition of this property from a base class, we need to create a property assignment to override that one in this type
-               if (node.getEnclosingType() != type) {
+               if (!ModelUtil.sameTypes(node.getEnclosingType(), type)) {
                   String propName = ModelUtil.getPropertyName(node);
                   if (expr == null) {
                      newAssign = OverrideAssignment.create(propName);

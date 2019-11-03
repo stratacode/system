@@ -268,8 +268,9 @@ public class EditorContext extends ClientEditorContext {
       // Notify code that this model has changed by sending a binding event.
       model.markChanged();
 
-      if (!changedModels.contains(model)) {
-         changedModels.add(model);
+      SrcEntry srcEnt = model.getSrcFile();
+      if (srcEnt != null && changedModels.get(srcEnt.absFileName) != model) {
+         changedModels.put(srcEnt.absFileName, model);
          model.unsavedModel = true;
          if (changedModels.size() == 1)
             Bind.sendEvent(IListener.VALUE_CHANGED, this, needsSaveProperty);
@@ -279,7 +280,7 @@ public class EditorContext extends ClientEditorContext {
 
    @Remote(remoteRuntimes="js")
    public synchronized void save() {
-      for (JavaModel model:changedModels) {
+      for (JavaModel model:changedModels.values()) {
          if (model.getSrcFile() != null) {
             model.layeredSystem.acquireDynLock(false);
             try {
@@ -317,7 +318,7 @@ public class EditorContext extends ClientEditorContext {
    }
 
    void refreshEditSessions() {
-      for (JavaModel model:changedModels) {
+      for (JavaModel model:changedModels.values()) {
          ArrayList<IEditorSession> sessions = editSessions.get(model.getModelTypeDeclaration().getFullTypeName());
          if (sessions != null && sessions.size() > 0) {
             for (IEditorSession session : sessions)
@@ -1041,7 +1042,7 @@ public class EditorContext extends ClientEditorContext {
             system.refreshRuntimes(true);
             return;
          }
-         changedModels.remove(model);
+         changedModels.remove(srcEnt.absFileName);
          JavaModel origModel = model;
          model.unsavedModel = false;
          LinkedHashMap<SrcEntry,List<ModelError>> copyErrorModels = null;
@@ -1104,7 +1105,10 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public boolean modelChanged(JavaModel model) {
-      return changedModels.contains(model);
+      SrcEntry srcEnt = model.getSrcFile();
+      if (srcEnt == null)
+         return false;
+      return changedModels.get(srcEnt.absFileName) != null;
    }
 
    public SystemRefreshInfo refresh() {
@@ -1120,7 +1124,7 @@ public class EditorContext extends ClientEditorContext {
    }
 
    public boolean isChangedModel(Layer layer, String relFileName) {
-      for (JavaModel model:changedModels) {
+      for (JavaModel model:changedModels.values()) {
          SrcEntry ent = model.getSrcFile();
          if (ent != null && model.layer == layer && ent.relFileName.equals(relFileName))
             return true;
@@ -1216,12 +1220,15 @@ public class EditorContext extends ClientEditorContext {
 
    void doRefresh() {
       SystemRefreshInfo info = refresh();
-      List<Layer.ModelUpdate> changedModels = info.changedModels;
-      if (changedModels != null) {
+      List<Layer.ModelUpdate> refreshedModels = info.changedModels;
+
+      if (refreshedModels != null) {
+         boolean origChanges = hasAnyMemoryEditSession(false);
+
          boolean errorModelsChanged = false;
          HashMap<SrcEntry,MemoryEditSession> newMemSessions = null;
          LinkedHashMap<SrcEntry,List<ModelError>> copyErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>(errorModels);
-         for (Layer.ModelUpdate modelUpdate:changedModels) {
+         for (Layer.ModelUpdate modelUpdate:refreshedModels) {
             Object modelObj = modelUpdate.changedModel;
             if (modelObj != null) { // Could not parse the model
                if (modelObj instanceof ModelParseError) {
@@ -1231,16 +1238,21 @@ public class EditorContext extends ClientEditorContext {
                }
                else if (modelObj instanceof JavaModel) {
                   JavaModel model = (JavaModel) modelObj;
+                  MemoryEditSession sess = memSessions.get(model.getSrcFile());
                   if (model.hasErrors()) {
                      copyErrorModels.put(model.getSrcFile(), model.errorMessages);
-                     MemoryEditSession sess = memSessions.get(model.getSrcFile());
                      if (sess != null && sess.model != null)
                         sess.model.markChanged();
                   }
-                  else {
+                  else if (sess != null) {
+                     sess.setModel(model); // Here we want to preserve the caret position
+                     sess.setOrigText(model.toLanguageString());
+                     sess.setText(null);
+                     /*
                      newMemSessions = new HashMap<SrcEntry,MemoryEditSession>(memSessions);
                      newMemSessions.remove(model.getSrcFile());
                      copyErrorModels.remove(model.getSrcFile());
+                     */
                   }
                   errorModelsChanged = true;
                }
@@ -1257,6 +1269,9 @@ public class EditorContext extends ClientEditorContext {
          if (newMemSessions != null) {
             setMemSessions(newMemSessions);
          }
+         boolean newChanges = hasAnyMemoryEditSession(false);
+         if (newChanges != origChanges)
+            setMemorySessionChanged(newChanges);
       }
    }
 
@@ -1272,6 +1287,13 @@ public class EditorContext extends ClientEditorContext {
             mes.setSaved(true);
             mes.model.saveModelTextToFile(mes.getText());
          }
+
+         // In case this model previously had pending changes remove it here.
+         if (changedModels.remove(mes.model.getSrcFile().absFileName) != null) {
+            if (changedModels.size() == 0)
+               Bind.sendEvent(IListener.VALUE_CHANGED, this, needsSaveProperty);
+            Bind.sendChangedEvent(this, "changedModels");
+         }
       }
       doRefresh();
 
@@ -1279,9 +1301,25 @@ public class EditorContext extends ClientEditorContext {
          setMemorySessionChanged(false);
    }
 
+   private boolean refreshMemSessionErrorsScheduled = false;
+
+   public void scheduleRefreshMemorySessionErrors() {
+      if (refreshMemSessionErrorsScheduled)
+         return;
+
+      DynUtil.invokeLater(new Runnable() {
+         public void run() {
+            refreshMemorySessionErrors();
+         }
+      }, 0);
+   }
+
    public void refreshMemorySessionErrors() {
+      refreshMemSessionErrorsScheduled = false;
+
       if (memSessions == null)
          return;
+
       // For now, just save all of the files, then refresh from the files.  We could only refresh the memory models but
       // that's a lot more code.
       // TODO: deal with file write errors here
@@ -1289,41 +1327,43 @@ public class EditorContext extends ClientEditorContext {
       for (MemoryEditSession mes:memSessions.values()) {
          String text = mes.getText();
          SrcEntry srcEntry = mes.model.getSrcFile();
-         if (text != null && mes.getStaleErrors()) {
-            Object parseRes = system.parseSrcBuffer(srcEntry, true, text, true, true);
-            List<ModelError> newErrs = null;
-            if (parseRes instanceof ParseError) {
-               newErrs = convertFromParseError((ParseError) parseRes, srcEntry);
-            }
-            else if (parseRes instanceof JavaModel) {
-               JavaModel model = (JavaModel) parseRes;
-               ParseUtil.initAndStartComponent(model);
-               IParseNode modelPN = model.getParseNode();
-               List<ParseError> parseErrors = ParseUtil.getParseNodeErrors(modelPN, 10);
-               boolean hasModelErrors = model.hasErrors();
-               if (hasModelErrors || parseErrors != null) {
-                  newErrs = new ArrayList<ModelError>();
-                  if (hasModelErrors)
-                     newErrs.addAll(model.errorMessages);
-                  if (parseErrors != null) {
-                     for (ParseError pe:parseErrors)
-                        newErrs.addAll(convertFromParseError(pe, srcEntry));
+         if (mes.getStaleErrors()) {
+            if (text != null) {
+               Object parseRes = system.parseSrcBuffer(srcEntry, true, text, true, true);
+               List<ModelError> newErrs = null;
+               if (parseRes instanceof ParseError) {
+                  newErrs = convertFromParseError((ParseError) parseRes, srcEntry);
+               }
+               else if (parseRes instanceof JavaModel) {
+                  JavaModel model = (JavaModel) parseRes;
+                  ParseUtil.initAndStartComponent(model);
+                  IParseNode modelPN = model.getParseNode();
+                  List<ParseError> parseErrors = ParseUtil.getParseNodeErrors(modelPN, 10);
+                  boolean hasModelErrors = model.hasErrors();
+                  if (hasModelErrors || parseErrors != null) {
+                     newErrs = new ArrayList<ModelError>();
+                     if (hasModelErrors)
+                        newErrs.addAll(model.errorMessages);
+                     if (parseErrors != null) {
+                        for (ParseError pe:parseErrors)
+                           newErrs.addAll(convertFromParseError(pe, srcEntry));
+                     }
+                  }
+                  else if (errorModels.get(srcEntry) != null) {
+                     if (newErrorModels == null)
+                        newErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>();
+                     newErrorModels.remove(srcEntry);
                   }
                }
-               else if (errorModels.get(srcEntry) != null) {
+
+               if (newErrs != null) {
                   if (newErrorModels == null)
                      newErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>();
-                  newErrorModels.remove(srcEntry);
+                  newErrorModels.put(srcEntry, newErrs);
                }
-            }
-
-            if (newErrs != null) {
-               if (newErrorModels == null)
-                  newErrorModels = new LinkedHashMap<SrcEntry,List<ModelError>>();
-               newErrorModels.put(srcEntry, newErrs);
+               mes.lastParseRes = parseRes;
             }
             mes.setStaleErrors(false);
-            mes.lastParseRes = parseRes;
          }
       }
       if (newErrorModels != null) {

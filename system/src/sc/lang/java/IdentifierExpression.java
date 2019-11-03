@@ -2571,7 +2571,7 @@ public class IdentifierExpression extends ArgumentsExpression {
       List<IString> idents = getAllIdentifiers();
       int sz = idents.size();
       String identifier = idents.get(i).toString();
-      return (sz == 1 && inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || isManualGetSet() || (isAssignment && i == sz-1);
+      return (inNamedPropertyMethod(identifier)) || isThisExpression() || isSuperExpression() || !getJavaModel().enableExtensions() || isManualGetSet() || (isAssignment && i == sz-1);
    }
 
    boolean isManualGetSet() {

@@ -6991,7 +6991,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          initInstance(overriddenAssign, currentObj, ctx, iit);
       }
       else {
-         getLayeredSystem().setStaleCompiledModel(true, "No current object of type: ", typeName, " to set property: " + overriddenAssign);
+         LayeredSystem sys = getLayeredSystem();
+         if (sys.options.verbose)
+            sys.verbose("No current object of type: ", typeName, " to set property: " + overriddenAssign);
       }
    }
 

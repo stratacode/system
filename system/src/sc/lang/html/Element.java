@@ -2649,7 +2649,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             if (repeatExpr != null) {
                boolean started = repeatExpr.isStarted();
                Object repeatType = repeatExpr.getGenericType();
-               repeatElementType = ModelUtil.getArrayOrListComponentType(getJavaModel(), repeatType);
+               repeatElementType = ModelUtil.getArrayOrListComponentType(repeatType);
                // if this was not started we need to stop it now so the whole type gets started properly
                if (!started)
                   ParseUtil.stopComponent(repeatExpr);
@@ -3645,10 +3645,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       String[] emptyArgs = {};
       addTagAttributes("element", null, new String[] {"id", "style", "class"}, null);
       addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
-      addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex"}, null);
-      addTagAttributes("option", "element", new String[] {"selected", "value", "disabled"}, null);
-      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete", "list"}, null);
-      addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size"}, null);
+      addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex", "tabindex"}, null);
+      addTagAttributes("option", "element", new String[] {"selected", "value", "disabled", "tabindex"}, null);
+      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete", "list", "tabindex"}, null);
+      addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size", "tabindex"}, null);
       addTagAttributes("button", "input", emptyArgs, null);
       addTagAttributes("span", "element", emptyArgs, null);
       addTagAttributes("div", "element", emptyArgs, null);
@@ -3666,9 +3666,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("td", "element", emptyArgs, null);
       addTagAttributes("th", "element", emptyArgs, null);
       addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit"}, new String[] {"action"});
-      addTagAttributes("a", "element", new String[] {"href", "disabled"}, new String[] {"href"});
+      addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex"}, new String[] {"href"});
       addTagAttributes("script", "element", new String[] {"type", "src"}, new String[] {"src"});
-      addTagAttributes("link", "element", new String[] {"rel", "type", "href"}, new String[] {"href"});
+      addTagAttributes("link", "element", new String[] {"rel", "type", "href", "tabindex"}, new String[] {"href"});
       addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt"}, new String[] {"src"});
       addTagAttributes("style", "element", new String[] {"type"}, null);
       addTagAttributes("pre", "element", emptyArgs, null);

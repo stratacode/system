@@ -18,6 +18,15 @@ public class MemoryEditSession implements sc.obj.IObjectId {
    // Most current parse of the text (only on the server and not sync'd)
    Object lastParseRes;
 
+   public void setModel(JavaModel m) {
+      this.model = m;
+      Bind.sendChangedEvent(this, "model");
+   }
+
+   public JavaModel getModel() {
+      return model;
+   }
+
    private String text;
    public void setText(String t) {
       if (text == null || !text.equals(t))
@@ -59,11 +68,7 @@ public class MemoryEditSession implements sc.obj.IObjectId {
    private boolean staleErrors; // Have we saved this since origText was set - not synchronized and only used on the server now
    public void setStaleErrors(boolean s) {
       if (s && !staleErrors && ctx != null) {
-         DynUtil.invokeLater(new Runnable() {
-            public void run() {
-               ctx.refreshMemorySessionErrors();
-            }
-         }, 0);
+         ctx.scheduleRefreshMemorySessionErrors();
       }
       staleErrors = s;
       Bind.sendChangedEvent(this, "staleErrors");
@@ -73,6 +78,6 @@ public class MemoryEditSession implements sc.obj.IObjectId {
    }
 
    public String getObjectId() {
-      return "EDS_" + (model == null ? "null" : sc.type.CTypeUtil.escapeIdentifierString(model.getLayer().getLayerName() + "__" + model.getSrcFile().relFileName));
+      return "MES_" + (model == null ? "null" : sc.type.CTypeUtil.escapeIdentifierString(model.getLayer().getLayerName() + "__" + model.getSrcFile().relFileName));
    }
 }
