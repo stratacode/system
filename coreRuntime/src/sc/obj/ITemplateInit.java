@@ -5,7 +5,7 @@
 package sc.obj;
 
 /**
- * Created by jvroom on 3/24/14.
+ * Interface for the parameter type supplied by an evaluated code-template
  */
 public interface ITemplateInit {
    public void initTemplate(Object param);
