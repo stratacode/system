@@ -13,8 +13,6 @@ import sc.util.LineCountStringBuilder;
  * This class is used as the base class for compiled JS type templates, i.e. the templates used to define the code-generation
  * for the Java to JS mapping for a type.  These templates can also be interpreted if it's not possible to
  * compile and load a class at runtime.
- *
- * Created by jvroom on 3/23/14.
  */
 @JSSettings(jsLibFiles="js/javasys.js")
 @CompilerSettings(outputMethodTemplate="sc.js.JSTemplateOutputMethod")
