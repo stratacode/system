@@ -2331,7 +2331,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             // Now convert it to the member itself.
             type = ModelUtil.definesMember(type, name, mtype, refType, ctx, skipIfaces, isTransformed, layeredSystem);
 
-            assert type != null;
+            if (type == null) { // This used to be an 'assert; but caused an error in the IDE so turned it into a type error
+               displayTypeError("Static imported type - no member with name: " + name);
+            }
          }
       }
       if (type != null) {
