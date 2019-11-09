@@ -437,15 +437,17 @@ public class SyncManager {
          if (state == SyncState.CopyingPrevious)
             return;
          if (state != SyncState.Disabled) {
-            if (state == SyncState.RecordingChanges) {
+            //if (state == SyncState.RecordingChanges) {
+            if (state == SyncState.RecordingChanges || (state == SyncState.ApplyingChanges && Bind.getNestedBindingCount() > 0)) {
                SyncLayer changedLayer = getChangedSyncLayer(syncGroup);
                // When we are in the initial sync, we are not recording these as changes - just putting them in the
                // initial layer.
                if (!initialSync)
-                  changedLayer.addNewObj(obj, instInfo);
+                  changedLayer.addNewObj(obj, instInfo, false);
             }
-            if (recordInitial || state != SyncState.Initializing)
-               initialSyncLayer.addNewObj(obj, instInfo);
+            if (recordInitial || state != SyncState.Initializing) {
+               initialSyncLayer.addNewObj(obj, instInfo, recordInitial && state == SyncState.ApplyingChanges);
+            }
          }
       }
 
@@ -606,7 +608,7 @@ public class SyncManager {
          if (useCtx == null)
             System.err.println("Unable to resolve sync context for scope: " + scopeName + " to register inst: " + objName);
          else {
-            useCtx.registerObjNameOnScope(inst, objName, fixedName, initInst, false);
+            useCtx.registerObjNameOnScope(inst, objName, fixedName, initInst, false, false);
             InstInfo ii = getInstInfo(inst);
             if (ii == null) {
                ii = getInheritedInstInfo(inst);
@@ -624,7 +626,7 @@ public class SyncManager {
          syncInsts.put(inst, ii);
       }
 
-      void registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued) {
+      InstInfo registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued, boolean registered) {
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
             ii = getInheritedInstInfo(inst);
@@ -651,7 +653,7 @@ public class SyncManager {
                if (verbose)
                   System.out.println("Re-registering " + ii.name + " as: " + objName);
             }
-            if (ii.onDemand && !ii.initialized && initInst) {
+            if (ii.onDemand && !ii.initialized && initInst) { // TODO: should the ii.onDemand part be removed here?
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
                   ii.setName(objName);
@@ -661,7 +663,7 @@ public class SyncManager {
          }
          ii.setName(objName);
          ii.fixedObject = fixedName; // when true the object name is not reset
-         ii.registered = nameQueued;
+         ii.registered = registered;
          ii.nameQueued = nameQueued;
 
          Object oldInst = objectIndex.put(objName, inst);
@@ -685,6 +687,7 @@ public class SyncManager {
             }
             catch (NumberFormatException exc) {}
          }
+         return ii;
       }
 
       public boolean registerSyncInst(Object inst) {
@@ -710,8 +713,9 @@ public class SyncManager {
             return false;
          }
          else {
-            initChildContexts(ii, inst, ii.args, ii.props);
-
+            if (ii.name != null && ii.initialized) {
+               initChildContexts(ii, inst, ii.args, ii.props);
+            }
             return true;
          }
       }
@@ -1277,9 +1281,10 @@ public class SyncManager {
                   }
                   if ((syncProps != null && syncProps.broadcast) || childCtx.scope.isCurrent()) {
                      if (childII == null) {
-                        childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
-                        childII.nameQueued = true;
-                        childII.initialized = true;
+                        //childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
+                        //childII.nameQueued = true;
+                        //childII.initialized = true;
+                        childII = childCtx.registerObjNameOnScope(inst, ii.name, ii.fixedObject, true, true, ii.registered);
                      }
                      if (initChildContexts == null) {
                         initChildContexts = new ArrayList<SyncContext>();
@@ -1331,6 +1336,14 @@ public class SyncManager {
                */
                   addNewObj(inst, syncProps.syncGroup, ii);
                ii.nameQueued = true;
+            }
+            else {
+               SyncState state = getSyncState();
+               if (state == SyncState.ApplyingChanges || state == SyncState.InitializingLocal) {
+                  if (initialSyncLayer != null) {
+                     initialSyncLayer.addNewObj(inst, ii, recordInitial && getSyncState() == SyncState.ApplyingChanges);
+                  }
+               }
             }
          }
          else {
@@ -1624,7 +1637,7 @@ public class SyncManager {
          return changeAdded;
       }
 
-      public SyncAction getSyncAction(String actionProp) {
+      public SyncAction getSyncAction() {
          SyncState state = getSyncState();
          switch (state) {
             case Initializing:
@@ -1649,7 +1662,7 @@ public class SyncManager {
 
 
       public void recordChange(Object syncObj, String syncProp, Object value, String syncGroup) {
-         SyncAction action = getSyncAction(syncProp);
+         SyncAction action = getSyncAction();
          switch (action) {
             case Previous:
                addPreviousValue(syncObj, syncProp, value, true, true);
@@ -2109,7 +2122,7 @@ public class SyncManager {
       /** Called when we receive a property changed either from the data binding event (originalCtx=true) or propagated from a parent context (originalCtx = false) */
       public boolean valueInvalidated(Object obj, String propName, Object curValue, String syncGroup) {
          updatePropertyValueListener(obj, propName, curValue, syncGroup);
-         SyncAction action = getSyncAction(propName);
+         SyncAction action = getSyncAction();
          return valueInvalidatedInternal(obj, propName, curValue, syncGroup, action);
       }
 
@@ -2144,6 +2157,7 @@ public class SyncManager {
                 addPreviousValue(obj, propName, curValue, true, true);
             // TODO: does this need to be done after we process the child contexts and update the previous value?
             else if (refreshProperty(obj, propName, curValue, syncGroup, "Applying remote change to shared context")) {
+                // TODO: do we need to process child contexts here anyway? For example, to potentially cancel a change that's redundant now because we reset the value back on the previous side
                 return true;
             }
          }
@@ -2197,10 +2211,10 @@ public class SyncManager {
                else
                   System.out.println(opName + ": no change: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(curValue));
             }
-            return true; // Still flagging this as a potential change since it may have changed from its most recent value.
+            return true; // Returns true for value has not changed from the previous value on the other side
          }
          addChangedValue(null, obj, propName, curValue, syncGroup, null);
-         return false;
+         return false; // value has changed
       }
 
       public void refreshSyncProperties(Object syncObj, String syncGroup) {
@@ -3023,7 +3037,7 @@ public class SyncManager {
          SyncContext ctx = syncMgr.getSyncContext(scopeId, true);
          if (ctx != null) {
             // Here we've already been given the scope for the syncInst so just put it into that one.
-            ctx.registerObjNameOnScope(inst, instName, fixedName, initInst, true);
+            ctx.registerObjNameOnScope(inst, instName, fixedName, initInst, true, true);
          }
       }
    }
@@ -3326,11 +3340,6 @@ public class SyncManager {
       ctx.commitNewObjNames(ctx);
 
       StringBuilder res = lastSer == null ? new StringBuilder() : lastSer.getOutput();
-
-      if (trace) {
-         if (res.length() > 0)
-            System.out.println("Initial sync for: " + ctx + ":\n" + (lastSer == null ? "" :lastSer.getDebugOutput()));
-      }
 
       if (outputLanguage == null || syncDestination.getSendLanguage().equals(outputLanguage))
          return res;

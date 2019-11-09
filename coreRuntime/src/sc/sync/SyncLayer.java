@@ -126,10 +126,11 @@ public class SyncLayer {
 
    public static class SyncNewObj extends SyncChange {
       SyncManager.InstInfo instInfo;
-      SyncNewObj(Object obj, SyncManager.InstInfo instInfo) {
+      SyncNewObj(Object obj, SyncManager.InstInfo instInfo, boolean remoteChange) {
          super(obj);
 
          this.instInfo = instInfo;
+         this.remoteChange = remoteChange;
       }
 
       public int hashCode() {
@@ -333,13 +334,13 @@ public class SyncLayer {
    }
 
    /** Records a 'new object' sync change, including the optional parameters passed to the new object. */
-   public void addNewObj(Object obj, SyncManager.InstInfo instInfo) {
-      SyncNewObj change = new SyncNewObj(obj, instInfo);
+   public void addNewObj(Object obj, SyncManager.InstInfo instInfo, boolean remoteChange) {
+      SyncNewObj change = new SyncNewObj(obj, instInfo, remoteChange);
       addSyncChange(change);
    }
 
    public static void addDepNewObj(List<SyncChange> depChanges, Object obj, SyncManager.InstInfo instInfo) {
-      depChanges.add(new SyncNewObj(obj, instInfo));
+      depChanges.add(new SyncNewObj(obj, instInfo, false));
    }
 
    public void addFetchProperty(Object obj, String prop) {
