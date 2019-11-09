@@ -5,7 +5,9 @@
 package sc.util;
 
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,6 +31,9 @@ public class PerfMon {
    public static int maxSamples = 1000;
 
    public static boolean enabled = false;
+
+   private static String pattern = " HH:mm:ss.SSS";
+   private static SimpleDateFormat simpleDateFormat = new SimpleDateFormat(pattern);
 
    // This involves going up and down the stack.  If an op is highly recursive, it can start impacting results so periodically need to turn this off and check overall performance.
    // If it changes a lot, this stat is skewing the results.
@@ -431,7 +436,15 @@ public class PerfMon {
       }
       if (elapsed > 1000) // TODO: remove this - diagnostics only
          System.err.println("*** bad value in getTimeDelta!");
+      if (elapsed < 10)
+         sb.append("00");
+      else if (elapsed < 100)
+         sb.append("0");
       sb.append(elapsed);
       return sb.toString();
+   }
+
+   public static String formatTime(long time) {
+      return simpleDateFormat.format(new Date(time));
    }
 }
