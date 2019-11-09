@@ -1159,4 +1159,13 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       }
       return null;
    }
+
+   public boolean displayTypeError(String...args) {
+      boolean res = super.displayTypeError(args);
+      if (fromAttribute != null) {
+         if (fromAttribute.displayTypeError(args))
+            res = true;
+      }
+      return res;
+   }
 }
