@@ -50,4 +50,5 @@ public @interface Bindable {
    // disabled? - to force an error
    /** Should this binding not send a change event when setX is called with the same value. */
    boolean sameValueCheck() default false;
+   // TODO: add lazy=true that does a 'refreshBinding(obj,prop)' in the getX call before returning the value.
 }
