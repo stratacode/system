@@ -167,12 +167,14 @@ public class RepositorySystem {
             }
          }
       }
-      else {
+      else if (current != null) {
          int ix = current.replacedPkgs == null ? -1 : current.replacedPkgs.indexOf(pkg);
          if (ix == -1) {
             System.err.println("*** Remove of repository package - not found");
          }
       }
+      else
+         System.err.println("*** No repository package to remove: " + pkg.packageName);
    }
 
    public RepositoryPackage registerAlternateName(RepositoryPackage pkg, String altName) {
