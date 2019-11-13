@@ -9264,6 +9264,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          flags = getSyncFlags();
       }
+      //else // If there's no Sync annotation defined for this type, we do want to inherit the default sync state for subclasses
+      //   includeSuper = true;
 
       LayeredSystem sys = getLayeredSystem();
       List<LayeredSystem> syncSystems = isLayerComponent() ? null : sys.getSyncSystems();
@@ -9292,8 +9294,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          // When dealing with the same system, we just process types that have @Sync explicitly set.  Otherwise, all types would overlap
+         Layer syncLayer = null;
          if (syncSys != sys) {
-            Layer syncLayer = syncSys.getLayerByDirName(getLayer().getLayerName());
+            syncLayer = syncSys.getLayerByDirName(getLayer().getLayerName());
             if (syncLayer != null)
                syncLayer.ensureStarted(true);
             syncType = syncMode == SyncMode.Automatic? (TypeDeclaration) syncSys.getSrcTypeDeclaration(typeName, null, true, false, true, syncLayer, false) : null;
@@ -9322,6 +9325,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
                String propName = ModelUtil.getPropertyName(prop);
                int propFlags = 0;
+               BodyTypeDeclaration propSyncType = null;
 
                // Not using inherited annotation here because we walk the type hierarchy here.
                Object propSyncAnnot = ModelUtil.getAnnotation(prop, "sc.obj.Sync");
@@ -9374,6 +9378,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      if (inheritSyncMode != null) {
                         propSyncMode = inheritSyncMode;
                         inheritedSync = true;
+                        if (inheritSyncMode == SyncMode.Automatic) {
+                           String parentTypeName = ModelUtil.getTypeName(parentType);
+                           propSyncType = syncSys == sys ? null : (TypeDeclaration) syncSys.getSrcTypeDeclaration(parentTypeName, null, true, false, true, syncLayer, false);
+                        }
                      }
                   }
                   else {
@@ -9392,18 +9400,26 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                boolean addSyncProp = false;
                switch (propSyncMode) {
                   case Automatic:
-                     if (syncType == null)
-                        continue;
-
-                     ModelUtil.ensureStarted(syncType, false);
-
-                     if (syncType.excluded) {
-                        continue;
+                     Object syncPropInit = null;
+                     if (propSyncType != null) {
+                        ModelUtil.ensureStarted(propSyncType, false);
+                        if (propSyncType.excluded)
+                           continue;
+                        syncPropInit = propSyncType.definesMember(propName, MemberType.SyncSet, null, null, false, false);
                      }
+                     else if (syncType != null) {
+                        ModelUtil.ensureStarted(syncType, false);
+
+                        if (syncType.excluded) {
+                           continue;
+                        }
+                        syncPropInit = syncType.definesMember(propName, MemberType.SyncSet, null, null, false, false);
+                     }
+                     else
+                        continue;
                      // See if the other type defines the property - if so, we're in default mode so we sync on it.
                      // TODO: check the Sync annotation on the remote side?  Or maybe that annotation should only
                      // control how it syncs against us, not the other way around.
-                     Object syncPropInit = syncType.definesMember(propName, MemberType.SyncSet, null, null, false, false);
                      if (syncPropInit != null) {
                         // If the remote side has a bound value, then assume it is computed and not synchronized from this side by default.
                         String syncOpStr = syncPropInit instanceof IVariableInitializer ? ((IVariableInitializer) syncPropInit).getOperatorStr() : null;
