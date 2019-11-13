@@ -799,9 +799,9 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return res;
    }
 
-   private boolean resultListContainsMethod(ArrayList<Object> res, Object overMeth) {
+   private boolean resultListContainsMethod(LayeredSystem sys, ArrayList<Object> res, Object overMeth) {
       for (int i = 0; i < res.size(); i++) {
-         if (ModelUtil.sameMethods(res.get(i), overMeth))
+         if (ModelUtil.sameMethodInLayer(sys, res.get(i), overMeth))
             return true;
       }
       return false;
@@ -810,7 +810,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    private void addOverridingMethods(LayeredSystem sys, BodyTypeDeclaration enclType, ArrayList<Object> res, List<? extends Object> ptypes, HashSet<Object> visited) {
       if (name == null)
          return;
-      ArrayList<BodyTypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, false);
+      ArrayList<BodyTypeDeclaration> modTypes = sys.getModifiedTypesOfType(enclType, false, true);
       if (modTypes != null) {
          for (BodyTypeDeclaration modType:modTypes) {
             if (visited.contains(modType))
@@ -818,7 +818,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             visited.add(modType);
             Object overMeth = ModelUtil.definesMethod(modType, name, getParameterList(), null, null, false, false, null, null, getLayeredSystem());
             // Instead of overMeth != this it should be sameMethodsInLayers - i.e. where we compare the method's enclosing type's type-name and layer since we know the parameters and name match
-            if (overMeth != null && !resultListContainsMethod(res, overMeth) && overMeth != this && !ModelUtil.sameMethodInLayer(sys, overMeth, this))
+            if (overMeth != null && !resultListContainsMethod(sys, res, overMeth) && overMeth != this && !ModelUtil.sameMethodInLayer(sys, overMeth, this))
                res.add(overMeth);
          }
       }
@@ -836,7 +836,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
          // In this case, we need to consider all overriding methods - including those in modified types
          Object result = subType.declaresMethod(name, ptypes, null, enclType, false, false, null, null, false);
-         if (result instanceof MethodDefinition && !resultListContainsMethod(res, result)) {
+         if (result instanceof MethodDefinition && !resultListContainsMethod(sys, res, result)) {
             res.add(result);
          }
          BodyTypeDeclaration modType = subType.getModifiedType();
@@ -845,7 +845,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
             if (modType == null || ModelUtil.sameTypes(modType, enclType) && modType.layer.getLayerName().equals(subType.layer.getLayerName()))
                break;
             result = modType.declaresMethod(name, ptypes, null, enclType, false, false, null, null, false);
-            if (result instanceof MethodDefinition && !resultListContainsMethod(res, result))
+            if (result instanceof MethodDefinition && !resultListContainsMethod(sys, res, result))
                res.add(result);
             modType = modType.getModifiedType();
          } while (true);
