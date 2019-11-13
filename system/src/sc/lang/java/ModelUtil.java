@@ -1143,7 +1143,7 @@ public class ModelUtil {
     * Will consider two methods in
     * different runtimes but the same layer the same method.
     */
-   public static boolean sameMethodInLayer(LayeredSystem sys, Object m1, MethodDefinition m2) {
+   public static boolean sameMethodInLayer(LayeredSystem sys, Object m1, Object m2) {
       if (ModelUtil.sameMethods(m1, m2)) {
          Object enc1 = ModelUtil.getEnclosingType(m1);
          Object enc2 = ModelUtil.getEnclosingType(m2);
