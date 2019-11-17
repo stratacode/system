@@ -2287,8 +2287,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (layers.contains(rootLayer))
          return root;
-      //if (layer.transparentToLayer(rootLayer, mergeLayerCt))
-      //   return root;
 
       for (BodyTypeDeclaration next = root.getModifiedType(); next != null; next = next.getModifiedType()) {
          if (layers.contains(next.getLayer()))
