@@ -3003,14 +3003,27 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                   String subPath = fullTypeName.replace(".", FileUtil.FILE_SEPARATOR);
                   SrcEntry srcEnt = getSrcFileFromTypeName(fullTypeName, true, depProc.getPrependLayerPackage(), subPath, false);
                   if (srcEnt != null) {
-                     // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
-                     TypeIndexEntry dummyIndex = new TypeIndexEntry();
-                     dummyIndex.typeName = fullTypeName;
-                     dummyIndex.layerName = getLayerName();
-                     dummyIndex.processIdent = layeredSystem.getProcessIdent();
-                     dummyIndex.fileName = srcEnt.absFileName;
-                     dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
-                     updateTypeIndex(dummyIndex, typeIndexFileLastModified);
+                     if (srcEnt.isLayerFile()) {
+                        // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
+                        TypeIndexEntry layerIndex = new TypeIndexEntry();
+                        layerIndex.typeName = fullTypeName;
+                        layerIndex.layerName = getLayerName();
+                        layerIndex.processIdent = layeredSystem.getProcessIdent();
+                        layerIndex.fileName = srcEnt.absFileName;
+                        layerIndex.declType = DeclarationType.OBJECT; // Is it always a template?
+                        layerIndex.isLayerType = true;
+                        updateTypeIndex(layerIndex, typeIndexFileLastModified);
+                     }
+                     else {
+                        // This happens for Template's which do not transform into a type - e.g. sctd files.  It's important that we record something for this source file so we don't re-parse the layer etc. next time.
+                        TypeIndexEntry dummyIndex = new TypeIndexEntry();
+                        dummyIndex.typeName = fullTypeName;
+                        dummyIndex.layerName = getLayerName();
+                        dummyIndex.processIdent = layeredSystem.getProcessIdent();
+                        dummyIndex.fileName = srcEnt.absFileName;
+                        dummyIndex.declType = DeclarationType.TEMPLATE; // Is it always a template?
+                        updateTypeIndex(dummyIndex, typeIndexFileLastModified);
+                     }
                   } else {
                      System.err.println("*** No type or src file found for index entry for source file: " + srcFile);
                   }
