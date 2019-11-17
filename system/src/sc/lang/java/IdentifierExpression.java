@@ -1507,6 +1507,11 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (currentType instanceof ITypeDeclaration) {
          ITypeDeclaration currentTypeDecl = (ITypeDeclaration) currentType;
 
+         // TODO: the IDE has been having problems where currentTypeDecl has not been started here, but we can't start this type here because
+         // we might already be in a start of a type in this tree.  I think the real bug here is that we are getting interrupted during the
+         // start sequence and don't properly re-start extended types or something like that.  Maybe we could do an initTypeInfo here?
+         //ModelUtil.ensureStarted(currentTypeDecl, false);
+
          if (isMethod) {
             Object methVar = currentTypeDecl.definesMethod(nextName, arguments, null, enclosingType, enclosingType != null && enclosingType.isTransformedType(), isStatic, inferredType, methodTypeArgs);
             if (methVar != null) {
@@ -1756,8 +1761,11 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (meth != null) {
          LayeredSystem sys = expr.getLayeredSystem();
          ITypeDeclaration enclType = expr.getEnclosingIType();
-         if (enclType != null && sys != null && !enclType.isLayerType() && !enclType.isLayerComponent())
+         if (enclType != null && sys != null && !enclType.isLayerType() && !enclType.isLayerComponent()) {
             remote = ModelUtil.execForRuntime(sys, enclType.getLayer(), meth, sys) == RuntimeStatus.Disabled;
+         }
+         if (!remote && ModelUtil.isRemoteMethod(sys, meth))
+            remote = true;
       }
       return remote ? IdentifierType.RemoteMethodInvocation : IdentifierType.MethodInvocation;
    }
@@ -4953,6 +4961,9 @@ public class IdentifierExpression extends ArgumentsExpression {
                case ThisExpression:
                case SuperExpression:
                   styleName = "keyword";
+                  break;
+               case RemoteMethodInvocation:
+                  styleName = "remoteMethod";
                   break;
                default:
                   break;
