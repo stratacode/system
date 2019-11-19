@@ -31,7 +31,10 @@ public abstract class ScopeContext {
 
    ArrayList<IScopeChangeListener> changeListeners;
 
+   /** Adds a value to the scope context that will be disposed when the scope is destroyed */
    public abstract void setValue(String name, Object value);
+
+   public abstract void setValueByRef(String name, Object value);
 
    public abstract Object getValue(String name);
 

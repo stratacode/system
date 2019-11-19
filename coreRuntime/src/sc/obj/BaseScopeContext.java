@@ -13,15 +13,20 @@ import java.util.Map;
 @sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public abstract class BaseScopeContext extends ScopeContext {
    LinkedHashMap<String, Object> valueTable;
+   LinkedHashMap<String, Object> refTable;
 
-   @Override
    public void setValue(String name, Object value) {
       if (valueTable == null)
          valueTable = new LinkedHashMap<String,Object>();
       valueTable.put(name, value);
    }
 
-   @Override
+   public void setValueByRef(String name, Object value) {
+      if (refTable == null)
+         refTable = new LinkedHashMap<String,Object>();
+      refTable.put(name, value);
+   }
+
    public Object getValue(String name) {
       if (valueTable == null)
          return null;
@@ -50,6 +55,7 @@ public abstract class BaseScopeContext extends ScopeContext {
          }
          valueTable = null;
       }
+      refTable = null;
       // Destroy the sync context after we dispose of any items directly in the attributes list so they are not disposed of twice.
       super.scopeDestroyed(fromParent);
    }
