@@ -632,6 +632,19 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          if (templateProcessor != null)
             resultSuffix = templateProcessor.getResultSuffix();
       }
+      catch (RuntimeException exc) {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys == null || sys.externalModelIndex == null || !(sys.externalModelIndex.isCancelledException(exc))) {
+            System.err.println("*** Error initializing template: " + getSrcFile() + ":" + exc);
+            exc.printStackTrace();
+         }
+         else {
+            System.err.println("*** Cancelled while initializing template: " + getSrcFile());
+         }
+
+         clearInitialized();
+         throw exc;
+      }
       finally {
          beingInitialized = false;
          PerfMon.end("initTemplate");

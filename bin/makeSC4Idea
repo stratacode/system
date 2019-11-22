@@ -8,17 +8,72 @@
 
 set -e
 
-if [ "$#" -eq 0 ]; then
-   BUILDDIR=/jjv/sc4ideaBuild
-else
-   BUILDDIR="$1"
-fi
+BUILDS_DIR=/usr/local/sc4idea/builds
+BUILD_NUM_FILE=~/.stratacode/buildNum.properties 
 
-echo "Building sc4idea into: $BUILDDIR"
+SC_DIR=`dirname $BASH_SOURCE[0]`
+SC_DIR=`dirname $SC_DIR`
+
+RES_FILE=sc4idea.zip
+
+BP_FILE=${SC_DIR}/buildTag/build.properties
+CUR_TAG=`grep tag $BP_FILE | sed 's/tag=//'`
+CUR_VERSION=`grep version $BP_FILE | sed 's/version=//'`
+CUR_BUILDNUM=`grep sc4idea= $BUILD_NUM_FILE | sed 's/sc4idea=//'`
+
+if [ "$CUR_BUILDNUM" = "" ] ; then
+   read -p "Missing current build number from file: $BUILD_NUM_FILE - enter start build number: [1]:" CUR_BUILDNUM
+   if [ "$CUR_BUILDNUM" == "" ] ; then
+      CUR_BUILDNUM=1
+   fi
+   mkdir -p `dirname $BUILD_NUM_FILE`
+   touch $BUILD_NUM_FILE 
+   cat >> $BUILD_NUM_FILE <<endbf 
+sc4idea=$CUR_BUILDNUM
+endbf
+fi   
+
+USAGE_MSG="makeSCC [--release] [buildsDir - default is $BUILDS_DIR]"
+SCC_ARGS=""
+
+BUILDS_DIR_SET=0
+
+while [[ $# -gt 0 ]]
+do
+   case $1 in
+       --release)
+       SCC_ARGS="-Pbuild.tag=release"
+       CUR_TAG=release
+       shift 
+       ;;
+       *)
+       if [ "$BUILDS_DIR_SET" = "1" ] ; then
+          echo "Extra argument: $USAGE_MSG" 
+          exit 1
+       fi
+       BUILDS_DIR=$1
+       BUILDS_DIR_SET=1
+       shift
+       ;;
+   esac
+done
+
+RES_DIR=$BUILDS_DIR/$CUR_TAG/$CUR_VERSION/$CUR_BUILDNUM
+LATEST_VERSION=$BUILDS_DIR/$CUR_TAG/$CUR_VERSION/latest
+LATEST_TAG=$BUILDS_DIR/$CUR_TAG/latest
+BUILD_DIR=$RES_DIR/build
+mkdir -p $RES_DIR
+mkdir -p $BUILD_DIR
+
+echo "Building sc4idea into: $BUILD_DIR"
 
 
 # For a clean build you should run this from the source directly, or first build StrataCode, then use it to build itself.
-mkdir -p $BUILDDIR
-scc -c -cc -a sc4idea -da $BUILDDIR
+mkdir -p $BUILD_DIR
+scc -c -cc $SCC_ARGS -a sc4idea -da $BUILD_DIR
 
-echo "Result is in: $BUILDDIR"
+rm -f $LATEST_VERSION $LATEST_TAG
+ln -s $RES_DIR $LATEST_VERSION
+ln -s $RES_DIR $LATEST_TAG
+
+echo "Result file is: $BUILD_DIR/$RES_FILE - or $LATEST_TAG or $LATEST_VERSION"

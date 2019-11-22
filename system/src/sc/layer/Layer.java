@@ -4840,6 +4840,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    HashMap<String,Properties> propertiesCache;
 
    /**
+    * Called with propertiesFile="build" to return propName in the layer path build.properties.
     * Returns the layer property of any layer under this one in the stack.  Note that this searches all layers, not just base layers because
     * we only use it now for 'build properties' that need to do a merge of everything.   In some cases, we only use baseLayers because of the
     * desire for 'static typing' and support of resolution in the IDE where there is no build layer.

@@ -1089,14 +1089,15 @@ public class LayerUtil implements LayerConstants {
       else {
          try {
             buildNumber = Integer.parseInt(oldBn);
-            buildNumber++;
          }
          catch (NumberFormatException exc) {
             System.err.println("*** Failed to parse buildNumber: " + oldBn + " as integer in file: " + buildNumberPropsFile + ": " + exc + " resetting buildNumber to 1");
             buildNumber = 1;
          }
       }
-      bnProps.setProperty(appName, String.valueOf(buildNumber));
+      // Store the next build number - this is used by makeSCC as well to determine the buildDir (although maybe we should move that logic into the system?)
+      int nextBuildNumber = buildNumber + 1;
+      bnProps.setProperty(appName, String.valueOf(nextBuildNumber));
 
       FileWriter writer = null;
       try {

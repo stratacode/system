@@ -135,6 +135,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Element replaceWith;
 
+   private transient boolean stopped = false;
+
    // TODO: we probably should support wrap or probably bodyOnly for normal tags - i.e. when it's set to false, we render just the body, without the start/end tag.
    /**
     * For repeat tags, with wrap=true, the body repeats without a wrapper tag.  Instead a wrapper tag based using this element's tag name wraps all of the repeated content without
@@ -3388,6 +3390,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
          */
       }
+      catch (RuntimeException exc) {
+         tagObject = null;
+         LayeredSystem sys = getLayeredSystem();
+         if (sys == null || sys.externalModelIndex == null || !(sys.externalModelIndex.isCancelledException(exc))) {
+            System.err.println("*** Error initializing tag object: " + tagName + " " + getId() + ":" + exc);
+            exc.printStackTrace();
+         }
+         else {
+            System.err.println("*** Cancelled while initializing tag object: " + tagName + " " + getId());
+         }
+         throw exc;
+      }
       finally {
          convertingToObject = false;
       }
@@ -5201,6 +5215,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       needsSuper = false;
       needsBody = false;
       convertingToObject = false;
+      stopped = true;
    }
 
    public TypeDeclaration getElementTypeDeclaration() {
@@ -5357,10 +5372,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         // here to avoid walking up the tree to determine if an element is a server tag or not.
                         this.serverTag = true;
 
-                        // Even though this tag is already part of some ScopeContext, here we are registering it with it's tagId in the document.
+                        // Even though this tag is already part of some ScopeContext, here we are adding it here by reference with it's tagId in the document.
                         // It seems to make sense to use the DOM id over the wire for readability and they are shorter although some of these ids
-                        // are just the tag-name _ <ix>.
-                        scopeCtx.setValue(tagId, this);
+                        // are just the tag-name _ <ix>. By ref means it won't be disposed when this context is destroyed.
+                        scopeCtx.setValueByRef(tagId, this);
                         // Register this with the sync system so we can apply changes made on the client and detect changes
                         // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
                         // and those should be unique cause they are already a global name space used by this page.

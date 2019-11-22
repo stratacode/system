@@ -25,12 +25,13 @@ CUR_BUILDNUM=`grep scc= $BUILD_NUM_FILE | sed 's/scc=//'`
 if [ "$CUR_BUILDNUM" = "" ] ; then
    read -p "Missing current build number from file: $BUILD_NUM_FILE - enter starting build number: [1]:" CUR_BUILDNUM
    mkdir -p `dirname $BUILD_NUM_FILE`
-   cat > $BUILD_NUM_FILE <<endbf 
-buildNum=$CUR_BUILDNUM
+   touch $BUILD_NUM_FILE
+   cat >> $BUILD_NUM_FILE <<endbf 
+scc=$CUR_BUILDNUM
 endbf
 fi   
 
-USAGE_MSG="makeSC [--release] [buildsDir - default is $BUILDS_DIR]"
+USAGE_MSG="makeSCC [--release] [buildsDir - default is $BUILDS_DIR]"
 SCC_ARGS=""
 
 BUILDS_DIR_SET=0
@@ -40,6 +41,7 @@ do
    case $1 in
        --release)
        SCC_ARGS="-Pbuild.tag=release"
+       CUR_TAG=release
        shift 
        ;;
        *)
@@ -55,6 +57,8 @@ do
 done
 
 RES_DIR=$BUILDS_DIR/$CUR_TAG/$CUR_VERSION/$CUR_BUILDNUM
+LATEST_VERSION=$BUILDS_DIR/$CUR_TAG/$CUR_VERSION/latest
+LATEST_TAG=$BUILDS_DIR/$CUR_TAG/latest
 BUILD_DIR=$RES_DIR/build
 mkdir -p $RES_DIR
 mkdir -p $BUILD_DIR
@@ -80,4 +84,7 @@ if [ "$RES_DIR" != "$STAGEDIR" ]; then
    mv $RES_FILE $RES_DIR/
 fi
 
-echo "Result file is: $RES_DIR/$RES_FILE"
+rm -f $LATEST_VERSION $LATEST_TAG
+ln -s $RES_DIR $LATEST_VERSION
+ln -s $RES_DIR $LATEST_TAG
+echo "Result file is: $RES_DIR/$RES_FILE - or $LATEST_TAG or $LATEST_VERSION"
