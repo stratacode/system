@@ -2056,7 +2056,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public ParseRange getNodeErrorRange() {
-      if (parseNode != null) {
+      if (parseNode != null && typeName != null) {
          int startIx = parseNode.indexOf(typeName);
          if (startIx != -1) {
             startIx = startIx + parseNode.getStartIndex();

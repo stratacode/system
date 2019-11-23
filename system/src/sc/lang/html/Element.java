@@ -117,7 +117,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public transient boolean refreshTagsScheduled = false;
 
    public transient String startTagCache, bodyCache;
-   public transient CacheMode cache;
+   private transient CacheMode cache;
 
    private transient boolean needsSuper = false;
    private transient boolean needsBody = true;
@@ -5623,5 +5623,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    @Bindable(manual=true) public void setChangedCount(int _changedCount) {
       changedCount = _changedCount;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _changedCountProp, _changedCount);
+   }
+
+   public void setCache(CacheMode m) {
+      cache = m;
+   }
+
+   public CacheMode getCache() {
+      return cache;
    }
 }

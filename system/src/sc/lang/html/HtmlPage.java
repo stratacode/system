@@ -25,7 +25,7 @@ import java.util.LinkedHashMap;
 // and have it just set tagName to 'html'?
 @Sync(syncMode= SyncMode.Default) // Turn back on sync mode for user defined page types so that any fields they defined will be synchronized by default. - TODO call this SyncMode.Unset?
 @CompilerSettings(liveDynamicTypes=true) // An important component - nice to track instances for the command line editor
-public class HtmlPage extends Html {
+public class HtmlPage extends Html implements IPage {
    private final static sc.type.IBeanMapper _pageVisitProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HtmlPage.class, "pageVisitCount");
 
    protected boolean isPageElement() {
@@ -40,6 +40,26 @@ public class HtmlPage extends Html {
 
    @sc.obj.EditorSettings(visible=false)
    public IPageDispatcher pageDispatcher;
+
+   public void setPageDispatcher(IPageDispatcher pd) {
+      pageDispatcher = pd;
+   }
+   public IPageDispatcher getPageDispatcher() {
+      return pageDispatcher;
+   }
+
+   public boolean getCacheEnabled() {
+      CacheMode cacheMode = getCache();
+      return cacheMode == CacheMode.Enabled || cacheMode == CacheMode.Unset || cacheMode == null;
+   }
+
+   public boolean getPageCached() {
+      return bodyCache != null && getCacheEnabled();
+   }
+
+   public void setCacheEnabled(boolean cacheEnabled) {
+      setCache(CacheMode.Enabled);
+   }
 
    private QueryParamProperty[] queryParamProperties;
 

@@ -188,6 +188,7 @@ public class Options {
    @Constant public String layerPath = null;
    @Constant public boolean needsClassLoaderReset;
 
+   // TODO: remove me?
    /** For schtml pages, should they use caching by default for runtimes that support it? */
    @Constant public boolean defaultPageCache = true;
 
@@ -432,10 +433,6 @@ public class Options {
                      startInterpreter = false;
                   else if (opt.equals("ndbg")) {
                      debug = false;
-                     break;
-                  }
-                  else if (opt.equals("npc")) {
-                     defaultPageCache = false;
                      break;
                   }
                   else
