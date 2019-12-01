@@ -1148,7 +1148,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          ArrayList<Attr> attList = getInheritedAttributes();
          if (attList != null) {
             for (Attr att:attList) {
-               if (isHtmlAttribute(att.name)) { // Do we need to draw thie attribute
+               if (isHtmlAttribute(att.name)) { // Do we need to draw the attribute
                   Expression outputExpr = att.getOutputExpr();
                   boolean isConstant = outputExpr == null || outputExpr instanceof StringLiteral;
                   if (!inactive && (!staticContentOnly || isConstant)) {
@@ -1371,6 +1371,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                               else
                                  strExprs.add(outputExprCopy);
                            }
+                        }
+                        else { // Just the attribute with no value - e.g. download by itself
+                           str.append(" ");
+                           str.append(att.name);
                         }
                      }
                      else if (att.value instanceof Expression) // this expression has been disabled due to being out of scope
@@ -3680,7 +3684,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("td", "element", emptyArgs, null);
       addTagAttributes("th", "element", emptyArgs, null);
       addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit"}, new String[] {"action"});
-      addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex"}, new String[] {"href"});
+      addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex", "download"}, new String[] {"href"});
       addTagAttributes("script", "element", new String[] {"type", "src"}, new String[] {"src"});
       addTagAttributes("link", "element", new String[] {"rel", "type", "href", "tabindex"}, new String[] {"href"});
       addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt"}, new String[] {"src"});
