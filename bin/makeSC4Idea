@@ -76,4 +76,10 @@ rm -f $LATEST_VERSION $LATEST_TAG
 ln -s $RES_DIR $LATEST_VERSION
 ln -s $RES_DIR $LATEST_TAG
 
-echo "Result file is: $BUILD_DIR/$RES_FILE - or $LATEST_TAG or $LATEST_VERSION"
+VERS_FILE=$RES_DIR/build/${RES_FILE%.*}.version
+
+echo "Result file is: $BUILD_DIR/$RES_FILE"
+echo "$LATEST_TAG" 
+#echo "$LATEST_VERSION"
+#echo "version: $VERS_FILE"
+cat $VERS_FILE

@@ -1,4 +1,5 @@
 system extends fullRuntime, buildTag {
+   buildTagProduct = "scc";
    // StrataCode itself can only be compiled since the type names needed for the dynamic mode are the same ones used by the system
    compiledOnly = true;
 

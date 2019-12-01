@@ -2,12 +2,18 @@
 
 # Run with an argument to specify the target build dir.  If no argument is supplied a default is chosen in /tmp
 
-# Builds StrataCode using StrataCode. This is the preferred way to build a distribution for tagging and packaging but it's
-# easy to build StrataCode from Java as well to bootstrap the process since there's no StrataCode used in building StrataCode.
+# Builds scc using scc. This is the preferred way to build a distribution for tagging and packaging but it's
+# easy to build scc from Java as well to build a separate version 
+
+# Warning: this can fail when a contract has changed that prevents the old version of scc from building the new one.
+# In this case, see the --orig option to point to a directory built using Java from IntelliJ or gradle for those cases where a contract
+# changes that prevents scc from building a new version of itself.
 
 set -e
 
 STAGEDIR=/tmp/
+ORIG_DIR=/jjv/vbuild
+SCC_CMD=scc
 
 BUILDS_DIR=/usr/local/scc/builds
 BUILD_NUM_FILE=~/.stratacode/buildNum.properties 
@@ -15,7 +21,7 @@ BUILD_NUM_FILE=~/.stratacode/buildNum.properties
 SC_DIR=`dirname $BASH_SOURCE[0]`
 SC_DIR=`dirname $SC_DIR`
 
-RES_FILE=StrataCode.zip
+RES_FILE=scc.zip
 
 BP_FILE=${SC_DIR}/buildTag/build.properties
 CUR_TAG=`grep tag $BP_FILE | sed 's/tag=//'`
@@ -44,6 +50,10 @@ do
        CUR_TAG=release
        shift 
        ;;
+       --orig)
+       SCC_CMD=$ORIG_DIR/bin/scc
+       shift 
+       ;;
        *)
        if [ "$BUILDS_DIR_SET" = "1" ] ; then
           echo "Extra argument: $USAGE_MSG" 
@@ -63,22 +73,22 @@ BUILD_DIR=$RES_DIR/build
 mkdir -p $RES_DIR
 mkdir -p $BUILD_DIR
 
-echo "Building StrataCode into: $BUILD_DIR - results in $RES_DIR/$RES_FILE (stagedir: $STAGEDIR)"
-# For a clean build you should run this from the source directly, or first build StrataCode, then use it to build itself.
-scc -c -a coreRuntime -da $BUILD_DIR
-scc -c -a $SCC_ARGS system -da $BUILD_DIR
+echo "Building scc into: $BUILD_DIR - results in $RES_DIR/$RES_FILE (stagedir: $STAGEDIR)"
+# For a clean build you should run this from the source directly, or first build scc, then use it to build itself.
+$SCC_CMD -c -a coreRuntime -da $BUILD_DIR
+$SCC_CMD -c -a $SCC_ARGS system -da $BUILD_DIR
 
-# Now we package up the STAGEDIR/StrataCode directory.  
-rm -rf $STAGEDIR/StrataCode
+# Now we package up the STAGEDIR/scc directory.  
+rm -rf $STAGEDIR/scc
 
 # old - top level build dir
-echo "cp -rf $BUILD_DIR $STAGEDIR/StrataCode"
-cp -prf $BUILD_DIR $STAGEDIR/StrataCode
+echo "cp -rf $BUILD_DIR $STAGEDIR/scc"
+cp -prf $BUILD_DIR $STAGEDIR/scc
 
 echo "From stagedir: $STAGEDIR"
 cd $STAGEDIR
-echo "zip $RES_FILE StrataCode/bin/* StrataCode/README.md StrataCode/layers/* StrataCode/bundles/* StrataCode/conf/*"
-zip $RES_FILE StrataCode/bin/* StrataCode/README.md StrataCode/layers/* StrataCode/bundles/* StrataCode/conf/*
+echo "zip $RES_FILE scc/bin/* scc/README.md scc/layers/* scc/bundles/* scc/conf/*"
+zip $RES_FILE scc/bin/* scc/README.md scc/layers/* scc/bundles/* scc/conf/*
 
 if [ "$RES_DIR" != "$STAGEDIR" ]; then
    mv $RES_FILE $RES_DIR/
@@ -87,4 +97,12 @@ fi
 rm -f $LATEST_VERSION $LATEST_TAG
 ln -s $RES_DIR $LATEST_VERSION
 ln -s $RES_DIR $LATEST_TAG
-echo "Result file is: $RES_DIR/$RES_FILE - or $LATEST_TAG or $LATEST_VERSION"
+
+VERS_FILE=$RES_DIR/build/${RES_FILE%.*}.version
+
+echo "Result file is: $RES_DIR/$RES_FILE" 
+echo "$LATEST_TAG" 
+#echo "$LATEST_VERSION" 
+#echo "version: $VERS_FILE"
+cat $VERS_FILE
+

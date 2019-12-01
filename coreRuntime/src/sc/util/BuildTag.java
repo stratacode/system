@@ -34,8 +34,11 @@ public class BuildTag {
    public String osVersion; // os.name+os.arch.+.os.version
    public String layerNames; // list of build layers
    //public List<LayerDepTag> layerDepTags; // the library and version of all dependencies added by each layer
-
    public String getBuildTag() {
+      return getBuildTagString(version, tag, revision, buildNumber, timeStamp, scmVersion);
+   }
+
+   public static String getBuildTagString(String version, String tag, String revision, String buildNumber, String timeStamp, String scmVersion) {
       StringBuilder sb = new StringBuilder();
       if (version != null) {
          sb.append("v");

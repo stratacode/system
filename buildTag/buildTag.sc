@@ -1,10 +1,34 @@
 package sc.buildTag;
 
-/** This is a buildTag layer used for StrataCode.  The code here is interpreted, not compiled as it's the layer definition  */
+/** 
+ * This is the layer definition file for the buildTag layer. It generates the SccBuildTag class with the version information and a 'scc.version' file placed in the buildDir. 
+ * <p/>
+ * More about layer definition files in general: The code here is interpreted when the layered system is initialized - at the beginning of a build, or when initializing the
+ * dynamic runtime. 
+*/
 public buildTag {
-   String scmVersion;
+   exportPackage = false;
 
-   void init() {
+   // Need this for build.properties
+   object configFileProcessor extends LayerFileProcessor {
+      prependLayerPackage = true;
+      useSrcDir = true;
+      extensions = {"properties"};
+   }
+
+   String buildTagProduct = "scc";
+   String scmVersion;
+   String buildVersion;
+   String buildTagName;
+   String buildRevision;
+   String buildNumber;
+   String buildTime;
+
+   // In validate because we need the Layer.start method to run to look up layer properties
+   void validate() {
+      if (buildTagProduct == null) {
+         System.err.println("*** Must set buildTagProduct to the name of the product when extending the buildTag layer");
+      }
       String branch = FileUtil.execCmd("git symbolic-ref --short HEAD"); // Current branch name only
       if (branch != null) {
          branch = branch.trim();
@@ -48,5 +72,16 @@ public buildTag {
       else {
          scmVersion = "not built from git dir";
       }
+      buildVersion = getLayerProperty("build","version"); 
+      if (buildVersion == null)
+         buildVersion = "<build.version>";
+      buildTagName = getLayerProperty("build","tag");
+      buildRevision = getLayerProperty("build","revision");
+      buildNumber = LayerUtil.incrBuildNumber(buildTagProduct);
+      buildTime = new java.util.Date().toString();
+   }
+
+   void process() {
+      FileUtil.saveStringAsReadOnlyFile(FileUtil.concat(layeredSystem.buildDir, buildTagProduct + ".version"), sc.util.BuildTag.getBuildTagString(buildVersion, buildTagName, buildRevision, buildNumber, buildTime, scmVersion) + "\n", false);
    }
 }
