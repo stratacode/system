@@ -7531,6 +7531,14 @@ public class ModelUtil {
       return null;
    }
 
+   public static Object getPropertyAnnotationValue(Object type, String annotationName, String valueName) {
+      Object annot = getPropertyAnnotation(type, annotationName);
+      if (annot != null) {
+         return getAnnotationValue(annot, valueName);
+      }
+      return null;
+   }
+
    /** Returns any scope name set on this type or field.  Note that scopes can only be set on source descriptions.  If you need scope info for other than code generation, i.e. at runtime, you set the annotationName for the scope process and then check for the annotation at runtime. */
    public static String getScopeName(Object def) {
       if (def instanceof Definition) {

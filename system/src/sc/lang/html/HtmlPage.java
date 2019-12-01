@@ -41,24 +41,28 @@ public class HtmlPage extends Html implements IPage {
    @sc.obj.EditorSettings(visible=false)
    public IPageDispatcher pageDispatcher;
 
+   @sc.obj.EditorSettings(visible=false)
    public void setPageDispatcher(IPageDispatcher pd) {
       pageDispatcher = pd;
    }
+   @sc.obj.EditorSettings(visible=false)
    public IPageDispatcher getPageDispatcher() {
       return pageDispatcher;
    }
 
+   @sc.obj.EditorSettings(visible=false)
    public boolean getCacheEnabled() {
       CacheMode cacheMode = getCache();
       return cacheMode == CacheMode.Enabled || cacheMode == CacheMode.Unset || cacheMode == null;
    }
 
-   public boolean getPageCached() {
-      return bodyCache != null && getCacheEnabled();
-   }
-
    public void setCacheEnabled(boolean cacheEnabled) {
       setCache(CacheMode.Enabled);
+   }
+
+   @sc.obj.EditorSettings(visible=false)
+   public boolean getPageCached() {
+      return bodyCache != null && getCacheEnabled();
    }
 
    private QueryParamProperty[] queryParamProperties;

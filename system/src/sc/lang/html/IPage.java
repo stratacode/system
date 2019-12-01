@@ -12,6 +12,7 @@ public interface IPage {
     * This property is set right after the page object is created to provide access to the
     * IPageDispatcher that will be calling the output method later
     */
+   @sc.obj.EditorSettings(visible=false)
    void setPageDispatcher(IPageDispatcher dispatcher);
    IPageDispatcher getPageDispatcher();
 

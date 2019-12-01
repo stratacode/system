@@ -1326,12 +1326,14 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       callLayerMethod("validate");
    }
 
-   // TODO: have not needed this yet
+   /** Called right before the code processing phase starts - an opportunity for the layer to generate a build file */
    public void process() {
+      processed = true;
+      callLayerMethod("process");
    }
    
    public boolean isProcessed() {
-      return isValidated();
+      return processed;
    }
 
    public void init() {
@@ -2170,6 +2172,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (baseLayers != null) {
             for (Layer baseLayer:baseLayers) {
                baseLayer.ensureValidated(true);
+            }
+         }
+      }
+   }
+
+   public void ensureProcessed(boolean checkBaseLayers) {
+      if (!isProcessed()) {
+         process();
+      }
+      if (checkBaseLayers && !excluded) {
+         if (baseLayers != null) {
+            for (Layer baseLayer:baseLayers) {
+               baseLayer.ensureProcessed(true);
             }
          }
       }
@@ -5033,4 +5048,3 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return IFileProcessor.FileEnabledState.NotEnabled;
    }
 }
-

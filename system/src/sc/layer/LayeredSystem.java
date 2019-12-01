@@ -217,6 +217,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public String runtimeLibsDir = null;   /* Frameworks like android which can't just include sc runtime classes from the classpath can specify this path, relative to the buildDir.  The build will look for the sc classes in its classpath.  If it finds scrt.jar, it copies it.   If it finds a buildDir, it generates it and places it in the lib dir.  */
    public String runtimeSrcDir = null;   /* Some frameworks also may need to deploy the src to the core runtime - for example, to convert it to Javascript.  Set this property to the directory where the scrt-core-src.jar file should go */
    public String strataCodeLibsDir = null; /* Or set this directory to have sc.jar either copied or built from the scSourcePath */
+   public RuntimeModuleType buildModuleType = RuntimeModuleType.DynamicRuntime;
 
    public boolean systemCompiled = false;  // Set to true when the system has been fully compiled once
    public boolean buildingSystem = false;
@@ -1146,7 +1147,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
       "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
-      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil"};
+      "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil",
+      "sc.layer.RuntimeModuleType"};
 
    // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
@@ -2601,9 +2603,31 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String buildDirName;
    }
 
-   public String getStrataCodeRuntimePath(boolean core, boolean src) {
+   public String getStrataCodeRuntimePath(RuntimeModuleType moduleType, boolean src) {
       // sc.core.src.path or sc.src.path
-      String propName = "sc." + (core ? "core." : "") + (src ? "src." : "") + "path";
+      String basePropName;
+      String baseFileName;
+      String ideModuleName;
+      switch (moduleType) {
+         case CoreRuntime:
+            basePropName = "sc.core.";
+            baseFileName = "scrt-core";
+            ideModuleName = "coreRuntime";
+            break;
+         case DynamicRuntime:
+            basePropName = "sc.";
+            baseFileName = "scrt";
+            ideModuleName = "fullRuntime";
+            break;
+         case FullRuntime:
+            basePropName = "sc.full.";
+            baseFileName = "sc";
+            ideModuleName = "sc";
+            break;
+         default:
+            throw new UnsupportedOperationException();
+      }
+      String propName = basePropName + (src ? "src." : "") + "path";
       String path;
       if ((path = System.getProperty(propName)) != null)
          return path;
@@ -2612,7 +2636,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          RuntimeRootInfo info = getRuntimeRootInfo();
          if (info.zipFileName != null) {
             String dir = FileUtil.getParentPath(info.zipFileName);
-            String res = FileUtil.concat(dir, "scrt" + (core ? "-core" : "") + (src ? "-src" : "") + ".jar");
+            String res = FileUtil.concat(dir, baseFileName + (src ? "-src" : "") + ".jar");
             if (new File(res).canRead())
                return res;
          }
@@ -2620,13 +2644,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             String sysRoot;
             if ((sysRoot = getSystemBuildLayer(info.buildDirName)) != null) {
                if (!src)
-                  return FileUtil.concat(sysRoot, core ? "coreRuntime" : "fullRuntime", !isIDEBuildLayer(info.buildDirName) ? "build" : null);
+                  return FileUtil.concat(sysRoot, ideModuleName, !isIDEBuildLayer(info.buildDirName) ? "build" : null);
             }
          }
       }
 
       if (scSourcePath != null) {
-         String scRuntimePath = FileUtil.concat(scSourcePath, core ? "coreRuntime": "fullRuntime", "src");
+         String scRuntimePath = FileUtil.concat(scSourcePath, ideModuleName, "src");
          File f = new File(scRuntimePath);
          if (!f.canRead())
             System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages - missing: " + scRuntimePath + " inside of scSourcePath: " + scSourcePath);
@@ -2650,7 +2674,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // for the runtime files when building projects of various kinds.
    private static boolean isIDEBuildLayer(String buildDirName) {
       String file;
-      if ((file = FileUtil.getFileName(buildDirName)).equals("coreRuntime") || file.equals("fullRuntime"))
+      if ((file = FileUtil.getFileName(buildDirName)).equals("coreRuntime") || file.equals("fullRuntime") || file.equals("system"))
          return true;
       return false;
    }
@@ -2777,7 +2801,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private final static String STRATACODE_RUNTIME_SRC_FILE = "scrt-core-src.jar";
 
    private void syncRuntimeSrc(String dir) {
-      String srcDir = getStrataCodeRuntimePath(true, true);
+      String srcDir = getStrataCodeRuntimePath(RuntimeModuleType.CoreRuntime, true);
       File srcDirFile = new File(srcDir);
 
       String outJarName = FileUtil.concat(dir, STRATACODE_RUNTIME_SRC_FILE);
@@ -2802,8 +2826,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    private final static String[] SC_JAR_PATTERN = new String[] {".*jline.*\\.jar"};
 
-   private void syncStrataCodeLibraries(String dir) {
-      String fullRuntimeDir = getStrataCodeRuntimePath(false, false);
+   private void syncStrataCodeLibraries(String dir, RuntimeModuleType buildModuleType) {
+      String fullRuntimeDir = getStrataCodeRuntimePath(buildModuleType, false);
       File srcDirFile = new File(fullRuntimeDir);
 
       String outJarName = FileUtil.concat(dir, STRATACODE_LIBRARIES_FILE);
@@ -6300,7 +6324,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (startLayer == coreBuildLayer) {
          // Need this for the IDE because the sc.jar files are not in the rootClasspath in that environment because we want to debug those.  They are when running scc though.
          if (strataCodeInstallDir != null) {
-            LayerUtil.addQuotedPath(sb, getStrataCodeRuntimePath(false, false));
+            LayerUtil.addQuotedPath(sb, getStrataCodeRuntimePath(buildModuleType, false));
          }
          addOrigBuild = startLayer.appendClassPath(sb, includeBuildDir, useBuildDir, addOrigBuild);
 
@@ -8086,7 +8110,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             syncRuntimeSrc(runtimeSrcDir);
          }
          if (strataCodeLibsDir != null) {
-            syncStrataCodeLibraries(strataCodeLibsDir);
+            syncStrataCodeLibraries(strataCodeLibsDir, buildModuleType);
          }
       }
 
@@ -9402,7 +9426,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                runtimeProcessor.postProcess(this, genLayer);
          }
 
-         genLayer.processed = true;
+         processLayers(genLayer);
          if (genLayer == buildLayer) {
             saveBuildInfo();
 
@@ -9558,20 +9582,36 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
       else {
       */
-      if (genLayer.layerPosition < (genLayer.activated ? layers.size() : inactiveLayers.size())) {
+      List<Layer> layersList = genLayer.activated ? layers : inactiveLayers;
+      int numLayers = layersList.size();
+      if (genLayer.layerPosition < numLayers) {
          for (int i = 0; i <= genLayer.layerPosition; i++) {
-            Layer l = genLayer.activated ? layers.get(i) : inactiveLayers.get(i);
+            Layer l = layersList.get(i);
             l.ensureStarted(false);
          }
          for (int i = 0; i <= genLayer.layerPosition; i++) {
-            Layer l = genLayer.activated ? layers.get(i) : inactiveLayers.get(i);
+            Layer l = layersList.get(i);
             l.ensureValidated(false);
          }
       }
       else
-         System.err.println("*** Attempt to start layer that is out of range: " + genLayer.layerPosition + " >= " + layers.size());
+         System.err.println("*** Attempt to start layer that is out of range: " + genLayer.layerPosition + " >= " + numLayers);
       //}
       PerfMon.end("startLayers");
+   }
+
+   public void processLayers(Layer genLayer) {
+      List<Layer> layersList = genLayer.activated ? layers : inactiveLayers;
+      int numLayers = layersList.size();
+      if (genLayer.layerPosition < numLayers) {
+         for (int i = 0; i <= genLayer.layerPosition; i++) {
+            Layer l = layersList.get(i);
+            l.ensureProcessed(false);
+         }
+      }
+      else
+         System.err.println("*** Attempt to process layer that is out of range: " + genLayer.layerPosition + " >= " + numLayers);
+
    }
 
    private void startLayers(List<Layer> theLayers, boolean checkBaseLayers) {
