@@ -3,7 +3,7 @@ coreRuntime {
 
    srcPath = "src";
 
-   // TODO: building sc currently does not depend on the sc layers so
+   // TODO: building scc currently does not depend on the sys.core layers so
    // we are duplicating a few utility file types here.  These probably belong
    // in some core utilities layer that coreRuntime extends.
    
