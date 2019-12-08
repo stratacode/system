@@ -38,6 +38,8 @@ public class PTypeUtil {
    // Old setting - set to true to debug errors encountered trying to resolve properties from types, e.g. properties discarded because of conflicting return types.
    public static boolean trace = false;
 
+   public static ClassLoader defaultClassLoader = null;
+
    public static IBeanMapper getListConverter(BeanMapper mapper, Class propertyClass, Class valueClass) {
       // Converts List<?> to List<String>
       if (propertyClass == String.class) {
@@ -938,7 +940,7 @@ public class PTypeUtil {
 
    public static Object findType(String typeName) {
       try {
-         return Class.forName(typeName);
+         return defaultClassLoader == null ? Class.forName(typeName) : Class.forName(typeName, true, defaultClassLoader);
       }
       catch (ClassNotFoundException exc) {
          return null;
