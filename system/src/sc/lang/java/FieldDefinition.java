@@ -13,6 +13,7 @@ import sc.lang.js.JSFormatMode;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.js.JSTypeParameters;
 import sc.lang.js.JSUtil;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
 import sc.parser.*;
@@ -71,27 +72,17 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
    public void start() {
       if (started) return;
 
+      if (execForRuntime(getLayeredSystem()) == RuntimeStatus.Disabled)
+         excluded = true;
+
       super.start();
+   }
 
+   public RuntimeStatus execForRuntime(LayeredSystem runtimeSys) {
       JavaModel model = getJavaModel();
-      if (model != null && model.mergeDeclaration) {
-         buildInitExpr = getBuildInitExpression(type.getTypeDeclaration());
-
-         if (variableDefinitions.size() == 1) {
-            VariableDefinition varDef = variableDefinitions.get(0);
-
-            if (buildInitExpr != null && varDef.initializer != null) {
-               displayError("@BuildInit - not allowed with field that has initializer: ");
-               buildInitExpr = null;
-            }
-         }
-         else {
-            if (buildInitExpr != null) {
-               displayError("@BuildInit not allowed for fields with more than one definition ");
-               buildInitExpr = null;
-            }
-         }
-      }
+      Layer refLayer = model == null ? null : model.getLayer();
+      RuntimeStatus propStatus = ModelUtil.execForRuntime(getLayeredSystem(), refLayer, this, runtimeSys);
+      return propStatus;
    }
 
    public void validate() {
@@ -475,21 +466,58 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       return "field";
    }
 
+   public void process() {
+      if (processed)
+         return;
+      super.process();
+
+      // process this here so it happens after JS files are defined.
+      // don't do it in transform because we need it to run for dynamic types too
+      JavaModel model = getJavaModel();
+      Object fieldType = type.getTypeDeclaration();
+      if (model != null && model.mergeDeclaration) {
+         buildInitExpr = getBuildInitExpression(fieldType);
+
+         if (variableDefinitions.size() == 1) {
+            VariableDefinition varDef = variableDefinitions.get(0);
+
+            if (buildInitExpr != null && varDef.initializer != null) {
+               displayError("@BuildInit - not allowed with field that has initializer: ");
+               buildInitExpr = null;
+            }
+         }
+         else {
+            if (buildInitExpr != null) {
+               displayError("@BuildInit not allowed for fields with more than one definition ");
+               buildInitExpr = null;
+            }
+         }
+      }
+   }
+
    public boolean transform(ILanguageModel.RuntimeType runtime) {
+      JavaModel model = getJavaModel();
+      Object fieldType = type.getTypeDeclaration();
+
       // Need to first transform the type.  It may get used in the applyPropertyTemplate applied when we
       // transform the variable definitions.
       boolean any = type != null && type.transform(runtime);
       if (super.transform(runtime))
          any = true;
 
-      JavaModel model = getJavaModel();
-
       if (model != null && variableDefinitions.size() == 1) {
          VariableDefinition varDef = variableDefinitions.get(0);
          if (model.mergeDeclaration) { // At build time
             if (buildInitExpr != null) {
+               if (ModelUtil.isAssignableFrom(Collection.class, fieldType)) {
+                  NewExpression newExpr = TransformUtil.convertArrayInitializerToNewCollection(this, fieldType, (ArrayInitializer) buildInitExpr);
+                  buildInitExpr = newExpr;
+               }
                varDef.setProperty("operator", "=");
                varDef.setProperty("initializer", buildInitExpr);
+               if (!buildInitExpr.getTransformed()) {
+                  buildInitExpr.transform(runtime);
+               }
                any = true;
             }
          }

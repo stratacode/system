@@ -627,6 +627,8 @@ public class SyncManager {
       }
 
       InstInfo registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued, boolean registered) {
+         if (objName == null)
+            throw new IllegalArgumentException("Invalid null object name for instance: " + inst);
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
             ii = getInheritedInstInfo(inst);

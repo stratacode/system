@@ -489,7 +489,10 @@ public abstract class Language extends LayerFileComponent {
     */
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleBuildFile(String layerName, String buildPathPrefix, String fileName, boolean displayError, boolean isLayer, boolean layerEnabled) {
-      LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
+      LayeredSystem current = LayeredSystem.getCurrent();
+      if (current == null)
+         throw new IllegalArgumentException("Language.styleBuildFile requires the dynamic runtime for: " + fileName);
+      LayeredSystem sys = current.getMainLayeredSystem();
       fileName = FileUtil.unnormalize(fileName);
       String absFileName = fileName;
       // TODO: this is a hack!  Add a new parameter or maybe disabled:layerName?
@@ -522,7 +525,10 @@ public abstract class Language extends LayerFileComponent {
 
    @sc.obj.HTMLSettings(returnsHTML=true)
    public Object styleFile(String layerName, String fileName, boolean displayError, boolean isLayer, boolean layerEnabled) {
-      LayeredSystem sys = LayeredSystem.getCurrent().getMainLayeredSystem();
+      LayeredSystem current = LayeredSystem.getCurrent();
+      if (current == null)
+         throw new IllegalArgumentException("Language.styleFile requires the dynamic runtime for: " + fileName);
+      LayeredSystem sys = current.getMainLayeredSystem();
       fileName = FileUtil.unnormalize(fileName);
       String absFileName = fileName;
       boolean active = false;

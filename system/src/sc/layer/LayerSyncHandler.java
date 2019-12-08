@@ -6,6 +6,7 @@ package sc.layer;
 
 import sc.lang.AbstractInterpreter;
 import sc.lang.java.*;
+import sc.lang.sc.OverrideAssignment;
 import sc.sync.SyncHandler;
 import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
@@ -41,7 +42,8 @@ public class LayerSyncHandler extends SyncHandler {
       }
 
       if (inst instanceof IBeanMapper) {
-         Object member = ((IBeanMapper) inst).getPropertyMember();
+         IBeanMapper mapper = ((IBeanMapper) inst);
+         Object member = mapper.getPropertyMember();
          return replaceInstance(member);
       }
 

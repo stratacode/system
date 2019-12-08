@@ -5,6 +5,7 @@
 package sc.lang.html;
 
 import sc.bind.Bind;
+import sc.bind.Bindable;
 import sc.bind.IListener;
 import sc.obj.CompilerSettings;
 import sc.obj.Sync;
@@ -12,6 +13,7 @@ import sc.obj.SyncMode;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 
 /**
  * We are setting the dependentTypes here to ensure these classes are compiled into the JS runtime when HtmlPage is used.
@@ -38,14 +40,12 @@ public class HtmlPage extends Html implements IPage {
       super(concreteType);
    }
 
-   @sc.obj.EditorSettings(visible=false)
    public IPageDispatcher pageDispatcher;
 
    @sc.obj.EditorSettings(visible=false)
    public void setPageDispatcher(IPageDispatcher pd) {
       pageDispatcher = pd;
    }
-   @sc.obj.EditorSettings(visible=false)
    public IPageDispatcher getPageDispatcher() {
       return pageDispatcher;
    }
@@ -102,7 +102,18 @@ public class HtmlPage extends Html implements IPage {
       return pageVisitCount;
    }
 
+   private List<String> pageJSFiles;
+
+   public void setPageJSFiles(List<String> jsFiles) {
+      pageJSFiles = jsFiles;
+   }
+   @sc.obj.EditorSettings(visible=false)
+   public List<String> getPageJSFiles() {
+      return pageJSFiles;
+   }
+
    /** Incremented before rendering for each page view */
+   @Bindable(manual = true)
    public void setPageVisitCount(int ct) {
       pageVisitCount = ct;
       Bind.sendEvent(IListener.VALUE_CHANGED, this, _pageVisitProp);

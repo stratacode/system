@@ -11,9 +11,8 @@ import sc.classfile.CFClass;
 import sc.js.URLPath;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSRuntimeProcessor;
-import sc.lang.sc.SCModel;
+import sc.lang.sc.*;
 import sc.dyn.*;
-import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
 import sc.layer.deps.*;
 import sc.lifecycle.ILifecycle;
@@ -28,8 +27,6 @@ import sc.type.*;
 import sc.util.*;
 import sc.bind.IListener;
 import sc.lang.*;
-import sc.lang.sc.IScopeProcessor;
-import sc.lang.sc.ModifyDeclaration;
 import sc.lang.java.*;
 
 import java.io.*;
@@ -147,6 +144,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    static ThreadLocal<LayerUtil.LayeredSystemPtr> currentLayeredSystem = new ThreadLocal<LayerUtil.LayeredSystemPtr>();
 
    static LayeredSystem defaultLayeredSystem;
+
+   static boolean disableDefaultLayeredSystem = false;
 
    /** The LayeredSystem which is currently associated with the thread's ContextClassLoader. */
    static LayeredSystem contextLoaderSystem;
@@ -3041,7 +3040,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public static void setCurrent(LayeredSystem sys) {
-      if (defaultLayeredSystem == null) // Pick the initial main layered system here by default
+      if (defaultLayeredSystem == null && !disableDefaultLayeredSystem) // Pick the initial main layered system here by default
          defaultLayeredSystem = sys;
       DynUtil.dynamicSystem = sys;
       RDynUtil.dynamicSystem = sys;
@@ -4055,6 +4054,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             if (commandThread != null && sys.getUseContextClassLoader())
                commandThread.setContextClassLoader(sys.getSysClassLoader());
+            PTypeUtil.defaultClassLoader = sys.getSysClassLoader();
 
             // first initialize and start all initOnStartup and createOnStartup objects
             // Note: this should be done via code generation in the main methods
@@ -4207,10 +4207,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          SyncManager.addSyncType(VariableDefinition.class, new SyncProperties(null, null, new Object[] { "variableName" , "initializerExprStr" , "operatorStr" , "layer", "comment", "variableTypeName", "indexedProperty", "annotations", "modifierFlags", "enclosingTypeName", "writable"},
                                  null, SyncPropOptions.SYNC_INIT| SyncPropOptions.SYNC_CONSTANT, globalScopeId));
-         SyncManager.addSyncType(PropertyAssignment.class,
-              new SyncProperties(null, null,
-                                 new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags", "enclosingTypeName"},
-                                 null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
+         SyncProperties sps =
+                 new SyncProperties(null, null,
+                         new Object[] { "propertyName" , "operatorStr", "initializerExprStr", "layer" , "comment", "variableTypeName", "annotations", "modifierFlags", "enclosingTypeName"},
+                         null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId);
+         SyncManager.addSyncType(PropertyAssignment.class, sps);
+         SyncManager.addSyncType(OverrideAssignment.class, sps);
 
          SyncManager.addSyncType(MethodDefinition.class,
                  new SyncProperties(null, null,
@@ -4861,7 +4863,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (options.info)
                System.out.println("Running compiled main for class: " + runClass + "(" + StringUtil.arrayToString(args) + ")");
             runClassStarted = true;
+
+            boolean clearedCurrent = false;
+            // Don't pass the LayeredSystem to the main method via the current hook so it runs like in standalone mode.
+            // TODO: ideally we'd just fork a new process here so that this runs just like it would if you run it
+            // outside of the dynamic runtime entirely. It seems like we could run 'scc' to compile the system then debug
+            // a new process to run it without too much difficulty.
+            if (options.noDynRuntime) {
+               defaultLayeredSystem = null;
+               disableDefaultLayeredSystem = true;
+               DynUtil.dynamicSystem = null;
+               RDynUtil.dynamicSystem = null;
+               if (getCurrent() == this) {
+                  setCurrent(null);
+                  clearedCurrent = true;
+               }
+            }
             PTypeUtil.invokeMethod(null, meth, args);
+            if (clearedCurrent)
+               setCurrent(this);
          }
       }
       return null;
@@ -9664,6 +9684,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (systemClassLoader != null)
          warning("replacing system class loader!");
       systemClassLoader = loader;
+      if (runtimeProcessor == null || runtimeProcessor.getLoadClassesInRuntime())
+         PTypeUtil.defaultClassLoader = loader;
    }
 
    public void setFixedSystemClassLoader(ClassLoader loader) {
@@ -15817,6 +15839,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // for layers like the example.todo.data layer which should not run in both the client and the server, but should run in
       // client-only mode when there's only a client.
       return runtimes.indexOf(proc) == 0;
+   }
+
+   /** This method is used by BuildInit hooks to inject the set of compile files into generated script tags or other similar patterns for other languages */
+   public List<String> getCompiledFiles(String lang, String typeName) {
+      IRuntimeProcessor langRT = hasActiveRuntime(lang) ? getRuntime(lang) : null;
+      if (langRT == null) {
+         // No javascript runtime - do we need to include the server tags Javascript files? - TODO: should this be moved into a hook that's specific to the HTML framework
+         if (lang.equals("js")) {
+            Object type = getTypeDeclaration(typeName);
+            if (type != null) {
+               String jsFiles = (String) DynUtil.getInheritedAnnotationValue(type, "sc.obj.ServerTagSettings", "jsFiles");
+               if (jsFiles == null)
+                  return null;
+               String[] jsFilesArr = jsFiles.split(",");
+               return new ArrayList<String>(Arrays.asList(jsFilesArr));
+            }
+         }
+         return null;
+      }
+      return langRT.getCompiledFiles(lang, typeName);
    }
 
 }

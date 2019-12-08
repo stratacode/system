@@ -10,6 +10,7 @@ import sc.util.FileUtil;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -87,8 +88,12 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public void postProcess(LayeredSystem sys, Layer genLayer) {
    }
 
-   public String[] getJsFiles() {
+   public String[] getCompiledFiles(String lang) {
       return new String[0];
+   }
+
+   public List<String> getCompiledFiles(String lang, String refTypeName) {
+      return Collections.emptyList();
    }
 
    public int getExecMode() {

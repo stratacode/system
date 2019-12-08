@@ -1066,7 +1066,14 @@ public class ModelUtil {
          return ((DynType) type).getMethod(methodName, paramSig);
       else if (type instanceof String) {
          String typeName = (String) type;
-         Object resolvedType = LayeredSystem.getCurrent().getTypeDeclaration(typeName);
+         LayeredSystem sys = LayeredSystem.getCurrent();
+         Object resolvedType;
+         if (sys != null) {
+            resolvedType = sys.getTypeDeclaration(typeName);
+         }
+         else {
+            resolvedType = DynUtil.findType(typeName);
+         }
          if (resolvedType == null)
             throw new IllegalArgumentException("No type named: " + typeName);
          return getMethodFromSignature(resolvedType, methodName, paramSig, resolveLayer);
@@ -5848,6 +5855,8 @@ public class ModelUtil {
    public static Object findTypeDeclaration(LayeredSystem sys, String typeName, Layer refLayer, boolean layerResolve) {
       if (sys == null)
          sys = LayeredSystem.getCurrent();
+      if (sys == null)
+         return DynUtil.findType(typeName);
       return sys.getTypeDeclaration(typeName, false, refLayer, layerResolve);
    }
 
@@ -7850,7 +7859,7 @@ public class ModelUtil {
    }
 
    public static Object getRuntimeType(Object rootType) {
-      if (rootType instanceof Class)
+      if (rootType instanceof Class || rootType instanceof ParameterizedType)
          return rootType;
       else if (rootType instanceof ITypeDeclaration)
          return ((ITypeDeclaration) rootType).getRuntimeType();

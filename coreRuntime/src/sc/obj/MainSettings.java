@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
 /**
  * This annotation is placed on a standard Java main method (i.e. a method with signature "public static void main(String[] args)").
  * It tells StrataCode when/how to execute that main method after compiling.  StrataCode will also generate a start script if
- * you specify the produceScript option or a package jar file if you set packageJar.   You can control Java options required
+ * you specify the produceScript option or a package jar file if you set produceJar to true.   You can control Java options required
  * by the main method as well, or disable auto-execution.
  */
 @Target({ElementType.METHOD})

@@ -1386,7 +1386,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (processed)
          return;
 
-      initReverseDeps();
+      if (!isLayerModel)
+         initReverseDeps();
 
       super.process();
    }
@@ -3557,7 +3558,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if (parseNode == null) {
          LayeredSystem sys = getLayeredSystem();
          SrcEntry srcEnt = getSrcFile();
-         if (srcEnt == null)
+         if (srcEnt == null || sys == null)
             return false;
          IFileProcessor processor = sys.getFileProcessorForSrcEnt(srcEnt, null, false);
          Object res = LayerUtil.restoreParseNodes(sys, (Language) processor, srcEnt, getLastModifiedTime(), this);

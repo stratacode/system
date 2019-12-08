@@ -1,5 +1,17 @@
 #!/bin/bash
 
+if [ ! -d bundles ] ; then
+  echo "Error: no bundles directory - run from StrataCode directory" 
+  exit -1
+fi
+
+PORT_IN_USE=`lsof -i :8080 | grep LISTEN`
+if [ ! -z "$PORT_IN_USE" ] ; then
+   echo "Error: port 8080 needed by tests is in use"
+   echo "$PORT_IN_USE"
+   exit -1
+fi
+
 if [ -z "TEST_HOME" ] ; then
    if [ -z "$BASH_SOURCE" ] ; then 
       echo "No default source for tests - must set TEST_HOME environment variable to path to test scripts"

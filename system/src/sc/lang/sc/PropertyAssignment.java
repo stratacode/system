@@ -119,13 +119,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          // setInferredType may loop around and try to start us again
          starting = true;
 
-         buildInitExpr = getBuildInitExpression(getPropertyTypeDeclaration());
-
-         if (buildInitExpr != null && initializer != null) {
-            displayError("@BuildInit valid only for property definitions which do not have an initializer");
-            buildInitExpr = null;
-         }
-
          // Check to be sure the initializer is compatible with the property
          // Skip this test for reverse-only bindings
          if (initializer != null && !isReverseOnlyExpression()) {
@@ -256,6 +249,28 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return true;
    }
 
+   public void process() {
+      if (processed)
+         return;
+
+      super.process();
+
+      // Need this done late enough so that all of the JS files and other state like that commonly used in this expressions
+      // have been set but don't put it in transform because then it won't run for dynamic types.
+      buildInitExpr = getBuildInitExpression(getPropertyTypeDeclaration());
+
+      /* TODO: remove this? For pageJSFiles, one BuildInit needs to override the previous one when a page modifies another
+      if (buildInitExpr != null && initializer != null) {
+         displayError("@BuildInit valid only for property definitions which do not have an initializer");
+         buildInitExpr = null;
+      }
+      */
+
+      if (assignedProperty != null && buildInitExpr != null) {
+         setProperty("initializer", buildInitExpr);
+      }
+   }
+
    /** The PropertyAssignment defined for .sc is not in Java - we do a simple conversion here to replace x = y by { x = y } */
    public boolean transform(ILanguageModel.RuntimeType runtime) {
       if (runtime == ILanguageModel.RuntimeType.JAVA) {
@@ -264,10 +279,6 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
          // TODO: we should pass this down from the parent node to avoid the N*N
          int ix = decl.body.indexOf(this);
-
-         if (assignedProperty != null && buildInitExpr != null) {
-            setProperty("initializer", buildInitExpr);
-         }
 
          // Property assignments without an initializer are used to just merge modifiers and stuff into
          // the definition.  Just remove the property assignment and move on.
@@ -458,7 +469,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                return newVarDef;
             }
             else {
-               if (modifiers != null && !definedInThisType)
+               if (modifiers != null && !definedInThisType && anyModifiersToMerge())
                   displayError("Cannot modify field attributes. Property: " + propertyName + " not defined in type " + base.getFullTypeName() + ": " + toDefinitionString());
 
                base.addBodyStatement(this);
@@ -496,7 +507,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                return oldAssign;
             }
             else {
-               if (!definedInThisType && modifiers != null)
+               if (!definedInThisType && modifiers != null && anyModifiersToMerge())
                   displayError("Cannot modify field attributes. Property: " + propertyName + " not defined in type " + base.getFullTypeName() + ": ");
                if (initializer != null)
                   base.addBodyStatement(this);
@@ -511,15 +522,16 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                oldMethDef.mergeModifiers(this, true, false);
             }
             else  {
-               if (modifiers != null)
+               if (modifiers != null && anyModifiersToMerge())
                   displayError("Cannot modify field attributes. Property: " + propertyName + " not defined in type " + base.getFullTypeName() + ": ");
             }
             base.addBodyStatement(this);
             return oldMethDef;
          }
          else {
-            if (modifiers != null)
-               displayError("Cannot modify property attributes. Property: " + propertyName + " no source definition for field definition " + var + ": ");
+            if (modifiers != null && anyModifiersToMerge()) {
+               displayError("Cannot change modifiers of compiled property: " + propertyName + " for compiled field: " + var + ": ");
+            }
             // Just reinitialize the property since that's all we can do
             base.addBodyStatementIndent(this);
             return this;
@@ -530,6 +542,23 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          var = base.definesMember(propertyName, MemberType.PropertyAnySet, null, null, false, true); // TODO: remove for debugging purposes only
          return null;
       }
+   }
+
+   private boolean anyModifiersToMerge() {
+      if (modifiers != null) {
+         boolean anyToMerge = false;
+         for (Object modifier:modifiers) {
+            if (modifier instanceof Annotation) {
+               Annotation annot = (Annotation) modifier;
+               // This annotation is allowed on compiled types because it only involves setting the property
+               if (annot.typeName != null && annot.typeName.equals("sc.obj.BuildInit"))
+                  continue;
+            }
+            anyToMerge = true;
+         }
+         return anyToMerge;
+      }
+      return false;
    }
 
    public void collectReferenceInitializers(List<Statement> refInits) {

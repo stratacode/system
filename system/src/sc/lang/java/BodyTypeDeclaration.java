@@ -2943,6 +2943,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object[] getStaticValues() {
+      if (!isProcessed()) {
+         JavaModel model = getJavaModel();
+         if (model != null)
+            model.process();
+      }
       // The values should never be accessed on a replaced type.  On the other hand, the static field map is needed
       // by the modified class to build its own table.
       if (replacedByType != null)

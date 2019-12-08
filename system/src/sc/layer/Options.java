@@ -78,6 +78,7 @@ public class Options {
    /** By default run all main methods defined with no arguments */
    @Constant public String runClass = ".*";
    @Constant public String[] runClassArgs = null;
+   @Constant public boolean noDynRuntime = false;
    /** File used to record script by default */
    @Constant public String recordFile;
    @Constant public String restartArgsFile;
@@ -412,28 +413,25 @@ public class Options {
                case 'n':
                   if (opt.equals("nc")) {
                      noCompile = true;
-                     break;
                   }
                   else if (opt.equals("nd"))
                      liveDynamicTypes = false;
+                  else if (opt.equals("ndr"))
+                     noDynRuntime = true;
                   else if (opt.equals("n")) {
                      createNewLayer = true;
-                     break;
                   }
                   else if (opt.equals("nw")) {
                      openPageAtStartup = false;
-                     break;
                   }
                   else if (opt.equals("nh")) {
                      headless = true;
                      headlessSet = true;
-                     break;
                   }
                   else if (opt.equals("ni"))
                      startInterpreter = false;
                   else if (opt.equals("ndbg")) {
                      debug = false;
-                     break;
                   }
                   else
                      Options.usage("Unrecognized option: " + opt, args);

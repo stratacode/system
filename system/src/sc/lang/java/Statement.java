@@ -635,14 +635,22 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public Expression getBuildInitExpression(Object expectedType) {
       JavaModel model = getJavaModel();
-      String buildInitExprStr = (String) ModelUtil.getAnnotationValue(this, "sc.obj.BuildInit", "value");
+      String buildInitTemplStr = (String) ModelUtil.getAnnotationValue(this, "sc.obj.BuildInit", "value");
       Expression buildInitExpr = null;
-      if (buildInitExprStr != null && model != null && !model.temporary) {
-         if (buildInitExprStr.length() > 0) {
+      if (buildInitTemplStr != null && model != null && !model.temporary) {
+         if (buildInitTemplStr.length() > 0) {
+            TypeDeclaration enclType = getEnclosingType();
+            ObjectDefinitionParameters params = TransformUtil.createObjectDefinitionParameters(enclType);
+            String buildInitExprStr = TransformUtil.evalTemplate(params, buildInitTemplStr, false);
+            if (buildInitExprStr == null) {
+               displayError("@BuildInit(\"" + buildInitTemplStr + "\") invalid template expression for: ");
+               return null;
+            }
             SCLanguage lang = SCLanguage.getSCLanguage();
             Object evalRes = lang.parseString(buildInitExprStr, lang.expression);
             if (evalRes instanceof ParseError) {
-               displayError("@BuildInit(\"" + buildInitExprStr + "\") invalid expression: " + evalRes + " for: ");
+               displayError("@BuildInit(\"" + buildInitTemplStr + "\") invalid template expression: " + evalRes + " for: ");
+               return null;
             }
             else {
                LayeredSystem sys = model.getLayeredSystem();

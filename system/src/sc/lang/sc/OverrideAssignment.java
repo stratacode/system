@@ -39,7 +39,7 @@ public class OverrideAssignment extends PropertyAssignment {
          inheritedMember = null;
    }
 
-   public static PropertyAssignment create(String pname) {
+   public static OverrideAssignment create(String pname) {
       OverrideAssignment pa = new OverrideAssignment();
       pa.propertyName = pname;
       return pa;

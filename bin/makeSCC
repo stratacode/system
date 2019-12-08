@@ -12,6 +12,7 @@
 set -e
 
 STAGEDIR=/tmp/
+# directory to use for building with the --orig option - the build using the IDE source to build itself
 ORIG_DIR=/jjv/vbuild
 SCC_CMD=scc
 
@@ -20,6 +21,9 @@ BUILD_NUM_FILE=~/.stratacode/buildNum.properties
 
 SC_DIR=`dirname $BASH_SOURCE[0]`
 SC_DIR=`dirname $SC_DIR`
+
+echo "Building StrataCode in $SC_DIR"
+cd $SC_DIR
 
 RES_FILE=scc.zip
 

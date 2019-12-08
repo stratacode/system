@@ -120,13 +120,25 @@ public abstract class AbstractLiteral extends Expression implements IValueConver
             return StringLiteral.create((String) literalValue);
          case Object:
             if (literalValue instanceof List) {
-               return Expression.createFromValue(((List) literalValue).toArray(), isInitializer);
+               Expression arrArg = Expression.createFromValue(((List) literalValue).toArray(), isInitializer);
+               return arrArg;
+               /*
+               SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+               args.add(arrArg);
+               return IdentifierExpression.createMethodCall(args, "java.util.Arrays.asList");
+               */
             }
             else if (literalValue instanceof Set) {
                return Expression.createFromValue(((Set) literalValue).toArray(), isInitializer);
             }
             else if (literalValue instanceof Object[]) {
                return Expression.createFromValue(literalValue, isInitializer);
+            }
+            else if (literalValue instanceof ITypeDeclaration) {
+               ITypeDeclaration type = (ITypeDeclaration) literalValue;
+               SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+               args.add(StringLiteral.create(type.getFullTypeName()));
+               return IdentifierExpression.createMethodCall(args, "sc.dyn.DynUtil.findType");
             }
             /* TODO: create a 'new Date' or SimpleDateFormat.parse("xxx")
             else if (literalValue instanceof Date) {

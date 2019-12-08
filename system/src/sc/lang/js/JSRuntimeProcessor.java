@@ -3128,8 +3128,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    }
 
-   public String[] getJsFiles() {
-      return jsBuildInfo.jsFiles.toArray(new String[jsBuildInfo.jsFiles.size()]);
+   public String[] getCompiledFiles(String lang) {
+      if (lang.equals("js"))
+         return jsBuildInfo.jsFiles.toArray(new String[jsBuildInfo.jsFiles.size()]);
+      return super.getCompiledFiles(lang);
    }
 
    public int getExecMode() {
@@ -3202,13 +3204,15 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return false;
    }
 
-   public List<String> getJSFiles(Object type) {
-      String typeName = ModelUtil.getTypeName(type);
+   public List<String> getCompiledFiles(String lang, String typeName) {
+      if (!lang.equals("js"))
+         return null;
+
       String modFile = getCachedJSModuleFile(typeName);
       if (modFile == null) {
          // Get the src file for this type in this runtime.  The type given may be from another runtime.
          // Do not look up the type unless we need to because otherwise we load stuff into the JS runtime that may not otherwise be needed.
-         type = system.getRuntimeTypeDeclaration(typeName);
+         Object type = system.getRuntimeTypeDeclaration(typeName);
          // If there's no type name in the javascript runtime, no need for any JS files.
          if (type == null)
             return null;

@@ -17,8 +17,6 @@ scc -a -c example/todo/clientOnly
 cp build/example_todo_clientOnly/web/TodoList.html bundles/doc/doc/core/examples/todoRun/
 cp build/example_todo_clientOnly/web/js/*.js bundles/doc/doc/core/examples/todoRun/js/
 
-# Including js/schtml and servlet/options/globalScope for the static file version.  
-# Without js/schtml we will use server pages which only works with a server.
-# Without globalscope we don't generate the static files and would rely on the server
+scc -c -a doc/clientOnly 
 
-scc -c -a js/schtml servlet/options/globalScope doc/core 
+scc -c -a doc/forms

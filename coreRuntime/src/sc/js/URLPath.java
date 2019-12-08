@@ -45,6 +45,13 @@ public class URLPath implements Comparable {
       url = templatePathName;
    }
 
+   public URLPath(String url, String name, String keyName, Object pageType) {
+      this.url = url;
+      this.name = name;
+      this.keyName = keyName;
+      this.pageType = pageType;
+   }
+
    public int hashCode() {
       return url.hashCode();
    }

@@ -43,6 +43,14 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
       return annot;
    }
 
+   /** Create an annotation with a single value  */
+   public static Annotation createSingleValue(String typeName, Object valValue) {
+      Annotation annot = create(typeName);
+      annot.setProperty("elementValue", AbstractLiteral.createFromValue(valValue, true));
+
+      return annot;
+   }
+
    public void addAnnotationValues(AnnotationValue... elemValues) {
       SemanticNodeList<AnnotationValue> newValues = new SemanticNodeList<AnnotationValue>();
       for (AnnotationValue val:elemValues)

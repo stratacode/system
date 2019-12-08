@@ -42,7 +42,9 @@ public interface IRuntimeProcessor {
    /** Called after processing all types */
    public void postProcess(LayeredSystem sys, Layer genLayer);
 
-   public String[] getJsFiles();
+   public String[] getCompiledFiles(String lang);
+
+   public List<String> getCompiledFiles(String lang, String refTypeName);
 
    public int getExecMode();
 

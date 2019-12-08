@@ -16,6 +16,7 @@ import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.ModifyDeclaration;
+import sc.lang.sc.OverrideAssignment;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.ScopeModifier;
 import sc.lang.template.*;
@@ -1132,7 +1133,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (needsObject) {
          // TODO: Note: this case is not reached because the getEnclosingContext method here returns GlueExpression.  We do not have a way to dig into the glue expressions and glue statements that are stored under a tag to create these sub-objects.  So these get treated like strings in their parent.
          if (!isAbstract()) {
-            String objName = isRepeatElement() ? getRepeatObjectName() : getObjectName();
+            String objName = getTopLevelObjectName();
             return IdentifierExpression.createMethodCall(null, objName, "output");
          }
       }
@@ -2498,6 +2499,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagTypeBodyStatement(type, PropertyAssignment.create("id", idInitExpr, "="));
    }
 
+   private String getTopLevelObjectName() {
+      return isRepeatElement() ? getRepeatObjectName() : getObjectName();
+   }
+
    public TypeDeclaration getExcludedStub() {
       if (tagObject == null)
          return null;
@@ -2512,7 +2517,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // TODO: the addTypeVar param here might not be necessary... I think we add it typically for all classes in case they eventually are used as
          // a base class for a repeat tag which uses it for the element type.  Saw an error where the type param could not be resolved: RE_typeName so I
          // think maybe when the ClassType tries to resolve itself, it is not looking at the stub?
-         ClassDeclaration decl = ClassDeclaration.create("object", tagObject.typeName, convertExtendsTypeToJavaType(extType, false, tagObject.getFullTypeName(), tagObject.getRootType().getFullTypeName()));
+         ClassDeclaration decl = ClassDeclaration.create("object", getTopLevelObjectName(), convertExtendsTypeToJavaType(extType, false, tagObject.getFullTypeName(), tagObject.getRootType().getFullTypeName()));
          decl.addModifier("public");
          decl.parentNode = parentNode;
          addSetServerAtt(decl, 0, "serverContent");
@@ -2952,6 +2957,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
 
          SemanticNodeList<Object> tagModifiers = null;
+         SemanticNodeList<Object> repeatWrapperModifiers = null;
          // Start with any modifiers specified in the template declaration for this object. We build these up as a list before
          // we set them due to the fact that we are not yet initialized, and parselets only tracks changes
          // on initialized objects.
@@ -2959,6 +2965,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (templateModifiers != null) {
             tagModifiers = (SemanticNodeList<Object>) templateModifiers.deepCopy(ISemanticNode.CopyNormal, null);
          }
+
+         boolean abstractTag = false;
 
          // If we make these classes abstract, it makes it simpler to identify them and omit from type groups, but it means we can't
          // instantiate these classes as base type.  This means more classes in the code.  So instead the type groups stuff needs
@@ -2970,6 +2978,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                tagModifiers.add(tagLayer.defaultModifier);
             }
             if (isAbstract()) {
+               abstractTag = true;
                if (tagModifiers == null)
                   tagModifiers = new SemanticNodeList<Object>();
                if (tagTypeNeedsAbstract()) {
@@ -2987,9 +2996,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
          if (tagModifiers == null)
             tagModifiers = new SemanticNodeList<Object>();
+         if (repeatWrapperModifiers == null)
+            repeatWrapperModifiers = new SemanticNodeList<Object>();
 
          processScope(tagType, scopeName, tagModifiers);
-         processExecAttr(tagType, tagModifiers);
+         processExecAttr(tagType, tagModifiers, repeatWrapperModifiers);
 
          String componentStr = getFixedAttribute("component");
          if (componentStr != null && componentStr.equalsIgnoreCase("true")) {
@@ -2998,6 +3009,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
          if (tagModifiers != null && tagModifiers.size() > 0)
             tagType.setProperty("modifiers", tagModifiers);
+
+         if (repeatWrapper != null && repeatWrapperModifiers != null) {
+            for (Object mod:repeatWrapperModifiers)
+               repeatWrapper.addModifier(mod);
+         }
 
          // Leave a trail for finding where this statement was generated from for debugging purposes
          tagType.fromStatement = this;
@@ -3097,6 +3113,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   addTagTypeBodyStatement(repeatWrapper, pa);
                else
                   addTagTypeBodyStatement(tagType, pa);
+            }
+
+            if (ModelUtil.isAssignableFrom(HtmlPage.class, extTypeDecl) && !abstractTag) {
+               OverrideAssignment jsFilesInit = OverrideAssignment.create("pageJSFiles");
+               jsFilesInit.addModifier(Annotation.createSingleValue("sc.obj.BuildInit","layeredSystem.getCompiledFiles(\"js\", \"<%= typeName %>\")"));
+               addTagTypeBodyStatement(tagType, jsFilesInit);
             }
          }
 
@@ -3251,7 +3273,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                }
             }
          }
-
 
          if (!staticContentOnly && !remoteContent) {
             String repeatVarName = getRepeatVarName();
@@ -3578,7 +3599,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
    }
 
-   private void processExecAttr(TypeDeclaration tagType, SemanticNodeList<Object> tagModifiers) {
+   private void processExecAttr(TypeDeclaration tagType, SemanticNodeList<Object> tagModifiers, SemanticNodeList<Object> repeatWrapperModifiers) {
       if (oldExecTag)
          return;
       String execStr = getFixedAttribute("exec");
@@ -3592,6 +3613,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             annot.addAnnotationValues(AnnotationValue.create("clientOnly", true));
 
          tagModifiers.add(annot);
+         repeatWrapperModifiers.add(annot.deepCopy(ISemanticNode.CopyNormal, null));
       }
    }
 
@@ -4769,6 +4791,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public List<String> getJSFiles() {
       LayeredSystem sys = getLayeredSystem();
       if (sys == null) {
+         Element parent = getEnclosingTag();
+         if (parent != null)
+            return parent.getJSFiles();
+
+         if (serverTag) {
+            return getServerTagJSFiles();
+         }
+         // TODO: need to record the list of JS files for each type during build time and make it available
+         // via an annotation or something at runtime
          System.out.println("*** No Element.JSFiles - no layered system!");
          return null;
       }
@@ -4786,24 +4817,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             Object declRoot = DynUtil.getRootType(decl);
             if (declRoot == null)
                declRoot = decl;
-            List<String> fileList = jsRT.getJSFiles(declRoot);
+            List<String> fileList = jsRT.getCompiledFiles("js", ModelUtil.getTypeName(declRoot));
             if (fileList != null) {
-               ArrayList<String> res = new ArrayList<String>(fileList);
-               Template templ = getEnclosingTemplate();
-               for (int i = 0; i < res.size(); i++) {
-                  String jsFilePath = res.get(i);
-                  // We need to use relative paths for client-only or prepend the absolute path of the document root here
-                  if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
-                     if (!sys.postBuildProcessing)  // We don't technically need this extra test... it was for the static file based websites like the doc which are built with a server, the JS links would not work from the file system, but would when you put them onto a web server.
-                        jsFilePath = "/" + jsFilePath;
-                     else {
-                        // If this tag is not defined in a top-level directory, we need to prepend ../../ to find the js files which are relative to the root.
-                        jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
-                     }
-                  }
-                  res.set(i, jsFilePath);
-               }
-               return res;
+               return getRelFileList(fileList);
             }
          }
       }
@@ -4811,6 +4827,28 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          return getServerTagJSFiles();
       }
       return null;
+   }
+
+   public List<String> getRelFileList(List<String> fileList) {
+      LayeredSystem sys = LayeredSystem.getCurrent();
+      if (fileList != null) {
+         ArrayList<String> res = new ArrayList<String>(fileList);
+         for (int i = 0; i < res.size(); i++) {
+            String jsFilePath = res.get(i);
+            // We need to use relative paths for client-only or prepend the absolute path of the document root here
+            if ((sys == null || sys.serverEnabled) && !jsFilePath.startsWith("/")) {
+               if (sys == null || !sys.postBuildProcessing)  // We don't technically need this extra test... it was for the static file based websites like the doc which are built with a server, the JS links would not work from the file system, but would when you put them onto a web server.
+                  jsFilePath = "/" + jsFilePath;
+               else {
+                  // If this tag is not defined in a top-level directory, we need to prepend ../../ to find the js files which are relative to the root.
+                  jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
+               }
+            }
+            res.set(i, jsFilePath);
+         }
+         return res;
+      }
+      return fileList;
    }
 
    private List<String> getServerTagJSFiles() {
@@ -4821,20 +4859,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (jsFiles == null)
             return null;
          String[] jsFilesArr = jsFiles.split(",");
-         ArrayList<String> res = new ArrayList<String>(jsFilesArr.length);
-         for (int i = 0; i < jsFilesArr.length; i++) {
-            String jsFilePath = jsFilesArr[i];
-            // TODO: code copied from above - move to a separate method
-            if (sys.serverEnabled && !jsFilePath.startsWith("/")) {
-               if (!sys.postBuildProcessing)
-                  jsFilePath = "/" + jsFilePath;
-               else {
-                  jsFilePath = FileUtil.concat(getRelPrefix(""), jsFilePath);
-               }
-            }
-            res.add(jsFilePath);
-         }
-         return res;
+         return getRelFileList(new ArrayList<String>(Arrays.asList(jsFilesArr)));
       }
       return null;
    }
@@ -4847,6 +4872,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (dynObj != null)
             decl = dynObj.getDynType();
          else {
+            if (sys == null)
+               return getClass();
             decl = sys.getRuntimeTypeDeclaration(DynUtil.getTypeName(DynUtil.getType(this), false));
          }
       }
@@ -4931,6 +4958,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    /** Returns the set of types which are either mainInit elements (for JS) or which have the URL annotation (for server based components) */
+   /*
    public List<URLPath> getURLPaths() {
       LayeredSystem sys = getLayeredSystem();
       if (sys == null) {
@@ -4939,6 +4967,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       return sys.buildInfo.getURLPaths();
    }
+   */
 
    transient public String HTMLClass;
 
