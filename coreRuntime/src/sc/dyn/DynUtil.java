@@ -167,6 +167,12 @@ public class DynUtil {
             if (res != null)
                return res;
          }
+         else if (type instanceof String) {
+            Object resType = DynUtil.findType((String) type);
+            if (resType != null)
+               return resolvePropertyMapping(resType, dstPropName);
+            throw new IllegalArgumentException("No type: " + type + " for resolvePropertyMapping of: " + dstPropName);
+         }
          else
             throw new IllegalArgumentException("Attempt to use dynamic mapping with no registered dynamic model");
       }
@@ -317,8 +323,16 @@ public class DynUtil {
          return ((DynType) type).getMethod(methodName, paramSig);
       else if (dynamicSystem != null)
          return dynamicSystem.resolveMethod(type, methodName, returnType, paramSig);
-      else
+      else if (type instanceof String) {
+         Object resType = DynUtil.findType((String) type);
+         if (resType != null)
+            return resolveMethod(resType, methodName, returnType, paramSig);
+         else
+            throw new IllegalArgumentException("No type: " + type + " to resolveMethod for: " + methodName);
+      }
+      else {
          throw new IllegalArgumentException("Unrecognized type to resolveMethod: " + type);
+      }
    }
 
    public static String getMethodName(Object method) {
@@ -641,10 +655,21 @@ public class DynUtil {
          return dynamicSystem.createInnerInstance(typeObj, outerObj, constrSig, params);
       }
       else if (typeObj instanceof Class) {
-         Object[] newParams = new Object[params.length+1];
-         newParams[0] = outerObj;
-         System.arraycopy(params, 0, newParams, 1, params.length);
-         return PTypeUtil.createInstance((Class) typeObj, constrSig, newParams);
+         Object[] useParams;
+         if (outerObj != null) {
+            int len;
+            if (params == null)
+               len = 0;
+            else
+               len = params.length;
+            useParams = new Object[len+1];
+            useParams[0] = outerObj;
+            if (params != null)
+               System.arraycopy(params, 0, useParams, 1, params.length);
+         }
+         else
+            useParams = params;
+         return PTypeUtil.createInstance((Class) typeObj, constrSig, useParams);
       }
       else
          throw new IllegalArgumentException("Invalid dynamic type: " + typeObj);
@@ -690,7 +715,33 @@ public class DynUtil {
    public static String getObjectName(Object obj, Map<Object,String> idMap, Map<String,Integer> typeIdCounts) {
       if (dynamicSystem != null)
          return dynamicSystem.getObjectName(obj, idMap, typeIdCounts);
-      return null;
+
+      Object outer = DynUtil.getOuterObject(obj);
+      if (outer == null) {
+         Object typeObj = DynUtil.getSType(obj);
+         if (DynUtil.isObjectType(typeObj))
+            return DynUtil.getTypeName(typeObj, false);
+         return DynUtil.getInstanceId(objectIds, typeIdCounts, obj);
+      }
+      else {
+         String outerName = DynUtil.getObjectName(outer, idMap, typeIdCounts);
+         String typeClassName = CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getType(obj), false));
+         String objTypeName = outerName + "." + typeClassName;
+         if (DynUtil.isObjectType(DynUtil.getSType(obj))) {
+            return objTypeName;
+         }
+         if (obj instanceof IObjectId)
+            return outerName + "." + DynUtil.getInstanceId(objectIds, typeIdCounts, obj);
+
+         // Let the parent provide the name for the child - used for repeating components or others that
+         // will have dynamically created child objects
+         if (outer instanceof INamedChildren) {
+            String childName = ((INamedChildren) outer).getNameForChild(obj);
+            if (childName != null)
+               return outerName + "." + childName;
+         }
+         return DynUtil.getObjectId(obj, null, objTypeName, objectIds, typeIdCounts);
+      }
    }
 
    /**
@@ -745,6 +796,7 @@ public class DynUtil {
       if (dynamicSystem == null) {
          if (inst instanceof IObjChildren)
             return ((IObjChildren) inst).getObjChildren(create);
+         return null;
       }
 
       return dynamicSystem.getObjChildren(inst, scopeName, create);
