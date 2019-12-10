@@ -1,12 +1,12 @@
 #!/bin/sh
 
 scp -r /jjv/StrataCode/build/doc_clientOnly/web/ root@strataCode.com:/tmp/newWeb.$$
-scp -r /jjv/StrataCode/build/doc_forms/ root@strataCode.com:/tmp/newForms.$$
+scp -r /jjv/StrataCode/build/doc_webConfig/ root@strataCode.com:/tmp/newForms.$$
 ssh root@strataCode.com mkdir -p /usr/local/scc/build/doc_clientOnly/web
 ssh root@stratacode.com mv /usr/local/scc/build/doc_clientOnly/web /tmp/oldWeb.$$
-ssh root@stratacode.com mv /usr/local/scc/build/doc_forms /tmp/oldForms.$$
+ssh root@stratacode.com mv /usr/local/scc/build/doc_webConfig /tmp/oldForms.$$
 
 ssh root@stratacode.com mv /tmp/newWeb.$$ /usr/local/scc/build/doc_clientOnly/web
-ssh root@stratacode.com mv /tmp/newForms.$$ /usr/local/scc/build/doc_forms
+ssh root@stratacode.com mv /tmp/newForms.$$ /usr/local/scc/build/doc_webConfig
 
 ssh root@stratacode.com ln -s /usr/local/scc/packages /usr/local/scc/build/doc_clientOnly/web/packages

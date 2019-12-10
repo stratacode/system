@@ -594,10 +594,11 @@ public class LayerUtil implements LayerConstants {
       File jarDirFile = new File(jarDir);
       jarDirFile.mkdirs();
       StringBuilder jarArgsDesc = new StringBuilder();
+      File zipTemp = null;
+      File zipStageDir = null;
 
       try {
          List<String> allClassFiles = null;
-         File zipTemp = null;
          if (mergePath != null && mergePath.trim().length() > 0) {
             String[] mergeDirs = mergePath.split(FileUtil.PATH_SEPARATOR);
             zipTemp = createTempDirectory("scJarPkg");
@@ -668,6 +669,13 @@ public class LayerUtil implements LayerConstants {
 
          allClassFiles = folderizeFileList(allClassFiles);
 
+         zipStageDir = createTempDirectory("scJarStage");
+         for (String classFileName:allClassFiles) {
+            String fromFile = FileUtil.concat(classDir, classFileName);
+            String toFile = FileUtil.concat(zipStageDir.getPath(), classFileName);
+            FileUtil.copyFile(fromFile, toFile, true);
+         }
+
          if (mainTypeName != null || classPath != null) {
             StringBuilder manifestChunk = new StringBuilder();
             if (mainTypeName != null) {
@@ -697,10 +705,12 @@ public class LayerUtil implements LayerConstants {
          args.add(jarName);
          if (manifestTmp != null)
             args.add(manifestTmp.toString());
-         args.addAll(allClassFiles);
+         //args.addAll(allClassFiles);
+         args.add(".");
 
          ProcessBuilder pb = new ProcessBuilder(args);
-         pb.directory(new File(classDir));
+         //pb.directory(new File(classDir));
+         pb.directory(zipStageDir);
          pb.redirectErrorStream(true);
 
          if (verbose)
@@ -717,6 +727,8 @@ public class LayerUtil implements LayerConstants {
 
          if (zipTemp != null)
             FileUtil.removeDirectory(zipTemp.getPath());
+
+         FileUtil.removeDirectory(zipStageDir.getPath());
 
          return stat;
       }

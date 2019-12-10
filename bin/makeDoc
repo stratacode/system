@@ -19,4 +19,4 @@ cp build/example_todo_clientOnly/web/js/*.js bundles/doc/doc/core/examples/todoR
 
 scc -c -a doc/clientOnly 
 
-scc -c -a doc/forms
+scc -c -a doc/webConfig

@@ -2608,18 +2608,20 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String baseFileName;
       String ideModuleName;
       switch (moduleType) {
+         case None:
+            return null;
          case CoreRuntime:
             basePropName = "sc.core.";
             baseFileName = "scrt-core";
             ideModuleName = "coreRuntime";
             break;
-         case DynamicRuntime:
-            basePropName = "sc.";
+         case FullRuntime:
+            basePropName = "sc.full.";
             baseFileName = "scrt";
             ideModuleName = "fullRuntime";
             break;
-         case FullRuntime:
-            basePropName = "sc.full.";
+         case DynamicRuntime:
+            basePropName = "sc.";
             baseFileName = "sc";
             ideModuleName = "sc";
             break;
@@ -2690,7 +2692,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean warned = false;
 
       if (strataCodeInstallDir != null) {
-         String mainJarFile = FileUtil.concat(strataCodeInstallDir, STRATACODE_LIBRARIES_FILE);
+         String mainJarFile = FileUtil.concat(strataCodeInstallDir, "bin", STRATACODE_LIBRARIES_FILE);
          if (!new File(mainJarFile).canRead()) {
             error("Install directory: " + strataCodeInstallDir + " missing main jar file: " + mainJarFile);
          }
@@ -4729,7 +4731,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       List<BuildCommandHandler> cmds = runCommands.get(BuildPhase.Process);
       if (cmds != null) {
          List<ProcessBuilder> pbs = getProcessBuildersFromCommands(cmds, this, this, null);
-         if (!LayerUtil.execCommands(pbs, buildDir, options.info)) {
+         if (!LayerUtil.execCommands(pbs, buildDir, options.info && !options.testVerifyMode)) {
             System.err.println("*** Error occurred during run command");
             return -1;
          }
@@ -4741,7 +4743,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       List<BuildCommandHandler> cmds = testCommands.get(BuildPhase.Process);
       if (cmds != null) {
          List<ProcessBuilder> pbs = getProcessBuildersFromCommands(cmds, this, this, null);
-         if (!LayerUtil.execCommands(pbs, buildDir, options.info)) {
+         if (!LayerUtil.execCommands(pbs, buildDir, options.info && !options.testVerifyMode)) {
             System.err.println("*** Error occurred during test command");
             return -1;
          }
@@ -6333,7 +6335,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public String getDepsClassPath() {
       if (buildLayer == null)
          return null;
-      return getClassPathForLayer(buildLayer, false, null, false);
+      String scRuntimeClassPath = getStrataCodeRuntimePath(buildModuleType, false);
+      String mainClassPath = getClassPathForLayer(buildLayer, false, null, false);
+      if (scRuntimeClassPath != null)
+         mainClassPath = mainClassPath + FileUtil.PATH_SEPARATOR + scRuntimeClassPath;
+      return mainClassPath;
    }
 
    public String getClassPathForLayer(Layer startLayer, boolean includeBuildDir, String useBuildDir, boolean addSysClassPath) {
@@ -8147,7 +8153,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (cmds != null) {
             // TODO: should the genLayer argument to the template here be the layered system instead so it is consistent with the run commands?
             List<ProcessBuilder> pbs = getProcessBuildersFromCommands(cmds, this, genLayer, genLayer);
-            if (!LayerUtil.execCommands(pbs, genLayer.buildDir, options.info))
+            if (!LayerUtil.execCommands(pbs, genLayer.buildDir, options.info && !options.testVerifyMode))
                return GenerateCodeStatus.Error;
             else
                refreshLayerIndex();
@@ -9549,7 +9555,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             cmds = postBuildCommands.get(phase);
             if (cmds != null) {
                List<ProcessBuilder> pbs = getProcessBuildersFromCommands(cmds, this, genLayer, genLayer);
-               if (!LayerUtil.execCommands(pbs, genLayer.buildDir, options.info))
+               if (!LayerUtil.execCommands(pbs, genLayer.buildDir, options.info && !options.testVerifyMode))
                   return GenerateCodeStatus.Error;
                else
                   refreshLayerIndex();

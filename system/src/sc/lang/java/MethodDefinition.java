@@ -437,7 +437,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
          String dynStr = "";
          if (lsys.hasDynamicLayers()) {
-            dynStr = "sc.layer.LayeredSystem " + lsys.getLayerNames() + " -lp " + lsys.getLayerPath() + " -r ";
+            dynStr = lsys.getLayerNames() + " -lp " + lsys.getLayerPath() + " -r ";
          }
 
          String sepStr = shellType.equals("bat") ? "\\" : "/";
@@ -447,13 +447,13 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          String[] defaultArgList = defaultArgs.length() == 0 ? null : defaultArgs.trim().split(" ");
          // TODO: put this code into a configurable template
          if (produceJar != null && produceJar) {
-            // TODO: need to find a way to inject command line args into the jar process
-            if (dynStr.length() > 0)
-               System.err.println("*** Unable to produce script with jar option for dynamic layers");
-            if (addMain)
-               lsys.buildInfo.addModelJar(model, model.getModelTypeName(), jarFileName, null, false, includeDepsInJar == null || includeDepsInJar);
+            if (addMain) {
+               String mainClass = lsys.hasDynamicLayers() ? "sc.layer.LayeredSystem " : fullTypeName;
+               lsys.buildInfo.addModelJar(model, mainClass, jarFileName, null, false, includeDepsInJar == null || includeDepsInJar);
+               lsys.buildInfo.addMainCommand(model, execName, defaultArgList, stopMethod);
+            }
             sharedArgs =  memStr + vmParams +
-                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(jarFileName, "/") + "\"";
+                    " -jar \"" + varString("DIRNAME") + sepStr + getFileNamePart(jarFileName, "/") + "\" " + dynStr;
          }
          else {
             if (addMain)
@@ -543,9 +543,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                                     // probably better than killing it from a reliability standpoint anyway.
                                     //"trap \"kill -- $$\" EXIT SIGINT SIGTERM\n" +
                                     //FileUtil.LINE_SEPARATOR +
-                                    "CMDPATH=\"`type -p $0`\"" +
-                                    FileUtil.LINE_SEPARATOR +
-                                    "DIRNAME=`dirname $CMDPATH`" +
+                                    "DIRNAME=\"$( cd \"$(dirname \"$0\")\"; pwd -P)\"" +
                                     FileUtil.LINE_SEPARATOR + debugCommands +
                                     FileUtil.LINE_SEPARATOR +
                                     "java" + debugArgs + ci.javaArgs +
