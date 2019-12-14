@@ -1454,7 +1454,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             ctx.defineVariable("ctx", octx);
          }
 
-         if (createInstance && rootType != null && ctx.getCurrentObject() == null) {
+         if (createInstance && rootType != null) {
             ctx.pushCurrentObject(ModelUtil.createInstance(rootType, null, new ArrayList<Expression>(0), ctx));
             newObj = true;
          }

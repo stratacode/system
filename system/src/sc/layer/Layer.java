@@ -987,7 +987,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (definesProperty(propName)) {
             return dynObj.getPropertyFromWrapper(this, propName, getField);
          }
-         if (baseLayers != null) {
+         LayeredSystem sys = layeredSystem;
+         // We use the current build layer to represent all layers in the current process and so should resolve any
+         // properties even if we don't directly extend the base layer that defines in.
+         if (activated && sys != null && sys.currentBuildLayer == this) {
+            List<Layer> layersList = getLayersList();
+            for (int i = getLayerPosition() - 1; i >= 0; i--) {
+               Layer depLayer = layersList.get(i);
+               if (depLayer.hasProperty(propName))
+                  return depLayer.getProperty(propName, getField);
+            }
+         }
+         else if (baseLayers != null) {
             for (Layer base:baseLayers) {
                if (base.hasProperty(propName))
                   return base.getProperty(propName, getField);

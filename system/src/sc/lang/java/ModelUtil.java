@@ -777,8 +777,9 @@ public class ModelUtil {
          // All fields or methods defined in the cmd object are visible for everyone
          if (encType instanceof AbstractInterpreter.CmdClassDeclaration)
             return true;
-         // Special rule to allow a layer to see any package private values if it extends the other layer explicitly
-         if (ModelUtil.isLayerType(encType)) {
+         // By default everything is public inside of a layer definition file
+         if (ModelUtil.isLayerType(encType) || ModelUtil.isLayerComponent(encType)) {
+            /* old - a layer to see any package private values if it extends the other layer explicitly
             if (ModelUtil.isLayerType(refType)) {
                Layer encLayer = ModelUtil.getLayerForType(null, encType);
                Layer refLayer = ModelUtil.getLayerForType(null, refType);
@@ -786,7 +787,10 @@ public class ModelUtil {
                   return true;
                }
             }
+            */
+            return true;
          }
+         // TODO: should we make all layer components public by default
          return ModelUtil.samePackage(refType, encType);
       }
       switch (memberLevel) {
@@ -8301,6 +8305,10 @@ public class ModelUtil {
 
    public static boolean isLayerType(Object type) {
       return type instanceof BodyTypeDeclaration && ((BodyTypeDeclaration) type).isLayerType;
+   }
+
+   public static boolean isLayerComponent(Object type) {
+      return type instanceof BodyTypeDeclaration && ((BodyTypeDeclaration) type).isLayerComponent();
    }
 
    public static JavaModel getJavaModel(Object node) {

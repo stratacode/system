@@ -3918,6 +3918,11 @@ public class IdentifierExpression extends ArgumentsExpression {
                if (model.commandInterpreter != null && srcType == model.commandInterpreter.cmdObject) {
                   return model.commandInterpreter;
                }
+               // If we are evaluating a template during the 'process' build phase, need to return the layer object
+               if (model.resolveInLayer && (srcType instanceof BodyTypeDeclaration) && ((BodyTypeDeclaration) srcType).isLayerType) {
+                  if (ctx.currentObjects.size() > 1 && ctx.currentObjects.get(0) instanceof Layer)
+                     return ctx.currentObjects.get(0);
+               }
             }
          }
       }

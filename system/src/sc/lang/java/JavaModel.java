@@ -198,6 +198,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    /** For models without a srcFile, the "a.b" name to append onto the layer package to get the package for the model */
    private transient String relDirPath;
 
+   public transient boolean resolveInLayer = false;
+
    public void setLayeredSystem(LayeredSystem system) {
       layeredSystem = system;
    }
@@ -944,7 +946,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                      String nextRoot = rootTypeName.substring(0,lix);
                      String tail = importedName.substring(lix+1);
                      if (nextRoot.equals(typeName)) {
-                        System.err.println("*** finTypeDeclaration - avoiding infinite loop - somehow came up with the same type name as the one we were passed - not good: " + typeName + " rootTypeName: " + rootTypeName);
+                        System.err.println("*** findTypeDeclaration - avoiding infinite loop - somehow came up with the same type name as the one we were passed - not good: " + typeName + " rootTypeName: " + rootTypeName);
                         break;
                      }
                      try {
@@ -1019,6 +1021,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          // Even if we can't resolve this, it is an external reference.  It can be a Java class we don't
          // know about such as java.util.xxx
          addExternalReference(importedName);
+      }
+      if (td == null && resolveInLayer) {
+         Layer layer = getLayer();
+         if (layer != null && layer.model != null)
+            td = layer.model.getModelTypeDeclaration().findType(typeName);
       }
       return td;
    }
@@ -2309,7 +2316,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if ((v = definesMember(name, mtype, refType, ctx, skipIfaces, nonTransformedModel != null)) != null)
          return v;
 
-      return super.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
+      Object res = super.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
+      if (res == null) {
+         if (resolveInLayer) {
+            Layer layer = getLayer();
+            if (layer != null && layer.model != null) {
+               TypeDeclaration layerType = layer.model.getModelTypeDeclaration();
+               if (layerType != null)
+                  res = layerType.findMember(name, mtype, fromChild, refType, ctx, skipIfaces);
+            }
+         }
+      }
+      return res;
    }
 
    public Object definesMember(String name, EnumSet<MemberType> mtype, Object refType, TypeContext ctx, boolean skipIfaces, boolean isTransformed) {

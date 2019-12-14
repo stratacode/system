@@ -4,14 +4,15 @@
 
 package sc.repos;
 
+import sc.util.FileUtil;
 import sc.util.IMessageHandler;
 import sc.util.URLUtil;
 
 import java.io.File;
 
 /**
- * For this RepoistoryManager, packages are stored from the URL and downloaded via the URL protocol handler built into Java.
- * From there they are transfered to the installedRoot, which is then typically unzipped.
+ * For this RepositoryManager, packages are stored from the URL and downloaded via the URL protocol handler built into Java.
+ * From there they are transferred to the installedRoot, which is then typically unzipped.
  */
 public class URLRepositoryManager extends AbstractRepositoryManager {
    public URLRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
@@ -19,14 +20,23 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
    }
 
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
-      src.pkg.definesClasses = false;
+      String installDir = src.pkg.installedRoot;
+      String installFile = installDir;
+      if (src.pkg.unzip)
+         src.pkg.definesClasses = false;
+      else if (src.pkg.fileNames.size() == 1) {
+         String fileName = src.pkg.fileNames.get(0);
+         installFile = FileUtil.concat(installDir, fileName);
+      }
+      // TODO: should we have an option here to set definesClasses true/false for a package url package?
       if (!system.reinstallSystem) {
          if (new File(src.pkg.installedRoot).isDirectory()) {
             info("Package already downloaded: " + src);
             return null;
          }
       }
-      return URLUtil.saveURLToFile(src.url, src.pkg.installedRoot, src.unzip, msg);
+      new File(installDir).mkdirs();
+      return URLUtil.saveURLToFile(src.url, installFile, src.unzip, msg);
    }
 
    @Override

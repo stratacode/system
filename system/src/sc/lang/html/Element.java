@@ -4889,17 +4889,21 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * external URL corresponds to a given internal path.
     */
    public static String getRelURL(String srcRelPath, String urlPath) {
-      return URLUtil.concat(getRelPrefix(srcRelPath), urlPath);
+      String res = URLUtil.concat(getRelPrefix(srcRelPath), urlPath);
+      //System.out.println("*** in getRelURL - returning: " + res + " for: " + srcRelPath + " and " + urlPath);
+      return res;
    }
 
    /** In the generated code, we'll call this method to find the relative directory prefix to prepend (if any) for a reference from this src path in the tree.  */
    public static String getRelPrefix(String srcRelPath) {
+      //System.out.println("in getRelPrefix: " + srcRelPath);
       if (srcRelPath == null)
          srcRelPath = "";
       Window window = Window.getWindow();
       if (window == null)
          return srcRelPath;
       String curRelPath = window.location.getPathname();
+      //System.out.println("in getRelPrefix cur path: " + curRelPath);
       if (curRelPath != null) {
          // TODO: remove this bogus code - if we have /articles/ the relPath should be /articles
          //if (curRelPath.endsWith("/") && curRelPath.length() > 1)
@@ -4908,11 +4912,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             curRelPath = curRelPath.substring(1);
          curRelPath = URLUtil.getParentPath(curRelPath);
       }
-      if (curRelPath == null)
+      if (curRelPath == null) {
+         //System.out.println("in getRelPrefix returning srcRelPath: " + srcRelPath);
          return srcRelPath;
+      }
       // The current URL is pointed to the same directory as the URL in the link so we return no directory prefix.
-      if (curRelPath.equals(srcRelPath))
+      if (curRelPath.equals(srcRelPath)) {
+         //System.out.println("in getRelPrefix returning null - " + srcRelPath + " is curRelPath");
          return null;
+      }
 
       // We need to return a prefix for a relative url reference which will resolve to srcRelPath but in the context of curRelPath.
       String[] curRelDirs = curRelPath.split("/");
@@ -4937,6 +4945,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             relPath.append("/");
          }
       }
+      //System.out.println("in getRelPrefix returning: " + relPath);
       return relPath.toString();
    }
 

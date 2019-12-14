@@ -267,6 +267,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
       if (semValue instanceof Template) {
          Template temp = (Template) semValue;
          if (processTemplate) {
+            // Allow the template to see values in the layer definition file since it's being evaluated
+            temp.resolveInLayer = true;
+
             if (!staticTemplate)
                temp.createInstance = true;
             if (!compiledTemplate)
@@ -354,8 +357,9 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                   if (rootTypeObj instanceof BodyTypeDeclaration) {
                      ((BodyTypeDeclaration) rootTypeObj).setDynamicType(true);
                   }
-                  ExecutionContext ctx = new ExecutionContext();
+                  ExecutionContext ctx = new ExecutionContext((JavaModel) buildLayer.model);
                   ctx.resolver = this;
+                  ctx.pushCurrentObject(buildLayer);
                   if (!staticTemplate) {
                      templateCopy.createInstance = true;
                   }
@@ -592,7 +596,14 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                return model;
             }
          }
-         return template.resolveName(name, create, returnTypes);
+         Object res = template.resolveName(name, create, returnTypes);
+         if (res == null) {
+            // Include the layer components in the resolution
+            Layer layer = template.getLayer();
+            if (layer != null && layer.model != null)
+               res = ((JavaModel) layer.model).resolveName(name, create, returnTypes);
+         }
+         return res;
       }
    }
 
