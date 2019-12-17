@@ -1345,6 +1345,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       this.externalModelIndex = extModelIndex;
       this.systemInstalled = !options.installLayers;
       this.strataCodeInstallDir = scInstallDir;
+      if (scInstallDir != null && !new File(scInstallDir).isDirectory())
+         error("Specified install directory: " + scInstallDir + " does not exist");
 
       lastChangedModelTime = System.currentTimeMillis();
 
@@ -2694,7 +2696,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (strataCodeInstallDir != null) {
          String mainJarFile = FileUtil.concat(strataCodeInstallDir, "bin", STRATACODE_LIBRARIES_FILE);
          if (!new File(mainJarFile).canRead()) {
-            error("Install directory: " + strataCodeInstallDir + " missing main jar file: " + mainJarFile);
+            mainJarFile = FileUtil.concat(strataCodeInstallDir, STRATACODE_LIBRARIES_FILE);
+            if (!new File(mainJarFile).canRead()) {
+               error("Install directory: " + strataCodeInstallDir + " missing main jar file: " + mainJarFile + " - both bin/sc.jar and sc.jar are valid paths");
+            }
          }
          rootInfo.zipFileName = mainJarFile;
          return rootInfo;
@@ -6757,20 +6762,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // Ordinarily the classes.jar is in the classpath.  But if not (like in the -jar option used in layerCake), we need to
       // find the classes in the boot class path.
       if (packageIndex.get("java" + FileUtil.FILE_SEPARATOR + "awt") == null) {
+         boolean jdkFound = false;
          String bootPath = System.getProperty("sun.boot.class.path");
          if (bootPath == null)
-            System.err.println("*** No boot classpath found in properties: " + System.getProperties());
-         String[] pathEntries = StringUtil.split(bootPath, FileUtil.PATH_SEPARATOR);
-         boolean jdkFound = false;
-         // Only add the JDK.  This is needed for importing "*" on system packages.
-         for (String p:pathEntries) {
-            if (p.contains("classes.jar") || p.contains("Classes.jar") || p.contains("rt.jar")) {
-               jdkFound = true;
-               addPathToIndex(null, p);
+            System.err.println("*** No boot classpath found in properties: " + System.getProperties() + " not adding jdk classes to class index");
+         else {
+            String[] pathEntries = StringUtil.split(bootPath, FileUtil.PATH_SEPARATOR);
+            // Only add the JDK.  This is needed for importing "*" on system packages.
+            for (String p:pathEntries) {
+               if (p.contains("classes.jar") || p.contains("Classes.jar") || p.contains("rt.jar")) {
+                  jdkFound = true;
+                  addPathToIndex(null, p);
+               }
             }
+            if (!jdkFound)
+               System.err.println("*** Did not find classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + pathEntries);
          }
-         if (!jdkFound)
-            System.err.println("*** Did not find classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + pathEntries);
       }
    }
 
