@@ -2289,6 +2289,11 @@ public class ModelUtil {
             return null;
          return typeParams.get(ix);
       }
+      else if (paramType != null) {
+         // TODO: maybe a type parameter? this happened once when a library was not resolved
+         System.err.println("*** Unrecognized type to getTypeParameter: " + paramType.getClass());
+         return null;
+      }
       else throw new UnsupportedOperationException();
    }
 
@@ -5842,7 +5847,7 @@ public class ModelUtil {
          Definition def = ((VariableDefinition) superType).getDefinition();
          return getAnnotation(def, annotationName);
       }
-      else {
+      else if (superType != null) {
          System.err.println("*** Unrecognized type in getInheritedAnnotation: " + superType);
       }
       return null;
