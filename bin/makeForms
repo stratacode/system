@@ -1,0 +1,7 @@
+#!/bin/sh
+
+SC=/jjv/StrataCode
+
+cd $SC
+
+scc -c -a doc/webConfig

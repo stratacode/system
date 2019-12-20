@@ -18,6 +18,7 @@ SCC_CMD=scc
 
 BUILDS_DIR=/usr/local/scc/builds
 BUILD_NUM_FILE=~/.stratacode/buildNum.properties 
+CLEAN_SC_DIR=/usr/local/cleanScc
 
 SC_DIR=`dirname $BASH_SOURCE[0]`
 SC_DIR=`dirname $SC_DIR`
@@ -110,3 +111,4 @@ echo "$LATEST_TAG"
 #echo "version: $VERS_FILE"
 cat $VERS_FILE
 
+(cd $CLEAN_SC_DIR; git pull; jar -cf $RES_DIR/scc-src.zip .)
