@@ -525,7 +525,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                      String debugCommands = !includeDebug ? "# @MainSettings(debug not enabled)" :
                                      "DBG_ARGS=" +
                                      FileUtil.LINE_SEPARATOR +
-                                     "if [ \"$1\" == \"-dbg\" ] ; then" +
+                                     "if [ \"$1\" = \"-dbg\" ] ; then" +
                                      FileUtil.LINE_SEPARATOR +
                                      "   DBG_ARGS=\"" + ci.debugArgs + "\"" +
                                      FileUtil.LINE_SEPARATOR +
