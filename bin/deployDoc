@@ -10,3 +10,5 @@ ssh scserver@stratacode.com mv /tmp/newWeb.$$ /usr/local/scc/build/doc_clientOnl
 ssh scserver@stratacode.com mv /tmp/newForms.$$ /usr/local/scc/build/doc_webConfig
 
 ssh scserver@stratacode.com ln -s /usr/local/scc/packages /usr/local/scc/build/doc_clientOnly/web/packages
+
+ssh root@stratacode.com systemctl restart scforms
