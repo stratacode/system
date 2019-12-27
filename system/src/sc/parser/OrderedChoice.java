@@ -4,20 +4,16 @@
 
 package sc.parser;
 
-import javafx.scene.Parent;
 import sc.binf.ParseInStream;
 import sc.binf.ParseOutStream;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
-import sc.util.IntStack;
 import sc.util.PerfMon;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static sc.parser.NestedParselet.ParameterMapping.INHERIT;
 
 /**
  * A NestedParselet which represents a choice of parselets.  You provide the list of child parselets and it matches them
