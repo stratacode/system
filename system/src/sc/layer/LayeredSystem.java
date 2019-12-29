@@ -1109,10 +1109,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
 
    public enum BuildCommandTypes {
-      Pre, Post, Run, Test
+      PreBuild, PostProcess, PostBuild, Run, Test
    }
 
    private EnumMap<BuildPhase,List<BuildCommandHandler>> preBuildCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
+   private EnumMap<BuildPhase,List<BuildCommandHandler>> postProcessCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
    private EnumMap<BuildPhase,List<BuildCommandHandler>> postBuildCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
    private EnumMap<BuildPhase,List<BuildCommandHandler>> runCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
    private EnumMap<BuildPhase,List<BuildCommandHandler>> testCommands = new EnumMap<BuildPhase,List<BuildCommandHandler>>(BuildPhase.class);
@@ -1457,6 +1458,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (!peerMode) {
          String scSourceConfig = getStrataCodeConfDir(SC_SOURCE_PATH);
+         if (scSourceConfig.startsWith("~/"))
+            scSourceConfig = FileUtil.concat(System.getProperty("user.home"), scSourceConfig.substring(2));
          if (new File(scSourceConfig).canRead()) {
             scSourcePath = FileUtil.getFileAsString(scSourceConfig);
             if (scSourcePath != null) {
@@ -1664,10 +1667,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (int ix = 0; ix < processes.size(); ix++) {
             IProcessDefinition proc = processes.get(ix);
 
+            boolean procIsDisabled = proc != null && isRuntimeDisabled(proc.getRuntimeName());
+
             // Skip the processor associated with the main layered system
             if (ProcessDefinition.compare(proc, processDefinition)) {
                // make the main layered system point to this process.
-               if (processDefinition == null && proc != null)
+               if (processDefinition == null && proc != null && !procIsDisabled)
                   updateProcessDefinition(proc);
 
                // Do not do this for the IDE in activeLayers since we have already marked the excluded layers and will remove them after we
@@ -2151,14 +2156,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       initProcessesList(procDef);
       IProcessDefinition existing = null;
       int procIndex = 0;
+      LayeredSystem fromSys = fromLayer == null ? null : fromLayer.layeredSystem;
       for (IProcessDefinition existingProc:processes) {
+         boolean isDisabled = fromSys != null && existingProc != null && fromSys.isRuntimeDisabled(existingProc.getRuntimeName());
          if (procDef == null && existingProc == null)
             return;
          // If the existing proc is null it's a default runtime and no designated process.  If the new guy has a name and the same runtime process, just use it rather than creating a new one.
-         else if (existingProc == null && procDef.getRuntimeProcessor() == null && getProcessDefinition(procDef.getProcessName(), procDef.getRuntimeName()) == null) {
+         // Just don't let a disabled process define the main system since that ends up with one too many systems (e.g. Runtime: android happens to be the first process
+         // created - since it's a Java process, it becomes the system but then is disabled).
+         else if (existingProc == null && procDef.getRuntimeProcessor() == null && getProcessDefinition(procDef.getProcessName(), procDef.getRuntimeName()) == null && !isDisabled) {
             processes.set(procIndex, procDef);
-            if (fromLayer != null && fromLayer.layeredSystem.processDefinition == null)
-               fromLayer.layeredSystem.updateProcessDefinition(procDef);
+            if (fromSys != null && fromSys.processDefinition == null)
+               fromSys.updateProcessDefinition(procDef);
             procInfoNeedsSave = true;
             return;
          }
@@ -3338,7 +3347,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       BuildCommandHandler bch = new BuildCommandHandler();
       bch.args = args;
       bch.definedInLayer = layer;
-      addBuildCommand(phase, BuildCommandTypes.Pre, bch);
+      addBuildCommand(phase, BuildCommandTypes.PreBuild, bch);
    }
 
    public void addPreBuildCommand(String checkTypeGroup, BuildPhase phase, Layer layer, String...args) {
@@ -3346,15 +3355,29 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       bch.args = args;
       bch.definedInLayer = layer;
       bch.checkTypeGroup = checkTypeGroup;
-      addBuildCommand(phase, BuildCommandTypes.Pre, bch);
+      addBuildCommand(phase, BuildCommandTypes.PreBuild, bch);
    }
 
    public void addPreBuildCommand(BuildPhase phase, BuildCommandHandler handler) {
-      addBuildCommand(phase, BuildCommandTypes.Pre, handler);
+      addBuildCommand(phase, BuildCommandTypes.PreBuild, handler);
+   }
+
+   public void addPostProcessCommand(BuildPhase phase, BuildCommandHandler handler) {
+      addBuildCommand(phase, BuildCommandTypes.PostProcess, handler);
+   }
+
+   /**
+    * Run the command after after the transformation phase is complete, before files are compiled and packaged
+    */
+   public void addPostProcessCommand(BuildPhase phase, Layer layer, String...args) {
+      BuildCommandHandler bch = new BuildCommandHandler();
+      bch.args = args;
+      bch.definedInLayer = layer;
+      addBuildCommand(phase, BuildCommandTypes.PostProcess, bch);
    }
 
    public void addPostBuildCommand(BuildPhase phase, BuildCommandHandler handler) {
-      addBuildCommand(phase, BuildCommandTypes.Post, handler);
+      addBuildCommand(phase, BuildCommandTypes.PostBuild, handler);
    }
 
    /**
@@ -3364,7 +3387,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       BuildCommandHandler bch = new BuildCommandHandler();
       bch.args = args;
       bch.definedInLayer = layer;
-      addBuildCommand(phase, BuildCommandTypes.Post, bch);
+      addBuildCommand(phase, BuildCommandTypes.PostBuild, bch);
    }
 
    /**
@@ -3375,7 +3398,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       bch.args = args;
       bch.definedInLayer = layer;
       bch.checkTypeGroup = checkTypeGroup;
-      addBuildCommand(phase, BuildCommandTypes.Post, bch);
+      addBuildCommand(phase, BuildCommandTypes.PostBuild, bch);
    }
 
    public void addRunCommand(BuildCommandHandler handler) {
@@ -3408,10 +3431,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (hndlr.definedInLayer == null || hndlr.definedInLayer.activated) {
          EnumMap<BuildPhase,List<BuildCommandHandler>> buildCommands = null;
          switch (bct) {
-            case Pre:
+            case PreBuild:
                buildCommands = preBuildCommands;
                break;
-            case Post:
+            case PostProcess:
+               buildCommands = postProcessCommands;
+               break;
+            case PostBuild:
                buildCommands = postBuildCommands;
                break;
             case Run:
@@ -4762,7 +4788,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          int i = 0;
          for (String arg:args) {
             if (arg.indexOf("<%") != -1) {
-               String targ = TransformUtil.evalTemplate(buildLayer, arg, true);
+               String targ = TransformUtil.evalTemplate(buildLayer, arg, true, true, buildLayer);
                // Args which are surrounded by [ brackets are split into multiple args
                if (targ.startsWith("[")) {
                   targ = targ.substring(1, targ.length()-1);
@@ -7798,7 +7824,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       for (BuildCommandHandler handler:cmds) {
          // Commands that specify a layer argument should only be run when building layers which extend that layer unless it's the final build layer
          if (definedInLayer == null || handler.definedInLayer == null || definedInLayer.extendsLayer(handler.definedInLayer) || definedInLayer == buildLayer) {
-            String[] args = handler.getExecArgs(sys, templateArg);
+            String[] args = handler.getExecArgs(sys, templateArg, sys.buildLayer);
             String inputFile = handler.redirInputFile;
             String outputFile = handler.redirOutputFile;
             boolean redirErrors = handler.redirErrors;
@@ -9487,6 +9513,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (options.verbose && !options.testVerifyMode) {
             verbose("Generation completed in: " + StringUtil.formatFloat((System.currentTimeMillis() - buildStartTime)/1000.0));
          }
+
+         List<BuildCommandHandler> cmds = null;
+         cmds = postProcessCommands.get(phase);
+         if (cmds != null) {
+            List<ProcessBuilder> pbs = getProcessBuildersFromCommands(cmds, this, genLayer, genLayer);
+            if (!LayerUtil.execCommands(pbs, genLayer.buildDir, options.info && !options.testVerifyMode))
+               return GenerateCodeStatus.Error;
+            else
+               refreshLayerIndex();
+         }
+
          if (phase == BuildPhase.Process && !skipBuild) {
             if (!options.noCompile) {
                int numToCompile = bd.toCompile.size();
@@ -9555,7 +9592,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             }
          }
 
-         List<BuildCommandHandler> cmds = null;
 
          if (!compileFailed && !skipBuild) {
             cmds = postBuildCommands.get(phase);

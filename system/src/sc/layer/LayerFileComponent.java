@@ -43,7 +43,15 @@ public abstract class LayerFileComponent extends LayerComponent implements IFile
     */
    public boolean processInAllLayers = false;
 
-   /** When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does? */
+   /**
+    * For layered build directories, should the file processor inherit output files from the previous build layer in the stack.
+    * For example, Java .class files set inheritFiles to true because they can be inherited in the classpath from the previous build
+    * layer so they are not included in the next one unless they have changed. Instead a .inh file is created to represent the generated file.
+    * When inheriting a file from a previous layer, should we use the .inh files and remove all class files like the Java case does?
+    * Use the default false, when the output file should be included in all build layers, even when it's unchanged.
+    *
+    * TODO: change the name to inheritOutputFiles?
+    */
    public boolean inheritFiles = false;
 
    public List<String> excludeRuntimes = null;

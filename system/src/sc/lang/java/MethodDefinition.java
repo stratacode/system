@@ -416,7 +416,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          if (defaultArgs != null && defaultArgs.length() > 0) {
             if (defaultArgs.length() > 0 && !defaultArgs.startsWith(" ")) {
                try {
-                  extraArgs = " " + TransformUtil.evalTemplate(this, defaultArgs, false);
+                  extraArgs = " " + TransformUtil.evalTemplate(this, defaultArgs, false, true, null);
                }
                catch (IllegalArgumentException exc) {
                   displayError("Failed to parse defaultArgs as a template string: " + defaultArgs);

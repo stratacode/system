@@ -162,12 +162,12 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (customResolverTemplate != null)
          customResolver = TransformUtil.evalTemplate(this, customResolverTemplate);
       else if (customResolver != null)
-         customResolver = TransformUtil.evalTemplate(this, customResolver, true);
+         customResolver = TransformUtil.evalTemplate(this, customResolver, true, false, null);
 
       if (customSetterTemplate != null)
          customSetter = TransformUtil.evalTemplate(this, customSetterTemplate);
       else if (customResolver != null)
-         customSetter = TransformUtil.evalTemplate(this, customSetter, true);
+         customSetter = TransformUtil.evalTemplate(this, customSetter, true, false, null);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -365,7 +365,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (preAssignments != null) {
          for (String preTemplate:preAssignments) {
             try {
-               preAssignment += TransformUtil.evalTemplate(this, preTemplate, true);
+               preAssignment += TransformUtil.evalTemplate(this, preTemplate, true, false, null);
             }
             catch (IllegalArgumentException exc) {
                objType.displayError("Invalid preAssignment template: " + preTemplate + ": " + exc.toString() + " for type: ");
@@ -380,7 +380,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (postAssignments != null) {
          for (String postTemplate:postAssignments) {
             try {
-               postAssignment += TransformUtil.evalTemplate(this, postTemplate, true);
+               postAssignment += TransformUtil.evalTemplate(this, postTemplate, true, false, null);
             }
             catch (IllegalArgumentException exc) {
                objType.displayError("Invalid postAssignment template: " + postTemplate + ": " + exc.toString() + " for type: ");
@@ -395,7 +395,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (accessHooks != null) {
          for (String accessHookTemplate:accessHooks) {
             try {
-               accessHookStr += TransformUtil.evalTemplate(this, accessHookTemplate, true);
+               accessHookStr += TransformUtil.evalTemplate(this, accessHookTemplate, true, false, null);
             }
             catch (IllegalArgumentException exc) {
                objType.displayError("Invalid accessHook template: " + accessHookTemplate + ": " + exc.toString() + " for type: ");

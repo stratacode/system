@@ -2390,7 +2390,18 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          return v;
 
       // If this is an inner type, we still need to check the parent
-      return super.findMethod(name, params, this, refType, staticOnly, inferredType);
+      Object res = super.findMethod(name, params, this, refType, staticOnly, inferredType);
+      if (res == null) {
+         if (resolveInLayer) {
+            Layer layer = getLayer();
+            if (layer != null && layer.model != null) {
+               TypeDeclaration layerType = layer.model.getModelTypeDeclaration();
+               if (layerType != null)
+                  res = layerType.findMethod(name, params, fromChild, refType, staticOnly, inferredType);
+            }
+         }
+      }
+      return res;
    }
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {

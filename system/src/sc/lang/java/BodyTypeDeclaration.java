@@ -5211,7 +5211,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    String generateDynamicStub(boolean batchCompile) {
       // TODO: could make this configurable via compiler settings
       if (dynStubTemplate == null)
-         dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr, DynStubParameters.class, false, getLayeredSystem());
+         dynStubTemplate = TransformUtil.parseTemplate(dynStubTemplateStr, DynStubParameters.class, false, false, null, getLayeredSystem());
       return TransformUtil.evalTemplate(new DynStubParameters(getLayeredSystem(), getLayer(), this, batchCompile), dynStubTemplate);
    }
 
@@ -7516,7 +7516,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                                  contextParams = typeScope.getContextParams();
                               if (contextParams != null) {
                                  useChildNames.append("(");
-                                 useChildNames.append(TransformUtil.evalTemplate(innerTypeDecl.getScopeTemplateParameters(), contextParams, true));
+                                 useChildNames.append(TransformUtil.evalTemplate(innerTypeDecl.getScopeTemplateParameters(), contextParams, true, false, null));
                                  useChildNames.append(")");
                               }
                               else

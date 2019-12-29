@@ -23,7 +23,7 @@ public class BuildCommandHandler {
    /** When set, this ensures the command is only run when you are building a layer which extends this layer. */
    public Layer definedInLayer;
 
-   public String[] getExecArgs(LayeredSystem sys, Object templateArg) {
+   public String[] getExecArgs(LayeredSystem sys, Object templateArg, Layer layer) {
       ArrayList<String> resArgs = new ArrayList<String>(Arrays.asList(args));
       if (checkTypeGroup != null) {
          List<TypeGroupMember> tgms;
@@ -45,8 +45,8 @@ public class BuildCommandHandler {
          String arg = resArgs.get(i);
          if (arg == null)
             System.out.println("*** Invalid arg to command layer: " + this);
-         if (arg.indexOf("<%") != -1) {
-            resArgs.set(i, TransformUtil.evalTemplate(templateArg, arg, true));
+         if (arg.contains("<%")) {
+            resArgs.set(i, TransformUtil.evalTemplate(templateArg, arg, true, true, layer));
             // Multiple valued args are surrounded by brackets
             if (resArgs.get(i).startsWith("[")) {
                arg = resArgs.get(i);
@@ -70,7 +70,10 @@ public class BuildCommandHandler {
          else if (arg.equals("<")) {
             if (resArgs.size() - 1 > i) {
                resArgs.remove(i);
-               redirInputFile = resArgs.get(i);
+               arg = resArgs.get(i);
+               if (arg.contains("<%"))
+                  arg = TransformUtil.evalTemplate(templateArg, arg, true, true, layer);
+               redirInputFile = arg;
                resArgs.remove(i);
                i--;
             }
@@ -82,6 +85,9 @@ public class BuildCommandHandler {
          else if (arg.equals(">") || arg.equals("&>")) {
             if (resArgs.size() - 1 > i) {
                resArgs.remove(i);
+               arg = resArgs.get(i);
+               if (arg.contains("<%"))
+                  arg = TransformUtil.evalTemplate(templateArg, arg, true, true, layer);
                redirOutputFile = resArgs.get(i);
                resArgs.remove(i);
                i--;

@@ -5,18 +5,33 @@
 package sc.layer;
 
 /**
- * This is the core interface used when adding new types to the system.  Typically you use either a Language such as
- * sc.lang.JavaLanguage or you use a LayerFileProcessor instance.  Each of those classes comes with various properties
- * to customize how you process a file.
- * When you implement a file processor that produces a new file type, e.g. the .scsh files produce .sh files, you
- * also need to register a file processor which tells the system where the resulting files go.  It uses that internally
- * for the buildSrcIndex.  It's also good practice because you can then replace a .scsh file with a .sh file and vice
- * versa.
+ * This is the core interface used when adding new file types to the system.  Implementations include sc.parser.Language subclasses:
+ * sc.lang.JavaLanguage, etc. The LayerFileProcessor class supports simpler processors that merge files without parsing (the default
+ * behavior is to just take the last version to allow for a layer to replace the file in a previous one).
+ * Each of those classes include configurable properties to make file type processor flexible.
+ * Some file processors convert one format to another e.g. a file with a suffix .scsh files produces one with .sh.
+ * In this case, register a LayerFileProcessor for .sh files to control the output file location.  This is needed for
+ * the buildSrcIndex so that it can manage the generated files.
+ * This also allows a .sh file to replace a .scsh file - to go from a converted file, to a fixed one in a subsequent layer.
  */
 public interface IFileProcessor {
    final static Object FILE_OVERRIDDEN_SENTINEL = new String("<file-overridden-sentinel>");
 
+   /** Called when the processor is registered to validate it's configuration */
    void validate();
+
+   /**
+    * Once all files have been validated, the process method is called on each to actually perform
+    * produce the processor result.
+    * This method returns Object to make it easier to plug in different
+    * frameworks.
+    * For a Language, the file is parsed and produces an IParseNode or a ParseError.
+    *
+    * For LayerFileProcessors, it returns IFileProcessorResult - an interface with info about the file to help with
+    * dependency management, increment rebuilds, etc.
+    *
+    * For Languages, the top level semantic node (e.g. JavaModel) implements IFileProcessorResult for the same thing.
+    */
    Object process(SrcEntry file, boolean enablePartialValues);
 
    boolean getInheritFiles();

@@ -245,7 +245,7 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       if (customResolverTemplate != null)
          return customResolverTemplate;
       if (customResolver != null) {
-         customResolverTemplate = TransformUtil.parseTemplate(customResolver, ObjectDefinitionParameters.class, true, sys);
+         customResolverTemplate = TransformUtil.parseTemplate(customResolver, ObjectDefinitionParameters.class, true, false, null, sys);
       }
       return customResolverTemplate;
    }
@@ -258,7 +258,7 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       if (customSetterTemplate != null)
          return customSetterTemplate;
       if (customSetter != null) {
-         customSetterTemplate = TransformUtil.parseTemplate(customSetter, ObjectDefinitionParameters.class, true, sys);
+         customSetterTemplate = TransformUtil.parseTemplate(customSetter, ObjectDefinitionParameters.class, true, false, null, sys);
       }
       return customSetterTemplate;
    }

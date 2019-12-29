@@ -641,7 +641,8 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
          if (buildInitTemplStr.length() > 0) {
             TypeDeclaration enclType = getEnclosingType();
             ObjectDefinitionParameters params = TransformUtil.createObjectDefinitionParameters(enclType);
-            String buildInitExprStr = TransformUtil.evalTemplate(params, buildInitTemplStr, false);
+            // TODO: should resolveInLayer be true here and pass in the current layer? We instead handle that by setting the parentNode below before starting it.
+            String buildInitExprStr = TransformUtil.evalTemplate(params, buildInitTemplStr, false, false, null);
             if (buildInitExprStr == null) {
                displayError("@BuildInit(\"" + buildInitTemplStr + "\") invalid template expression for: ");
                return null;

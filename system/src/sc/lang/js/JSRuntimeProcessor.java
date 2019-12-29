@@ -1480,7 +1480,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                registerPrefixAlias(type);
 
                Object typeParams = new ObjectTypeParameters(system, type);
-               String jsModuleRes = TransformUtil.evalTemplate(typeParams, jsModuleStr, true); // TODO: preparse these strings for speed
+               String jsModuleRes = TransformUtil.evalTemplate(typeParams, jsModuleStr, true, false, null);
                addModuleEntryPoint(type, jsModuleRes);
                addJsModuleName(typeName, jsModuleRes);
                return jsModuleRes;
@@ -2053,7 +2053,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       BodyTypeDeclaration td = (BodyTypeDeclaration) typeObj;
 
       Object typeParams = new JSTypeParameters(td);
-      return TransformUtil.evalTemplate(typeParams, classPrefix, true);
+      return TransformUtil.evalTemplate(typeParams, classPrefix, true, false, null);
    }
 
    public String getJSTypeName(String typeName) {
@@ -2062,12 +2062,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String getInstanceTemplate(BodyTypeDeclaration td) {
       Object typeParams = new JSTypeParameters(td);
-      return TransformUtil.evalTemplate(typeParams, instanceTemplate, true);
+      return TransformUtil.evalTemplate(typeParams, instanceTemplate, true, false, null);
    }
 
    public String evalMainTemplate(BodyTypeDeclaration td) {
       Object typeParams = new JSTypeParameters(td);
-      return TransformUtil.evalTemplate(typeParams, mainTemplate, true);
+      return TransformUtil.evalTemplate(typeParams, mainTemplate, true, false, null);
    }
 
    static class JSFileEntry {

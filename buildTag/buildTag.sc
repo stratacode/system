@@ -81,7 +81,11 @@ public buildTag {
       buildTime = new java.util.Date().toString();
    }
 
+   String getCurrentBuildTagString() {
+      return sc.util.BuildTag.getBuildTagString(buildVersion, buildTagName, buildRevision, buildNumber, buildTime, scmVersion);
+   }
+
    void process() {
-      FileUtil.saveStringAsReadOnlyFile(FileUtil.concat(layeredSystem.buildDir, buildTagProduct + ".version"), sc.util.BuildTag.getBuildTagString(buildVersion, buildTagName, buildRevision, buildNumber, buildTime, scmVersion) + "\n", false);
+      FileUtil.saveStringAsReadOnlyFile(FileUtil.concat(layeredSystem.buildDir, buildTagProduct + ".version"), getCurrentBuildTagString() + "\n", false);
    }
 }
