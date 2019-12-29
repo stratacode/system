@@ -1,14 +1,44 @@
 #!/bin/sh
 
-scp -r /jjv/StrataCode/build/doc_clientOnly/web/ scserver@strataCode.com:/tmp/newWeb.$$
-scp -r /jjv/StrataCode/build/doc_webConfig/ scserver@strataCode.com:/tmp/newForms.$$
-ssh scserver@strataCode.com mkdir -p /usr/local/scc/build/doc_clientOnly/web
-ssh scserver@stratacode.com mv /usr/local/scc/build/doc_clientOnly/web /tmp/oldWeb.$$
-ssh scserver@stratacode.com mv /usr/local/scc/build/doc_webConfig /tmp/oldForms.$$
+DEPLOY_DIR=/usr/local/scc/deploy
 
-ssh scserver@stratacode.com mv /tmp/newWeb.$$ /usr/local/scc/build/doc_clientOnly/web
-ssh scserver@stratacode.com mv /tmp/newForms.$$ /usr/local/scc/build/doc_webConfig
+hasStageDir=`ssh scserver@stratacode.com "sh -c 'if [ -f ${DEPLOY_DIR}/currentStageDir ] ; then echo YES; fi'"`
+if [ "$hasStageDir" = "YES" ] ; then
+   CUR=`cat /tmp/currentStageDir`
+else
+   echo "No ${DEPLOY_DIR}/currentStageDir - starting at 0"
+   CUR=1
+fi
 
-ssh scserver@stratacode.com ln -s /usr/local/scc/packages /usr/local/scc/build/doc_clientOnly/web/packages
+NEXT=$(( ($CUR+1)%2 ))
+
+NOW=`date`
+MSG=`echo "Started deployDoc to stageDir${NEXT} at: ${NOW}"`
+echo $MSG
+ssh scserver@stratacode.com "sh -c 'echo $MSG >> ${DEPLOY_DIR}/log'"
+
+# first ssh to the server and rsync locally from the current to the next so that
+# the next rsyncs will only transfer changes from the current site. It's more
+# efficient this way and adds better traceability for what changed and will
+# leverage rsync to minimize deltas over the wire.
+ssh scserver@stratacode.com rsync -zavr ${DEPLOY_DIR}/stageDir${CUR}/ ${DEPLOY_DIR}/stageDir${NEXT}
+
+rsync -zavr /jjv/StrataCode/build/doc_clientOnly/web/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_clientOnly/web
+
+rsync -zavr /jjv/StrataCode/build/doc_webConfig/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_webConfig
+
+ssh scserver@stratacode.com rm ${DEPLOY_DIR}/current
+ssh scserver@stratacode.com ln -s ${DEPLOY_DIR}/stageDir${NEXT} ${DEPLOY_DIR}/current
 
 ssh root@stratacode.com systemctl restart scforms
+
+echo $NEXT > /tmp/currentStageDir
+
+scp /tmp/currentStageDir scserver@stratacode.com:${DEPLOY_DIR}/currentStageDir 
+
+# This might get removed by the rsync so make it each time
+ssh scserver@stratacode.com "sh -c 'if [ ! -f ${DEPLOY_DIR}/current/doc_clientOnly/web/packages ] ; then ln -sf /usr/local/scc/packages /usr/local/scc/deploy/current/doc_clientOnly/web/packages; fi'"
+
+NOW=`date`
+MSG=`echo "Completed deployDoc of stageDir${NEXT} at: ${NOW}"`
+ssh scserver@stratacode.com "sh -c 'echo $MSG >> ${DEPLOY_DIR}/log'"

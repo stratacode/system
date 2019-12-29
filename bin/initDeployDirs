@@ -1,0 +1,24 @@
+#!/bin/sh
+
+MAIN_DIR=/usr/local/scc
+IDEA_DIR=/usr/local/sc4idea
+
+ssh scserver@stratacode.com mkdir -p $MAIN_DIR
+ssh scserver@stratacode.com mkdir -p $MAIN_DIR/deploy
+ssh scserver@stratacode.com mkdir -p $MAIN_DIR/builds
+ssh scserver@stratacode.com mkdir -p $MAIN_DIR/deploy/stageDir0/doc_clientOnly/web
+ssh scserver@stratacode.com mkdir -p $MAIN_DIR/deploy/stageDir1/doc_clientOnly/web
+ssh scserver@stratacode.com mkdir -p $IDEA_DIR/builds
+
+is_inited=`ssh scserver@stratacode.com "sh -c 'if [ -f ${MAIN_DIR}/deploy/log ] ; then echo INITIALIZED; fi'"`
+
+if [ "$is_inited" = "INITIALIZED" ] ; then
+   echo "Log file already initialized"
+else
+   MSG=$(echo "Initialize doc server: $(date)")
+   echo $MSG > /tmp/initLog.$$
+   scp /tmp/initLog.$$ scserver@stratacode.com:${MAIN_DIR}/deploy/log
+fi
+
+ssh scserver@stratacode.com chown -R scserver $MAIN_DIR
+ssh scserver@stratacode.com chown -R scserver $IDEA_DIR
