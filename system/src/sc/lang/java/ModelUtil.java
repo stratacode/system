@@ -9285,7 +9285,7 @@ public class ModelUtil {
          if (execRuntimes != null && execRuntimes.length() > 0) {
             String[] rtNames = execRuntimes.split(",");
             for (String rtName:rtNames) {
-               if (rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
+               if (runtimeSys == null || rtName.equals(runtimeSys.getRuntimeName()) || rtName.equals(runtimeSys.getProcessName()))
                   return RuntimeStatus.Enabled;
                if (rtName.equals("default") && runtimeSys.isDefaultSystem())
                   return RuntimeStatus.Enabled;
