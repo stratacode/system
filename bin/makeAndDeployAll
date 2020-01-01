@@ -1,0 +1,11 @@
+#!/bin/sh
+
+makeSCC
+makeSCC --release
+makeSC4Idea 
+makeSC4Idea --release
+
+makeDoc
+makeJavaDoc
+deployDoc
+deployBuilds

@@ -124,7 +124,7 @@ public class LayerUtil implements LayerConstants {
       return FileUtil.concat(LayerUtil.getDefaultHomeDir(), modelCacheDirName);
    }
 
-   private static String getModelCacheDir(LayeredSystem sys) {
+   static String getModelCacheDir(LayeredSystem sys) {
       return sys.getStrataCodeHomeDir(modelCacheDirName);
    }
 

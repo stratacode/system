@@ -15878,6 +15878,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (f.isDirectory()) {
          FileUtil.removeFileOrDirectory(f);
       }
+      String modelCacheDirName = LayerUtil.getModelCacheDir(this);
+      File mcd = new File(modelCacheDirName);
+      if (mcd.isDirectory())
+         FileUtil.removeFileOrDirectory(mcd);
    }
 
    /** Returns true for the IRuntimeProcessor which defines the process which should initialize the other processes. */
