@@ -17,31 +17,6 @@ INPUT_FILE=""
 INTERACTIVE=0
 IGNORE_ERRORS=0
 
-if [ ! -d $VALID_RESULTS ] ; then
-   echo "Valid results directory: $VALID_RESULTS does not exist"
-   acceptYN=""
-   while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
-   do
-      echo "Init new test environment required - need to run:"
-      echo "mkdir $VALID_RESULTS" 
-      echo "sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $RESULTS_DIR"
-      read -p "Proceed? [yn] " acceptYN
-      if [[ ! "$acceptYN" =~ [yn] ]] ; then
-          echo "Invalid: $acceptYN - enter y or n"
-      fi
-   done
-
-   if [ "$acceptYN" = "y" ] ; then 
-      echo "mkdir $VALID_RESULTS"
-      sudo mkdir $VALID_RESULTS
-      echo "sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $RESULTS_DIR"
-      sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $RESULTS_DIR
-   else 
-      echo "Exiting runTests"
-      exit 1
-   fi
-fi
-
 while [[ $# -gt 0 ]]
 do
    case $1 in
@@ -113,6 +88,31 @@ do
        ;;
    esac
 done
+
+if [ ! -d $VALID_RESULTS ] ; then
+   echo "Valid results directory: $VALID_RESULTS does not exist"
+   acceptYN=""
+   while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+   do
+      echo "Init new test environment required - need to run:"
+      echo "mkdir $VALID_RESULTS" 
+      echo "sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $SC_RESULTS_DIR"
+      read -p "Proceed? [yn] " acceptYN
+      if [[ ! "$acceptYN" =~ [yn] ]] ; then
+          echo "Invalid: $acceptYN - enter y or n"
+      fi
+   done
+
+   if [ "$acceptYN" = "y" ] ; then 
+      echo "mkdir $VALID_RESULTS"
+      sudo mkdir $VALID_RESULTS
+      echo "sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $SC_RESULTS_DIR"
+      sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $SC_RESULTS_DIR
+   else 
+      echo "Exiting runTests"
+      exit 1
+   fi
+fi
 
 if [ ! -d $SC_RESULTS_DIR ] ; then
    echo "Test results directory: $SC_RESULTS_DIR does not exist"
