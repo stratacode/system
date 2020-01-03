@@ -109,4 +109,8 @@ echo "$LATEST_TAG"
 #echo "version: $VERS_FILE"
 cat $VERS_FILE
 
-(cd $CLEAN_SC_DIR; git pull; jar -cf $RES_DIR/scc-src.zip .)
+if [ -d $CLEAN_SC_DIR ] ; then
+   (cd $CLEAN_SC_DIR; git pull; jar -cf $RES_DIR/scc-src.zip .)
+else
+   echo "No $CLEAN_SC_DIR - not generating scc-src.zip"
+fi
