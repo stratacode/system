@@ -30,3 +30,14 @@ cd ..
 if [ ! -d test ] ; then
    ln -s bundles/test/test test
 fi
+
+if [ ! -f conf/scSourcePath ] ; then
+   if [ ! -d conf ] ; then
+      mkdir conf
+   fi
+   cd conf
+
+   cat > scSourcePath << END
+      /usr/local/scc
+   END
+fi
