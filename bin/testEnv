@@ -17,23 +17,23 @@ INPUT_FILE=""
 INTERACTIVE=0
 IGNORE_ERRORS=0
 
-if [ ! -d $VALIDRESULTS ] ; then
-   echo "Valid results directory: $VALIDRESULTS does not exist"
+if [ ! -d $VALID_RESULTS ] ; then
+   echo "Valid results directory: $VALID_RESULTS does not exist"
    acceptYN=""
    while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
    do
-      echo "To init a new environment, run:"
-      echo "sudo mkdir $VALIDRESULTS; chown $USER $VALIDRESULTS"
+      echo "Init new test environment required - need to run:"
+      echo "sudo mkdir $VALID_RESULTS; chown $USER $VALID_RESULTS"
       echo "sudo mkdir -p $SC_RESULTS_DIR; chown $USER $RESULTS_DIR"
-      read -p "Init new test environment (requires sudo)? [yn] " acceptYN
+      read -p "Proceed? [yn] " acceptYN
       if [[ ! "$acceptYN" =~ [yn] ]] ; then
           echo "Invalid: $acceptYN - enter y or n"
       fi
    done
 
    if [ "$acceptYN" = "y" ] ; then 
-      echo "sudo mkdir $VALIDRESULTS; chown $USER $VALIDRESULTS"
-      sudo mkdir $VALIDRESULTS; chown $USER $VALIDRESULTS
+      echo "sudo mkdir $VALID_RESULTS; chown $USER $VALID_RESULTS"
+      sudo mkdir $VALID_RESULTS; chown $USER $VALID_RESULTS
       echo "sudo mkdir -p $SC_RESULTS_DIR; chown $USER $RESULTS_DIR"
       sudo mkdir $SC_RESULTS_DIR; chown $USER $RESULTS_DIR
    else 
