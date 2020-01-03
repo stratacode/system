@@ -95,7 +95,7 @@ if [ ! -d $VALID_RESULTS ] ; then
    while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
    do
       echo "Init new test environment required - need to run:"
-      echo "mkdir $VALID_RESULTS" 
+      echo "sudo mkdir -p $VALID_RESULTS; sudo chown $USER $VALID_RESULTS" 
       echo "sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $SC_RESULTS_DIR"
       read -p "Proceed? [yn] " acceptYN
       if [[ ! "$acceptYN" =~ [yn] ]] ; then
@@ -104,8 +104,8 @@ if [ ! -d $VALID_RESULTS ] ; then
    done
 
    if [ "$acceptYN" = "y" ] ; then 
-      echo "mkdir $VALID_RESULTS"
-      sudo mkdir $VALID_RESULTS
+      echo "sudo mkdir -p $VALID_RESULTS; sudo chown $USER $VALID_RESULTS"
+      sudo mkdir -p $VALID_RESULTS; sudo chown $USER $VALID_RESULTS
       echo "sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $SC_RESULTS_DIR"
       sudo mkdir -p $SC_RESULTS_DIR; sudo chown $USER $SC_RESULTS_DIR
    else 
