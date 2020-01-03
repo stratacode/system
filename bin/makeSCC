@@ -1,9 +1,7 @@
 #!/bin/sh
 
-# Run with an argument to specify the target build dir.  If no argument is supplied a default is chosen in /tmp
-
 # Builds scc using scc. This is the preferred way to build a distribution for tagging and packaging but it's
-# easy to build scc from Java as well to build a separate version 
+# easy to build scc from Java as well to build a separate version. 
 
 # Warning: this can fail when a contract has changed that prevents the old version of scc from building the new one.
 # In this case, see the --orig option to point to a directory built using Java from IntelliJ or gradle for those cases where a contract
@@ -12,7 +10,7 @@
 set -e
 
 STAGEDIR=/tmp/
-# directory to use for building with the --orig option - the build using the IDE source to build itself
+# directory to use for building with the --orig option - the build using the IDE source to build itself (the value of the -da option when compiling the 'system' layer)
 ORIG_DIR=/jjv/vbuild
 SCC_CMD=scc
 

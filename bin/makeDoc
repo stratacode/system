@@ -4,6 +4,12 @@ SC=/jjv/StrataCode
 
 cd $SC
 
+# If we remove a .schtml file it will not necessarily remove the 
+# .html file in the build dir so we are going to start from scratch
+# for the production builds
+rm -rf build/doc_clientOnly
+rm -rf build/doc_webConfig
+
 # Bunch of examples whose build output is referenced from the source.
 scc -a -c example/simpleComponent
 scc -a -c example/simple js/schtml

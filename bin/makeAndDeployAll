@@ -1,11 +1,25 @@
 #!/bin/sh
 
+SC_DIR=`dirname $BASH_SOURCE[0]`
+SC_DIR=`dirname $SC_DIR`
+
+echo "makeAndDeployAll running from $SC_DIR"
+cd $SC_DIR
+
+echo "Making SCC"
 makeSCC
+echo "Making SCC release"
 makeSCC --release
+echo "Making SC4Idea"
 makeSC4Idea 
+echo "Making SC4Idea release"
 makeSC4Idea --release
 
+echo "Making doc"
 makeDoc
+echo "Making javadoc"
 makeJavaDoc
+echo "Deploying doc"
 deployDoc
+echo "Deploying builds"
 deployBuilds

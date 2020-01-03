@@ -14,6 +14,9 @@ BUILD_NUM_FILE=~/.stratacode/buildNum.properties
 SC_DIR=`dirname $BASH_SOURCE[0]`
 SC_DIR=`dirname $SC_DIR`
 
+echo "Making sc4Idea in $SC_DIR"
+cd $SC_DIR
+
 RES_FILE=sc4idea.zip
 
 BP_FILE=${SC_DIR}/buildTag/build.properties

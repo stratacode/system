@@ -1,6 +1,6 @@
 # Environment file to be source by runTests or runTest if it's run separately
 
-SC=${SC:-"/usr/local/StrataCode"}
+SC=${SC:-"/usr/local/scMain"}
 echo "SC dir: ${SC}"
 SC_RESULTS_DIR=${SC_RESULTS_DIR:-"/tmp/testResults"}
 VALID_RESULTS="${SC}/test/valid"
