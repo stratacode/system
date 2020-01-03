@@ -1334,8 +1334,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (strataCodeConfPath == null) {
          if (options.confPath != null)
             strataCodeConfPath = new ArrayList<String>(Arrays.asList(StringUtil.split(options.confPath, FileUtil.PATH_SEPARATOR)));
-         else
-            return getStrataCodeDir(fileName);
+         else {
+            String confDir = getStrataCodeDir("conf");
+            if (confDir == null)
+               return null;
+            return FileUtil.concat(confDir, fileName);
+         }
       }
       for (String confDir:strataCodeConfPath) {
          String conf = FileUtil.concat(confDir, fileName);
