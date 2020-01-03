@@ -1199,6 +1199,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Set to true when we have identified the real StrataCode directory structure (as opposed to the older looser collection of layers) */
    boolean isStrataCodeDir = false;
    public String strataCodeMainDir = null; // Directory containing .stratacode dir.  It's either the StrataCode install dir or a layer dir if you are running a layer not in the context of the install dir.
+   public List<String> strataCodeConfPath = null; // List of directories to check for 'conf' to find scSourcePath etc
 
    public String strataCodeInstallDir = null; // Configured to point to the install directory for StrataCode so we can find sc.jar and scrt-core-src.jar and files like that more easily
 
@@ -1329,8 +1330,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getStrataCodeDir(dirName);
    }
 
-   public String getStrataCodeConfDir(String dirName) {
-      return getStrataCodeDir(FileUtil.concat("conf", dirName));
+   public String getStrataCodeConfDir(String fileName) {
+      if (strataCodeConfPath == null) {
+         if (options.confPath != null)
+            strataCodeConfPath = new ArrayList<String>(Arrays.asList(StringUtil.split(options.confPath, FileUtil.PATH_SEPARATOR)));
+         else
+            return getStrataCodeDir(fileName);
+      }
+      for (String confDir:strataCodeConfPath) {
+         String conf = FileUtil.concat(confDir, fileName);
+         if (new File(conf).canRead())
+            return conf;
+      }
+      return null;
    }
 
    public LayeredSystem(List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
@@ -1458,15 +1470,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (!peerMode) {
          String scSourceConfig = getStrataCodeConfDir(SC_SOURCE_PATH);
-         if (scSourceConfig.startsWith("~/"))
-            scSourceConfig = FileUtil.concat(System.getProperty("user.home"), scSourceConfig.substring(2));
-         if (new File(scSourceConfig).canRead()) {
-            scSourcePath = FileUtil.getFileAsString(scSourceConfig);
-            if (scSourcePath != null) {
-               scSourcePath = scSourcePath.trim();
-               // For windows, fix this path to be file system specific
-               if (FileUtil.FILE_SEPARATOR_CHAR != '/')
-                  scSourcePath = FileUtil.unnormalize(scSourcePath);
+         if (scSourceConfig != null) {
+            if (scSourceConfig.startsWith("~/"))
+               scSourceConfig = FileUtil.concat(System.getProperty("user.home"), scSourceConfig.substring(2));
+            if (new File(scSourceConfig).canRead()) {
+               scSourcePath = FileUtil.getFileAsString(scSourceConfig);
+               if (scSourcePath != null) {
+                  scSourcePath = scSourcePath.trim();
+                  // For windows, fix this path to be file system specific
+                  if (FileUtil.FILE_SEPARATOR_CHAR != '/')
+                     scSourcePath = FileUtil.unnormalize(scSourcePath);
+               }
             }
          }
 
@@ -6381,7 +6395,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (startLayer == coreBuildLayer) {
          // Need this for the IDE because the sc.jar files are not in the rootClasspath in that environment because we want to debug those.  They are when running scc though.
          if (strataCodeInstallDir != null) {
-            LayerUtil.addQuotedPath(sb, getStrataCodeRuntimePath(buildModuleType, false));
+            String path = getStrataCodeRuntimePath(buildModuleType, false);
+            if (path != null)
+               LayerUtil.addQuotedPath(sb, path);
          }
          addOrigBuild = startLayer.appendClassPath(sb, includeBuildDir, useBuildDir, addOrigBuild);
 

@@ -184,6 +184,7 @@ public class Options {
 
    @Constant public String scInstallDir = null;
    @Constant public String mainDir = null;
+   @Constant public String confPath = null;
 
    @Constant public String classPath = null;
    @Constant public String layerPath = null;

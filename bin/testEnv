@@ -1,8 +1,8 @@
 # Environment file to be source by runTests or runTest if it's run separately
 
 SC=${SC:-"/usr/local/scMain"}
-echo "SC dir: ${SC}"
-SC_RESULTS_DIR=${SC_RESULTS_DIR:-"/tmp/testResults"}
+echo "Test project: ${SC}"
+SC_RESULTS_DIR=${SC_RESULTS_DIR:-"/var/scc/testResults"}
 VALID_RESULTS="${SC}/test/valid"
 # Create a unique name for this test - based on the date plus a suffix to ensure it's unique
 TEST_DATE_TAG=$(date +"%Y_%m_%d")
@@ -19,7 +19,27 @@ IGNORE_ERRORS=0
 
 if [ ! -d $VALIDRESULTS ] ; then
    echo "Valid results directory: $VALIDRESULTS does not exist"
-   exit 1
+   acceptYN=""
+   while [[ "$acceptYN" != "y" && "$acceptYN" != "n" ]] ; 
+   do
+      echo "To init a new environment, run:"
+      echo "sudo mkdir $VALIDRESULTS; chown $USER $VALIDRESULTS"
+      echo "sudo mkdir -p $SC_RESULTS_DIR; chown $USER $RESULTS_DIR"
+      read -p "Init new test environment (requires sudo)? [yn] " acceptYN
+      if [[ ! "$acceptYN" =~ [yn] ]] ; then
+          echo "Invalid: $acceptYN - enter y or n"
+      fi
+   done
+
+   if [ "$acceptYN" = "y" ] ; then 
+      echo "sudo mkdir $VALIDRESULTS; chown $USER $VALIDRESULTS"
+      sudo mkdir $VALIDRESULTS; chown $USER $VALIDRESULTS
+      echo "sudo mkdir -p $SC_RESULTS_DIR; chown $USER $RESULTS_DIR"
+      sudo mkdir $SC_RESULTS_DIR; chown $USER $RESULTS_DIR
+   else 
+      echo "Exiting runTests"
+      exit 1
+   fi
 fi
 
 while [[ $# -gt 0 ]]

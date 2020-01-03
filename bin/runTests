@@ -27,7 +27,12 @@ fi
 
 source $TEST_HOME/testEnv
 
-echo "Running ${SCRIPTS[*]} in ${SCRIPT_DIR} with results in: ${SC_RESULTS_DIR}/${TEST_RUN_NAME} comparing against: $VALID_RESULTS"
+SCRIPT_LIST=${SCRIPTS[*]}
+if [ "$SCRIPT_LIST" = "" ] ; then
+  SCRIPT_LIST="allScripts"
+fi
+
+echo "Running $SCRIPT_LIST in ${SCRIPT_DIR} with results in: ${SC_RESULTS_DIR}/${TEST_RUN_NAME} comparing against: $VALID_RESULTS"
 
 if [ ${#SCRIPTS[@]} == 0 ] ; then
   SCRIPTS=( $(cat $SCRIPT_DIR/allScripts) )
