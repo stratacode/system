@@ -38,6 +38,7 @@ if [ ! -f conf/scSourcePath ] ; then
    cd conf
 
    cat > scSourcePath << END
-      /usr/local/scc
-   END
+/usr/local/scc
+END
+
 fi
