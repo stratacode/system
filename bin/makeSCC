@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Builds scc using scc. This is the preferred way to build a distribution for tagging and packaging but it's
 # easy to build scc from Java as well to build a separate version. 
@@ -11,15 +11,14 @@ set -e
 
 STAGEDIR=/tmp/
 # directory to use for building with the --orig option - the build using the IDE source to build itself (the value of the -da option when compiling the 'system' layer)
-ORIG_DIR=/jjv/vbuild
+ORIG_DIR=/usr/local/scc/origBuild
 SCC_CMD=scc
 
 BUILDS_DIR=/usr/local/scc/builds
 BUILD_NUM_FILE=~/.stratacode/buildNum.properties 
 CLEAN_SC_DIR=/usr/local/cleanScc
 
-SC_DIR=`dirname $BASH_SOURCE[0]`
-SC_DIR=`dirname $SC_DIR`
+SC_DIR="$( cd "$(dirname "$0")"; pwd -P)"
 
 echo "Building StrataCode in $SC_DIR"
 cd $SC_DIR
@@ -45,7 +44,7 @@ SCC_ARGS=""
 
 BUILDS_DIR_SET=0
 
-while [[ $# -gt 0 ]]
+while [ $# -gt 0 ]
 do
    case $1 in
        --release)

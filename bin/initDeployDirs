@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 MAIN_DIR=/usr/local/scc
 IDEA_DIR=/usr/local/sc4idea

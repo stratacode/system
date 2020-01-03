@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #if [ -d sc4idea ] ; then
 #   git clone https://github.com/stratacode/sc4idea.git

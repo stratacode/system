@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 
 rsync -zavr /usr/local/scc/builds scserver@stratacode.com:/usr/local/scc/

@@ -1,8 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
-SC=/jjv/StrataCode
+SC=${SC:-"/usr/local/scMain"}
 
 cd $SC
+
+echo "Making doc from: $SC at $( date )"
 
 # If we remove a .schtml file it will not necessarily remove the 
 # .html file in the build dir so we are going to start from scratch
@@ -27,4 +29,10 @@ scc -c -a doc/clientOnly
 
 scc -c -a doc/webConfig
 
+echo "Done making doc from: $SC at $( date )"
+
+echo "Making javadoc at $( date )"
+
 makeJavaDoc
+
+echo "Done making javadoc at $( date )"

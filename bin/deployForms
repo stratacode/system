@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 scp -r /usr/local/scMain/build/doc_webConfig/ scserver@strataCode.com:/tmp/newForms.$$
 ssh scserver@stratacode.com mv /usr/local/scc/build/doc_webConfig /tmp/oldForms.$$

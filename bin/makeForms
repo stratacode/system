@@ -1,6 +1,6 @@
-#!/bin/sh
+#!/bin/bash
 
-SC=/jjv/StrataCode
+SC=${SC:-"/usr/local/scMain"}
 
 cd $SC
 

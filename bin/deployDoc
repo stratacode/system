@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 DEPLOY_DIR=/usr/local/scc/deploy
 
