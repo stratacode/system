@@ -1,0 +1,32 @@
+#!/bin/sh
+
+SC=${SC:-"/usr/local/scMain"}
+
+cd $SC
+if [ ! -d bundles ] ; then
+  mkdir bundles
+fi
+
+cd bundles
+
+if [ ! -d coreFramework ] ; then
+  git clone https://github.com/stratacode/coreFramework.git
+fi
+if [ ! -d example ] ; then
+  git clone https://github.com/stratacode/example.git
+fi
+if [ ! -d managementUI ] ; then
+  git clone https://github.com/stratacode/managementUI.git
+fi
+if [ ! -d integrationTest ] ; then
+  git clone https://github.com/stratacode/integrationTest.git
+fi
+if [ ! -d test ] ; then
+  git clone https://github.com/stratacode/test.git
+fi
+
+cd ..
+   
+if [ ! -d test ] ; then
+   ln -s bundles/test/test test
+fi
