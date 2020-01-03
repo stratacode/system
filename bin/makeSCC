@@ -18,7 +18,8 @@ BUILDS_DIR=/usr/local/scc/builds
 BUILD_NUM_FILE=~/.stratacode/buildNum.properties 
 CLEAN_SC_DIR=/usr/local/cleanScc
 
-SC_DIR="$( cd "$(dirname "$0")"; pwd -P)"
+SC_DIR=`dirname $BASH_SOURCE[0]`
+SC_DIR=`dirname $SC_DIR`
 
 echo "Building StrataCode in $SC_DIR"
 cd $SC_DIR
