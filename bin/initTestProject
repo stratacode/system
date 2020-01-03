@@ -7,6 +7,10 @@ if [ ! -d bundles ] ; then
   mkdir bundles
 fi
 
+if [ ! -d layers ] ; then
+  mkdir layers
+fi
+
 cd bundles
 
 if [ ! -d coreFramework ] ; then
