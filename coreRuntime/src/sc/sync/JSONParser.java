@@ -88,7 +88,8 @@ public class JSONParser {
          else if (val.charAt(0) == '\\' && len > 5 && isRefPrefix(val, 1))
             val = val.subSequence(1, len);
       }
-      val = CTypeUtil.unescapeJavaString(val);
+      if (val != null)
+         val = CTypeUtil.unescapeJavaString(val);
       return val;
    }
 
