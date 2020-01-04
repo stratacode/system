@@ -1178,4 +1178,14 @@ public class PTypeUtil {
    public static boolean isUndefined(Object o) {
       return false;
    }
+
+   public static String getPlatformOpenCommand() {
+      String osName = System.getProperty("os.name");
+      if (osName == null || osName.contains("Mac OS X"))
+         return "open";
+      else if (osName.contains("Windows"))
+         return "start";
+      else // Assuming linux
+         return "xdg-open";
+   }
 }
