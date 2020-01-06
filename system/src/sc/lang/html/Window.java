@@ -33,6 +33,7 @@ import java.util.*;
 public class Window implements IObjectId {
    private final static sc.type.IBeanMapper innerWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Window.class, "innerWidth");
    private final static sc.type.IBeanMapper innerHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Window.class, "innerHeight");
+   private final static sc.type.IBeanMapper devicePixelRatioProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Window.class, "devicePixelRatio");
 
    @Constant
    public Location location;
@@ -45,7 +46,7 @@ public class Window implements IObjectId {
    @Constant
    public Document documentTag;
 
-   private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp};
+   private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
 
    public static int DefaultWidth = 700;
    public static int DefaultHeight = 500;
@@ -70,6 +71,17 @@ public class Window implements IObjectId {
    public void setInnerHeight(int ih) {
       this.innerHeight = ih;
       Bind.sendChange(this, innerHeightProp, ih);
+   }
+
+
+   private double devicePixelRatio = 1.0;
+   @Bindable(manual=true)
+   public double getDevicePixelRatio() {
+      return devicePixelRatio;
+   }
+   public void setDevicePixelRatio(double f) {
+      this.devicePixelRatio = f;
+      Bind.sendChange(this, devicePixelRatioProp, f);
    }
 
    @Bindable(manual=true)
