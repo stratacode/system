@@ -7247,7 +7247,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object inst = null;
 
       if (getDeclarationType() != DeclarationType.OBJECT) {
-         if (isDynamicType()) {
+         if (isDynamicNew()) {
             // Get this before we add the inner obj's parent
             ConstructorDefinition con = (ConstructorDefinition) declaresConstructor(args, null);
 
@@ -8161,7 +8161,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object getRuntimeEnum() {
       BodyTypeDeclaration enumParent = getEnclosingType();
-      if (enumParent.isDynamicType())
+      if (enumParent.isDynamicNew())
          return getEnumValue();
       else
          return RTypeUtil.getEnum(enumParent.getCompiledClass(), typeName);

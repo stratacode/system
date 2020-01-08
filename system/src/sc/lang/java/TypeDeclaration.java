@@ -1361,7 +1361,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    /** Returns the type we use at runtime */
    public Object getRuntimeType() {
-      if (isDynamicType())
+      if (isDynamicNew())
          return this;
       else
          return getCompiledClass();
@@ -1369,7 +1369,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    /** Returns the type we use at runtime */
    public String getRuntimeTypeName() {
-      if (isDynamicType())
+      if (isDynamicNew())
          return this.getFullTypeName();
       else
          return getCompiledClassName();

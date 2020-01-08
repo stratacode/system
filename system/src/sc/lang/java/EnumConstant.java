@@ -25,6 +25,12 @@ public class EnumConstant extends BodyTypeDeclaration {
 
    public void init() {
       super.init();
+
+      TypeDeclaration enclType = getEnclosingType();
+      if (enclType.dynamicNew)
+         dynamicNew = true;
+      if (enclType.dynamicType)
+         dynamicType = true;
    }
 
    public void validate() {
