@@ -17,15 +17,18 @@ MSG=`echo "Started deployDoc to stageDir${NEXT} at: ${NOW}"`
 echo $MSG
 ssh scserver@stratacode.com "sh -c 'echo $MSG >> ${DEPLOY_DIR}/log'"
 
+#ROPTS="-zavr --delete --checksum --itemize-changes --progress --out-format='[%t] [%i] (Last Modified: %M) (bytes: %-10l) %-100n'"
+ROPTS="-zavr --delete --checksum"
+
 # first ssh to the server and rsync locally from the current to the next so that
 # the next rsyncs will only transfer changes from the current site. It's more
 # efficient this way and adds better traceability for what changed and will
 # leverage rsync to minimize deltas over the wire.
-ssh scserver@stratacode.com rsync -zavr --delete ${DEPLOY_DIR}/stageDir${CUR}/ ${DEPLOY_DIR}/stageDir${NEXT}
+ssh scserver@stratacode.com rsync $ROPTS ${DEPLOY_DIR}/stageDir${CUR}/ ${DEPLOY_DIR}/stageDir${NEXT}
 
-rsync -zavr --delete /usr/local/scMain/build/doc_clientOnly/web/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_clientOnly/web
+rsync $ROPTS /usr/local/scMain/build/doc_clientOnly/web/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_clientOnly/web
 
-rsync -zavr --delete /usr/local/scMain/build/doc_webConfig/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_webConfig
+rsync $ROPTS /usr/local/scMain/build/doc_webConfig/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_webConfig
 
 ssh scserver@stratacode.com rm ${DEPLOY_DIR}/current
 ssh scserver@stratacode.com ln -s ${DEPLOY_DIR}/stageDir${NEXT} ${DEPLOY_DIR}/current

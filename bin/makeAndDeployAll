@@ -15,10 +15,7 @@ makeSC4Idea
 echo "Making SC4Idea release"
 makeSC4Idea --release
 
-echo "Making doc"
 makeDoc
-echo "Making javadoc"
-makeJavaDoc
 echo "Deploying doc"
 deployDoc
 echo "Deploying builds"
