@@ -11,8 +11,6 @@ import sc.js.ServerTag;
 import sc.js.ServerTagContext;
 import sc.obj.Constant;
 import sc.obj.IObjectId;
-import sc.obj.ScopeDefinition;
-import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 
@@ -95,9 +93,22 @@ public class Window implements IObjectId {
       return errorCount;
    }
 
-   // TODO: can we determine a default window size somehow? from device metadata?
-   public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI, String pathInfo, String queryStr) {
+   public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI, String pathInfo, String queryStr, String userAgentStr) {
       Window win = new Window();
+      if (userAgentStr != null) {
+         UserAgentInfo userAgentInst = UserAgentInfo.getUserAgent(userAgentStr);
+         if (userAgentInst != null) {
+            int iw = userAgentInst.getDefaultInnerWidth();
+            if (iw != -1)
+               win.setInnerWidth(iw);
+            int ih = userAgentInst.getDefaultInnerHeight();
+            if (ih != -1)
+               win.setInnerHeight(ih);
+            double dpr = userAgentInst.getDefaultDevicePixelRatio();
+            if (dpr != -1.0)
+               win.setDevicePixelRatio(dpr);
+         }
+      }
       win.location = new Location();
       Location loc = win.location;
       if (serverPort == 80) {

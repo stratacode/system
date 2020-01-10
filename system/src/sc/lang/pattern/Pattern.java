@@ -145,7 +145,8 @@ public class Pattern extends SemanticNode {
 
    /**
     * The internal routine that implements the match for a given pattern.
-    * Returns null for no match - empty string for an optional match that did not match.  We could implement this using the getParselet for the
+    * Returns null for no match - empty string for an optional match that did not match.
+    * We could implement this using the getParselet for the
     * server but want to have one set of logic we share between client and server and don't want to require Parselets just for URL pattern matching.
     */
    String match(String fromStr, Object inst) {

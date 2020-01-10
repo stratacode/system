@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 SC_DIR=`dirname $BASH_SOURCE[0]`
 SC_DIR=`dirname $SC_DIR`
 

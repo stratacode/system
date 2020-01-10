@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 SC=${SC:-"/usr/local/scMain"}
 
 cd $SC

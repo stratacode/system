@@ -486,7 +486,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
                // This lets templates find their URL using the Window.location object
                // TODO: maybe this should be moved into a hook added by the HTML language?  I don't see it hurting anything in other frameworks but it really belongs in an HTML specific class.
                Window.setWindow(Window.createNewWindow("http://" + sys.serverName + (sys.serverPort == 80 ? "" : (":" + sys.serverPort)) + "/" + pathInfo,
-                                                       sys.serverName, sys.serverPort, pathInfo, pathInfo, null));
+                                                       sys.serverName, sys.serverPort, pathInfo, pathInfo, null, null));
 
                result = (String) template.eval(String.class, ctx);
                if (filterCommand != null)

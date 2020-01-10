@@ -6,10 +6,7 @@ package sc.lang.pattern;
 
 import sc.lang.SCLanguage;
 import sc.layer.Layer;
-import sc.parser.OrderedChoice;
-import sc.parser.ParseUtil;
-import sc.parser.Parselet;
-import sc.parser.SymbolChoice;
+import sc.parser.*;
 import sc.util.URLUtil;
 
 /** A small language that's not parsed itself but supplies parselets used for parsing values from URLs using the pattern property of the @URL annotation */
@@ -20,6 +17,7 @@ public class URLPatternLanguage extends SCLanguage {
 
    public URLPatternLanguage(Layer layer) {
       super (layer);
+      addToSemanticValueClassPath("sc.lang.html");
       setStartParselet(urlString);
       urlString.setLanguage(this);
       integer.setLanguage(this);
@@ -46,6 +44,7 @@ public class URLPatternLanguage extends SCLanguage {
 
    public SymbolChoice urlSpecialChar = new SymbolChoice(URLUtil.URL_SPECIAL_CHARS);
 
+
    public Parselet urlString = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, urlSpecialChar);
    public Parselet integer = new OrderedChoice(digits);
    {
@@ -53,4 +52,16 @@ public class URLPatternLanguage extends SCLanguage {
       // specify an Integer as a semantic value type.
       //integer.setSemanticValueClass(Integer.class);  - this actually disables the type conversion we had built in :(
    }
+
+   //public SymbolChoice uaNameSpecialChar = new SymbolChoice('+', '.', ':');
+   public SymbolChoice uaCommentSpecialChar = new SymbolChoice('+', '.', ':', '/', ';', ' ', ',');
+   public Parselet userAgentName = new OrderedChoice("('','')", REPEAT, alphaNumChar, digits /*, uaNameSpecialChar*/);
+   public Parselet userAgentComment = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, uaCommentSpecialChar);
+
+   public Parselet versionString = new OrderedChoice("('','','')", REPEAT, digits, alphaNumChar, period);
+
+   // In the browser user-agent string, the list of extensions name/version (...)
+   public Parselet userAgentExts = new Sequence("([])", OPTIONAL | REPEAT,
+           new Sequence("UserAgentExtension(name,,version,,comment)", userAgentName, new Symbol("/"), versionString, whiteSpace,
+            new Sequence("(,.,)", OPTIONAL, openParen, userAgentComment, closeParen)));
 }

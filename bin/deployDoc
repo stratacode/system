@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 DEPLOY_DIR=/usr/local/scc/deploy
 
 hasStageDir=`ssh scserver@stratacode.com "sh -c 'if [ -f ${DEPLOY_DIR}/currentStageDir ] ; then echo YES; fi'"`
