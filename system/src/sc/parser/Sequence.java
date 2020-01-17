@@ -936,7 +936,7 @@ public class Sequence extends NestedParselet  {
                      return oldList.get(rctx.arrIndex);
                   }
                   else
-                     System.out.println("*** Unhandled array size case");
+                     return null;
                }
                else {
                   // When we've hit the end of the array, we won't have a parse-node and so don't go into the 'restoreNext' case.  We need to just go into pIn.readChild

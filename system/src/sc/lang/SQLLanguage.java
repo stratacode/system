@@ -155,7 +155,7 @@ public class SQLLanguage extends BaseLanguage {
    Sequence binaryOperands = new Sequence("SQLBinaryOperand(operator,rhs)", OPTIONAL | REPEAT, binaryOperators, sqlPrimary);
    Sequence sqlExpression = new ChainedResultSequence("SQLBinaryExpression(firstExpr,operands)", sqlPrimary, binaryOperands);
    Sequence parenExpression = new Sequence("SQLParenExpression(,expression,)" , openParen, sqlExpression, closeParenSkipOnError);
-   Sequence expressionList = new Sequence("([],[])", OPTIONAL, sqlExpression, new Sequence("(,.)", OPTIONAL | REPEAT, comma, sqlExpression));
+   Sequence expressionList = new Sequence("([],[])", OPTIONAL, sqlExpression, new Sequence("(,[])", OPTIONAL | REPEAT, comma, sqlExpression));
    Sequence functionCall = new Sequence("FunctionCall(functionName,,expressionList,)", sqlQualifiedIdentifier, openParen, expressionList, closeParenSkipOnError);
    Sequence trueLiteral = new Sequence("TrueLiteral(value)", trueKeyword);
    Sequence falseLiteral = new Sequence("FalseLiteral(value)", falseKeyword);
@@ -252,6 +252,9 @@ public class SQLLanguage extends BaseLanguage {
 
    Sequence sizeList = new Sequence("(,[],)", OPTIONAL | REPEAT, openParen, digits, closeParen);
    Sequence dimsList = new Sequence("(,[],)", OPTIONAL | REPEAT, openSqBracket, optDigits, closeSqBracket);
+   {
+      dimsList.allowNullElements = true; // We need to store an empty element when there are no digits to keep track of the brackets themselves
+   }
    Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
 
    Sequence columnDef = new Sequence("ColumnDef(columnName,columnType,collation,constraintName,columnConstraints)",
