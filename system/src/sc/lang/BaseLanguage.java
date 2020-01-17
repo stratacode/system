@@ -15,9 +15,15 @@ import java.util.Set;
 /**
  * The BaseLanguage contains some core constructs useful in all languages digits, whitespace, and some higher
  * level parselets like Keyword, SemanticToken, etc.
+ * It's possible to modify parselets, or override language features by overriding methods (e.g. to modify what
+ * characters are valid in an identifier). This is helpful to reuse higher level features that use those parselets.
+ * Like changing EOLComment for SQL to -- or the array bracket character between JS and Java.
+ * It's also possible to clone and change a parselet rather than copying the original definition.
  */
 public abstract class BaseLanguage extends Language implements IParserConstants {
    public static Set DEPS_KEYWORDS = Collections.emptySet();
+
+   public boolean ignoreCaseInKeywords = false;
 
    public Set getKeywords() {
       return DEPS_KEYWORDS;
@@ -201,13 +207,13 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          IString str = PString.toIString(value);
          if (str == null)
             return "Identifiers must be non null";
-         if (str.length() == 1 && Character.isJavaIdentifierStart(str.charAt(0)))
+         if (str.length() == 1 && isIdentifierStartChar(str.charAt(0)))
             return null;
          return "Not a valid start identifier character";
       }
    };
 
-   public static class IdentSymbol extends Symbol {
+   public class IdentSymbol extends Symbol {
       public IdentSymbol(String id, int options, String ev) {
          super(id, options, ev);
       }
@@ -217,14 +223,14 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          if (str == null)
             return "Identifiers must be non null";
          if (!repeat) {
-            if (str.length() == 1 && Character.isJavaIdentifierPart(str.charAt(0)))
+            if (str.length() == 1 && isIdentifierPartChar(str.charAt(0)))
                return null;
          }
          else {
             int len = str.length();
             int i;
             for (i = 0; i < len; i++) {
-               if (!Character.isJavaIdentifierPart(str.charAt(i)))
+               if (!isIdentifierPartChar(str.charAt(i)))
                   break;
             }
             if (i == len) {
@@ -233,6 +239,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          }
          return "Not a valid character for the inside of an identifier";
       }
+   }
+
+   // Hooks so that new languages can change the rules for identifier and reuse more parselets
+   public boolean isIdentifierPartChar(char c) {
+      return Character.isJavaIdentifierPart(c);
+   }
+
+   public boolean isIdentifierStartChar(char c) {
+      return Character.isJavaIdentifierStart(c);
    }
 
    public Symbol identifierChar = new IdentSymbol("<idChar>", 0, Symbol.ANYCHAR);
@@ -268,6 +283,9 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
             value = PString.toIString(value);
          if (getLanguage() == null)
             throw new IllegalArgumentException("*** No language defined for parselet: " + this);
+         if (ignoreCaseInKeywords && value != null) {
+            value = new ToLowerWrapper((IString) value);
+         }
          if (!((BaseLanguage) getLanguage()).getKeywords().contains(value))
             return null;
          return "Identifiers cannot be keywords";
@@ -300,6 +318,19 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
            new Sequence("('','')", OPTIONAL | REPEAT, new SymbolSpace("."), identifier));
 
    public Sequence optQualifiedIdentifier = new Sequence("('')", OPTIONAL, qualifiedIdentifier);
+
+   OrderedChoice escapeSequence = new OrderedChoice("<escape>",
+           new SymbolChoice("\\b","\\t","\\n","\\f","\\r","\\\"","\\\\","\\'"),
+           new Sequence("('','','','','')", new Symbol("\\u"), hexDigit, hexDigit, hexDigit, hexDigit),
+           new Sequence("('','','','')", new Symbol("\\"), octalDigit, optOctalDigit, optOctalDigit));
+
+   public SymbolChoice escapedStringBody = new SymbolChoice(NOT, "\\", "\"", "\n", EOF);
+   public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, escapedStringBody);
+   public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", "\n", EOF));
+   {
+      escapedString.styleName = escapedSingleQuoteString.styleName = "string";
+      escapedSingleQuoteString.setLanguage(this);
+   }
 
    /**
     * The keyword ensures that it is not followed by an identifier character - i.e. "returnSpace" would
@@ -373,12 +404,14 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       public SymbolSpace(String symbol, String delim, int options) {
          // We used to include NOERROR here but need errors for ; and in general these seem to be important parselets
          super("('',):(.," + delim + ")", options);
-         symbolParselet = new Symbol(NOERROR, symbol);
+         int symbolOpts = options & IGNORE_CASE;
+         symbolParselet = new Symbol(NOERROR | symbolOpts, symbol);
          add(symbolParselet, spacing);
       }
       public SymbolSpace(String symbol, int options) {
          super("('',)", options);
-         symbolParselet = new Symbol(NOERROR, symbol);
+         int symbolOpts = options & IGNORE_CASE;
+         symbolParselet = new Symbol(NOERROR | symbolOpts, symbol);
          add(symbolParselet, spacing);
       }
 
@@ -473,7 +506,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       }
       SymbolChoiceSpace(String name, int options, String...values) {
          super(name, options | NOERROR);
-         choice = new SymbolChoice(NOERROR, values);
+         int symOptions = options & IGNORE_CASE;
+         choice = new SymbolChoice(NOERROR | symOptions, values);
          add(choice, spacing);
       }
 

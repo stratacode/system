@@ -6,6 +6,7 @@ package sc.parser;
 
 public class StringToken extends AbstractString {
    IString baseString;
+   public boolean toLower;
 
    public int startIndex;
    public int len;
@@ -28,7 +29,10 @@ public class StringToken extends AbstractString {
    }
 
    public char charAt(int index) {
-      return (char) baseString.charAt(startIndex + index);
+      char c = baseString.charAt(startIndex + index);
+      if (toLower)
+         return Character.toLowerCase(c);
+      return c;
    }
 
    public int length() {

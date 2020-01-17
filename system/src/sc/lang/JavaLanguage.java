@@ -21,7 +21,7 @@ import java.util.Set;
  * marked "public" so that you can parse and manipulate individual language elements like a
 * statement or an initializer
  */
-public class JavaLanguage extends BaseLanguage implements IParserConstants {
+public class JavaLanguage extends BaseLanguage {
    protected static final String[] JAVA_KEYWORDS = {
            "abstract",  "continue",  "for",         "new",        "switch",
            "assert",    "default",   "if",          "package",    "synchronized",
@@ -240,21 +240,9 @@ public class JavaLanguage extends BaseLanguage implements IParserConstants {
    // We put a lookahead check for a digit or . all of the first chars in a floating point literal.  
    Sequence fasterFloatingPointLiteral = new Sequence("FloatLiteral(,value)", fpChar, floatingPointLiteral);
 
-   OrderedChoice escapeSequence = new OrderedChoice("<escape>",
-         new SymbolChoice("\\b","\\t","\\n","\\f","\\r","\\\"","\\\\","\\'"),
-         new Sequence("('','','','','')", new Symbol("\\u"), hexDigit, hexDigit, hexDigit, hexDigit),
-         new Sequence("('','','','')", new Symbol("\\"), octalDigit, optOctalDigit, optOctalDigit));
 
    Symbol singleQuote = new Symbol("'");
    Symbol doubleQuote = new Symbol("\"");
-
-   public SymbolChoice escapedStringBody = new SymbolChoice(NOT, "\\", "\"", "\n", EOF);
-   public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, escapedStringBody);
-   public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", "\n", EOF));
-   {
-      escapedString.styleName = escapedSingleQuoteString.styleName = "string";
-      escapedSingleQuoteString.setLanguage(this);
-   }
 
    public Sequence stringLiteral = new Sequence("StringLiteral(,value,)", doubleQuote, escapedString, doubleQuote);
 

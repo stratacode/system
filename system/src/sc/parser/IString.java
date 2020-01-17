@@ -4,8 +4,7 @@
 
 package sc.parser;
 
-public interface IString extends CharSequence
-{
+public interface IString extends CharSequence {
    String toString();
 
    char charAt(int index);

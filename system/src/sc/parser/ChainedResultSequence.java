@@ -116,7 +116,14 @@ public class ChainedResultSequence extends Sequence {
       {
          // We either return the normal default return for this parselet or the value of the first slot if the
          // second one is null.
-         res = findCommonSuperClass(parselets.get(0).getSemanticValueClass(), super.getSemanticValueClass(), 1);
+         Parselet defaultParselet = parselets.get(0);
+
+         Class thisSemanticValueClass = super.getSemanticValueClass();
+         // If the default parselet is defined in terms of this parselet, use the default class.
+         if (defaultParselet.resultClass == NestedParselet.UNDEFINED_CLASS)
+            res = thisSemanticValueClass;
+         else
+            res = findCommonSuperClass(defaultParselet.getSemanticValueClass(), thisSemanticValueClass, 1);
 
          if (trace) {
             System.out.println("*** Trace: chained sequence: resolving type to: " + res + " from 0:" + parselets.get(0).getSemanticValueClass() + " 1:" +

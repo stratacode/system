@@ -94,6 +94,9 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
     */
    public boolean partialValuesOnly = false;
 
+   /** For Symbols only - match the symbol ignoring the case */
+   public boolean ignoreCase = false;
+
    // TODO: Ifdef "STATS_ENABLED"
    public int attemptCount, successCount;
    public int generatedBytes, failedProgressBytes;
@@ -262,6 +265,7 @@ public abstract class Parselet implements Cloneable, IParserConstants, ILifecycl
       trace = (options & TRACE) != 0;
       skipOnError = (options & SKIP_ON_ERROR) != 0;
       partialValuesOnly = (options & PARTIAL_VALUES_ONLY) != 0;
+      ignoreCase = (options & IGNORE_CASE) != 0;
       if (name == null || name.startsWith("<"))
          skip = true;
    }

@@ -88,4 +88,22 @@ public abstract class AbstractString implements IString {
    public CharSequence subSequence(int start, int end) {
       return substring(start, end);
    }
+
+   public boolean equalsIgnoreCase(CharSequence other) {
+      if (other == null)
+         return false;
+      int len = length();
+      int olen = other.length();
+      if (len != olen)
+         return false;
+      for (int i = 0; i < len; i++) {
+         char c = charAt(i);
+         char o = other.charAt(i);
+         if (Character.toUpperCase(c) != Character.toUpperCase(o))
+            return false;
+         if (Character.toLowerCase(c) != Character.toLowerCase(o))
+            return false;
+      }
+      return true;
+   }
 }

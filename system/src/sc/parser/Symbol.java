@@ -113,7 +113,7 @@ public class Symbol extends Parselet {
          else {
             char lastChar = '\1';
             // Returns 0 for match, 1 for no match, 2 for no-match that hit eof
-            int stat = parser.peekInputStr(expectedValue, negated);
+            int stat = parser.peekInputStr(expectedValue, negated, ignoreCase);
             if (stat == 0) {
                int startIx = parser.currentIndex;
                input.startIndex = startIx;
@@ -169,20 +169,19 @@ public class Symbol extends Parselet {
       if (excludedPeekStrings != null) {
          for (ArrString excludedValue:excludedPeekStrings) {
             // If we match the excluded peek string for this symbol, it's not a match
-            if (parser.peekInputStr(excludedValue, false) == 0)
+            if (parser.peekInputStr(excludedValue, false, ignoreCase) == 0)
                return "excluded token";
          }
       }
       return null;
    }
 
-   private String getSymbolValue()
-   {
+   /** Display this symbol for diagnostics */
+   private String getSymbolValue() {
       return getPrefixSymbol() + (expectedValue == null ? "EOF" : expectedValue.equals(ANYCHAR) ? "ANY" : "'" + ParseUtil.escapeString(expectedValue) + "'");
    }
 
-   public String toHeaderString(Map<Parselet,Integer> visited)
-   {
+   public String toHeaderString(Map<Parselet,Integer> visited) {
       if (name == null)
          return getSymbolValue();
       return name;
@@ -208,7 +207,7 @@ public class Symbol extends Parselet {
       if (expectedValue.length() == 0)
          return !negated;
 
-      return !negated == (expectedValue.equals(value));
+      return !negated == (ignoreCase ? expectedValue.equalsIgnoreCase((CharSequence)value) : expectedValue.equals(value));
    }
 
    private final static GenerateError ACCEPT_ERROR = new GenerateError("Accept rule failed");

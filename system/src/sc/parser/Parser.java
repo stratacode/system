@@ -844,7 +844,7 @@ public class Parser implements IString {
     * If you pass in negated the match is opposite:
     *    return 1 for a match and 0 for a non-match, 0 for EOF
     */
-   public int peekInputStr(ArrString expectedValue, boolean negated) {
+   public int peekInputStr(ArrString expectedValue, boolean negated, boolean ignoreCase) {
       int relIx = currentIndex - currentBufferPos;
       if (relIx < 0)
          throw new IllegalArgumentException("Attempt to access character before the current buffer position");
@@ -852,9 +852,17 @@ public class Parser implements IString {
       char[] expectedBuf = expectedValue.buf;
       int expectedLen = expectedBuf.length;
       if (relIx+expectedLen <= bufSize) {
-         for (int i = 0; i < expectedLen; i++) {
-            if (inputBuffer[relIx++] != expectedBuf[i])
-               return negated ? 0 : 1;
+         if (ignoreCase) {
+            for (int i = 0; i < expectedLen; i++) {
+               if (Character.toLowerCase(inputBuffer[relIx++]) != Character.toLowerCase(expectedBuf[i]))
+                  return negated ? 0 : 1;
+            }
+         }
+         else {
+            for (int i = 0; i < expectedLen; i++) {
+               if (inputBuffer[relIx++] != expectedBuf[i])
+                  return negated ? 0 : 1;
+            }
          }
          return !negated ? 0 : 1;
       }
@@ -866,7 +874,7 @@ public class Parser implements IString {
          }
 
          if (relIx + expectedLen <= bufSize)
-            return peekInputStr(expectedValue, negated);
+            return peekInputStr(expectedValue, negated, ignoreCase);
 
          eof = true;
          return negated ? 0 : 2;

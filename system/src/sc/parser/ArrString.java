@@ -30,4 +30,5 @@ public class ArrString extends AbstractString {
          return null;
       return new ArrString(str.toCharArray());
    }
+
 }

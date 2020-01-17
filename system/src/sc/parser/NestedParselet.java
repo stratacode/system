@@ -459,14 +459,14 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       Class o1 = c1;
       Class o2 = c2;
 
-      if (o1 == null && o2 != null)
+      if (o1 == null)
          return o2;
-      if (o2 == null && o1 != null)
+      if (o2 == null)
          return o1;
 
       boolean isInterface = o1.isInterface();
 
-      while (o1 != null && o2 != null && !o1.isAssignableFrom(o2)) {
+      while (!o1.isAssignableFrom(o2)) {
          o1 = o1.getSuperclass();
          if (isInterface && o1 == null) {
             o1 = Object.class;
@@ -476,7 +476,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       isInterface = o2.isInterface();
 
-      while (c1 != null && o2 != null && !o2.isAssignableFrom(c1)) {
+      while (!o2.isAssignableFrom(c1)) {
          o2 = o2.getSuperclass();
          if (isInterface && o2 == null) {
             o2 = Object.class;
@@ -485,7 +485,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
       }
 
 
-      Class res = o1 != null && o2 != null && o1.isAssignableFrom(o2) ? o2 : o1;
+      Class res = o1.isAssignableFrom(o2) ? o2 : o1;
 
       if (trace && o1 != res)
          System.out.println("Trace: changing parselet type to: " + res + " from: " + o1 +
@@ -543,7 +543,9 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
 
       // Value not defined yet - we'll have to map this column later
       if (valueClass == null) {
-         System.err.println("*** No name to compute semantic value type for child parselet: " + childParselet + " the slot with position: " + i + " for: " + this);
+         System.err.println("Missing semantic value type for child parselet: " + childParselet + " referenced in slot: " + i + " in: " + name);
+         if (childParselet.name == null)
+            System.err.println("   -- No parselet name specified for this parselet. Add a name of the form ('',.,,[]) for (string,passthrough,skip,array)");
          return; // Cannot assign
       }
 

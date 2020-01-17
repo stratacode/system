@@ -130,10 +130,16 @@ public class SymbolChoice extends Parselet {
          Iterator<IString> svs = expectedValues.iterator();
          for (int i = 0; i < esz; i++)
             expectedChars[i] = svs.next().charAt(0);
+
+         if (ignoreCase) {
+            for (int i = 0; i < esz; i++)
+               expectedChars[i] = Character.toLowerCase(expectedChars[i]);
+         }
       }
 
       if (keySize == -1) {
          keySize = esz < 12 ? 1 : 2;
+         ArrayList<IString> toAdd = ignoreCase ? new ArrayList<IString>() : null;
          for (IString val: expectedValues) {
             int valLen;
             if (val == null) {
@@ -151,7 +157,15 @@ public class SymbolChoice extends Parselet {
             else if (valLen < keySize) {
                keySize = val.length();
             }
+
+            if (toAdd != null && val != null) {
+               IString lower = PString.toIString(val.toString().toLowerCase());
+               if (!lower.equals(val))
+                  toAdd.add(lower);
+            }
          }
+         if (toAdd != null)
+            expectedValues.addAll(toAdd);
       }
 
       if (keySize <= 0)
@@ -164,7 +178,8 @@ public class SymbolChoice extends Parselet {
                if (!repeat && newLen > maxLen)
                   maxLen = newLen;
 
-               IString key = new PString(val.toString().substring(0, keySize));
+               String valStr = val.toString();
+               IString key = new PString(valStr.substring(0, keySize));
                List<IString> l;
                if ((l = valueIndex.get(key)) != null) {
                   int i;
@@ -188,6 +203,8 @@ public class SymbolChoice extends Parselet {
          excludedPeekString = new HashMap<IString,ArrayList<ArrString>>();
          for (IString excludeValue:excludedValues) {
             boolean matched = false;
+            if (ignoreCase)
+               excludeValue = PString.toIString(excludeValue.toString().toLowerCase());
             for (IString expectedValue:expectedValues) {
                if (excludeValue.startsWith(expectedValue)) {
                   matched = true;
@@ -268,12 +285,15 @@ public class SymbolChoice extends Parselet {
    private boolean stringMatches(IString inputStr) {
       boolean matched;
 
+      if (ignoreCase)
+         inputStr = new ToLowerWrapper(inputStr);
+
       if (repeat)
         return stringMatchesRepeating(inputStr);
 
-      if (allSingleCharPatterns) {
-         // TODO: optimize this!
-      }
+      // TODO: optimize this!
+      //if (allSingleCharPatterns) {
+      //}
 
       // Not enough input - just fail as though we did not match
       if (inputStr == null)
@@ -413,7 +433,7 @@ public class SymbolChoice extends Parselet {
          if (excludedTokensToPeek != null) {
             for (ArrString excludeToken:excludedTokensToPeek) {
                // If we match the excluded peek string for this symbol, it's not a match
-               if (parser.peekInputStr(excludeToken, false) == 0)
+               if (parser.peekInputStr(excludeToken, false, ignoreCase) == 0)
                   return "excluded token";
             }
          }
@@ -433,6 +453,8 @@ public class SymbolChoice extends Parselet {
       boolean matched;
 
       StringToken inputStr = new StringToken(parser);
+      if (ignoreCase)
+         inputStr.toLower = true;
       do {
          matched = stringMatches(parser, inputStr);
 
@@ -447,6 +469,10 @@ public class SymbolChoice extends Parselet {
             int len = inputStr.length();
             parser.changeCurrentIndex(parser.currentIndex + len);
             if (matchedValue == null) {
+               if (ignoreCase) {
+                  inputStr.toLower = false; // put the token back into it's normal mode after the match is complete
+                  inputStr.hc = -333;
+               }
                matchedValue = inputStr;
                inputStr = new StringToken(parser);
             }

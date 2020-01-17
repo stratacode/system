@@ -7,7 +7,6 @@ package sc.lang;
 import sc.layer.Layer;
 import sc.parser.*;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -36,138 +35,6 @@ public class HTMLLanguage extends TemplateLanguage {
    public final static HTMLLanguage INSTANCE = new HTMLLanguage();
 
    public final static String SC_HTML_SUFFIX = "schtml";
-
-   /**
-    * The parser lets you maintain additional parse-state so that you can match or reject any given element in the input stream.
-    * This extension point is the SemanticContext.  For HTML, we need to maintain the tagStack so that we can match open and closed
-    * tags and allow open tags with no close tag.
-    */
-   public class HTMLSemanticContext extends SemanticContext {
-      public class HTMLContextEntry {
-         int startIx;
-         int endIx;
-         int endTagIx;
-         String tagName;
-
-         public String toString() {
-            return tagName + "[" + startIx + ":" + endTagIx + "]";
-         }
-      }
-      ArrayList<HTMLContextEntry> tagStack = new ArrayList<HTMLContextEntry>();
-
-      ArrayList<HTMLContextEntry> removedStack = new ArrayList<HTMLContextEntry>();
-
-      // Flag we can set to parse closeTag's without matching to a start tag for diagnostics
-      boolean allowAnyCloseTag = false;
-
-      void addEntry(Object semanticValue, int startIx, int endIx) {
-         HTMLContextEntry ent = new HTMLContextEntry();
-         ent.startIx = startIx;
-         ent.endIx = endIx;
-         ent.endTagIx = -1;
-         ent.tagName = semanticValue.toString().toLowerCase();
-         tagStack.add(ent);
-      }
-
-      public String getCurrentTagName() {
-         int sz = tagStack.size();
-         if (sz == 0)
-            return null;
-         return tagStack.get(sz-1).tagName;
-      }
-
-      public Object resetToIndex(int ix) {
-         ArrayList<HTMLContextEntry> removedList = null;
-         // When we are resetting the index back - behind the current pointer, we might need to remove tag stack entries.
-         // Keep track of those we remove so we can restore them again if we set the index ahead again.
-         for (int i = tagStack.size() - 1; i >= 0; i--) {
-            if (tagStack.get(i).startIx >= ix) {
-               if (removedList == null)
-                  removedList = new ArrayList<HTMLContextEntry>();
-               HTMLContextEntry removedEntry = tagStack.remove(i);
-               removedList.add(removedEntry);
-
-               addRemovedStackEntry(removedEntry);
-            }
-            else {
-               break;
-            }
-         }
-         return removedList;
-      }
-
-      public void restoreToIndex(int ix, Object retVal) {
-         if (retVal != null) {
-            ArrayList<HTMLContextEntry> toRestore = (ArrayList<HTMLContextEntry>) retVal;
-            for (int i = 0; i < toRestore.size(); i++)
-               tagStack.add(toRestore.get(i));
-         }
-         else {
-            for (int i = removedStack.size() - 1; i >= 0 && i < removedStack.size(); i--) {
-               HTMLContextEntry removedEnt = removedStack.get(i);
-               if (removedEnt.startIx <= ix) {
-                  // Does this tag overlap the current position?  If so, we add it back in to the current tag stack.
-                  if (removedEnt.endTagIx != -1 && removedEnt.endTagIx >= ix) {
-                     addTagStackEntry(removedEnt);
-                  }
-                  //removedStack.remove(i);
-                  //i++;
-               }
-            }
-         }
-      }
-
-      public void popTagName(int endTagIx) {
-         int sz = tagStack.size();
-         if (sz == 0)
-            System.err.println("*** invalid pop tag!");
-         else {
-            HTMLContextEntry removedEnt = tagStack.remove(sz - 1);
-            removedEnt.endTagIx = endTagIx;
-            addRemovedStackEntry(removedEnt);
-         }
-      }
-
-      private void addTagStackEntry(HTMLContextEntry toAdd) {
-         int i;
-         for (i = tagStack.size() - 1; i >= 0; i--) {
-            HTMLContextEntry curEnt = tagStack.get(i);
-            if (curEnt.startIx < toAdd.startIx) {
-               break;
-            }
-            else if (curEnt.startIx == toAdd.startIx) {
-               assert(curEnt.tagName.equals(toAdd.tagName));
-               if (curEnt.endTagIx == -1)
-                  curEnt.endTagIx = toAdd.endTagIx;
-               return;
-            }
-         }
-         if (i == tagStack.size() - 1)
-            tagStack.add(toAdd);
-         else
-            tagStack.add(i + 1, toAdd);
-      }
-
-      private void addRemovedStackEntry(HTMLContextEntry removedEnt) {
-         int i;
-         for (i = removedStack.size() - 1; i >= 0; i--) {
-            HTMLContextEntry curEnt = removedStack.get(i);
-            if (curEnt.startIx < removedEnt.startIx) {
-               break;
-            }
-            else if (curEnt.startIx == removedEnt.startIx) {
-               assert(curEnt.tagName.equals(removedEnt.tagName));
-               if (curEnt.endTagIx == -1)
-                  curEnt.endTagIx = removedEnt.endTagIx;
-               return;
-            }
-         }
-         if (i == removedStack.size() - 1)
-            removedStack.add(removedEnt);
-         else
-            removedStack.add(i + 1, removedEnt);
-      }
-   }
 
    /**
     * Script tags are treated separately - the bodies are not escaped so that you can embed Javascript, or Java code in them with out escaping the
@@ -349,7 +216,7 @@ public class HTMLLanguage extends TemplateLanguage {
                if (startIx == -1)
                   return null;
 
-               HTMLSemanticContext hctx = ((HTMLSemanticContext) ctx);
+               TagStackSemanticContext hctx = ((TagStackSemanticContext) ctx);
                if (hctx.allowAnyCloseTag) // In diagnostic mode - need to just parse the close tag for an error
                   return null;
                String openTagName = hctx.getCurrentTagName();
@@ -363,7 +230,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
          // This is called for both parsing when startIx is known and generation when it's -1.  We are not doing the tag name stack during the generate since the tagStack is about creating the tree and it already tree exists
          if (startIx != -1 && (matchType == TagNameMatchType.UnescapedOpen || matchType == TagNameMatchType.EscapedOpen))
-            ((HTMLSemanticContext) ctx).addEntry(value, startIx, endIx);
+            ((TagStackSemanticContext) ctx).addEntry(value, startIx, endIx);
          return null;
       }
    }
@@ -510,7 +377,7 @@ public class HTMLLanguage extends TemplateLanguage {
     * keeping track of the current tag name stack so the grammar can properly assemble the tag-tree.
     */
    public SemanticContext newSemanticContext(Parselet parselet, Object semanticValue) {
-      return new HTMLSemanticContext();
+      return new TagStackSemanticContext(true);
    }
 
    /** This method in the Element class is used to escape the body so no HTML characters leak out from the application */
@@ -520,7 +387,7 @@ public class HTMLLanguage extends TemplateLanguage {
 
    protected Object incompleteParse(Parser p) {
       if (p.peekInputChar(0) == '<' && p.peekInputChar(1) == '/') {
-         HTMLSemanticContext hctx = (HTMLSemanticContext) p.semanticContext;
+         TagStackSemanticContext hctx = (TagStackSemanticContext) p.semanticContext;
          hctx.allowAnyCloseTag = true;
 
          Object closeTagRes = closeTag.parse(p);

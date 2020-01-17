@@ -972,7 +972,6 @@ public class Sequence extends NestedParselet  {
             break;
       }
       return null;
-
    }
 
    public Object restore(Parser parser, ISemanticNode oldNode, RestoreCtx rctx, boolean inherited) {

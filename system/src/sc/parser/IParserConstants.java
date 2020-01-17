@@ -19,6 +19,7 @@ public interface IParserConstants {
    public static int TRACE = 128;
    public static int SKIP_ON_ERROR = 256;
    public static int PARTIAL_VALUES_ONLY = 512;
+   public static int IGNORE_CASE = 1024;
 
    /** Arg to the Symbol constructor for representing EOF */
    public static String EOF = null;
