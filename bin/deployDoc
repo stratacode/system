@@ -6,9 +6,10 @@ DEPLOY_DIR=/usr/local/scc/deploy
 
 hasStageDir=`ssh scserver@stratacode.com "sh -c 'if [ -f ${DEPLOY_DIR}/currentStageDir ] ; then echo YES; fi'"`
 if [ "$hasStageDir" = "YES" ] ; then
+   scp scserver@stratacode.com:${DEPLOY_DIR}/currentStageDir /tmp
    CUR=`cat /tmp/currentStageDir`
 else
-   echo "No ${DEPLOY_DIR}/currentStageDir - starting at 0"
+   echo "No ${DEPLOY_DIR}/currentStageDir on stratacode.com - starting at 0"
    CUR=1
 fi
 
