@@ -6,11 +6,14 @@ package sc.lang.java;
 
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
+import sc.db.DBTypeDescriptor;
 import sc.dyn.*;
 import sc.lang.*;
 import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.*;
+import sc.lang.sql.DBAnnotationProcessor;
+import sc.lang.sql.DBProvider;
 import sc.lang.template.Template;
 import sc.layer.*;
 import sc.obj.*;
@@ -264,6 +267,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    transient public ArrayList<SyncProperties> syncProperties = null;
 
    transient protected boolean syncPropertiesInited = false;
+   transient protected boolean dbTypeDescriptorInited = false;
+
+   transient public DBTypeDescriptor dbTypeDescriptor;
 
    // Debug flag - keep track of whether this model has ever been stopped
    public transient boolean hasBeenStopped = false;
@@ -1232,10 +1238,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       boolean hasSync = false;
       boolean hasScope = false;
+      boolean hasDB = false;
       if (res != null) {
          for (IDefinitionProcessor proc : res) {
             if (proc == SyncAnnotationProcessor.getSyncAnnotationProcessor())
                hasSync = true;
+            if (proc instanceof DBAnnotationProcessor)
+               hasDB = true;
             if (proc instanceof BasicScopeProcessor)
                hasScope = true;
          }
@@ -1253,6 +1262,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             res = new ArrayList<IDefinitionProcessor>();
 
          res.add(SyncAnnotationProcessor.getSyncAnnotationProcessor());
+      }
+      if (!hasDB && getDBTypeDescriptor() != null) {
+         if (res == null)
+            res = new ArrayList<IDefinitionProcessor>();
+
+         res.add(DBAnnotationProcessor.getDBAnnotationProcessor());
       }
       return res;
    }
@@ -8537,6 +8552,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             BuildInfo bi = sys.buildInfo;
             bi.addTypeGroupMember(getFullTypeName(),  getTemplatePathName(), BuildInfo.AllowEditorCreateGroupName);
          }
+
+         DBTypeDescriptor typeDesc = getDBTypeDescriptor();
+         if (typeDesc != null) {
+            DBProvider dbProvider = ModelUtil.getDBProviderForType(getLayeredSystem(), getLayer(), this);
+            if (dbProvider != null) {
+               dbProvider.processGeneratedFiles(this, typeDesc);
+            }
+         }
       }
 
       Layer layer = model.layer;
@@ -9039,6 +9062,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return syncProperties;
    }
 
+  public void initDBTypeDescriptor() {
+      dbTypeDescriptor = ModelUtil.initDBTypeDescriptor(getLayeredSystem(), getLayer(), this);
+      dbTypeDescriptorInited = true;
+  }
+
+  public DBTypeDescriptor getDBTypeDescriptor() {
+      if (!dbTypeDescriptorInited)
+         initDBTypeDescriptor();
+      return dbTypeDescriptor;
+  }
+
    public List<SyncProperties> getInheritedSyncProperties() {
       List<SyncProperties> res = getSyncProperties();
       if (res != null)
@@ -9081,16 +9115,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    static SyncMode getTypeOrLayerSyncMode(LayeredSystem sys, Object checkType) {
-      Object parentSyncAnnot = ModelUtil.getTypeOrLayerAnnotation(sys, checkType, "sc.obj.Sync");
-      SyncMode parentSyncMode;
+      return (SyncMode) getTypeOrLayerAnnotation(sys, checkType, "sc.obj.Sync", "syncMode", SyncMode.Enabled);
+   }
+
+   static Object getTypeOrLayerAnnotation(LayeredSystem sys, Object checkType, String annotName, String annotField, Object defaultValue) {
+      Object parentSyncAnnot = ModelUtil.getTypeOrLayerAnnotation(sys, checkType, annotName);
+      Object res;
       if (parentSyncAnnot != null) {
-         parentSyncMode = (SyncMode) ModelUtil.getAnnotationValue(parentSyncAnnot, "syncMode");
-         if (parentSyncMode == null)
-            parentSyncMode = SyncMode.Enabled;
+         res = ModelUtil.getAnnotationValue(parentSyncAnnot, annotField);
+         if (res == null)
+            res = defaultValue;
       }
       else
-         parentSyncMode = null;
-      return parentSyncMode;
+         res = null;
+      return res;
    }
 
    /** To find out whether a type is synchronized at either the type or layer level by walking the type hierarchy */

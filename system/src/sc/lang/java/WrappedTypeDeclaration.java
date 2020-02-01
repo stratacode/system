@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.db.DBTypeDescriptor;
 import sc.layer.Layer;
 import sc.type.CTypeUtil;
 import sc.type.DynType;
@@ -373,6 +374,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    public void setAccessTime(long time) {
       if (baseType instanceof ITypeDeclaration)
          ((ITypeDeclaration) baseType).setAccessTime(time);
+   }
+
+   public DBTypeDescriptor getDBTypeDescriptor() {
+      return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), baseType);
    }
 
    public boolean isLayerType() {

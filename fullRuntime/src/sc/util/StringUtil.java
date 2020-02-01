@@ -26,7 +26,7 @@ public class StringUtil {
       return isEmpty(s) || s.trim().length() == 0;
    }
 
-   public static String argsToString(List<String> args) {
+   public static String argsToString(List<?> args) {
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < args.size(); i++) {
          if (i != 0) sb.append(" ");

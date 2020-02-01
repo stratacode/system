@@ -4,6 +4,7 @@
 
 package sc.classfile;
 
+import sc.db.DBTypeDescriptor;
 import sc.util.*;
 import sc.lang.SemanticNode;
 import sc.lang.sc.ModifyDeclaration;
@@ -971,5 +972,9 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
 
    public boolean fileChanged() {
       return classFile.fileChanged();
+   }
+
+   public DBTypeDescriptor getDBTypeDescriptor() {
+      return ModelUtil.initDBTypeDescriptor(system, layer, this);
    }
 }

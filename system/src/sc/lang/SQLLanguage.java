@@ -84,6 +84,7 @@ public class SQLLanguage extends BaseLanguage {
    ICSymbolSpace actionKeyword = new ICSymbolSpace("action");
    ICSymbolSpace setKeyword = new ICSymbolSpace("set");
    ICSymbolSpace defaultKeyword = new ICSymbolSpace("default");
+   ICSymbolSpace primaryKeyword = new ICSymbolSpace("primary");
    ICSymbolSpace keyKeyword = new ICSymbolSpace("key");
    ICSymbolSpace referencesKeyword = new ICSymbolSpace("references");
    ICSymbolSpace likeKeyword = new ICSymbolSpace("like");
@@ -215,8 +216,8 @@ public class SQLLanguage extends BaseLanguage {
 
    Sequence tableUniqueConstraint = new Sequence("UniqueConstraint(,columnList,indexParams)", new ICSymbolSpace("unique"), sqlIdentifierList, indexParameters);
 
-   Sequence colPrimaryKeyConstraint = new Sequence("PrimaryKeyConstraint(,,indexParams)", new ICSymbolSpace("primary"), keyKeyword, indexParameters);
-   Sequence tablePrimaryKeyConstraint = new Sequence("PrimaryKeyConstraint(,,columnList,indexParams)", new ICSymbolSpace("primary"), keyKeyword, sqlIdentifierList, indexParameters);
+   Sequence colPrimaryKeyConstraint = new Sequence("PrimaryKeyConstraint(,,indexParams)", primaryKeyword, keyKeyword, indexParameters);
+   Sequence tablePrimaryKeyConstraint = new Sequence("PrimaryKeyConstraint(,,columnList,indexParams)", primaryKeyword, keyKeyword, sqlIdentifierList, indexParameters);
 
    Sequence usingMethod = new Sequence("(,'')",OPTIONAL, new ICSymbolSpace("using"), identifier);
 
@@ -255,7 +256,7 @@ public class SQLLanguage extends BaseLanguage {
    {
       dimsList.allowNullElements = true; // We need to store an empty element when there are no digits to keep track of the brackets themselves
    }
-   Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
+   public Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
 
    Sequence columnDef = new Sequence("ColumnDef(columnName,columnType,collation,constraintName,columnConstraints)",
                                                     sqlIdentifier, sqlDataType, collation, optNamedConstraint, columnConstraints);
@@ -269,10 +270,12 @@ public class SQLLanguage extends BaseLanguage {
 
    // TODO: add 'exclude' rule to list of table constraints at the end here
    // TODO: make this an indexedChoice
-   Sequence tableConstraint = new Sequence("TableConstraint(namedConstraint,constraint)", optNamedConstraint, new OrderedChoice("(.,.,.,.,.,.)", checkConstraint, tableUniqueConstraint, tablePrimaryKeyConstraint, referencesConstraint, foreignKeyConstraint, excludeConstraint));
+   Sequence tableConstraint = new Sequence("TableConstraint(namedConstraint,constraint)", optNamedConstraint,
+           new OrderedChoice("(.,.,.,.,.,.)", checkConstraint, tableUniqueConstraint, tablePrimaryKeyConstraint,
+                             referencesConstraint, foreignKeyConstraint, excludeConstraint));
    OrderedChoice tableDef = new OrderedChoice(columnDef, likeSource, tableConstraint, columnWithOptions);
 
-   Sequence tableDefList = new Sequence("([],[])", tableDef, new Sequence("(,[])", OPTIONAL | REPEAT, comma, tableDef));
+   Sequence tableDefList = new Sequence("([],[])", tableDef, new Sequence("(,[])", OPTIONAL | REPEAT, commaEOL, tableDef));
 
    Sequence ifNotExists = new Sequence("('','','')", OPTIONAL, ifKeyword, notKeyword, existsKeyword);
 

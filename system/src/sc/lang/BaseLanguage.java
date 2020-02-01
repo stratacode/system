@@ -165,6 +165,10 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    }
    public Sequence optSemicolon = new Sequence(OPTIONAL, new Symbol(";"), spacing);
    public SymbolSpace comma = new SymbolSpace(",");
+   public SymbolSpace commaEOL = new SymbolSpace(",");
+   {
+      commaEOL.generateParseNode = new NewlineParseNode(commaEOL, ",");
+   }
    public SymbolSpace openBrace = new SymbolSpace("{");
    public SymbolSpace openBraceEOL = new SymbolSpace("{");
    {

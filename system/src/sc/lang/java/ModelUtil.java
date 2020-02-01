@@ -8,6 +8,7 @@ import sc.bind.BindSettings;
 import sc.bind.IChangeable;
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
+import sc.db.*;
 import sc.dyn.DynRemoteMethod;
 import sc.dyn.IDynObject;
 import sc.lang.*;
@@ -16,6 +17,8 @@ import sc.lang.html.Element;
 import sc.lang.sc.PropertyAssignment;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.OverrideAssignment;
+import sc.lang.sql.DBProvider;
+import sc.lang.sql.SQLUtil;
 import sc.lang.template.Template;
 import sc.lang.template.TemplateStatement;
 import sc.layer.*;
@@ -39,6 +42,8 @@ import java.lang.reflect.Type;
 import java.util.*;
 
 import sc.lang.java.Statement.RuntimeStatus;
+
+import javax.management.loading.MLet;
 
 /**
  * This interface contains a wide range of operations on Java objects defined in either java.lang.Class, or ITypeDeclaration as the
@@ -5725,6 +5730,8 @@ public class ModelUtil {
          Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
             annotationClass = RDynUtil.loadClass("sc.obj." + annotationName);
+            if (annotationClass != null)
+               System.err.println("*** Remove old non-qualified annotation reference: " + annotationName);
          }
 
          // TODO: fix annotation type name resolution problems
@@ -9516,5 +9523,240 @@ public class ModelUtil {
                types.add(ftn);
          }
       }
+   }
+
+   public static DBTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
+      if (typeDecl instanceof ITypeDeclaration) {
+         return ((ITypeDeclaration) typeDecl).getDBTypeDescriptor();
+      }
+      else {
+         System.err.println("*** Not caching DB type descriptor");
+         return initDBTypeDescriptor(sys, refLayer, typeDecl);
+      }
+
+   }
+
+   public static DBTypeDescriptor initDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
+      ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
+      // TODO: should check for annotations on the Layer of all types in the type tree. For each attribute, check the layer annotation if it's not set at the type level
+      // TODO: need getAllLayerAnnotations(typeDecl, annotName)
+      if (typeSettings != null) {
+         boolean persist = true;
+         String dataSourceName = null;
+         String versionProp = null, primaryTableName = null;
+         List<String> auxTableNames = null;
+         for (Object annot:typeSettings) {
+            Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
+            if (tmpPersist != null)
+               persist = tmpPersist;
+            String tmpDataSourceName  = (String) ModelUtil.getAnnotationValue(annot, "dataSourceName");
+            if (tmpDataSourceName != null)
+               dataSourceName = tmpDataSourceName;
+            String tmpVersionProp = (String) ModelUtil.getAnnotationValue(annot, "versionProp");
+            if (tmpVersionProp != null) {
+               versionProp = tmpVersionProp;
+            }
+            String tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "primaryTable");
+            if (tmpPrimaryTableName != null) {
+               primaryTableName = tmpPrimaryTableName;
+            }
+            String tmpAuxTableNames = (String) ModelUtil.getAnnotationValue(annot, "auxTables");
+            if (tmpAuxTableNames != null) {
+               auxTableNames = new ArrayList<String>(Arrays.asList(tmpAuxTableNames.split(",")));
+            }
+         }
+
+         if (persist) {
+            if (dataSourceName == null) {
+               DataSourceDef def = sys.defaultDataSource;
+               dataSourceName = def == null ? null : def.jndiName;
+               if (dataSourceName == null)
+                  return null;
+            }
+            Object baseType = ModelUtil.getExtendsClass(typeDecl);
+            DBTypeDescriptor baseTD = baseType != null && baseType != Object.class ? ModelUtil.getDBTypeDescriptor(sys, refLayer, baseType) : null;
+            String fullTypeName = ModelUtil.getTypeName(typeDecl);
+            String typeName = CTypeUtil.getClassName(fullTypeName);
+            if (primaryTableName == null)
+               primaryTableName = DBUtil.getSQLName(typeName);
+            ArrayList<TableDescriptor> auxTables = new ArrayList<TableDescriptor>();
+            Map<String,TableDescriptor> auxTablesIndex = new TreeMap<String,TableDescriptor>();
+            ArrayList<MultiTableDescriptor> multiTables = new ArrayList<MultiTableDescriptor>();
+            if (auxTableNames != null) {
+               for (String auxTableName:auxTableNames)
+                  auxTables.add(new TableDescriptor(auxTableName));
+            }
+            TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
+
+            Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
+            if (properties != null) {
+               for (Object property:properties) {
+                  Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
+                  String propName = ModelUtil.getPropertyName(property);
+                  Object propType = ModelUtil.getPropertyType(property);
+
+                  if (idSettings != null) {
+                     String idColumnName = null;
+                     String idColumnType = null;
+                     boolean definedByDB = true;
+
+                     String tmpColumnName = (String) ModelUtil.getAnnotationValue(idSettings, "columnName");
+                     if (tmpColumnName != null) {
+                        idColumnName = tmpColumnName;
+                     }
+
+                     String tmpColumnType = (String) ModelUtil.getAnnotationValue(idSettings, "columnType");
+                     if (tmpColumnType != null) {
+                        idColumnType = tmpColumnType;
+                     }
+
+                     Boolean tmpDefinedByDB  = (Boolean) ModelUtil.getAnnotationValue(idSettings, "definedByDB");
+                     if (tmpDefinedByDB != null) {
+                        definedByDB = tmpDefinedByDB;
+                     }
+
+                     if (idColumnName == null)
+                        idColumnName = DBUtil.getSQLName(propName);
+                     if (idColumnType == null)
+                        idColumnType = DBUtil.getDefaultSQLType(propType);
+
+                     IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
+
+                     primaryTable.addIdColumnProperty(idDesc);
+
+                     continue;
+                  }
+                  // Skip transient fields
+                  if (ModelUtil.hasModifier(property, "transient"))
+                     continue;
+                  Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
+                  String propTableName = null;
+                  String propColumnName = null;
+                  String propColumnType = null;
+                  boolean propOnDemand = false;
+                  boolean propAllowNull = false;
+                  String propDataSourceName = null;
+                  String propFetchGroup = null;
+                  if (propSettings != null) {
+                     Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
+                     if (tmpPersist != null && !tmpPersist) {
+                        continue;
+                     }
+
+                     String tmpTableName = (String) ModelUtil.getAnnotationValue(propSettings, "tableName");
+                     if (tmpTableName != null) {
+                        propTableName = tmpTableName;
+                     }
+
+                     String tmpColumnName = (String) ModelUtil.getAnnotationValue(propSettings, "columnName");
+                     if (tmpColumnName != null) {
+                        propColumnName = tmpColumnName;
+                     }
+
+                     String tmpColumnType = (String) ModelUtil.getAnnotationValue(propSettings, "columnType");
+                     if (tmpColumnType != null) {
+                        propColumnType = tmpColumnType;
+                     }
+
+                     Boolean tmpOnDemand  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "onDemand");
+                     if (tmpOnDemand != null) {
+                        propOnDemand = tmpOnDemand;
+                     }
+                     Boolean tmpAllowNull  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "allowNull");
+                     if (tmpAllowNull != null) {
+                        propAllowNull = tmpAllowNull;
+                     }
+
+                     String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
+                     if (tmpDataSourceName != null) {
+                        propDataSourceName = tmpDataSourceName;
+                     }
+
+                     String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
+                     if (tmpFetchGroup != null) {
+                        propFetchGroup = tmpFetchGroup;
+                     }
+                  }
+
+                  if (propColumnName == null)
+                     propColumnName = DBUtil.getSQLName(propName);
+                  if (propColumnType == null)
+                     propColumnType = DBUtil.getDefaultSQLType(propType);
+
+                  DBPropertyDescriptor propDesc = new DBPropertyDescriptor(propName, propColumnName, propColumnType, propTableName, propAllowNull, propOnDemand, propDataSourceName, propFetchGroup);
+
+                  boolean isMultiProperty = ModelUtil.isArray(propType);
+
+                  TableDescriptor propTable = primaryTable;
+
+                  if (isMultiProperty) {
+                     if (propTableName == null)
+                        propTableName = primaryTableName + "_" + propColumnName;
+
+                     MultiTableDescriptor multiTable = new MultiTableDescriptor(propTableName);
+                     propTable = multiTable;
+                     multiTables.add(multiTable);
+                  }
+                  else if (propTableName != null && !propTableName.equals(propTable.tableName)) {
+                     propTable = auxTablesIndex.get(propTableName);
+                     if (propTable == null) {
+                        TableDescriptor auxTable = new TableDescriptor(propTableName);
+                        auxTablesIndex.put(propTableName, auxTable);
+                        auxTables.add(auxTable);
+                        propTable = auxTable;
+                     }
+                  }
+                  propTable.addColumnProperty(propDesc);
+               }
+            }
+
+            DBTypeDescriptor dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, auxTables, multiTables, versionProp);
+
+            return dbTypeDesc;
+         }
+      }
+      return null;
+   }
+
+   public static DBPropertyDescriptor getDBPropertyDescriptor(LayeredSystem sys, Layer refLayer, Object propObj) {
+      Object enclType = getEnclosingType(propObj);
+      if (enclType != null) {
+         DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType);
+         String propName = ModelUtil.getPropertyName(propObj);
+         if (typeDesc != null)
+            return typeDesc.getPropertyDescriptor(propName);
+      }
+      return null;
+   }
+
+   public static DBProvider getDBProviderForType(LayeredSystem sys, Layer refLayer, Object typeObj) {
+      DBTypeDescriptor typeDesc = ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj);
+      if (typeDesc != null) {
+         String dataSourceName = typeDesc.dataSourceName;
+         DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
+         if (dataSource != null) {
+            return sys.dbProviders.get(dataSource.provider);
+         }
+      }
+      return null;
+   }
+
+   public static DBProvider getDBProviderForProperty(LayeredSystem sys, Layer refLayer, Object propObj) {
+      Object enclType = ModelUtil.getEnclosingType(propObj);
+      String propName = ModelUtil.getPropertyName(propObj);
+      DBTypeDescriptor typeDesc = enclType == null ? null : ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForMember(sys, propObj), enclType);
+      if (typeDesc != null) {
+         DBPropertyDescriptor propDesc = typeDesc.getPropertyDescriptor(propName);
+         if (propDesc != null) {
+            String dataSourceName = propDesc.dataSourceName;
+            if (dataSourceName == null)
+               dataSourceName = typeDesc.dataSourceName;
+            DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
+            if (dataSource != null) {
+               return sys.dbProviders.get(dataSource.provider);
+            }
+         }
+      }
+      return null;
    }
 }

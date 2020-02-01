@@ -4,12 +4,18 @@
 
 package sc.lang.java;
 
+import sc.db.DBPropertyDescriptor;
+import sc.db.DBTypeDescriptor;
+import sc.db.DataSourceDef;
+import sc.lang.sql.DBProvider;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.CTypeUtil;
 
 public class PropertyDefinitionParameters {
    public String fieldModifiers, getModifiers, setModifiers, setIndexedModifiers; // Modifier values for each
    public boolean bindable;              // True if this field definition needs to be bindable
+   public boolean persist;               // True if this property is being persisted
    public String propertyTypeName;       // The class name of the field
    public String setTypeName;            // The type name for the setX method just in case it's different from the getX
    public String enclosingTypeName;      // The class name of the containing class
@@ -34,6 +40,11 @@ public class PropertyDefinitionParameters {
    public boolean sameValueCheck;
    public boolean useIndexSetForArrays = true;
 
+   public String dbObjPrefix ="";
+   public DBPropertyDescriptor dbPropDesc;
+   public String dbGetProperty = "";
+   public String dbSetProperty = "";
+
    public String bindClass = "sc.bind.Bind";
    public String bindableClass = "sc.bind.Bindable";
    public String dynUtilClass = "sc.dyn.DynUtil";
@@ -48,9 +59,11 @@ public class PropertyDefinitionParameters {
       return pdp;
    }
 
+   /** TODO: this method is not called for the main use of PropertyDefinitionParameters... there's some replicated code we should cleanup between here and the other places where this class is created */
    public void init(Object fieldObj, boolean doObjConvert, LayeredSystem sys) {
+      Object enclType = ModelUtil.getEnclosingType(fieldObj);
       // Need to get absolute type names here because we do not do the imports from the model because we never resolved the interface fields in this model
-      setTypeName = propertyTypeName = ModelUtil.getAbsoluteGenericTypeName(ModelUtil.getEnclosingType(fieldObj), fieldObj, true);
+      setTypeName = propertyTypeName = ModelUtil.getAbsoluteGenericTypeName(enclType, fieldObj, true);
       Object propType = ModelUtil.getPropertyType(fieldObj);
       useIndexSetForArrays = sys.useIndexSetForArrays;
 
@@ -78,7 +91,19 @@ public class PropertyDefinitionParameters {
       setModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, true, true, false, false, true, JavaSemanticNode.MemberType.SetMethod), TransformUtil.fieldOnlyModifiers);
       if (getNeedsIndexedSetter())
          setIndexedModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, false, true, false, false, true, JavaSemanticNode.MemberType.SetIndexed), TransformUtil.fieldOnlyModifiers);
+   }
 
+   public void initForVarDef(LayeredSystem sys, Object varDef) {
+      Object enclType = ModelUtil.getEnclosingType(varDef);
+      Layer propLayer = ModelUtil.getLayerForMember(sys, varDef);
+      DBProvider dbProvider = ModelUtil.getDBProviderForProperty(sys, propLayer, varDef);
+      if (dbProvider != null && dbProvider.getNeedsGetSet()) {
+         persist = true;
+         dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
+         dbPropDesc = ModelUtil.getDBPropertyDescriptor(sys, propLayer, varDef);
+         dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
+         dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
+      }
    }
 
    public boolean getNeedsIndexedSetter() {

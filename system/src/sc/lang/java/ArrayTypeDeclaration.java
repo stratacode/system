@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.classfile.CFClass;
+import sc.db.DBTypeDescriptor;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.type.*;
@@ -494,5 +495,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public void setAccessTime(long time) {
       if (componentType instanceof ITypeDeclaration)
          ((ITypeDeclaration) componentType).setAccessTime(time);
+   }
+
+   public DBTypeDescriptor getDBTypeDescriptor() {
+      return null;
    }
 }

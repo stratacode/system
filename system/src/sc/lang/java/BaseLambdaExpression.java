@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.db.DBTypeDescriptor;
 import sc.lang.ILanguageModel;
 import sc.lang.ISemanticNode;
 import sc.lang.JavaLanguage;
@@ -981,6 +982,9 @@ public abstract class BaseLambdaExpression extends Expression {
 
       public void setAccessTime(long time) {}
 
+      public DBTypeDescriptor getDBTypeDescriptor() {
+         return null;
+      }
    }
 
    /**
@@ -1321,5 +1325,9 @@ public abstract class BaseLambdaExpression extends Expression {
       public void setAccessTimeForRefs(long time) {}
 
       public void setAccessTime(long time) {}
+
+      public DBTypeDescriptor getDBTypeDescriptor() {
+         return null;
+      }
    }
 }

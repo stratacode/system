@@ -119,8 +119,10 @@ public class ForVarStatement extends ForStatement implements IVariable {
                }
             }
          }
-         else if (arrObj == null) throw new NullPointerException("For expression null: " + toDefinitionString());
-         else throw new IllegalArgumentException("Loop variable of incorrect type: " + arrObj.getClass() + " for: " + toDefinitionString());
+         else if (arrObj == null)
+            throw new NullPointerException("For expression null: " + toDefinitionString());
+         else
+            throw new IllegalArgumentException("Loop variable of incorrect type: " + arrObj.getClass() + " for: " + toDefinitionString());
       }
       finally {
          ctx.popFrame();

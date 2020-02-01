@@ -727,11 +727,11 @@ public class TransformUtil {
            "   private <%=fieldModifiers%> <%=propertyTypeName%><%=arrayDimensions%> <%=lowerPropertyName%>" +
                                        "<% if (initializer.length() > 0 && !bindable) { %> = <%=initializer%>; <% } else { %>;<% } %> \n" +
            "<% } %>\n" +
-           "   <%=getModifiers%> <%=propertyTypeName%><%=arrayDimensions%> <%=getOrIs%><%=upperPropertyName%>() {\n" +
+           "   <%=getModifiers%> <%=propertyTypeName%><%=arrayDimensions%> <%=getOrIs%><%=upperPropertyName%>() {" +
+           "<%= dbGetProperty %>\n" +
                    /*
-               Turning off for now... this is not tested and causes a lot of overhead so only should be turned on
-               if someone specifies an explicit annotation for that property to do lazy evaluation of the binding.
-           "<% if (bindable) { %>\n" +
+               TODO: add Bindable(lazy=true) and include code like this:
+           "<% if (lazyBindable) { %>\n" +
            "      sc.bind.Bind.sendEvent(sc.bind.IListener.VALUE_REQUESTED, <%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, _<%=lowerPropertyName%>Prop);\n" +
            "<% } %>\n" +
                    */
@@ -742,7 +742,8 @@ public class TransformUtil {
            "      return <%=lowerPropertyName%>;\n" +
            "<% } %>\n" +
            "   }\n" +
-           "   <%=setModifiers%> void set<%=upperPropertyName%>(<%=setTypeName%><%=arrayDimensions%> _<%=lowerPropertyName%>) {\n" +
+           "   <%=setModifiers%> void set<%=upperPropertyName%>(<%=setTypeName%><%=arrayDimensions%> _<%=lowerPropertyName%>) {" +
+           "<%= dbSetProperty %>\n" +
            "<% if (sameValueCheck) { %>" +
            "      boolean _valChanged = !sc.dyn.DynUtil.equalObjects(_<%=lowerPropertyName%>, <%=lowerPropertyName%>);\n" +
            "<% }\n" +
@@ -991,6 +992,8 @@ public class TransformUtil {
             varInit = variableDefinition.initializer;
          params.initializer = ParseUtil.toLanguageString(SCLanguage.INSTANCE.variableInitializer, varInit);
       }
+
+      params.initForVarDef(sys, variableDefinition);
 
       makePropertyBindableInType(field, typeDeclaration, convertedPropName, params, true, bindable);
 

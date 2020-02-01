@@ -520,6 +520,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                return v;
          }
       }
+
+      if (scopeInterfaces != null) {
+         LayeredSystem sys = getLayeredSystem();
+         for (Object scopeIf:scopeInterfaces)
+            if (scopeIf != null && (v = ModelUtil.definesMethod(scopeIf, name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs, sys)) != null)
+               return v;
+      }
       return null;
    }
 

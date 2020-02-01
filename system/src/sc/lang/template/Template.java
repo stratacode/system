@@ -5,6 +5,7 @@
 package sc.lang.template;
 
 import sc.bind.Bindable;
+import sc.db.DBTypeDescriptor;
 import sc.lang.*;
 import sc.lang.html.ControlTag;
 import sc.lang.html.Element;
@@ -442,6 +443,12 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       setLastAccessTime(time);
    }
 
+   public DBTypeDescriptor getDBTypeDescriptor() {
+      if (rootType != null)
+         return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), rootType);
+      return null;
+   }
+
    public DeclarationType getDeclarationType() {
       if (rootType == null)
          return DeclarationType.OBJECT;
@@ -544,7 +551,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                            preTagContent = null;
 
                         singleElementType = true;
-                        Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(getFullTypeName(), false) : null;
+                        String fullTypeName = getFullTypeName();
+                        if (!typeName.equals(fullTypeName)) // TODO: just use typeName here I think
+                           System.out.println("*** Mismatching type name case");
+                        Object modifyType = templateProcessor.getDefaultModify() ? getPreviousDeclaration(fullTypeName, false) : null;
                         rootType = td = elem.convertToObject(this, null, modifyType, templateModifiers, preTagContent);
                         td.fromStatement = elem;
                      }

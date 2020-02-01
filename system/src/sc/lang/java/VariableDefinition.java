@@ -9,6 +9,7 @@ import sc.bind.BindingDirection;
 import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.js.JSUtil;
+import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.parser.IStyleAdapter;
@@ -156,6 +157,13 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
       if (bindingDirection != null && (bindingDirection.doReverse() || bindable)) {
          makeBindable(false);
+      }
+
+      if (!convertGetSet) {
+         DBProvider dbProvider = ModelUtil.getDBProviderForProperty(getLayeredSystem(), getLayer(), this);
+         if (dbProvider != null && dbProvider.getNeedsGetSet()) {
+            convertGetSet = true;
+         }
       }
 
       // Check to be sure the initializer is compatible with the property

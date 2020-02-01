@@ -4,6 +4,10 @@
 
 package sc.lang.java;
 
+import sc.db.DBPropertyDescriptor;
+import sc.db.DBTypeDescriptor;
+import sc.db.IdPropertyDescriptor;
+import sc.db.TableDescriptor;
 import sc.lang.sc.IScopeProcessor;
 import sc.lang.template.Template;
 import sc.layer.Layer;
@@ -80,6 +84,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    protected TypeDeclaration accessClass;
 
    protected String constrModifiers;
+
+   DBTypeDescriptor dbTypeDescriptor;
 
    public ObjectDefinitionParameters() {
    }
@@ -168,6 +174,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          customSetter = TransformUtil.evalTemplate(this, customSetterTemplate);
       else if (customResolver != null)
          customSetter = TransformUtil.evalTemplate(this, customSetter, true, false, null);
+
+      dbTypeDescriptor = ModelUtil.getDBTypeDescriptor(objType.getLayeredSystem(), objType.getLayer(), objType);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -432,6 +440,151 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       sb.append("}");
       return sb.toString();
    }
+
+   public String formatDBTypeDescriptorDefinition() {
+      if (dbTypeDescriptor == null)
+         return "";
+
+      StringBuilder sb = new StringBuilder();
+      sb.append("sc.db.DBTypeDescriptor.add(new sc.db.DBTypeDescriptor(");
+
+      if (typeIsDynamic)
+         sb.append("sc.dyn.DynUtil.findType(\\\"\" + typeName + \"\\\")\"");
+      else {
+         sb.append(objType.getTypeName());
+         sb.append(".class");
+      }
+
+      sb.append(", ");
+
+      if (dbTypeDescriptor.baseType != null) {
+         sb.append("sc.db.DBTypeDescriptor.getByName(\"");
+         sb.append(ModelUtil.getTypeName(dbTypeDescriptor.baseType.typeDecl));
+         sb.append("\")");
+      }
+      else
+         sb.append("null");
+
+      sb.append(", \"");
+      sb.append(dbTypeDescriptor.dataSourceName);
+
+      sb.append("\", ");
+
+      appendTable(sb, dbTypeDescriptor.primaryTable, false);
+      sb.append(", ");
+      appendTableList(sb, dbTypeDescriptor.auxTables, false);
+      sb.append(", ");
+      appendTableList(sb, dbTypeDescriptor.multiTables, true);
+      sb.append(", ");
+      DBPropertyDescriptor versionProp = dbTypeDescriptor.versionProperty;
+      if (versionProp == null)
+         sb.append("null");
+      else {
+         sb.append('"');
+         sb.append(versionProp.columnName);
+         sb.append('"');
+      }
+      sb.append("));");
+
+      return sb.toString();
+   }
+
+   private void appendTableList(StringBuilder sb, List<? extends TableDescriptor> tableList, boolean multi) {
+      if (tableList == null || tableList.size() == 0) {
+         sb.append("null");
+         return;
+      }
+      String className = multi ? "TableDescriptor" : "MultiTableDescriptor";
+      sb.append("new java.util.ArrayList<sc.db.");
+      sb.append(className);
+      sb.append(">(java.util.Arrays.asList(new sc.db.");
+      sb.append(className);
+      sb.append("[]{");
+
+      boolean first = true;
+      for (TableDescriptor tableDesc:tableList) {
+         if (first)
+            first = false;
+         else
+            sb.append(", ");
+         appendTable(sb, tableDesc, multi);
+      }
+      sb.append("}))");
+   }
+
+   private void appendTable(StringBuilder sb, TableDescriptor tableDesc, boolean multi) {
+      sb.append("new sc.db.");
+      if (multi)
+         sb.append("MultiTableDescriptor(\"");
+      else
+         sb.append("TableDescriptor(\"");
+
+      sb.append(tableDesc.tableName);
+      sb.append("\", ");
+      appendPropertyList(sb, tableDesc.idColumns, true);
+      sb.append(", ");
+      appendPropertyList(sb, tableDesc.columns, false);
+
+      sb.append(")");
+   }
+
+   private void appendPropertyList(StringBuilder sb, List<? extends DBPropertyDescriptor> propList, boolean isIdProperty) {
+      if (propList == null) {
+         sb.append("null");
+         return;
+      }
+      String descClassName = isIdProperty ? "sc.db.IdPropertyDescriptor" : "sc.db.DBPropertyDescriptor";
+      sb.append("new java.util.ArrayList<");
+      sb.append(descClassName);
+      sb.append(">(java.util.Arrays.asList(new ");
+      sb.append(descClassName);
+      sb.append("[]{");
+      boolean first = true;
+      for (DBPropertyDescriptor propDesc:propList) {
+         if (first)
+            first = false;
+         else
+            sb.append(", ");
+         appendProperty(sb, propDesc, isIdProperty, descClassName);
+      }
+      sb.append("}))");
+   }
+
+   private void appendProperty(StringBuilder sb, DBPropertyDescriptor propDesc, boolean isIdProperty, String descName) {
+      sb.append("new ");
+      sb.append(descName);
+      sb.append("(");
+      appendString(sb, propDesc.propertyName, false);
+      appendString(sb, propDesc.columnName, true);
+      appendString(sb, propDesc.columnType, true);
+      if (!isIdProperty) {
+         appendString(sb, propDesc.tableName, true);
+         sb.append(", ");
+         sb.append(propDesc.allowNull);
+         sb.append(", ");
+         sb.append(propDesc.onDemand);
+         appendString(sb, propDesc.dataSourceName, true);
+         appendString(sb, propDesc.fetchGroup, true);
+      }
+      else {
+         sb.append(", ");
+         sb.append(((IdPropertyDescriptor) propDesc).definedByDB);
+      }
+      sb.append(")");
+   }
+
+   private void appendString(StringBuilder sb, String str, boolean commaPre) {
+      if (commaPre)
+         sb.append(", ");
+      if (str == null)
+         sb.append("null");
+      else {
+         sb.append('"');
+         sb.append(str);
+         sb.append('"');
+      }
+   }
+
 
    /** Do we need the type settings at all?  Even if we inherit it from a base type, we still want to include it in the code-gen. */
    public boolean getNeedsTypeSettings() {

@@ -8,11 +8,14 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
+import sc.db.DataSourceDef;
 import sc.js.URLPath;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.*;
 import sc.dyn.*;
+import sc.lang.sql.DBAnnotationProcessor;
+import sc.lang.sql.DBProvider;
 import sc.lang.template.Template;
 import sc.layer.deps.*;
 import sc.lifecycle.ILifecycle;
@@ -239,6 +242,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Each LayeredSystem stores the layers for one process.  This holds the configuration info for that process.  */
    public IProcessDefinition processDefinition = null;
+
+   public List<DataSourceDef> dataSources = null;
+   // TODO: move this to the 'layer' and only inherit it if your layer extends the one that sets it so that we can assembly stacks with more than one default that still work.
+   /** Set this to support @DBTypeSettings with no dataSourceName, to more easily aggregate components into one default db without having to set all of the types individually */
+   public DataSourceDef defaultDataSource;
+   public Map<String,DBProvider> dbProviders = new TreeMap<String,DBProvider>();
 
    public String serverName = "localhost";  /** The hostname for accessing this system */
 
@@ -1148,7 +1157,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
       "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
       "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil",
-      "sc.layer.RuntimeModuleType"};
+      "sc.layer.RuntimeModuleType", "sc.lang.sql.DBProvider", "sc.db.DataSourceDef"};
 
    // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
@@ -1225,6 +1234,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public HashMap<String,IAnnotationProcessor> defaultAnnotationProcessors = new HashMap<String,IAnnotationProcessor>();
    {
       registerDefaultAnnotationProcessor("sc.obj.Sync", SyncAnnotationProcessor.getSyncAnnotationProcessor());
+      registerDefaultAnnotationProcessor("sc.db.DBTypeSettings", DBAnnotationProcessor.getDBAnnotationProcessor());
    }
 
    // TODO: RuntimeState class to hold the next several fields
@@ -15464,8 +15474,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (searchInactiveTypesForLayer(refLayer)) {
-         return refLayer.getAnnotationProcessor(annotName, true);
+         IAnnotationProcessor proc = refLayer.getAnnotationProcessor(annotName, true);
+         if (proc != null)
+            return proc;
       }
+      IAnnotationProcessor def = defaultAnnotationProcessors.get(annotName);
+      if (def != null)
+         return def;
       return null;
    }
 
@@ -15933,6 +15948,24 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return langRT.getCompiledFiles(lang, typeName);
    }
 
+   public void addDataSource(DataSourceDef newDataSource) {
+      if (this.dataSources == null)
+         this.dataSources = new ArrayList<DataSourceDef>();
+      this.dataSources.add(newDataSource);
+   }
+
+   public DataSourceDef getDataSourceDef(String dataSourceName) {
+      if (this.dataSources == null)
+         return null;
+      for (DataSourceDef def:dataSources)
+         if (def.jndiName.equals(dataSourceName))
+            return def;
+      return null;
+   }
+
+   public void addDBProvider(DBProvider provider) {
+      this.dbProviders.put(provider.providerName, provider);
+   }
 }
 
 
