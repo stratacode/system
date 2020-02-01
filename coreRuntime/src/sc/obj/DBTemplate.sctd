@@ -1,0 +1,29 @@
+<% // This template gets merged into each persisted type - those with @DBTypeSettings on the type or layer for a provider that needs a the type descriptor
+   if (dbTypeDescriptor != null) { %>
+   static {
+      <%= formatDBTypeDescriptorDefinition() %>
+   }
+
+   <%    if (dbTypeDescriptor.baseType == null) { %>
+      // Stores persistent state for the instance
+      protected sc.db.DBObject _dbObject = new sc.db.DBObject(this);
+
+      public void dbInsert() {
+         _dbObject.dbInsert();
+      }
+      public void dbDelete() {
+         _dbObject.dbDelete();
+      }
+      public int dbUpdate() {
+         return _dbObject.dbUpdate();
+      }
+      public String getObjectId() {
+         return _dbObject.getObjectId();
+      }
+   <%    }
+         if (dbTypeDescriptor.needsAutoId) { %>
+      @sc.db.IdSettings // Generated id
+      long id;
+   <%    }
+   }
+%>
