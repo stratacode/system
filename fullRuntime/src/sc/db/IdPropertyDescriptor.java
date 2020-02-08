@@ -5,7 +5,7 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
    public boolean definedByDB;
 
    public IdPropertyDescriptor(String propertyName, String columnName, String columnType, boolean definedByDB) {
-      super(propertyName, columnName, columnType, null, false, false, null, null);
+      super(propertyName, columnName, columnType, null, false, false, null, null, null, false);
       this.definedByDB = definedByDB;
    }
 
@@ -18,5 +18,11 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
 
    public boolean isId() {
       return true;
+   }
+
+   public IdPropertyDescriptor createKeyIdColumn() {
+      IdPropertyDescriptor res = new IdPropertyDescriptor(propertyName, columnName, DBUtil.getKeyIdColumnType(columnType), definedByDB);
+      res.dbTypeDesc = dbTypeDesc;
+      return res;
    }
 }

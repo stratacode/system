@@ -22,6 +22,6 @@ public class ColumnDef extends TableDef {
    }
 
    public String toString() {
-      return columnName + " " + columnType + (collation == null ? "" : collation) + (constraintName == null ? "" : constraintName) + (columnConstraints == null ? "" : StringUtil.argsToString(columnConstraints));
+      return columnName + " " + columnType + (collation == null ? "" : collation) + (constraintName == null ? "" : constraintName) + (columnConstraints == null ? "" : " " + StringUtil.argsToString(columnConstraints));
    }
 }

@@ -17,6 +17,11 @@ public class TableDescriptor {
    /** Controls whether a row is inserted when all property values stored in this table are null - true for primary tables always */
    public boolean insertWithNullValues = false;
 
+   /** When false, there's one row per exposed value - it's not a multiTable */
+   public boolean multiRow = false;
+
+   public boolean primary = false;
+
    public TableDescriptor(String tableName) {
       this.tableName = tableName;
       this.columns = new ArrayList<DBPropertyDescriptor>();
@@ -26,18 +31,18 @@ public class TableDescriptor {
       this.tableName = tableName;
       this.idColumns = idColumns;
       this.columns = columns;
-      for (DBPropertyDescriptor col:columns)
-         col.init(dbTypeDesc, this);
-      if (idColumns != null) {
-         for (IdPropertyDescriptor idcol:idColumns)
-            idcol.init(dbTypeDesc, this);
-      }
    }
 
    void init(DBTypeDescriptor dbTypeDesc) {
       this.dbTypeDesc = dbTypeDesc;
       if (this == dbTypeDesc.primaryTable)
          insertWithNullValues = true;
+      for (DBPropertyDescriptor col:columns)
+         col.init(dbTypeDesc, this);
+      if (idColumns != null) {
+         for (IdPropertyDescriptor idcol:idColumns)
+            idcol.init(dbTypeDesc, this);
+      }
    }
 
    public void addColumnProperty(DBPropertyDescriptor prop) {
@@ -81,7 +86,21 @@ public class TableDescriptor {
       return idColumns;
    }
 
+   public List<IdPropertyDescriptor> createKeyIdColumns() {
+      ArrayList<IdPropertyDescriptor> res = new ArrayList<IdPropertyDescriptor>();
+      for (IdPropertyDescriptor idCol:idColumns) {
+          IdPropertyDescriptor keyCol = idCol.createKeyIdColumn();
+          res.add(keyCol);
+      }
+      return res;
+   }
+
    public String toString() {
       return "table " + tableName;
+   }
+
+   public void initIdColumns() {
+      if (idColumns == null)
+         idColumns = dbTypeDesc.primaryTable.createKeyIdColumns();
    }
 }

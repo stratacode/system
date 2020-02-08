@@ -74,14 +74,16 @@ public class DBTransaction {
    }
 
    public void flush() {
-      if (operationList == null)
-         return;
+      while (operationList != null) {
+         ArrayList<TxOperation> toApply = operationList;
 
-      for (TxOperation op:operationList) {
-         op.apply();
+         operationList = null;
+         operationIndex = null;
+
+         for (TxOperation op:toApply) {
+            op.apply();
+         }
       }
-      operationList = null;
-      operationIndex = null;
    }
 
    TreeMap<String,Connection> connections = null;

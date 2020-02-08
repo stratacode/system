@@ -9581,7 +9581,7 @@ public class ModelUtil {
                primaryTableName = DBUtil.getSQLName(typeName);
             ArrayList<TableDescriptor> auxTables = new ArrayList<TableDescriptor>();
             Map<String,TableDescriptor> auxTablesIndex = new TreeMap<String,TableDescriptor>();
-            ArrayList<MultiTableDescriptor> multiTables = new ArrayList<MultiTableDescriptor>();
+            ArrayList<TableDescriptor> multiTables = new ArrayList<TableDescriptor>();
             if (auxTableNames != null) {
                for (String auxTableName:auxTableNames)
                   auxTables.add(new TableDescriptor(auxTableName));
@@ -9594,6 +9594,9 @@ public class ModelUtil {
                   Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
                   String propName = ModelUtil.getPropertyName(property);
                   Object propType = ModelUtil.getPropertyType(property);
+
+                  if (propName == null || propType == null)
+                     continue;
 
                   if (idSettings != null) {
                      String idColumnName = null;
@@ -9617,8 +9620,11 @@ public class ModelUtil {
 
                      if (idColumnName == null)
                         idColumnName = DBUtil.getSQLName(propName);
-                     if (idColumnType == null)
+                     if (idColumnType == null) {
                         idColumnType = DBUtil.getDefaultSQLType(propType);
+                        if (idColumnType == null)
+                           throw new IllegalArgumentException("Invalid property type: " + propType + " for id: " + idColumnName);
+                     }
 
                      IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
 
@@ -9648,6 +9654,7 @@ public class ModelUtil {
                         propTableName = tmpTableName;
                      }
 
+                     // TODO: should we specify columnNames and Types here as comma separated lists to deal with multi-column primary key properties (and possibly others that need more than one column?)
                      String tmpColumnName = (String) ModelUtil.getAnnotationValue(propSettings, "columnName");
                      if (tmpColumnName != null) {
                         propColumnName = tmpColumnName;
@@ -9680,21 +9687,84 @@ public class ModelUtil {
 
                   if (propColumnName == null)
                      propColumnName = DBUtil.getSQLName(propName);
-                  if (propColumnType == null)
+                  DBTypeDescriptor refDBTypeDesc = null;
+
+                  boolean isMultiCol = false;
+
+                  // TODO: should we handle array and set properties here?
+                  boolean isArrayProperty = ModelUtil.isAssignableFrom(List.class, propType);
+                  if (isArrayProperty) {
+                     if (hasTypeParameters(propType)) {
+                        propType = getTypeParameter(propType, 0);
+                     }
+                     else
+                        propType = Object.class;
+                  }
+
+                  if (propColumnType == null) {
                      propColumnType = DBUtil.getDefaultSQLType(propType);
+                     if (propColumnType == null) {
+                        refDBTypeDesc = getDBTypeDescriptor(sys, refLayer, propType);
+                        if (refDBTypeDesc == null) {
+                           propColumnType = "json";
+                        }
+                        else {
+                           TableDescriptor refTable = refDBTypeDesc.primaryTable;
+                           if (refTable.idColumns.size() == 1)
+                              propColumnType = DBUtil.getKeyIdColumnType(refTable.getIdColumns().get(0).columnType);
+                           else {
+                              isMultiCol = true;
+                              StringBuilder cns = new StringBuilder();
+                              StringBuilder cts = new StringBuilder();
+                              for (int idx = 0; idx < refTable.idColumns.size(); idx++) {
+                                 if (idx != 0) {
+                                    cns.append(",");
+                                    cts.append(",");
+                                 }
+                                 IdPropertyDescriptor idCol = refTable.idColumns.get(idx);
+                                 cns.append(propColumnName);
+                                 cns.append("_");
+                                 cns.append(idCol.columnName);
+                                 cts.append(DBUtil.getKeyIdColumnType(idCol.columnType));
+                              }
+                              propColumnName = cns.toString();
+                              propColumnType = cts.toString();
+                           }
+                        }
+                     }
+                  }
 
-                  DBPropertyDescriptor propDesc = new DBPropertyDescriptor(propName, propColumnName, propColumnType, propTableName, propAllowNull, propOnDemand, propDataSourceName, propFetchGroup);
+                  boolean multiRow = false;
+                  // TODO: should we allow scalar arrays - arrays of strings and stuff like that?
+                  if (isArrayProperty && refDBTypeDesc != null)
+                     multiRow = true;
 
-                  boolean isMultiProperty = ModelUtil.isArray(propType);
+                  DBPropertyDescriptor propDesc;
+
+                  if (isMultiCol) {
+                     propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
+                                                               propColumnType, propTableName, propAllowNull, propOnDemand,
+                                                               propDataSourceName, propFetchGroup,
+                                                               refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
+                                                               multiRow);
+                  }
+                  else {
+                     propDesc = new DBPropertyDescriptor(propName, propColumnName,
+                                                         propColumnType, propTableName, propAllowNull, propOnDemand,
+                                                         propDataSourceName, propFetchGroup,
+                                                         refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
+                                                         multiRow);
+                  }
 
                   TableDescriptor propTable = primaryTable;
 
-                  if (isMultiProperty) {
+                  if (multiRow) {
                      if (propTableName == null)
                         propTableName = primaryTableName + "_" + propColumnName;
 
-                     MultiTableDescriptor multiTable = new MultiTableDescriptor(propTableName);
+                     TableDescriptor multiTable = new TableDescriptor(propTableName);
                      propTable = multiTable;
+                     multiTable.multiRow = true;
                      multiTables.add(multiTable);
                   }
                   else if (propTableName != null && !propTableName.equals(propTable.tableName)) {

@@ -9,6 +9,19 @@ public class TxInsert extends TxOperation {
       if (applied)
          throw new IllegalArgumentException("Already applied insert!");
       applied = true;
-      return doInsert(dbObject.dbTypeDesc.primaryTable);
+      insertTransientRefs();
+      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+      int ct = doInsert(dbTypeDesc.primaryTable);
+      if (ct > 0) {
+         if (dbTypeDesc.auxTables != null) {
+            for (TableDescriptor table:dbTypeDesc.auxTables)
+               ct += doInsert(table);
+         }
+         if (dbTypeDesc.multiTables != null) {
+            for (TableDescriptor table:dbTypeDesc.multiTables)
+               ct += doMultiInsert(table);
+         }
+      }
+      return ct;
    }
 }

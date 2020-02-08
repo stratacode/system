@@ -4,14 +4,12 @@ import sc.db.DBPropertyDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.db.DBUtil;
 import sc.db.TableDescriptor;
-import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.*;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.SCModel;
 import sc.layer.Layer;
 import sc.type.CTypeUtil;
-import sc.type.Modifier;
 import sc.util.StringUtil;
 
 import java.util.ArrayList;
@@ -129,8 +127,8 @@ public class SQLFileModel extends SCModel {
       CreateTable ct = new CreateTable();
       ct.setProperty("tableName", SQLIdentifier.create(tableDesc.tableName));
       SemanticNodeList<TableDef> tableDefs = new SemanticNodeList<TableDef>();
-      appendColumnDefs(tableDefs, tableDesc.idColumns, true);
-      appendColumnDefs(tableDefs, tableDesc.columns, false);
+      appendColumnDefs(tableDefs, tableDesc.getIdColumns(), true, tableDesc.multiRow);
+      appendColumnDefs(tableDefs, tableDesc.columns, false, tableDesc.multiRow);
       ct.setProperty("tableDefs", tableDefs);
 
       if (sqlCommands == null) {
@@ -139,15 +137,38 @@ public class SQLFileModel extends SCModel {
       sqlCommands.add(ct);
    }
 
-   private void appendColumnDefs(List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList, boolean isId) {
+   private void appendColumnDefs(List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList, boolean isId, boolean multiRow) {
       for (DBPropertyDescriptor propDesc:propDescList) {
          ColumnDef colDef = new ColumnDef();
          colDef.setProperty("columnName", SQLIdentifier.create(propDesc.columnName));
          colDef.setProperty("columnType", SQLDataType.create(propDesc.columnType));
+         // If it's a single column primary key, add it here - otherwise, it's a new constraint at the table level
          if (isId && propDescList.size() == 1) {
             SemanticNodeList<SQLConstraint> constraints = new SemanticNodeList<SQLConstraint>();
-            constraints.add(new PrimaryKeyConstraint());
+            if (multiRow) {
+               TableDescriptor primaryTable = propDesc.dbTypeDesc.primaryTable;
+               constraints.add(ReferencesConstraint.create(primaryTable.tableName, primaryTable.idColumns.get(0).columnName));
+            }
+            else
+               constraints.add(new PrimaryKeyConstraint());
             colDef.setProperty("columnConstraints", constraints);
+         }
+         if (propDesc.refTypeName != null) {
+            Object refType = findTypeDeclaration(propDesc.refTypeName, false);
+            if (refType == null) {
+               System.err.println("*** Failed to find refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
+            }
+            else {
+               DBTypeDescriptor refTypeDesc = ModelUtil.getDBTypeDescriptor(layeredSystem, getLayer(), refType);
+               if (refTypeDesc == null) {
+                  System.err.println("*** Failed to find DBTypeDescriptor for refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
+               }
+               else {
+                  SemanticNodeList<SQLConstraint> constraints = new SemanticNodeList<SQLConstraint>();
+                  constraints.add(ReferencesConstraint.create(refTypeDesc.primaryTable.tableName, refTypeDesc.primaryTable.idColumns.get(0).columnName));
+                  colDef.setProperty("columnConstraints", constraints);
+               }
+            }
          }
          tableDefs.add(colDef);
       }

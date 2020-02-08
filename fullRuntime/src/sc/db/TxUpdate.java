@@ -99,11 +99,11 @@ public class TxUpdate extends TxOperation {
          int pos = 1;
          for (int i = 0; i < numCols; i++) {
             DBPropertyDescriptor colProp = columnProps.get(i);
-            DBUtil.setStatementValue(st,  pos++, colProp.getPropertyMapper(), columnValues.get(i));
+            DBUtil.setStatementValue(st,  pos++, colProp.getPropertyMapper().getPropertyType(), columnValues.get(i));
          }
          for (int i = 0; i < numIdCols; i++) {
             IdPropertyDescriptor idProp = idCols.get(i);
-            DBUtil.setStatementValue(st,  pos++, idProp.getPropertyMapper(), idVals.get(i));
+            DBUtil.setStatementValue(st,  pos++, idProp.getPropertyMapper().getPropertyType(), idVals.get(i));
          }
 
          int ct = st.executeUpdate();

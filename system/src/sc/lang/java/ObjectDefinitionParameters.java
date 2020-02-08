@@ -4,10 +4,7 @@
 
 package sc.lang.java;
 
-import sc.db.DBPropertyDescriptor;
-import sc.db.DBTypeDescriptor;
-import sc.db.IdPropertyDescriptor;
-import sc.db.TableDescriptor;
+import sc.db.*;
 import sc.lang.sc.IScopeProcessor;
 import sc.lang.template.Template;
 import sc.layer.Layer;
@@ -494,7 +491,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("null");
          return;
       }
-      String className = multi ? "TableDescriptor" : "MultiTableDescriptor";
+      String className = "TableDescriptor";
       sb.append("new java.util.ArrayList<sc.db.");
       sb.append(className);
       sb.append(">(java.util.Arrays.asList(new sc.db.");
@@ -513,11 +510,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    }
 
    private void appendTable(StringBuilder sb, TableDescriptor tableDesc, boolean multi) {
-      sb.append("new sc.db.");
-      if (multi)
-         sb.append("MultiTableDescriptor(\"");
-      else
-         sb.append("TableDescriptor(\"");
+      sb.append("new sc.db.TableDescriptor(\"");
 
       sb.append(tableDesc.tableName);
       sb.append("\", ");
@@ -552,7 +545,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
    private void appendProperty(StringBuilder sb, DBPropertyDescriptor propDesc, boolean isIdProperty, String descName) {
       sb.append("new ");
-      sb.append(descName);
+      if (propDesc instanceof MultiColPropertyDescriptor)
+         sb.append("sc.db.MultiColPropertyDescriptor");
+      else
+         sb.append(descName);
       sb.append("(");
       appendString(sb, propDesc.propertyName, false);
       appendString(sb, propDesc.columnName, true);
@@ -565,6 +561,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(propDesc.onDemand);
          appendString(sb, propDesc.dataSourceName, true);
          appendString(sb, propDesc.fetchGroup, true);
+         appendString(sb, propDesc.refTypeName, true);
+         sb.append(", ");
+         sb.append(propDesc.multiRow);
       }
       else {
          sb.append(", ");

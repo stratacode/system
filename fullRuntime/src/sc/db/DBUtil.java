@@ -111,8 +111,7 @@ public class DBUtil {
       sb.append(ident);
    }
 
-   public static void setStatementValue(PreparedStatement st, int index, IBeanMapper mapper, Object val) throws SQLException {
-      Object propertyType = mapper.getPropertyType();
+   public static void setStatementValue(PreparedStatement st, int index, Object propertyType, Object val) throws SQLException {
       if (propertyType == Integer.class || propertyType == Integer.TYPE)
          st.setInt(index, (Integer) val);
       else if (propertyType == String.class)
@@ -125,7 +124,8 @@ public class DBUtil {
          st.setObject(index, val);
    }
 
-   public static Object getResultSetByIndex(ResultSet rs, int index, IBeanMapper mapper) throws SQLException {
+   public static Object getResultSetByIndex(ResultSet rs, int index, DBPropertyDescriptor dbProp) throws SQLException {
+      IBeanMapper mapper = dbProp.getPropertyMapper();
       Object propertyType = mapper.getPropertyType();
       if (propertyType == Integer.class || propertyType == Integer.TYPE)
          return rs.getInt(index);
@@ -153,6 +153,14 @@ public class DBUtil {
       else if (propertyType == Double.class || propertyType == Double.TYPE)
          return "double";
       else // TODO: BigDecimal, byte array, char, Character - size limit for strings through an annotation
-         throw new IllegalArgumentException("No default sql type for: " + propertyType);
+         return null;
+   }
+
+   public static String getKeyIdColumnType(String type) {
+      if (type.equals("serial"))
+         return "integer";
+      else if (type.equals("bigserial"))
+         return "long";
+      return type;
    }
 }

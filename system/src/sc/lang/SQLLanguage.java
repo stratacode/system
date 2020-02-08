@@ -225,7 +225,7 @@ public class SQLLanguage extends BaseLanguage {
 
    Sequence excludeConstraint = new Sequence("ExcludeConstraint(,usingMethod,withOpList,indexParams,whereClause)", new ICSymbolSpace("exclude"), usingMethod, withOpList, indexParameters, optWhereClause);
 
-   Sequence optColumnRef = new Sequence("(,'',)", OPTIONAL, openParen, sqlIdentifier, closeParen);
+   Sequence optColumnRef = new Sequence("(,.,)", OPTIONAL, openParen, sqlIdentifier, closeParen);
 
    Sequence matchOption = new Sequence("(,'')", OPTIONAL, matchKeyword, new ICSymbolChoiceSpace("full", "partial", "simple"));
 

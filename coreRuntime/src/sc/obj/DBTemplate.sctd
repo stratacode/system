@@ -17,6 +17,12 @@
       public int dbUpdate() {
          return _dbObject.dbUpdate();
       }
+      public boolean dbRefresh() {
+         return _dbObject.dbRefresh();
+      }
+      public sc.db.DBObject getDBObject() {
+         return _dbObject;
+      }
       public String getObjectId() {
          return _dbObject.getObjectId();
       }

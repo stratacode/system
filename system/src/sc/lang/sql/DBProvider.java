@@ -54,7 +54,7 @@ public class DBProvider {
    public void processGeneratedFiles(BodyTypeDeclaration type, DBTypeDescriptor typeDesc) {
       JavaModel model = type.getJavaModel();
 
-      SQLFileModel fileModel = SQLUtil.convertTypeToSQLFileModel(typeDesc);
+      SQLFileModel fileModel = SQLUtil.convertTypeToSQLFileModel(model, typeDesc);
 
       Object parseNode = ParseUtil.getParseNode(SQLLanguage.getSQLLanguage().sqlFileModel, fileModel);
       if (parseNode instanceof IParseNode) {

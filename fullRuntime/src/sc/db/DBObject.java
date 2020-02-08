@@ -27,7 +27,7 @@ import java.util.List;
 public class DBObject implements IDBObject {
    final static int MAX_FETCH_ERROR_COUNT = 3;
 
-   // 2 Bits per each queryIndex - for the queries needed to populate this instance - by default the primaryTable is index 0
+   // 2 Bits per each queryIndex in 'fstate' - for the queries needed to populate this instance - by default the primaryTable is index 0
    // then followed by aux-tables, or multi-tables. If two queries come in for the same batch, only one is executed - the rest wait and they
    // share the cached value in the index.
    public static final int PENDING = 1;
@@ -36,9 +36,13 @@ public class DBObject implements IDBObject {
 
    protected DBTypeDescriptor dbTypeDesc;
 
+   // Bits set in 'flags':
+
    public static final int TRANSIENT = 1; // set by default, but should be cleared for objects returned from the database
    public static final int REMOVED = 2;
-   public static final int PENDING_INSERT = 4;
+   public static final int PROTOTYPE = 4; // set when the instance is in 'prototype' mode - set id properties, or other properties and do 'dbRefresh()'
+   public static final int PENDING_INSERT = 8;
+
    private int flags = TRANSIENT;
 
    /**
@@ -71,7 +75,7 @@ public class DBObject implements IDBObject {
    }
 
    private PropUpdate getPendingUpdate(DBTransaction curr, String property, boolean createUpdateProp) {
-      TxOperation op = getPendingOperation(curr, property, createUpdateProp, false, false, false);
+      TxOperation op = getPendingOperation(curr, createUpdateProp, false, false, false);
       if (op instanceof TxUpdate) {
          TxUpdate objUpd = (TxUpdate) op;
          PropUpdate propUpd = objUpd.updateIndex.get(property);
@@ -97,7 +101,7 @@ public class DBObject implements IDBObject {
    }
 
    // get or create operations using one lock
-   private TxOperation getPendingOperation(DBTransaction curr, String property, boolean createUpdateProp, boolean createInsert, boolean createDelete, boolean remove) {
+   private TxOperation getPendingOperation(DBTransaction curr, boolean createUpdateProp, boolean createInsert, boolean createDelete, boolean remove) {
       synchronized (pendingOps) {
          // If we've updated the property in this transaction, find the updated value and return
          // a reference to that update so the updated value gets returned - only for that transaction.
@@ -151,56 +155,68 @@ public class DBObject implements IDBObject {
       if (pu != null)
          return pu;
 
-      DBFetchGroupQuery fetchQuery = dbTypeDesc.propQueriesIndex.get(property);
+      DBFetchGroupQuery fetchQuery = dbTypeDesc.getFetchQueryForProperty(property);
       if (fetchQuery == null)
          throw new IllegalArgumentException("Missing propQueries entry for property: " + property);
       int lockCt = fetchQuery.queryNumber;
       if (lockCt >= 31) // TODO: add an optional array to handle more?
          throw new IllegalArgumentException("Query limit exceeded: " + lockCt + " queries for: " + dbTypeDesc);
-      boolean doFetch = false;
-      int errorCount = 0;
       // two bits for each lock - 3 states 0,1,2
       int shift = lockCt << 1;
       while (((fstate >> shift) & FETCHED) == 0) {
-         synchronized(this) {
-            if (fstate == 0) {
-               fstate = fstate | (PENDING << shift);
-               doFetch = true;
-            }
-            else if (fstate == PENDING) {
-               try {
-                  wait();
-               }
-               catch (InterruptedException exc) {
-               }
-            }
-         }
+         runQueryOnce(curTransaction, fetchQuery);
+      }
+      return null;
+   }
 
-         if (doFetch) {
-            doFetch = false;
-            boolean fetched = false;
+   private void runQueryOnce(DBTransaction curTransaction, DBFetchGroupQuery fetchQuery) {
+      int shift = fetchQuery.queryNumber << 1;
+      boolean doFetch = false;
+      int errorCount = 0;
+      synchronized(this) {
+         if (fstate == 0) {
+            fstate = fstate | (PENDING << shift);
+            doFetch = true;
+         }
+         else if (fstate == PENDING) {
             try {
-               // TODO: do we want to flush before we query? It's possible the query results will be different for this transaction, and so the global
-               // cache could show changes made in the transaction to others prematurely. One fix would be to cache queries made on modified transactions in the local
-               // per-transaction cache until the transaction is committed. Then move them over to the shared cache.
-               //curr.flush(); // Flush out any updates before running the query
-               fetchQuery.fetchProperties(curTransaction, this);
-               fetched = true;
+               wait();
             }
-            catch (RuntimeException exc) {
-               System.err.println("*** Fetch query failed: " + exc);
-               errorCount++;
-               if (errorCount == MAX_FETCH_ERROR_COUNT)
-                  throw exc;
-            }
-            synchronized(this) {
-               if (fetched)
-                  fstate = (fstate & ~(PENDING << shift)) | (FETCHED << shift);
-               notify();
+            catch (InterruptedException exc) {
             }
          }
       }
-      return null;
+
+      if (doFetch) {
+         boolean fetched = false;
+         try {
+            // TODO: do we want to flush before we query? It's possible the query results will be different for this transaction, and so the global
+            // cache could show changes made in the transaction to others prematurely. One fix would be to cache queries made on modified transactions in the local
+            // per-transaction cache until the transaction is committed. Then move them over to the shared cache.
+            //curr.flush(); // Flush out any updates before running the query
+            if (fetchQuery.fetchProperties(curTransaction, this)) {
+               fetched = true;
+               if ((flags & PROTOTYPE) != 0)
+                  flags &= ~PROTOTYPE;
+            }
+            else {
+               if ((flags & PROTOTYPE) == 0) {
+                  System.err.println("*** Non-prototype state DBObject no longer exists in DB");
+               }
+            }
+         }
+         catch (RuntimeException exc) {
+            System.err.println("*** Fetch query failed: " + exc);
+            errorCount++;
+            if (errorCount == MAX_FETCH_ERROR_COUNT)
+               throw exc;
+         }
+         synchronized(this) {
+            if (fetched)
+               fstate = (fstate & ~(PENDING << shift)) | (FETCHED << shift);
+            notify();
+         }
+      }
    }
 
    /** Called to update the saved representation of the instance */
@@ -235,7 +251,7 @@ public class DBObject implements IDBObject {
          throw new IllegalArgumentException("Attempting to insert instance with pending insert");
       flags |= PENDING_INSERT;
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, null, false, true, false, false);
+      TxOperation op = getPendingOperation(curr, false, true, false, false);
       // The createInsert flag should return a new TxInsert, unless there's another operation already associated
       // to this instance in this transaction which I think should flag an error.
       if (!(op instanceof TxInsert))
@@ -246,7 +262,7 @@ public class DBObject implements IDBObject {
 
    public int dbUpdate() {
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, null, false, true, false, true);
+      TxOperation op = getPendingOperation(curr, false, true, false, true);
       if (op != null)
          return op.apply();
       return 0;
@@ -263,9 +279,42 @@ public class DBObject implements IDBObject {
       if ((flags & TRANSIENT) != 0)  // TODO: maybe this should be ok?
          throw new IllegalArgumentException("Attempting to remove instance never added");
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, null, false, false, true, false);
+      TxOperation op = getPendingOperation(curr, false, false, true, false);
       if (!(op instanceof TxDelete))
          throw new UnsupportedOperationException();
+   }
+
+   public boolean dbRefresh() {
+      if (replacedBy != null)
+         return replacedBy.dbRefresh();
+
+      if ((flags & TRANSIENT) != 0)
+         throw new IllegalArgumentException("dbRefresh called on transient instance");
+      if ((flags & REMOVED) != 0)
+         throw new IllegalArgumentException("dbRefresh called on removed instance");
+
+      if ((flags & PROTOTYPE) != 0) {
+         // TODO: if the id properties are not set, and other properties have been set, we could do a query using those properties here
+         dbFetch(null);
+         return (flags & PROTOTYPE) == 0;
+      }
+
+      long fetchState = fstate;
+      fstate = 0;
+      int queryNum = 0;
+      DBTransaction curTransaction = DBTransaction.getOrCreate();
+      while (fetchState != 0) {
+         if ((fetchState & (FETCHED | PENDING)) != 0) {
+            DBQuery query = dbTypeDesc.getQueryForNum(queryNum);
+            if (query instanceof DBFetchGroupQuery)
+               runQueryOnce(curTransaction, (DBFetchGroupQuery) query);
+            else
+               System.out.println("*** DBrefresh - warning - not refreshing non fetch query");
+         }
+         fetchState = fetchState >> 2;
+         queryNum++;
+      }
+      return flags == 0;
    }
 
    public boolean isTransient() {
@@ -277,6 +326,17 @@ public class DBObject implements IDBObject {
          flags |= TRANSIENT;
       else
          flags &= ~TRANSIENT;
+   }
+
+   public boolean isPrototype() {
+      return (flags & PROTOTYPE) != 0;
+   }
+
+   public void setPrototype(boolean val) {
+      if (val)
+         flags |= PROTOTYPE;
+      else
+         flags &= ~PROTOTYPE;
    }
 
    public String getObjectId() {
@@ -319,5 +379,9 @@ public class DBObject implements IDBObject {
             propUpdate.prop.getPropertyMapper().setPropertyValue(getInst(), propUpdate.value);
          }
       }
+   }
+
+   public DBObject getDBObject() {
+      return this;
    }
 }

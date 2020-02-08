@@ -1,9 +1,20 @@
 package sc.db;
 
 import sc.dyn.DynUtil;
+import sc.type.IBeanMapper;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Stores the metadata for a given type in the system that represents the mapping to a persistence storage
+ * layer. A given type can be persisted from one or more tables, in the same or different databases.
+ * There's a primary table, that will have one row per object instance. Auxiliary tables store alternate properties
+ * and can be optionally created.  Multi-tables store multi-valued properties stored with 'multiRow' mode.
+ *
+ * A fetchGroup allows collections of properties to be loaded at the same time. By default, a fetch group is
+ * created for each table.
+ */
 public class DBTypeDescriptor {
    static Map<Object,DBTypeDescriptor> typeDescriptorsByType = new HashMap<Object,DBTypeDescriptor>();
    static Map<String,DBTypeDescriptor> typeDescriptorsByName = new HashMap<String,DBTypeDescriptor>();
@@ -13,6 +24,8 @@ public class DBTypeDescriptor {
       DBTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, typeDescriptor);
       String typeName = DynUtil.getTypeName(typeDecl, false);
       DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, typeDescriptor);
+      typeDescriptor.resolveRefs();
+
       if ((oldType != null && oldType != typeDescriptor) | (oldName != null && oldName != typeDescriptor)) {
          System.err.println("Replacing type descriptor for type: " + typeName);
       }
@@ -45,12 +58,19 @@ public class DBTypeDescriptor {
    /** Set to true for types where the source has no 'id' property */
    public boolean needsAutoId = false;
 
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<MultiTableDescriptor> multiTables, String versionPropName) {
+   public String defaultFetchGroup;
+
+   public ConcurrentHashMap<Object,IDBObject> typeInstances = null;
+
+   private boolean refsResolved = false;
+
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
       this.typeDecl = typeDecl;
       this.baseType = baseType;
       this.dataSourceName = dataSourceName;
       this.primaryTable = primary;
       primary.dbTypeDesc = this;
+      primary.primary = true;
       if (auxTables != null) {
          for (TableDescriptor auxTable:auxTables)
             auxTable.init(this);
@@ -72,34 +92,46 @@ public class DBTypeDescriptor {
       allDBProps.addAll(primaryTable.idColumns);
       allDBProps.addAll(primaryTable.columns);
       if (auxTables != null) {
-         for (TableDescriptor td:auxTables)
+         for (TableDescriptor td:auxTables) {
+            td.initIdColumns();
             allDBProps.addAll(td.columns);
+         }
       }
       if (multiTables != null) {
-         for (MultiTableDescriptor mtd:multiTables)
+         for (TableDescriptor mtd:multiTables) {
+            mtd.initIdColumns();
             allDBProps.addAll(mtd.columns);
+         }
       }
 
       // Build up the set of 'fetchGroups' - the queries to fetch properties for a given item
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.dbTypeDesc = this;
-         if (prop.fetchGroup != null) {
-            addToFetchGroup(prop.fetchGroup, prop);
+         String fetchGroup = prop.fetchGroup;
+         if (prop.multiRow) {
+            TableDescriptor mvTable = getMultiTableByName(prop.getTableName(), prop);
+            if (mvTable == null)
+               System.err.println("*** No multi-value table for property: " + prop.propertyName);
+            else
+               addToFetchGroup(mvTable.getJavaName(), prop);
          }
-         else if (prop.onDemand)
-            addToFetchGroup(prop.propertyName, prop);
          else {
-            TableDescriptor table = getTableByName(prop.tableName);
-            addToFetchGroup(table.getJavaName(), prop);
+            if (fetchGroup != null) {
+               addToFetchGroup(fetchGroup, prop);
+            }
+            else if (prop.onDemand)
+               addToFetchGroup(prop.propertyName, prop);
+            else {
+               TableDescriptor table = getTableByName(prop.tableName);
+               addToFetchGroup(table.getJavaName(), prop);
+            }
          }
       }
+      defaultFetchGroup = primaryTable.getJavaName();
    }
 
-   public TableDescriptor getTableForProp(DBPropertyDescriptor prop) {
-      if (prop.tableName == null)
-         return primaryTable;
-      else
-         return getTableByName(prop.tableName);
+   public String getTypeName() {
+      return DynUtil.getTypeName(typeDecl, false);
    }
 
    private void addToFetchGroup(String fetchGroup, DBPropertyDescriptor prop) {
@@ -111,6 +143,7 @@ public class DBTypeDescriptor {
          query.dbTypeDesc = this;
          query.fetchGroup = fetchGroup;
          fetchGroups.put(fetchGroup, query);
+         addQuery(query);
       }
       query.addProperty(prop);
       propQueriesIndex.put(prop.propertyName, query);
@@ -120,7 +153,7 @@ public class DBTypeDescriptor {
 
    public List<TableDescriptor> auxTables;
 
-   public List<MultiTableDescriptor> multiTables;
+   public List<TableDescriptor> multiTables;
 
    public DBPropertyDescriptor versionProperty;
 
@@ -147,17 +180,40 @@ public class DBTypeDescriptor {
       return null;
    }
 
+   public TableDescriptor getMultiTableByName(String tableName, DBPropertyDescriptor mvProp) {
+      if (tableName == null)
+         throw new UnsupportedOperationException();
+      if (multiTables != null) {
+         for (TableDescriptor td:multiTables)
+            if (td.tableName.equalsIgnoreCase(tableName))
+               return td;
+      }
+      else
+         multiTables = new ArrayList<TableDescriptor>();
+      TableDescriptor newTable = new TableDescriptor(tableName);
+      newTable.multiRow = true;
+      newTable.addColumnProperty(mvProp);
+      multiTables.add(newTable);
+      return null;
+   }
+
    Map<String, DBFetchGroupQuery> propQueriesIndex = new HashMap<String, DBFetchGroupQuery>();
 
    Map<String,DBQuery> queriesIndex = new HashMap<String,DBQuery>();
    ArrayList<DBQuery> queriesList = new ArrayList<DBQuery>();
 
-   public DBQuery getFetchQueryForProperty(String propName) {
-      DBQuery query = propQueriesIndex.get(propName);
+   public DBFetchGroupQuery getFetchQueryForProperty(String propName) {
+      if (propName == null)
+         return fetchGroups.get(defaultFetchGroup);
+      DBFetchGroupQuery query = propQueriesIndex.get(propName);
       if (query == null) {
          System.err.println("*** No fetch query for property: " + propName);
       }
       return query;
+   }
+
+   public DBQuery getQueryForNum(int queryNum) {
+      return queriesList.get(queryNum);
    }
 
    public DBPropertyDescriptor getPropertyDescriptor(String propName) {
@@ -172,20 +228,11 @@ public class DBTypeDescriptor {
          if (res != null)
             return res;
       }
-      for (MultiTableDescriptor tableDesc:multiTables) {
+      for (TableDescriptor tableDesc:multiTables) {
          res = tableDesc.getPropertyDescriptor(propName);
          if (res != null)
             return res;
       }
-      /*
-      if (auxDatabases != null) {
-         for (DBTypeDescriptor auxDB:auxDatabases) {
-            res = auxDB.getPropertyDescriptor(propName);
-            if (res != null)
-               return res;
-         }
-      }
-      */
       return null;
    }
 
@@ -201,5 +248,48 @@ public class DBTypeDescriptor {
       if (typeDecl != null)
          sb.append(DynUtil.getTypeName(typeDecl, false));
       return sb.toString();
+   }
+
+   public Object getById(Object id) {
+      if (typeInstances == null) {
+         synchronized (this) {
+            if (typeInstances == null)
+               typeInstances = new ConcurrentHashMap<Object,IDBObject>();
+         }
+      }
+      // TODO: do we need to do dbRefresh() on the returned instance - check the status and return null if the item no longer exists?
+      // check cache mode here to determine what to fetch?
+      IDBObject inst = typeInstances.get(id);
+      if (inst != null) {
+         return inst;
+      }
+      synchronized (this) {
+         inst = (IDBObject) DynUtil.createInstance(typeDecl, null);
+         DBObject dbObj = inst.getDBObject();
+         dbObj.setPrototype(true);
+         typeInstances.put(id, inst);
+      }
+      return inst;
+   }
+
+   public Object getIdColumnValue(Object inst, int ci) {
+      IBeanMapper mapper = primaryTable.idColumns.get(ci).getPropertyMapper();
+      return mapper.getPropertyValue(inst, false,false);
+   }
+
+   public Object getIdColumnType(int ci) {
+      IBeanMapper mapper = primaryTable.idColumns.get(ci).getPropertyMapper();
+      return mapper.getPropertyType();
+   }
+
+   public void resolveRefs() {
+      if (refsResolved)
+         return;
+
+      refsResolved = true;
+
+      for (DBPropertyDescriptor prop:allDBProps) {
+         prop.resolve();
+      }
    }
 }
