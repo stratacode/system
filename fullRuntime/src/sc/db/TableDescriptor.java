@@ -22,6 +22,9 @@ public class TableDescriptor {
 
    public boolean primary = false;
 
+   /** Set to true for descriptors that refer to tables defined elsewhere - so no schema is generated */
+   public boolean reference = false;
+
    public TableDescriptor(String tableName) {
       this.tableName = tableName;
       this.columns = new ArrayList<DBPropertyDescriptor>();
@@ -37,8 +40,9 @@ public class TableDescriptor {
       this.dbTypeDesc = dbTypeDesc;
       if (this == dbTypeDesc.primaryTable)
          insertWithNullValues = true;
-      for (DBPropertyDescriptor col:columns)
+      for (DBPropertyDescriptor col:columns) {
          col.init(dbTypeDesc, this);
+      }
       if (idColumns != null) {
          for (IdPropertyDescriptor idcol:idColumns)
             idcol.init(dbTypeDesc, this);
@@ -102,5 +106,14 @@ public class TableDescriptor {
    public void initIdColumns() {
       if (idColumns == null)
          idColumns = dbTypeDesc.primaryTable.createKeyIdColumns();
+   }
+
+   public boolean isReadOnly() {
+      for (DBPropertyDescriptor col:columns)
+         if (!col.readOnly)
+            return false;
+      if (columns.size() == 0)
+         System.err.println("*** no columns for table in isReadOnly?");
+      return true;
    }
 }

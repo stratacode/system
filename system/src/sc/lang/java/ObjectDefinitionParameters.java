@@ -442,6 +442,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (dbTypeDescriptor == null)
          return "";
 
+      dbTypeDescriptor.init();
+      dbTypeDescriptor.start();
+
       StringBuilder sb = new StringBuilder();
       sb.append("sc.db.DBTypeDescriptor.add(new sc.db.DBTypeDescriptor(");
 
@@ -564,6 +567,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          appendString(sb, propDesc.refTypeName, true);
          sb.append(", ");
          sb.append(propDesc.multiRow);
+         appendString(sb, propDesc.reverseProperty, true);
       }
       else {
          sb.append(", ");

@@ -3,17 +3,44 @@ package sc.db;
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 
+/**
+ * Represents the metadata used for storing a property of a DBObject. It lives in a TableDescriptor and as part of a DBTypeDescriptor that corresponds to
+ * the mapping for a single class or dynamic type in the system.
+ */
 public class DBPropertyDescriptor {
    public String propertyName;
    public String columnName;
    public String columnType;
+   /** Optional table name - if not set, uses either the primary table, or another table for multi-row properties */
    public String tableName;
    public boolean allowNull;
+   /** For relationships, should the referenced value be fetched in-line, or should we wait till the properties of the referenced object are access to fetch them */
    public boolean onDemand;
+
+   /** When the property is stored in a separate data source, specifies that data source name */
    public String dataSourceName;
+
+   /**
+    * Override the default fetching behavior for the property and instead fetch it with a group created with this name.
+    * All properties using the same fetchGroup are populated at the same time
+    * By default, a property's fetchGroup is the Java style-name for the table the property is defined in
+    */
    public String fetchGroup;
+
+   /** For both single and multi-valued properties that refer to other DBObject's persisted, specifies the type name for this reference */
    public String refTypeName;
+
+   /** True if this property is a multi-valued property and is stored with a separate row per value (as opposed to a serialized form like JSON stored in a column) */
    public boolean multiRow;
+
+   /**
+    * For bi-directional relationships, stores the name of the reverse property. This is used to determine the nature of the relationship - one-to-many, one-to-one or many-to-many
+    * and for the default table layout for storing the items.
+    */
+   public String reverseProperty;
+
+   /** True for properties that are read from the database, but not updated. This is set in particular for reverse properties in a relationship - only one side needs to update based on the change. */
+   public boolean readOnly;
 
    public DBTypeDescriptor dbTypeDesc;
    public TableDescriptor tableDesc;
@@ -22,9 +49,13 @@ public class DBPropertyDescriptor {
 
    private IBeanMapper propertyMapper;
 
+   public DBPropertyDescriptor reversePropDesc;
+
+   private boolean started = false;
+
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
                                boolean allowNull, boolean onDemand, String dataSourceName, String fetchGroup,
-                               String refTypeName, boolean multiRow) {
+                               String refTypeName, boolean multiRow, String reverseProperty) {
       this.propertyName = propertyName;
       this.columnName = columnName;
       this.columnType = columnType;
@@ -35,15 +66,17 @@ public class DBPropertyDescriptor {
       this.fetchGroup = fetchGroup;
       this.refTypeName = refTypeName;
       this.multiRow = multiRow;
+      this.reverseProperty = reverseProperty;
    }
 
    void init(DBTypeDescriptor typeDesc, TableDescriptor tableDesc) {
       this.dbTypeDesc = typeDesc;
       this.tableDesc = tableDesc;
+      started = false;
    }
 
    void resolve() {
-      if (this.refTypeName != null) {
+      if (this.refTypeName != null && refDBTypeDesc == null) {
          Object refType = DynUtil.findType(this.refTypeName);
          if (refType == null)
             System.out.println("*** Ref type: " + refTypeName + " not found for property: " + propertyName);
@@ -51,13 +84,52 @@ public class DBPropertyDescriptor {
             this.refDBTypeDesc = DBTypeDescriptor.getByType(refType);
             if (this.refDBTypeDesc == null)
                System.out.println("*** Ref type: " + refTypeName + ": no DBTypeDescriptor for property: " + propertyName);
+            else
+               this.refDBTypeDesc.init();
+         }
+      }
+      if (this.reverseProperty != null) {
+         if (this.refTypeName == null)
+            System.err.println("*** DBSettings.reverseProperty must be specified on a property that's a reference to another DBObject");
+         if (this.refDBTypeDesc != null) {
+            reversePropDesc = refDBTypeDesc.getPropertyDescriptor(reverseProperty);
+            if (reversePropDesc == null)
+               System.err.println("*** reverseProperty: " + reverseProperty + " not found in type: " + refDBTypeDesc + " referenced by: " + dbTypeDesc + "." + propertyName);
+            else {
+               // Make sure that only one side has 'reverseProperty' set - we'll use that to determine the table owning side. It should always be the 'one' side in a
+               // one-to-many or many-to-many relationship
+               if (reversePropDesc == this)
+                  System.err.println("*** DBPropertyDescriptor: " + this + " has reverseProperty pointing to itself");
+               else if (reversePropDesc.reversePropDesc != null || reversePropDesc.reverseProperty != null) {
+                  System.err.println("*** reverseProperty conflict on  between: " + reverseProperty + " defined on: " + dbTypeDesc + " and " + reversePropDesc + " defined: " + reversePropDesc.reverseProperty);
+               }
+               else {
+                  if (multiRow && !reversePropDesc.multiRow)
+                     System.err.println("*** reverseProperty set on: " + this + " should be set the single-valued side of the relationship: " + reversePropDesc);
+                  reversePropDesc.reversePropDesc = this;
+                  reversePropDesc.readOnly = true;
+               }
+            }
          }
       }
    }
 
+   public void start() {
+      if (started)
+         return;
+
+      started = true;
+
+      if (reversePropDesc != null) {
+         dbTypeDesc.addReverseProperty(this);
+
+         // Point the reverse property as a reference to this one
+         if (!readOnly)
+            reversePropDesc.resetTable(tableDesc);
+      }
+   }
+
    public IBeanMapper getPropertyMapper() {
-      if (dbTypeDesc == null)
-         System.out.println("***");
       if (propertyMapper == null)
          propertyMapper = DynUtil.getPropertyMapping(dbTypeDesc.typeDecl, propertyName);
       return propertyMapper;
@@ -77,8 +149,13 @@ public class DBPropertyDescriptor {
 
    public String getTableName() {
       if (tableName == null) {
-         if (multiRow)
+         if (multiRow) {
+            if (reversePropDesc != null) {
+               if (!reversePropDesc.multiRow || reversePropDesc.reverseProperty != null)
+                  return reversePropDesc.getTableName();
+            }
             tableName = dbTypeDesc.primaryTable.tableName + "_" + columnName;
+         }
          else
             return dbTypeDesc.primaryTable.tableName;
       }
@@ -90,6 +167,7 @@ public class DBPropertyDescriptor {
          return tableDesc;
       if (multiRow) {
          if (tableName == null)
+
          tableDesc = dbTypeDesc.getMultiTableByName(getTableName(), this);
          return tableDesc;
       }
@@ -118,4 +196,12 @@ public class DBPropertyDescriptor {
    public String getColumnType(int colIx) {
       return columnType;
    }
+
+   public void resetTable(TableDescriptor table) {
+      if (tableDesc != null) {
+         tableDesc.tableName = table.tableName;
+         tableDesc.reference = true;
+      }
+   }
+
 }

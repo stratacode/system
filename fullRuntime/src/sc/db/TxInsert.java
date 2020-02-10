@@ -9,7 +9,7 @@ public class TxInsert extends TxOperation {
       if (applied)
          throw new IllegalArgumentException("Already applied insert!");
       applied = true;
-      insertTransientRefs();
+      insertTransientRefs(true);
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       int ct = doInsert(dbTypeDesc.primaryTable);
       if (ct > 0) {
@@ -22,6 +22,7 @@ public class TxInsert extends TxOperation {
                ct += doMultiInsert(table);
          }
       }
+      insertTransientRefs(false);
       return ct;
    }
 }

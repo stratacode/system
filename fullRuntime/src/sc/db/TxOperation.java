@@ -23,9 +23,13 @@ public abstract class TxOperation {
 
    /** Used by both TxInsert and TxUpdate */
    protected int doInsert(TableDescriptor insertTable) {
+      if (insertTable.isReadOnly())
+         return 0;
+
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
       boolean isPrimary = primaryTable == insertTable;
+
 
       if (isPrimary) {
          if (!dbObject.isTransient()) {
@@ -131,8 +135,14 @@ public abstract class TxOperation {
             st.executeUpdate();
          }
 
-         if (isPrimary)
+         if (isPrimary) {
             dbObject.setTransient(false);
+            // Mark all of the property queries in this type as fetched so we don't re-query them until the cache is invalidated
+            int numFetchQueries = dbTypeDesc.getNumFetchPropQueries();
+            for (int f = 0; f < numFetchQueries; f++) {
+               dbObject.fstate |= DBObject.FETCHED << (f*2);
+            }
+         }
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert: " + dbTypeDesc + " with dbIdCols: " + dbIdCols + " returned failed: " + exc);
@@ -141,6 +151,9 @@ public abstract class TxOperation {
    }
 
    protected int doMultiInsert(TableDescriptor insertTable) {
+      if (insertTable.isReadOnly())
+         return 0;
+
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
 
       if (dbObject.isTransient()) {
@@ -316,7 +329,7 @@ public abstract class TxOperation {
       }
    }
 
-   public void insertTransientRefs() {
+   public void insertTransientRefs(boolean doPreRefs) {
       Object inst = dbObject.getInst();
 
       List<DBPropertyDescriptor> allProps = dbObject.dbTypeDesc.allDBProps;
@@ -325,20 +338,28 @@ public abstract class TxOperation {
          DBPropertyDescriptor prop = allProps.get(i);
          IBeanMapper mapper = prop.getPropertyMapper();
          if (prop.refDBTypeDesc != null) {
+            if ((prop.readOnly && doPreRefs) || (!prop.readOnly && !doPreRefs))
+               continue;
             if (prop.multiRow) {
                List<IDBObject> refList = (List<IDBObject>) mapper.getPropertyValue(inst, false, false);
                int rsz = refList.size();
                for (int j = 0; j < rsz; j++) {
                   IDBObject ref = refList.get(j);
-                  if (ref != null && ref.getDBObject().isTransient()) {
+                  if (ref == null)
+                     continue;
+                  DBObject refObj = ref.getDBObject();
+                  if (refObj.isTransient() && !refObj.isPendingInsert()) {
                      ref.dbInsert();
                   }
                }
             }
             else {
                IDBObject refInst = (IDBObject) mapper.getPropertyValue(inst, false, false);
-               if (refInst != null && refInst.getDBObject().isTransient())
-                  refInst.dbInsert();
+               if (refInst != null) {
+                  DBObject refDBObj = refInst.getDBObject();
+                  if (refDBObj.isTransient() && !refDBObj.isPendingInsert())
+                     refInst.dbInsert();
+               }
             }
          }
       }

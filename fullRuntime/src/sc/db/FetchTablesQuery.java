@@ -48,7 +48,8 @@ public class FetchTablesQuery {
       // so that we do one query to fetch the list of instances - rather than the 1 + N queries if we did them one-by-one
       DBTypeDescriptor refType = prop.refDBTypeDesc;
       if (!prop.onDemand && refType != null) {
-         DBFetchGroupQuery defaultRefQuery = refType.getFetchQueryForProperty(refType.defaultFetchGroup);
+         refType.initFetchGroups();
+         DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
          for (FetchTablesQuery defQuery:defaultRefQuery.queries) {
             if (!defQuery.multiRow) {
                for (FetchTableDesc defQueryFetch:defQuery.fetchTables) {

@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
+import sc.db.DBTypeDescriptor;
 import sc.db.DataSourceDef;
 import sc.js.URLPath;
 import sc.lang.js.JSLanguage;
@@ -399,6 +400,21 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Stores up layers that we've found in checkRemovedDirectory that need to be removed (for the IDE to manage a two step process of identifying layers to remove) */
    private List<Layer> layersToRemove;
 
+   /** When building, stores the current mapping of type-name to DBTypeDescriptor, so that we can assemble the reference graph as it's being built for source and compiled classes */
+   public Map<String, DBTypeDescriptor> dbTypeDescriptors = null;
+
+   public void addDBTypeDescriptor(String typeName, DBTypeDescriptor dtd) {
+      if (dbTypeDescriptors == null)
+         dbTypeDescriptors = new HashMap<String,DBTypeDescriptor>();
+      dbTypeDescriptors.put(typeName, dtd);
+   }
+
+   public DBTypeDescriptor getDBTypeDescriptor(String typeName) {
+      if (dbTypeDescriptors == null)
+         return null;
+      return dbTypeDescriptors.get(typeName);
+   }
+
    public void buildReverseTypeIndex(boolean clear) {
       try {
          acquireDynLock(false);
@@ -585,6 +601,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       objectNameIndex.clear();
 
       subTypesByType.clear();
+
+      if (dbTypeDescriptors != null)
+         dbTypeDescriptors = null;
 
       if (buildClassLoader instanceof TrackingClassLoader) {
          ClassLoader newLoader = ((TrackingClassLoader) buildClassLoader).resetBuildLoader();

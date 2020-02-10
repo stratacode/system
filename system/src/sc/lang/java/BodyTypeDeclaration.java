@@ -8555,6 +8555,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          DBTypeDescriptor typeDesc = getDBTypeDescriptor();
          if (typeDesc != null) {
+            typeDesc.init();
+            typeDesc.start();
             DBProvider dbProvider = ModelUtil.getDBProviderForType(getLayeredSystem(), getLayer(), this);
             if (dbProvider != null) {
                dbProvider.processGeneratedFiles(this, typeDesc);

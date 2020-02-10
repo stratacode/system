@@ -1,6 +1,10 @@
 package sc.db;
 
+import sc.bind.AbstractListener;
+import sc.bind.Bind;
+import sc.bind.IListener;
 import sc.dyn.DynUtil;
+import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
 
 import java.util.*;
@@ -24,7 +28,8 @@ public class DBTypeDescriptor {
       DBTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, typeDescriptor);
       String typeName = DynUtil.getTypeName(typeDecl, false);
       DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, typeDescriptor);
-      typeDescriptor.resolveRefs();
+      typeDescriptor.init();
+      typeDescriptor.start();
 
       if ((oldType != null && oldType != typeDescriptor) | (oldName != null && oldName != typeDescriptor)) {
          System.err.println("Replacing type descriptor for type: " + typeName);
@@ -62,15 +67,32 @@ public class DBTypeDescriptor {
 
    public ConcurrentHashMap<Object,IDBObject> typeInstances = null;
 
-   private boolean refsResolved = false;
+   private boolean initialized = false, started = false;
 
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
+   /**
+    * Defines the type with the id properties of the primary table in tact so it can be used to create references from other types.
+    * Properties may be later added to the primary table and other tables added with initTables
+    */
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary) {
       this.typeDecl = typeDecl;
       this.baseType = baseType;
       this.dataSourceName = dataSourceName;
       this.primaryTable = primary;
-      primary.dbTypeDesc = this;
+      primary.init(this);
       primary.primary = true;
+
+      if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
+         needsAutoId = true;
+         primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "serial", true));
+      }
+   }
+
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
+      this(typeDecl, baseType, dataSourceName, primary);
+      initTables(auxTables, multiTables, versionPropName);
+   }
+
+   public void initTables( List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
       if (auxTables != null) {
          for (TableDescriptor auxTable:auxTables)
             auxTable.init(this);
@@ -83,11 +105,6 @@ public class DBTypeDescriptor {
       this.auxTables = auxTables;
       if (versionPropName != null)
          this.versionProperty = primaryTable.getPropertyDescriptor(versionPropName);
-
-      if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
-         needsAutoId = true;
-         primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "serial", true));
-      }
 
       allDBProps.addAll(primaryTable.idColumns);
       allDBProps.addAll(primaryTable.columns);
@@ -103,10 +120,17 @@ public class DBTypeDescriptor {
             allDBProps.addAll(mtd.columns);
          }
       }
-
-      // Build up the set of 'fetchGroups' - the queries to fetch properties for a given item
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.dbTypeDesc = this;
+      }
+   }
+
+   void initFetchGroups() {
+      if (defaultFetchGroup != null)
+         return;
+      defaultFetchGroup = primaryTable.getJavaName();
+      // Build up the set of 'fetchGroups' - the queries to fetch properties for a given item
+      for (DBPropertyDescriptor prop:allDBProps) {
          String fetchGroup = prop.fetchGroup;
          if (prop.multiRow) {
             TableDescriptor mvTable = getMultiTableByName(prop.getTableName(), prop);
@@ -127,7 +151,6 @@ public class DBTypeDescriptor {
             }
          }
       }
-      defaultFetchGroup = primaryTable.getJavaName();
    }
 
    public String getTypeName() {
@@ -158,6 +181,8 @@ public class DBTypeDescriptor {
    public DBPropertyDescriptor versionProperty;
 
    public List<DBPropertyDescriptor> allDBProps = new ArrayList<DBPropertyDescriptor>();
+
+   public List<DBPropertyDescriptor> reverseProps = null;
 
    public LinkedHashMap<String,DBFetchGroupQuery> fetchGroups = new LinkedHashMap<String,DBFetchGroupQuery>();
 
@@ -202,9 +227,11 @@ public class DBTypeDescriptor {
    Map<String,DBQuery> queriesIndex = new HashMap<String,DBQuery>();
    ArrayList<DBQuery> queriesList = new ArrayList<DBQuery>();
 
+   public DBFetchGroupQuery getDefaultFetchQuery() {
+      return fetchGroups.get(defaultFetchGroup);
+   }
+
    public DBFetchGroupQuery getFetchQueryForProperty(String propName) {
-      if (propName == null)
-         return fetchGroups.get(defaultFetchGroup);
       DBFetchGroupQuery query = propQueriesIndex.get(propName);
       if (query == null) {
          System.err.println("*** No fetch query for property: " + propName);
@@ -216,6 +243,10 @@ public class DBTypeDescriptor {
       return queriesList.get(queryNum);
    }
 
+   public int getNumFetchPropQueries() {
+      return queriesList.size();
+   }
+
    public DBPropertyDescriptor getPropertyDescriptor(String propName) {
       DBPropertyDescriptor res = null;
       if (primaryTable != null) {
@@ -223,15 +254,19 @@ public class DBTypeDescriptor {
          if (res != null)
             return res;
       }
-      for (TableDescriptor tableDesc:auxTables) {
-         res = tableDesc.getPropertyDescriptor(propName);
-         if (res != null)
-            return res;
+      if (auxTables != null) {
+         for (TableDescriptor tableDesc:auxTables) {
+            res = tableDesc.getPropertyDescriptor(propName);
+            if (res != null)
+               return res;
+         }
       }
-      for (TableDescriptor tableDesc:multiTables) {
-         res = tableDesc.getPropertyDescriptor(propName);
-         if (res != null)
-            return res;
+      if (multiTables != null) {
+         for (TableDescriptor tableDesc:multiTables) {
+            res = tableDesc.getPropertyDescriptor(propName);
+            if (res != null)
+               return res;
+         }
       }
       return null;
    }
@@ -282,14 +317,121 @@ public class DBTypeDescriptor {
       return mapper.getPropertyType();
    }
 
-   public void resolveRefs() {
-      if (refsResolved)
+   public void init() {
+      if (initialized)
          return;
 
-      refsResolved = true;
+      initialized = true;
 
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.resolve();
+      }
+   }
+
+   public void start() {
+      if (started)
+         return;
+      started = true;
+      for (DBPropertyDescriptor prop:allDBProps) {
+         prop.start();
+      }
+      initFetchGroups();
+   }
+
+   public void addReverseProperty(DBPropertyDescriptor reverseProp) {
+      if (reverseProps == null)
+         reverseProps = new ArrayList<DBPropertyDescriptor>();
+      reverseProps.add(reverseProp);
+   }
+
+   class ReversePropertyListener extends AbstractListener {
+      DBObject obj;
+      Object lastValue;
+      DBPropertyDescriptor rprop;
+      boolean valid = true;
+
+      ReversePropertyListener(DBObject obj, Object lastValue, DBPropertyDescriptor reverseProp) {
+         this.obj = obj;
+         this.lastValue = lastValue;
+         this.rprop = reverseProp;
+      }
+
+      public boolean valueInvalidated(Object lobj, Object prop, Object eventDetail, boolean apply) {
+         if (!valid)
+            return true;
+
+         Object newVal = DynUtil.getPropertyValue(obj.getInst(), rprop.propertyName);
+         if (!(DynUtil.equalObjects(newVal, lastValue))) {
+            valid = false;
+            return true;
+         }
+         // No value change so no need to call valueValidated
+         return false;
+      }
+
+      public boolean valueValidated(Object lobj, Object prop, Object eventDetail, boolean apply) {
+         IBeanMapper rmapper = rprop.getPropertyMapper();
+         Object inst = obj.getInst();
+         Object newVal = rmapper.getPropertyValue(inst, false, false);
+         DBPropertyDescriptor oprop = rprop.reversePropDesc;
+         if (rprop.multiRow) {
+            if (oprop.multiRow) {
+               // many-to-many
+               // For each new value in the rprop collection, add it to the corresponding property in the oprop's collection
+               // For each removed value in rprop, find it in the corresponding oprop and if not removed, remove it
+            }
+            else {
+               IBeanMapper omapper = oprop.getPropertyMapper();
+               // many-to-one
+               // For each new value in rprop, find the property in oprop and set it to point to this
+               // For each removed value in rprop, if it's set to this, and not removed, set it to null
+               List<Object> oldList = (List<Object>) lastValue;
+               List<Object> newList = (List<Object>) newVal;
+               if (oldList != null) {
+                  for (Object oldElem:oldList) {
+                     if (newList == null || !newList.contains(oldElem)) {
+                        Object oldElemProp = omapper.getPropertyValue(oldElem, false, false);
+                        if (oldElemProp == inst)
+                           omapper.setPropertyValue(oldElem, null);
+                     }
+                  }
+               }
+               if (newList != null) {
+                  for (Object newElem:newList) {
+                     if (oldList == null || !oldList.contains(newElem)) {
+                        omapper.setPropertyValue(newElem, inst);
+                     }
+                  }
+               }
+            }
+         }
+         else {
+            if (oprop.multiRow) {
+               // one-to-many change - here we need to find the entry in the old list - if it's still there, replace it with the new value
+               // otherwise add it to the collection
+            }
+            else {
+               // one-to-one - find the old property and if it's still pointing to this value, set it to null.
+               // set the new property to this value
+            }
+         }
+         valid = true;
+         return true;
+      }
+   }
+
+   public void initDBObject(DBObject obj) {
+      // These are properties in this type that have bi-directional relationships to properties in other types
+      // We need to listen to change in this object on these properties in order to keep those other properties in sync
+      // with those changes.
+      if (reverseProps != null) {
+         for (int i = 0; i < reverseProps.size(); i++) {
+            DBPropertyDescriptor reverseProp = reverseProps.get(i);
+            Object inst = obj.getInst();
+            Object curVal = DynUtil.getPropertyValue(inst, reverseProp.propertyName);
+            ReversePropertyListener listener = new ReversePropertyListener(obj, curVal, reverseProp);
+            Bind.addListener(inst, reverseProp.getPropertyMapper(), listener, IListener.VALUE_CHANGED_MASK);
+         }
       }
    }
 }

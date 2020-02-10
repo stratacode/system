@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.bind.Bind;
 import sc.bind.BindingDirection;
+import sc.db.DBPropertyDescriptor;
 import sc.dyn.DynUtil;
 import sc.lang.*;
 import sc.lang.js.JSUtil;
@@ -155,15 +156,25 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          }
       }
 
-      if (bindingDirection != null && (bindingDirection.doReverse() || bindable)) {
-         makeBindable(false);
+      // @Bindable(manual=true) also now here implies that the DBObject code is in there - we'd need some other marker like that to prevent
+      // converting the field that's already part of the convertGetSet method.
+      if (!convertGetSet && !bindable) {
+         LayeredSystem sys = getLayeredSystem();
+         Layer refLayer = getLayer();
+         DBPropertyDescriptor dbPropDesc = ModelUtil.getDBPropertyDescriptor(sys, refLayer, this);
+         if (dbPropDesc != null) {
+            DBProvider dbProvider = ModelUtil.getDBProviderForPropertyDesc(sys, refLayer, dbPropDesc);
+            if (dbProvider != null && dbProvider.getNeedsGetSet()) {
+               convertGetSet = true;
+               // Need to be able to listen to events on the property to keep the reverse side in sync
+               if (dbPropDesc.reversePropDesc != null)
+                  bindable = true;
+            }
+         }
       }
 
-      if (!convertGetSet) {
-         DBProvider dbProvider = ModelUtil.getDBProviderForProperty(getLayeredSystem(), getLayer(), this);
-         if (dbProvider != null && dbProvider.getNeedsGetSet()) {
-            convertGetSet = true;
-         }
+      if (bindingDirection != null && (bindingDirection.doReverse() || bindable)) {
+         makeBindable(false);
       }
 
       // Check to be sure the initializer is compatible with the property

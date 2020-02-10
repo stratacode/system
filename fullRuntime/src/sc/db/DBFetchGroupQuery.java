@@ -20,7 +20,9 @@ class DBFetchGroupQuery extends DBQuery {
       for (FetchTablesQuery query:queries)
          if (query.dataSourceName.equals(dataSourceName) && query.multiRow == multiRow)
             return query;
-      return new FetchTablesQuery(dataSourceName, multiRow);
+      FetchTablesQuery ftq = new FetchTablesQuery(dataSourceName, multiRow);
+      queries.add(ftq);
+      return ftq;
    }
 
    public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {

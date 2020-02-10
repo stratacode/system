@@ -9575,7 +9575,13 @@ public class ModelUtil {
             }
             Object baseType = ModelUtil.getExtendsClass(typeDecl);
             DBTypeDescriptor baseTD = baseType != null && baseType != Object.class ? ModelUtil.getDBTypeDescriptor(sys, refLayer, baseType) : null;
+
             String fullTypeName = ModelUtil.getTypeName(typeDecl);
+
+            DBTypeDescriptor dbTypeDesc = sys.getDBTypeDescriptor(fullTypeName);
+            if (dbTypeDesc != null)
+               return dbTypeDesc;
+
             String typeName = CTypeUtil.getClassName(fullTypeName);
             if (primaryTableName == null)
                primaryTableName = DBUtil.getSQLName(typeName);
@@ -9587,6 +9593,8 @@ public class ModelUtil {
                   auxTables.add(new TableDescriptor(auxTableName));
             }
             TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
+
+            ArrayList<Object> persistProps = new ArrayList<Object>();
 
             Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
             if (properties != null) {
@@ -9629,7 +9637,24 @@ public class ModelUtil {
                      IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
 
                      primaryTable.addIdColumnProperty(idDesc);
+                  }
+               }
+            }
 
+            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable);
+
+            sys.addDBTypeDescriptor(fullTypeName, dbTypeDesc);
+
+            if (properties != null) {
+               for (Object property:properties) {
+                  Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
+                  String propName = ModelUtil.getPropertyName(property);
+                  Object propType = ModelUtil.getPropertyType(property);
+
+                  if (propName == null || propType == null)
+                     continue;
+
+                  if (idSettings != null) { // handled above
                      continue;
                   }
                   // Skip transient fields
@@ -9643,6 +9668,7 @@ public class ModelUtil {
                   boolean propAllowNull = false;
                   String propDataSourceName = null;
                   String propFetchGroup = null;
+                  String propReverseProperty = null;
                   if (propSettings != null) {
                      Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
                      if (tmpPersist != null && !tmpPersist) {
@@ -9682,6 +9708,11 @@ public class ModelUtil {
                      String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
                      if (tmpFetchGroup != null) {
                         propFetchGroup = tmpFetchGroup;
+                     }
+
+                     String tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSettings, "reverseProperty");
+                     if (tmpReverseProperty != null) {
+                        propReverseProperty = tmpReverseProperty;
                      }
                   }
 
@@ -9746,19 +9777,24 @@ public class ModelUtil {
                                                                propColumnType, propTableName, propAllowNull, propOnDemand,
                                                                propDataSourceName, propFetchGroup,
                                                                refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                                                               multiRow);
+                                                               multiRow, propReverseProperty);
                   }
                   else {
                      propDesc = new DBPropertyDescriptor(propName, propColumnName,
                                                          propColumnType, propTableName, propAllowNull, propOnDemand,
                                                          propDataSourceName, propFetchGroup,
                                                          refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                                                         multiRow);
+                                                         multiRow, propReverseProperty);
                   }
+
+                  propDesc.refDBTypeDesc = refDBTypeDesc;
 
                   TableDescriptor propTable = primaryTable;
 
                   if (multiRow) {
+                     // NOTE: this table name may be reassigned after we resolve references to other type descriptors
+                     // since the reference semantics determine how the reference is stored.  For example, if this is a
+                     // one-to-many relationship, we'll use the table for the 'one' side to avoid an extra multi-table
                      if (propTableName == null)
                         propTableName = primaryTableName + "_" + propColumnName;
 
@@ -9780,7 +9816,7 @@ public class ModelUtil {
                }
             }
 
-            DBTypeDescriptor dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, auxTables, multiTables, versionProp);
+            dbTypeDesc.initTables(auxTables, multiTables, versionProp);
 
             return dbTypeDesc;
          }
@@ -9793,8 +9829,10 @@ public class ModelUtil {
       if (enclType != null) {
          DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType);
          String propName = ModelUtil.getPropertyName(propObj);
-         if (typeDesc != null)
+         if (typeDesc != null) {
+            typeDesc.init();
             return typeDesc.getPropertyDescriptor(propName);
+         }
       }
       return null;
    }
@@ -9807,6 +9845,17 @@ public class ModelUtil {
          if (dataSource != null) {
             return sys.dbProviders.get(dataSource.provider);
          }
+      }
+      return null;
+   }
+
+   public static DBProvider getDBProviderForPropertyDesc(LayeredSystem sys, Layer refLayer, DBPropertyDescriptor propDesc) {
+      String dataSourceName = propDesc.dataSourceName;
+      if (dataSourceName == null)
+         dataSourceName = propDesc.dbTypeDesc.dataSourceName;
+      DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
+      if (dataSource != null) {
+         return sys.dbProviders.get(dataSource.provider);
       }
       return null;
    }

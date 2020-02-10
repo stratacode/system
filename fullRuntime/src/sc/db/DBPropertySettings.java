@@ -8,4 +8,5 @@ public @interface DBPropertySettings {
    String fetchWith() default "";
    String tableName() default "";
    String dataSourceName() default "";
+   String reverseProperty() default "";
 }

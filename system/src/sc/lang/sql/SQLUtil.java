@@ -15,12 +15,14 @@ public class SQLUtil {
       res.addCreateTable(typeDesc.primaryTable);
       if (typeDesc.auxTables != null) {
          for (TableDescriptor auxTable:typeDesc.auxTables) {
-            res.addCreateTable(auxTable);
+            if (!auxTable.reference)
+               res.addCreateTable(auxTable);
          }
       }
       if (typeDesc.multiTables != null) {
          for (TableDescriptor multiTable:typeDesc.multiTables) {
-            res.addCreateTable(multiTable);
+            if (!multiTable.reference)
+               res.addCreateTable(multiTable);
          }
       }
       return res;

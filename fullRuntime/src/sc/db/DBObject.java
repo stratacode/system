@@ -62,11 +62,18 @@ public class DBObject implements IDBObject {
    // We can also just extend DBObject to inherit - in this case wrapper is null.
    public DBObject() {
       this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(this));
+      init();
    }
 
+   // Used in generated code with a new field 'DBObject _dbObject = new DBObject(this)' along with IDBObject wrapper methods
    public DBObject(Object wrapper) {
       this.wrapper = wrapper;
       this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(getInst()));
+   }
+
+   public void init() {
+      if (dbTypeDesc != null)
+         dbTypeDesc.initDBObject(this);
    }
 
    /** Returns the persistent instance with the getX/setX methods */
@@ -247,7 +254,7 @@ public class DBObject implements IDBObject {
          throw new IllegalArgumentException("Attempting to insert removed instance");
       if ((flags & TRANSIENT) == 0) // TODO: Is this right?
          throw new IllegalArgumentException("Attempting to insert non-transient instance");
-      if ((flags & PENDING_INSERT) != 0) //
+      if ((flags & PENDING_INSERT) != 0)
          throw new IllegalArgumentException("Attempting to insert instance with pending insert");
       flags |= PENDING_INSERT;
       DBTransaction curr = DBTransaction.getOrCreate();
@@ -337,6 +344,10 @@ public class DBObject implements IDBObject {
          flags |= PROTOTYPE;
       else
          flags &= ~PROTOTYPE;
+   }
+
+   public boolean isPendingInsert() {
+      return (flags & PENDING_INSERT) != 0;
    }
 
    public String getObjectId() {
