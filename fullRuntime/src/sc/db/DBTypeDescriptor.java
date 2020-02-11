@@ -285,7 +285,20 @@ public class DBTypeDescriptor {
       return sb.toString();
    }
 
-   public Object getById(Object id) {
+   public Object getInstById(Object id) {
+      return lookupInstById(id, true, true);
+   }
+
+   /**
+    * Lower level method used to lookup an instance of this type with a given id - based on the "highlander principle" - we try to ensure
+    * there's only one instance of an object with the same id to prevent aliasing, simplify code and caching and provide a 'transactional view'
+    * of objects with persistent state.
+    *
+    * If createProto is true, and the instance is not in the cache, a prototype is created with that and returned. If fetchDefault
+    * is true, that prototype is populated with the default property group if the row exists and returned. If the row does not exist
+    * null is returned in that case.
+    */
+   public Object lookupInstById(Object id, boolean createProto, boolean fetchDefault) {
       if (typeInstances == null) {
          synchronized (this) {
             if (typeInstances == null)
@@ -295,14 +308,21 @@ public class DBTypeDescriptor {
       // TODO: do we need to do dbRefresh() on the returned instance - check the status and return null if the item no longer exists?
       // check cache mode here to determine what to fetch?
       IDBObject inst = typeInstances.get(id);
-      if (inst != null) {
+      if (inst != null || !createProto) {
          return inst;
       }
+      DBObject dbObj;
       synchronized (this) {
          inst = (IDBObject) DynUtil.createInstance(typeDecl, null);
-         DBObject dbObj = inst.getDBObject();
+         dbObj = inst.getDBObject();
          dbObj.setPrototype(true);
          typeInstances.put(id, inst);
+      }
+
+      // If requested, fetch the default (primary table) property group - if the row does not exist, the object does not exist
+      if (fetchDefault) {
+         if (!dbObj.dbFetchDefault())
+            return null;
       }
       return inst;
    }
@@ -397,22 +417,66 @@ public class DBTypeDescriptor {
                   }
                }
                if (newList != null) {
-                  for (Object newElem:newList) {
+                  int nlsz = newList.size();
+                  for (int i = 0; i < nlsz; i++) {
+                     Object newElem = newList.get(i);
                      if (oldList == null || !oldList.contains(newElem)) {
                         omapper.setPropertyValue(newElem, inst);
                      }
+                     nlsz = newList.size(); // In case an entry was removed or added to this list - TODO: do we need to start over to avoid missing items here if something changed?
                   }
                }
             }
          }
          else {
             if (oprop.multiRow) {
+               // Here the single-value side has changed it's value from oldVal to newVal. Get the current list property
                // one-to-many change - here we need to find the entry in the old list - if it's still there, replace it with the new value
                // otherwise add it to the collection
+               IBeanMapper omapper = oprop.getPropertyMapper();
+               Object oldVal = lastValue;
+               if (oldVal == newVal)
+                  return false;
+
+               boolean listNeedsSet = false;
+
+               List<Object> newList = (List<Object>)omapper.getPropertyValue(newVal, false, false);
+               if (newList == null) {
+                  // TODO: create a DBList here?
+                  newList = new ArrayList<Object>();
+                  listNeedsSet = true;
+               }
+               if (oldVal != null) {
+                  int ix = newList.indexOf(oldVal);
+                  if (ix != -1)
+                     newList.remove(ix);
+               }
+               if (newVal != null) {
+                  int ix = newList.indexOf(inst);
+                  if (ix == -1)
+                     newList.add(newVal);
+               }
+
+               if (listNeedsSet && newList.size() > 0)
+                  omapper.setPropertyValue(newVal, newList);
             }
             else {
-               // one-to-one - find the old property and if it's still pointing to this value, set it to null.
-               // set the new property to this value
+               Object oldVal = lastValue;
+               if (oldVal == newVal)
+                  return false;
+
+               IBeanMapper omapper = oprop.getPropertyMapper();
+               // Check if the oldValue is still pointing to this new value - set it to null if so since we are removing this reference
+               if (oldVal != null) {
+                  Object oldProp = omapper.getPropertyValue(oldVal, false, false);
+                  if (oldProp == inst)
+                     omapper.setPropertyValue(oldVal, null);
+               }
+
+               // Make the reverse direction change
+               if (newVal != null) {
+                  omapper.setPropertyValue(newVal, inst);
+               }
             }
          }
          valid = true;

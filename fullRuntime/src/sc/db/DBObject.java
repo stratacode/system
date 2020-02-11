@@ -107,6 +107,32 @@ public class DBObject implements IDBObject {
       return null;
    }
 
+   <E> TxListUpdate<E> getListUpdate(DBList<E> list, boolean create, boolean emptyList) {
+      if ((flags & (TRANSIENT | REMOVED)) != 0)
+         return null;
+      DBTransaction cur = create ? DBTransaction.getOrCreate() : DBTransaction.getCurrent();
+      if (cur == null)
+         return null;
+      synchronized (pendingOps) {
+         int txSz = pendingOps.size();
+         for (int i = 0; i < txSz; i++) {
+            TxOperation c = pendingOps.get(i);
+            if (c.transaction == cur && c instanceof TxListUpdate) {
+               TxListUpdate<E> listUpdate = (TxListUpdate<E>) c;
+               if (listUpdate.listProp == list.listProp)
+                  return listUpdate;
+            }
+         }
+
+         if (create) {
+            TxListUpdate<E> listUpdate = new TxListUpdate<E>(cur, this, list, emptyList);
+            pendingOps.add(listUpdate);
+            return listUpdate;
+         }
+      }
+      return null;
+   }
+
    // get or create operations using one lock
    private TxOperation getPendingOperation(DBTransaction curr, boolean createUpdateProp, boolean createInsert, boolean createDelete, boolean remove) {
       synchronized (pendingOps) {
@@ -176,10 +202,34 @@ public class DBObject implements IDBObject {
       return null;
    }
 
-   private void runQueryOnce(DBTransaction curTransaction, DBFetchGroupQuery fetchQuery) {
+   public boolean dbFetchDefault() {
+      if (replacedBy != null)
+         return replacedBy.dbFetchDefault();
+
+      if ((flags & (TRANSIENT | REMOVED)) != 0)
+         return false;
+
+      DBFetchGroupQuery fetchQuery = dbTypeDesc.getDefaultFetchQuery();
+      if (fetchQuery == null)
+         throw new IllegalArgumentException("Missing default fetch query");
+      int lockCt = fetchQuery.queryNumber;
+      if (lockCt >= 31) // TODO: add an optional array to handle more?
+         throw new IllegalArgumentException("Query limit exceeded: " + lockCt + " queries for: " + dbTypeDesc);
+      // two bits for each lock - 3 states 0,1,2
+      int shift = lockCt << 1;
+      DBTransaction curTransaction = DBTransaction.getOrCreate();
+      while (((fstate >> shift) & FETCHED) == 0) {
+         if (!runQueryOnce(curTransaction, fetchQuery))
+            return false;
+      }
+      return true;
+   }
+
+   private boolean runQueryOnce(DBTransaction curTransaction, DBFetchGroupQuery fetchQuery) {
       int shift = fetchQuery.queryNumber << 1;
       boolean doFetch = false;
       int errorCount = 0;
+      boolean res = false;
       synchronized(this) {
          if (fstate == 0) {
             fstate = fstate | (PENDING << shift);
@@ -203,6 +253,7 @@ public class DBObject implements IDBObject {
             //curr.flush(); // Flush out any updates before running the query
             if (fetchQuery.fetchProperties(curTransaction, this)) {
                fetched = true;
+               res = true;
                if ((flags & PROTOTYPE) != 0)
                   flags &= ~PROTOTYPE;
             }
@@ -224,6 +275,9 @@ public class DBObject implements IDBObject {
             notify();
          }
       }
+      else
+         res = (fstate & (FETCHED << shift)) != 0;
+      return res;
    }
 
    /** Called to update the saved representation of the instance */
@@ -313,8 +367,10 @@ public class DBObject implements IDBObject {
       while (fetchState != 0) {
          if ((fetchState & (FETCHED | PENDING)) != 0) {
             DBQuery query = dbTypeDesc.getQueryForNum(queryNum);
-            if (query instanceof DBFetchGroupQuery)
-               runQueryOnce(curTransaction, (DBFetchGroupQuery) query);
+            if (query instanceof DBFetchGroupQuery) {
+               if (!runQueryOnce(curTransaction, (DBFetchGroupQuery) query))
+                  System.out.println("*** DBrefresh of query: " + query + " returned no rows");
+            }
             else
                System.out.println("*** DBrefresh - warning - not refreshing non fetch query");
          }

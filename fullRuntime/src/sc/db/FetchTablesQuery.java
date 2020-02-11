@@ -110,7 +110,7 @@ public class FetchTablesQuery {
             if (numCols == 1)  {
                val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
                if (propDesc.refDBTypeDesc != null)
-                  val = propDesc.refDBTypeDesc.getById(val);
+                  val = propDesc.refDBTypeDesc.lookupInstById(val, true, false);
             }
             else {
                if (propDesc.refDBTypeDesc != null) {
@@ -123,7 +123,7 @@ public class FetchTablesQuery {
                      Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
                      idVals.setVal(idVal, i);
                   }
-                  val = propDesc.refDBTypeDesc.getById(idVals);
+                  val = propDesc.refDBTypeDesc.lookupInstById(idVals, true, false);
                }
                else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
                   System.err.println("*** Unsupported case - multiCol property that's not a reference");
@@ -158,7 +158,7 @@ public class FetchTablesQuery {
                if (numCols == 1)  {
                   val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
                   if (propDesc.refDBTypeDesc != null)
-                     val = propDesc.refDBTypeDesc.getById(val);
+                     val = propDesc.refDBTypeDesc.lookupInstById(val, true, false);
                }
                else {
                   if (propDesc.refDBTypeDesc != null) {
@@ -171,7 +171,7 @@ public class FetchTablesQuery {
                         Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
                         idVals.setVal(idVal, ci);
                      }
-                     val = propDesc.refDBTypeDesc.getById(idVals);
+                     val = propDesc.refDBTypeDesc.lookupInstById(idVals, true, false);
                   }
                   else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
                      System.err.println("*** Unsupported case - multiCol property that's not a reference");
@@ -181,7 +181,7 @@ public class FetchTablesQuery {
                if (fi == 0) {
                   currentRowVal = val;
                   if (resList == null) {
-                     resList = new ArrayList<Object>();
+                     resList = new DBList(10, dbObj, propDesc);
                      listProp = propDesc; // the first time through, the main property for this list
                   }
                   resList.add(currentRowVal);
