@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-rsync -zavr /usr/local/scc/builds/release scserver@stratacode.com:/usr/local/scc/release
+rsync -zavr /usr/local/scc/builds/release scserver@stratacode.com:/usr/local/scc/builds/
 rsync -zavr /usr/local/sc4idea/builds scserver@stratacode.com:/usr/local/sc4idea
 
 
