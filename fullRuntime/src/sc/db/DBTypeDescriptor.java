@@ -125,6 +125,18 @@ public class DBTypeDescriptor {
       }
    }
 
+   void addMultiTable(TableDescriptor table) {
+      if (multiTables == null)
+         multiTables = new ArrayList<TableDescriptor>();
+      multiTables.add(table);
+   }
+
+   void addAuxTable(TableDescriptor table) {
+      if (auxTables == null)
+         auxTables = new ArrayList<TableDescriptor>();
+      auxTables.add(table);
+   }
+
    void initFetchGroups() {
       if (defaultFetchGroup != null)
          return;
@@ -462,8 +474,6 @@ public class DBTypeDescriptor {
             }
             else {
                Object oldVal = lastValue;
-               if (oldVal == newVal)
-                  return false;
 
                IBeanMapper omapper = oprop.getPropertyMapper();
                // Check if the oldValue is still pointing to this new value - set it to null if so since we are removing this reference
@@ -475,8 +485,14 @@ public class DBTypeDescriptor {
 
                // Make the reverse direction change
                if (newVal != null) {
-                  omapper.setPropertyValue(newVal, inst);
+                  Object curVal = omapper.getPropertyValue(newVal, false, false);
+                  lastValue = newVal;
+                  if (curVal != inst) {
+                     omapper.setPropertyValue(newVal, inst);
+                  }
                }
+               else
+                  lastValue = null;
             }
          }
          valid = true;

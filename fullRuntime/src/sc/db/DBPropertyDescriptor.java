@@ -3,6 +3,8 @@ package sc.db;
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 
+import java.util.ArrayList;
+
 /**
  * Represents the metadata used for storing a property of a DBObject. It lives in a TableDescriptor and as part of a DBTypeDescriptor that corresponds to
  * the mapping for a single class or dynamic type in the system.
@@ -107,6 +109,9 @@ public class DBPropertyDescriptor {
                   if (multiRow && !reversePropDesc.multiRow)
                      System.err.println("*** reverseProperty set on: " + this + " should be set the single-valued side of the relationship: " + reversePropDesc);
                   reversePropDesc.reversePropDesc = this;
+                  // TODO: we could do read-only 1-1 relationships as well.
+                  // For one-to-many relationships, usually the many property is read-only - i.e. used for querying only, not updated
+                  //if (!multiRow && reversePropDesc.multiRow)
                   reversePropDesc.readOnly = true;
                }
             }
@@ -123,9 +128,10 @@ public class DBPropertyDescriptor {
       if (reversePropDesc != null) {
          dbTypeDesc.addReverseProperty(this);
 
-         // Point the reverse property as a reference to this one
-         if (!readOnly)
+         // The read-only property case occurs when the reverse property uses this property's table
+         if (reversePropDesc.readOnly) {
             reversePropDesc.resetTable(tableDesc);
+         }
       }
    }
 
@@ -197,10 +203,31 @@ public class DBPropertyDescriptor {
       return columnType;
    }
 
+   /** This is called when we determine that this property's value is derived from the table provided. If this table is
+    * already an aux or multi table, just give it the new name.  If it is a primary table for this type, need to create a new
+    * aux/multi table
+    */
    public void resetTable(TableDescriptor table) {
       if (tableDesc != null) {
-         tableDesc.tableName = table.tableName;
-         tableDesc.reference = true;
+         if (tableDesc.primary) {
+            TableDescriptor primaryTable = tableDesc;
+            if (!primaryTable.columns.remove(this))
+               System.err.println("*** Unable to find column to remove for resetTable");
+            tableDesc = new TableDescriptor(table.tableName);
+            tableDesc.reference = true;
+            tableDesc.dbTypeDesc = dbTypeDesc;
+            tableDesc.idColumns = new ArrayList<IdPropertyDescriptor>(primaryTable.idColumns);
+            tableDesc.columns = new ArrayList<DBPropertyDescriptor>();
+            tableDesc.columns.add(this);
+            if (multiRow)
+               dbTypeDesc.addMultiTable(tableDesc);
+            else
+               dbTypeDesc.addAuxTable(tableDesc);
+         }
+         else {
+            tableDesc.tableName = table.tableName;
+            tableDesc.reference = true;
+         }
       }
    }
 
