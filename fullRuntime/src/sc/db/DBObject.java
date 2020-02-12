@@ -408,17 +408,23 @@ public class DBObject implements IDBObject {
 
    public String getObjectId() {
       StringBuilder sb = new StringBuilder();
-      sb.append(CTypeUtil.getClassName(DynUtil.getTypeName(dbTypeDesc.typeDecl, false)));
-      sb.append("__");
       Object inst = getInst();
-      for (int i = 0; i < dbTypeDesc.primaryTable.idColumns.size(); i++) {
-         if (i != 0)
-            sb.append("__");
-         IdPropertyDescriptor idProp = dbTypeDesc.primaryTable.idColumns.get(i);
-         Object idVal = idProp.getPropertyMapper().getPropertyValue(inst, false, false);
-         if (idVal == null) // TODO: not sure what to do here since the object won't have an id until it's actually persisted and getObjectId has no way to change the id for the same instance (would require some changes to the sync system?)
-            idVal = "null_id";
-         sb.append(idVal);
+      String typeName = CTypeUtil.getClassName(DynUtil.getTypeName(dbTypeDesc.typeDecl, false));
+      if (isTransient()) {
+         sb.append(DynUtil.getObjectId(inst, dbTypeDesc.typeDecl, typeName + "-transient"));
+      }
+      else {
+         sb.append(typeName);
+         sb.append("__");
+         for (int i = 0; i < dbTypeDesc.primaryTable.idColumns.size(); i++) {
+            if (i != 0)
+               sb.append("__");
+            IdPropertyDescriptor idProp = dbTypeDesc.primaryTable.idColumns.get(i);
+            Object idVal = idProp.getPropertyMapper().getPropertyValue(inst, false, false);
+            if (idVal == null) // TODO: not sure what to do here since the object won't have an id until it's actually persisted and getObjectId has no way to change the id for the same instance (would require some changes to the sync system?)
+               idVal = "null_id";
+            sb.append(idVal);
+         }
       }
       return sb.toString();
    }

@@ -30,7 +30,6 @@ public abstract class TxOperation {
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
       boolean isPrimary = primaryTable == insertTable;
 
-
       if (isPrimary) {
          if (!dbObject.isTransient()) {
             throw new IllegalArgumentException("Inserting non-transient object");
@@ -85,36 +84,48 @@ public abstract class TxOperation {
 
       StringBuilder sb = new StringBuilder();
       sb.append("INSERT INTO ");
-      DBUtil.appendIdent(sb, insertTable.tableName);
+      DBUtil.appendIdent(sb, null, insertTable.tableName);
       sb.append("(");
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
             sb.append(", ");
          }
-         DBUtil.appendIdent(sb, columnNames.get(i));
+         DBUtil.appendIdent(sb, null, columnNames.get(i));
       }
       sb.append(") VALUES (");
+
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(sb) : null;
 
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
             sb.append(", ");
+            if (logSB != null)
+               logSB.append(", ");
          }
          sb.append("?");
+         if (logSB != null)
+            logSB.append(DBUtil.formatValue(columnValues.get(i)));
       }
-      sb.append(")");
+
+      StringBuilder rest = new StringBuilder();
+      rest.append(")");
 
       if (dbIdCols != null) {
-         sb.append(" RETURNING ");
+         rest.append(" RETURNING ");
          for (int i = 0; i < dbIdCols.size(); i++) {
             if (i != 0)
-               sb.append(", ");
-            DBUtil.appendIdent(sb, dbIdCols.get(i).columnName);
+               rest.append(", ");
+            DBUtil.appendIdent(rest, null, dbIdCols.get(i).columnName);
          }
       }
+      sb.append(rest);
+      if (logSB != null)
+         logSB.append(rest);
 
       try {
          Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         PreparedStatement st = conn.prepareStatement(sb.toString());
+         String statementStr = sb.toString();
+         PreparedStatement st = conn.prepareStatement(statementStr);
 
          for (int i = 0; i < numCols; i++) {
             DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
@@ -129,10 +140,35 @@ public abstract class TxOperation {
                IBeanMapper mapper = dbIdCol.getPropertyMapper();
                Object id = DBUtil.getResultSetByIndex(rs, i+1, dbIdCol);
                mapper.setPropertyValue(inst, id);
+
+               if (logSB != null) {
+                  if (i == 0) {
+                     logSB.append(" -> (");
+                  }
+                  else
+                     logSB.append(", ");
+                  logSB.append(id);
+               }
+            }
+
+            if (logSB != null) {
+               logSB.append(")");
+               DBUtil.info(logSB);
             }
          }
          else {
-            st.executeUpdate();
+            int numInserted = st.executeUpdate();
+            if (numInserted != 1)
+              DBUtil.error("Insert of one row returns: " + numInserted + " rows inserted");
+
+            if (logSB != null) {
+               if (numInserted == 1)
+                  logSB.append(" -> inserted one row");
+               else
+                  logSB.append(" -> updated " + numInserted + " rows") ;
+
+               DBUtil.info(logSB);
+            }
          }
 
          if (isPrimary) {
@@ -180,6 +216,7 @@ public abstract class TxOperation {
       List<String> nullProps = null;
 
       StringBuilder sb = new StringBuilder();
+      StringBuilder logSB = null;
       int toInsert = 0;
       int numCols = 0;
       for (int ix = 0; ix < numInsts; ix++) {
@@ -214,15 +251,17 @@ public abstract class TxOperation {
                return 0;
 
             sb.append("INSERT INTO ");
-            DBUtil.appendIdent(sb, insertTable.tableName);
+            DBUtil.appendIdent(sb, null, insertTable.tableName);
             sb.append("(");
             for (int i = 0; i < numCols; i++) {
                if (i != 0) {
                   sb.append(", ");
                }
-               DBUtil.appendIdent(sb, columnNames.get(i));
+               DBUtil.appendIdent(sb, null, columnNames.get(i));
             }
             sb.append(") VALUES");
+
+            logSB = DBUtil.verbose ? new StringBuilder(sb.toString()) : null;
          }
          else {
             for (int ci = 0; ci < idSize; ci++) {
@@ -232,18 +271,22 @@ public abstract class TxOperation {
             }
             addArrayValues(dbTypeDesc, arrInst, insertTable.columns, null, columnTypes, columnValues);
          }
-         toInsert++;
 
-         if (ix != 0)
-            sb.append(", ");
-         sb.append("(");
+         if (ix != 0) {
+            append(sb, logSB, ", ");
+         }
+
+         append(sb, logSB, "(");
          for (int ci = 0; ci < numCols; ci++) {
             if (ci != 0) {
-               sb.append(", ");
+               append(sb, logSB, ",");
             }
             sb.append("?");
+            if (logSB != null)
+               logSB.append(DBUtil.formatValue(columnValues.get(ci+toInsert*numCols)));
          }
-         sb.append(")");
+         append(sb, logSB, ")");
+         toInsert++;
       }
 
       if (toInsert == 0)
@@ -251,17 +294,33 @@ public abstract class TxOperation {
 
       try {
          Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         PreparedStatement st = conn.prepareStatement(sb.toString());
+         String insertStr = sb.toString();
+         PreparedStatement st = conn.prepareStatement(insertStr);
 
          for (int ci = 0; ci < columnValues.size(); ci++) {
             DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci));
          }
-         st.executeUpdate();
+         int numInserted = st.executeUpdate();
+         if (numInserted != toInsert)
+            DBUtil.error("Insert of: " + toInsert + " rows inserted: " + numInserted + " instead for: " + dbTypeDesc);
+
+         if (logSB != null) {
+            logSB.append(" -> inserted ");
+            logSB.append(numInserted);
+            DBUtil.info(logSB);
+         }
+
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert: " + dbTypeDesc + " with dbIdCols: " + dbIdCols + " returned failed: " + exc);
       }
       return 1;
+   }
+
+   static void append(StringBuilder sb, StringBuilder logSB, CharSequence val) {
+      sb.append(val);
+      if (logSB != null)
+         logSB.append(val);
    }
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
@@ -349,6 +408,8 @@ public abstract class TxOperation {
                      continue;
                   DBObject refObj = ref.getDBObject();
                   if (refObj.isTransient() && !refObj.isPendingInsert()) {
+                     if (DBUtil.verbose)
+                        DBUtil.verbose(" Inserting reference: " + ref.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper + "[]");
                      ref.dbInsert();
                   }
                }
@@ -357,8 +418,11 @@ public abstract class TxOperation {
                IDBObject refInst = (IDBObject) mapper.getPropertyValue(inst, false, false);
                if (refInst != null) {
                   DBObject refDBObj = refInst.getDBObject();
-                  if (refDBObj.isTransient() && !refDBObj.isPendingInsert())
+                  if (refDBObj.isTransient() && !refDBObj.isPendingInsert()) {
+                     if (DBUtil.verbose)
+                        DBUtil.verbose(" Inserting reference: " + refInst.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper);
                      refInst.dbInsert();
+                  }
                }
             }
          }

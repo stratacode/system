@@ -1,5 +1,6 @@
 package sc.db;
 
+import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
 
 import javax.naming.InitialContext;
@@ -10,8 +11,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import sc.db.DataSourceManager;
+import sc.util.IMessageHandler;
+import sc.util.MessageHandler;
 
 public class DBUtil {
+   public static boolean verbose = true;
+
+   public static IMessageHandler msgHandler;
 
    public static Connection createConnection(String dataSourceName) {
       try {
@@ -107,21 +113,36 @@ public class DBUtil {
 
    // TODO: add quoting here only if the ident was originally defined with quotes because they are case sensitive with quotes and not without...
    //  do we need to support quoting as an option through annotation specified definitions?
-   public static void appendIdent(StringBuilder sb, String ident) {
+   public static void appendIdent(StringBuilder sb, StringBuilder logSB, String ident) {
       sb.append(ident);
+      if (logSB != null)
+         logSB.append(ident);
+   }
+
+   public static String formatValue(Object val) {
+      if (val instanceof String) {
+         return "\"" + val + "\"";
+      }
+      else
+         return val.toString();
    }
 
    public static void setStatementValue(PreparedStatement st, int index, Object propertyType, Object val) throws SQLException {
-      if (propertyType == Integer.class || propertyType == Integer.TYPE)
+      if (propertyType == Integer.class || propertyType == Integer.TYPE) {
          st.setInt(index, (Integer) val);
-      else if (propertyType == String.class)
+      }
+      else if (propertyType == String.class) {
          st.setString(index, (String) val);
-      else if (propertyType == Long.class || propertyType == Long.TYPE)
+      }
+      else if (propertyType == Long.class || propertyType == Long.TYPE) {
          st.setLong(index, (Long) val);
-      else if (propertyType == Boolean.class || propertyType == Boolean.TYPE)
+      }
+      else if (propertyType == Boolean.class || propertyType == Boolean.TYPE) {
          st.setBoolean(index, (Boolean) val);
-      else
+      }
+      else {
          st.setObject(index, val);
+      }
    }
 
    public static Object getResultSetByIndex(ResultSet rs, int index, DBPropertyDescriptor dbProp) throws SQLException {
@@ -162,5 +183,42 @@ public class DBUtil {
       else if (type.equals("bigserial"))
          return "long";
       return type;
+   }
+
+   public static void info(CharSequence... msgs) {
+      MessageHandler.info(msgHandler, msgs);
+   }
+
+   public static void warn(CharSequence... msgs) {
+      MessageHandler.warning(msgHandler, msgs);
+   }
+
+   public static void verbose(CharSequence... msgs) {
+      if (verbose)
+         MessageHandler.info(msgHandler, msgs);
+   }
+
+   public static void error(CharSequence... msgs) {
+      MessageHandler.error(msgHandler, msgs);
+   }
+
+   public static String replaceNextParam(String logStr, Object colVal) {
+      int ix = logStr.indexOf('?');
+      if (ix == -1) {
+         System.err.println("*** replaceNextParam - found no param");
+         return logStr;
+      }
+      StringBuilder res = new StringBuilder();
+      res.append(logStr.substring(0, ix));
+      res.append(DBUtil.formatValue(colVal));
+      res.append(logStr.substring(ix+1));
+      return res.toString();
+   }
+
+   public static String toIdString(Object inst) {
+      if (inst instanceof IObjectId)
+         return ((IObjectId) inst).getObjectId();
+      else
+         return inst.toString();
    }
 }

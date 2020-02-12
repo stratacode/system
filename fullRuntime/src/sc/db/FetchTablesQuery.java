@@ -69,21 +69,32 @@ public class FetchTablesQuery {
       ResultSet rs = null;
       List<IdPropertyDescriptor> idColumns = mainTable.getIdColumns();
       try {
-         PreparedStatement st = conn.prepareStatement(qsb.toString());
+         String queryStr = qsb.toString();
+         PreparedStatement st = conn.prepareStatement(queryStr);
+         String logStr = DBUtil.verbose ? queryStr : null;
          Object inst = dbObj.getInst();
          for (int i = 0; i < idColumns.size(); i++) {
             DBPropertyDescriptor propDesc = idColumns.get(i);
             IBeanMapper propMapper = propDesc.getPropertyMapper();
             Object colVal = propMapper.getPropertyValue(inst, false, false);
             DBUtil.setStatementValue(st, i+1, propMapper.getPropertyType(), colVal);
+            if (logStr != null)
+               logStr = DBUtil.replaceNextParam(logStr, colVal);
          }
 
          rs = st.executeQuery();
 
+         StringBuilder logSB = logStr != null ? new StringBuilder(logStr) : null;
+
+         boolean res;
          if (!multiRow)
-            return processOneRowQueryResults(dbObj, inst, rs);
+            res = processOneRowQueryResults(dbObj, inst, rs, logSB);
          else
-            return processMultiResults(dbObj, inst, rs);
+            res = processMultiResults(dbObj, inst, rs, logSB);
+         if (logSB != null) {
+            DBUtil.info(logSB.toString());
+         }
+         return res;
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
@@ -94,7 +105,7 @@ public class FetchTablesQuery {
       }
    }
 
-   boolean processOneRowQueryResults(DBObject dbObj, Object inst, ResultSet rs) throws SQLException {
+   boolean processOneRowQueryResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       if (!rs.next()) {
          dbObj.setTransient(true);
          return false;
@@ -104,7 +115,15 @@ public class FetchTablesQuery {
       for (FetchTableDesc ftd:fetchTables) {
          Object fetchInst = ftd.refProp == null ? inst : ftd.refProp.getPropertyMapper().getPropertyValue(inst, false, false);
          for (DBPropertyDescriptor propDesc:ftd.props) {
+            if (logSB != null && rix != 1)
+               logSB.append(", ");
             IBeanMapper propMapper = propDesc.getPropertyMapper();
+
+            if (logSB != null) {
+               logSB.append(propMapper.getPropertyName());
+               logSB.append("=");
+            }
+
             Object val;
             int numCols = propDesc.getNumColumns();
             if (numCols == 1)  {
@@ -131,6 +150,10 @@ public class FetchTablesQuery {
                }
             }
             propMapper.setPropertyValue(fetchInst, val);
+
+            if (logSB != null) {
+               logSB.append(val);
+            }
          }
       }
       if (rs.next())
@@ -142,12 +165,19 @@ public class FetchTablesQuery {
     * Here the first fetchTable defines the list/array value - fetchTables.get(0).props.get(0).
     * The second and subsequent fetch tables are only there for onDemand=false references in the referenced object
     */
-   boolean processMultiResults(DBObject dbObj, Object inst, ResultSet rs) throws SQLException {
+   boolean processMultiResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       List<Object> resList = null;
       DBPropertyDescriptor listProp = null;
+      int rowCt = 0;
+
       while (rs.next()) {
          int rix = 1;
          Object currentRowVal = null;
+
+         if (rowCt > 0) {
+            logSB.append(",\n   ");
+         }
+
          for (int fi = 0; fi < fetchTables.size(); fi++) {
             FetchTableDesc fetchTable = fetchTables.get(fi);
 
@@ -185,11 +215,25 @@ public class FetchTablesQuery {
                      listProp = propDesc; // the first time through, the main property for this list
                   }
                   resList.add(currentRowVal);
+                  rowCt++;
+                  if (logSB != null) {
+                     logSB.append("[");
+                     logSB.append(currentRowVal);
+                     logSB.append("]: ");
+                     logSB.append(currentRowVal);
+                  }
                }
                else {
                   if (currentRowVal == null)
                      throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
                   propMapper.setPropertyValue(currentRowVal, val);
+
+                  if (logSB != null) {
+                     logSB.append(", ");
+                     logSB.append(propMapper.getPropertyName());
+                     logSB.append("=");
+                     logSB.append(val);
+                  }
                }
             }
          }
@@ -211,9 +255,9 @@ public class FetchTablesQuery {
       for (int i = 0; i < sz; i++) {
          if (i != 0)
             qsb.append(" AND ");
-         DBUtil.appendIdent(qsb, mainTable.tableName);
+         DBUtil.appendIdent(qsb, null, mainTable.tableName);
          qsb.append(".");
-         DBUtil.appendIdent(qsb, idCols.get(i).columnName);
+         DBUtil.appendIdent(qsb, null, idCols.get(i).columnName);
          qsb.append(" = ?");
       }
       return qsb;
@@ -226,11 +270,11 @@ public class FetchTablesQuery {
       for (FetchTableDesc fetchTable:fetchTables)
          appendTableSelect(res, fetchTable, hasAuxTables);
       res.append(" FROM ");
-      DBUtil.appendIdent(res, mainTable.tableName);
+      DBUtil.appendIdent(res, null, mainTable.tableName);
       for (int i = 1; i < fetchTables.size(); i++) {
          res.append(" LEFT OUTER JOIN ");
          TableDescriptor joinTable = fetchTables.get(i).table;
-         DBUtil.appendIdent(res, joinTable.tableName);
+         DBUtil.appendIdent(res, null, joinTable.tableName);
          res.append(" ON ");
          appendJoinTable(res, mainTable, joinTable);
       }
@@ -243,13 +287,13 @@ public class FetchTablesQuery {
       for (int i = 0; i < sz; i++) {
          if (i != 0)
             queryStr.append(" AND ");
-         DBUtil.appendIdent(queryStr, mainTable.tableName);
+         DBUtil.appendIdent(queryStr, null, mainTable.tableName);
          queryStr.append(".");
-         DBUtil.appendIdent(queryStr, idCols.get(i).columnName);
+         DBUtil.appendIdent(queryStr, null, idCols.get(i).columnName);
          queryStr.append(" = ");
-         DBUtil.appendIdent(queryStr, joinTable.tableName);
+         DBUtil.appendIdent(queryStr, null, joinTable.tableName);
          queryStr.append(".");
-         DBUtil.appendIdent(queryStr, idCols.get(i).columnName);
+         DBUtil.appendIdent(queryStr, null, idCols.get(i).columnName);
       }
    }
 

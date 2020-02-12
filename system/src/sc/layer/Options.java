@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.bind.Bind;
+import sc.db.DBUtil;
 import sc.lang.AbstractInterpreter;
 import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
@@ -645,6 +646,8 @@ public class Options {
                      Element.trace = true;
                   else if (opt.equals("vs"))
                      SyncManager.trace = true;
+                  else if (opt.equals("vdb"))
+                     DBUtil.verbose = true;
                   else if (opt.equals("vc")) {
                      RTypeUtil.verboseClasses = true;
                      verboseClasses = true;
@@ -673,12 +676,6 @@ public class Options {
                   }
                   else if (opt.equals("vp"))
                      PerfMon.enabled = true;
-                     // DEPRECATED - use -tv instead
-                  else if (opt.equals("vt")) {
-                     System.err.println("*** Deprecated use of -vt option");
-                     testVerifyMode = true;
-                     testMode = true;
-                  }
                   else if (opt.equals("ve"))
                      verboseExec = true;
                   else if (opt.equals("v"))

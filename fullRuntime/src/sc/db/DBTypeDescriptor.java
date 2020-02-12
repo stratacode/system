@@ -1,10 +1,8 @@
 package sc.db;
 
-import sc.bind.AbstractListener;
 import sc.bind.Bind;
 import sc.bind.IListener;
 import sc.dyn.DynUtil;
-import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
 
 import java.util.*;
@@ -374,130 +372,6 @@ public class DBTypeDescriptor {
       if (reverseProps == null)
          reverseProps = new ArrayList<DBPropertyDescriptor>();
       reverseProps.add(reverseProp);
-   }
-
-   class ReversePropertyListener extends AbstractListener {
-      DBObject obj;
-      Object lastValue;
-      DBPropertyDescriptor rprop;
-      boolean valid = true;
-
-      ReversePropertyListener(DBObject obj, Object lastValue, DBPropertyDescriptor reverseProp) {
-         this.obj = obj;
-         this.lastValue = lastValue;
-         this.rprop = reverseProp;
-      }
-
-      public boolean valueInvalidated(Object lobj, Object prop, Object eventDetail, boolean apply) {
-         if (!valid)
-            return true;
-
-         Object newVal = DynUtil.getPropertyValue(obj.getInst(), rprop.propertyName);
-         if (!(DynUtil.equalObjects(newVal, lastValue))) {
-            valid = false;
-            return true;
-         }
-         // No value change so no need to call valueValidated
-         return false;
-      }
-
-      public boolean valueValidated(Object lobj, Object prop, Object eventDetail, boolean apply) {
-         IBeanMapper rmapper = rprop.getPropertyMapper();
-         Object inst = obj.getInst();
-         Object newVal = rmapper.getPropertyValue(inst, false, false);
-         DBPropertyDescriptor oprop = rprop.reversePropDesc;
-         if (rprop.multiRow) {
-            if (oprop.multiRow) {
-               // many-to-many
-               // For each new value in the rprop collection, add it to the corresponding property in the oprop's collection
-               // For each removed value in rprop, find it in the corresponding oprop and if not removed, remove it
-            }
-            else {
-               IBeanMapper omapper = oprop.getPropertyMapper();
-               // many-to-one
-               // For each new value in rprop, find the property in oprop and set it to point to this
-               // For each removed value in rprop, if it's set to this, and not removed, set it to null
-               List<Object> oldList = (List<Object>) lastValue;
-               List<Object> newList = (List<Object>) newVal;
-               if (oldList != null) {
-                  for (Object oldElem:oldList) {
-                     if (newList == null || !newList.contains(oldElem)) {
-                        Object oldElemProp = omapper.getPropertyValue(oldElem, false, false);
-                        if (oldElemProp == inst)
-                           omapper.setPropertyValue(oldElem, null);
-                     }
-                  }
-               }
-               if (newList != null) {
-                  int nlsz = newList.size();
-                  for (int i = 0; i < nlsz; i++) {
-                     Object newElem = newList.get(i);
-                     if (oldList == null || !oldList.contains(newElem)) {
-                        omapper.setPropertyValue(newElem, inst);
-                     }
-                     nlsz = newList.size(); // In case an entry was removed or added to this list - TODO: do we need to start over to avoid missing items here if something changed?
-                  }
-               }
-            }
-         }
-         else {
-            if (oprop.multiRow) {
-               // Here the single-value side has changed it's value from oldVal to newVal. Get the current list property
-               // one-to-many change - here we need to find the entry in the old list - if it's still there, replace it with the new value
-               // otherwise add it to the collection
-               IBeanMapper omapper = oprop.getPropertyMapper();
-               Object oldVal = lastValue;
-               if (oldVal == newVal)
-                  return false;
-
-               boolean listNeedsSet = false;
-
-               List<Object> newList = (List<Object>)omapper.getPropertyValue(newVal, false, false);
-               if (newList == null) {
-                  // TODO: create a DBList here?
-                  newList = new ArrayList<Object>();
-                  listNeedsSet = true;
-               }
-               if (oldVal != null) {
-                  int ix = newList.indexOf(oldVal);
-                  if (ix != -1)
-                     newList.remove(ix);
-               }
-               if (newVal != null) {
-                  int ix = newList.indexOf(inst);
-                  if (ix == -1)
-                     newList.add(newVal);
-               }
-
-               if (listNeedsSet && newList.size() > 0)
-                  omapper.setPropertyValue(newVal, newList);
-            }
-            else {
-               Object oldVal = lastValue;
-
-               IBeanMapper omapper = oprop.getPropertyMapper();
-               // Check if the oldValue is still pointing to this new value - set it to null if so since we are removing this reference
-               if (oldVal != null) {
-                  Object oldProp = omapper.getPropertyValue(oldVal, false, false);
-                  if (oldProp == inst)
-                     omapper.setPropertyValue(oldVal, null);
-               }
-
-               // Make the reverse direction change
-               if (newVal != null) {
-                  Object curVal = omapper.getPropertyValue(newVal, false, false);
-                  lastValue = newVal;
-                  if (curVal != inst) {
-                     omapper.setPropertyValue(newVal, inst);
-                  }
-               }
-               else
-                  lastValue = null;
-            }
-         }
-         valid = true;
-         return true;
-      }
    }
 
    public void initDBObject(DBObject obj) {

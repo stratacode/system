@@ -74,28 +74,39 @@ public class TxUpdate extends TxOperation {
 
       StringBuilder sb = new StringBuilder();
       sb.append("UPDATE ");
-      DBUtil.appendIdent(sb, updateTable.tableName);
+      DBUtil.appendIdent(sb, null, updateTable.tableName);
       sb.append(" SET ");
       int numCols = columnProps.size();
+
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(sb.toString()) : null;
+
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
-            sb.append(", ");
+            append(sb, logSB, ", ");
          }
-         DBUtil.appendIdent(sb, columnProps.get(i).columnName);
-         sb.append(" = ?");
+         DBUtil.appendIdent(sb, logSB, columnProps.get(i).columnName);
+         append(sb, logSB, " = ");
+         sb.append("?");
+         if (logSB != null)
+            logSB.append(DBUtil.formatValue(columnValues.get(i)));
       }
-      sb.append(" WHERE ");
+      append(sb, logSB, " WHERE ");
+
       for (int i = 0; i < numIdCols; i++) {
          if (i != 0) {
-            sb.append(", ");
+            append(sb, logSB, ", ");
          }
-         DBUtil.appendIdent(sb, idCols.get(i).columnName);
-         sb.append(" = ?");
+         DBUtil.appendIdent(sb, logSB, idCols.get(i).columnName);
+         append(sb, logSB, " = ");
+         sb.append("?");
+         if (logSB != null)
+            logSB.append(DBUtil.formatValue(idVals.get(i)));
       }
 
       try {
          Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         PreparedStatement st = conn.prepareStatement(sb.toString());
+         String updateStr = sb.toString();
+         PreparedStatement st = conn.prepareStatement(updateStr);
          int pos = 1;
          for (int i = 0; i < numCols; i++) {
             DBPropertyDescriptor colProp = columnProps.get(i);
@@ -118,8 +129,14 @@ public class TxUpdate extends TxOperation {
          else if (ct != 1) {
             throw new UnsupportedOperationException("Invalid return from executeUpdate in doUpdate(): " + ct);
          }
-         else
+         else {
             dbObject.applyUpdates(updateList);
+
+            if (logSB != null) {
+               logSB.append(" updated: " + ct);
+               DBUtil.info(logSB);
+            }
+         }
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert without ids sql error: " + exc);
