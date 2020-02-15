@@ -29,6 +29,8 @@ public class DBTransaction {
    /** Set to indicate that the transaction is being committed - a signal to setX methods to allow the field to be updated */
    public boolean commitInProgress = false;
 
+   public boolean applyingDBChanges = false;
+
    public String lastThreadName;
 
    public DBTransaction() {

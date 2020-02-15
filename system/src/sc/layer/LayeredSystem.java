@@ -676,7 +676,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             ArrayList<IProcessDefinition> procs = new ArrayList<IProcessDefinition>();
             ArrayList<IRuntimeProcessor> runtimes = new ArrayList<IRuntimeProcessor>();
-            for (int i = 0; i < layers.size(); i++) {
+            for (int i = 0; i < layers.size(); i++) { // Get the list of processes and runtimes actually required by this program and then filter the active layers in each runtime by that
                Layer l = layers.get(i);
                if (l.hasDefinedProcess)
                   procs.add(l.definedProcess);
@@ -704,6 +704,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             LayeredSystem runtimeSys = getActiveLayeredSystem(null);
             if (runtimeSys != null)
                runtimeSys.initBuildSystem(true, true);
+
+            buildSeparateLayers();
 
             // Finally initialize the build system from scratch and we are ready to go.
             initBuildSystem(true, true);
@@ -6425,7 +6427,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       boolean addOrigBuild = true;
       if (useBuildDir != null && includeBuildDir)
          sb.append(useBuildDir); // Our build dir overrides all other directories
-      if (startLayer == coreBuildLayer) {
+      if (startLayer == coreBuildLayer || startLayer.buildSeparate) {
          // Need this for the IDE because the sc.jar files are not in the rootClasspath in that environment because we want to debug those.  They are when running scc though.
          if (strataCodeInstallDir != null) {
             String path = getStrataCodeRuntimePath(buildModuleType, false);
@@ -14112,8 +14114,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                      if (layer == buildLayer || !options.buildAllLayers) {
                         // Don't include the buildDir for the IDE and other environments when we are compiling only and not running unless it's a final layer like js.prebuild where
-                        // we want the compilation process to load the compiled classes for speed.
-                        if (options.includeBuildDirInClassPath || layer.finalLayer)
+                        // we want the compilation process to load the compiled classes for speed, or a buildSeparate layer like junit.lib so the layer definition files
+                        // that follow can load the classes compiled in the buildSeparate layer.
+                        if (options.includeBuildDirInClassPath || layer.finalLayer || layer.buildSeparate)
                            layer.appendBuildURLs(urls);
                      }
                   }
@@ -14352,8 +14355,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       else {
-         if (obj instanceof IComponent)
-            ((IComponent) obj).stop();
+         if (obj instanceof IStoppable)
+            ((IStoppable) obj).stop();
          if (obj instanceof IAltComponent)
             ((IAltComponent) obj)._stop();
       }
@@ -15037,15 +15040,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      for (Layer activeLayer:layers) {
-         if (activeLayer.buildSeparate && !activeLayer.compiled && !activeLayer.disabled) {
-            // then build the separate layers so the compiled results are available for parsing the types - again for all peers
-            buildSystem(null, true, true);
-
-            setCurrent(this);
-            break;
-         }
-      }
+      buildSeparateLayers();
 
       // This could be a compiled separate layer that we just ran across.  We just activate them and throw them into layers whenever they are first accessed by the IDE since we need to build them in order to start other layers.
       if (layer.activated)
@@ -15088,6 +15083,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          // else - error -
       }
       return layer;
+   }
+
+   private void buildSeparateLayers() {
+      for (Layer activeLayer:layers) {
+         if (activeLayer.buildSeparate && !activeLayer.compiled && !activeLayer.disabled) {
+            // then build the separate layers so the compiled results are available for parsing the types - again for all peers
+            buildSystem(null, true, true);
+
+            setCurrent(this);
+            break;
+         }
+      }
    }
 
    public Layer getActiveOrInactiveLayerByPathSync(String layerPath, String prefix, boolean openLayer, boolean checkPeers, boolean enabled) {

@@ -170,6 +170,17 @@ public class SQLFileModel extends SCModel {
                }
             }
          }
+         if (propDesc.required) {
+            List<SQLConstraint> constraints = colDef.columnConstraints;
+            boolean setProp = false;
+            if (constraints == null) {
+               constraints = new SemanticNodeList<SQLConstraint>();
+               setProp = true;
+            }
+            constraints.add(new NotNullConstraint());
+            if (setProp)
+               colDef.setProperty("columnConstraints", constraints);
+         }
          tableDefs.add(colDef);
       }
    }

@@ -9665,7 +9665,7 @@ public class ModelUtil {
                   String propColumnName = null;
                   String propColumnType = null;
                   boolean propOnDemand = false;
-                  boolean propAllowNull = false;
+                  boolean propRequired = false;
                   String propDataSourceName = null;
                   String propFetchGroup = null;
                   String propReverseProperty = null;
@@ -9695,9 +9695,9 @@ public class ModelUtil {
                      if (tmpOnDemand != null) {
                         propOnDemand = tmpOnDemand;
                      }
-                     Boolean tmpAllowNull  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "allowNull");
-                     if (tmpAllowNull != null) {
-                        propAllowNull = tmpAllowNull;
+                     Boolean tmpRequired  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "required");
+                     if (tmpRequired != null) {
+                        propRequired = tmpRequired;
                      }
 
                      String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
@@ -9774,14 +9774,14 @@ public class ModelUtil {
 
                   if (isMultiCol) {
                      propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
-                                                               propColumnType, propTableName, propAllowNull, propOnDemand,
+                                                               propColumnType, propTableName, propRequired, propOnDemand,
                                                                propDataSourceName, propFetchGroup,
                                                                refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                                                                multiRow, propReverseProperty);
                   }
                   else {
                      propDesc = new DBPropertyDescriptor(propName, propColumnName,
-                                                         propColumnType, propTableName, propAllowNull, propOnDemand,
+                                                         propColumnType, propTableName, propRequired, propOnDemand,
                                                          propDataSourceName, propFetchGroup,
                                                          refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                                                          multiRow, propReverseProperty);

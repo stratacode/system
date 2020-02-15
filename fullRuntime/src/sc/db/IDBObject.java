@@ -16,4 +16,6 @@ public interface IDBObject extends IObjectId {
    boolean dbRefresh();
 
    DBObject getDBObject();
+
+   Object getDBId();
 }

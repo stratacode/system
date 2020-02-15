@@ -15,7 +15,8 @@ public class DBPropertyDescriptor {
    public String columnType;
    /** Optional table name - if not set, uses either the primary table, or another table for multi-row properties */
    public String tableName;
-   public boolean allowNull;
+   // If required, the column gets a NOT NULL constraint
+   public boolean required;
    /** For relationships, should the referenced value be fetched in-line, or should we wait till the properties of the referenced object are access to fetch them */
    public boolean onDemand;
 
@@ -44,25 +45,33 @@ public class DBPropertyDescriptor {
    /** True for properties that are read from the database, but not updated. This is set in particular for reverse properties in a relationship - only one side needs to update based on the change. */
    public boolean readOnly;
 
+   /** The type this property descriptor is part of */
    public DBTypeDescriptor dbTypeDesc;
+
+   /** Reference to the table for this property */
    public TableDescriptor tableDesc;
 
+   /** When this property references one or more other properties, this is the type descriptor for that reference */
    public DBTypeDescriptor refDBTypeDesc;
 
    private IBeanMapper propertyMapper;
 
+   /**
+    * If this property participates in a bi-directional relationship, points to the back-pointing property - i.e.
+    * refDBTypeDesc == reversePropDesc.dbTypeDesc && reversePropDesc.reversePropDesc.refDBTypeDesc == dbTypeDesc
+    */
    public DBPropertyDescriptor reversePropDesc;
 
    private boolean started = false;
 
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
-                               boolean allowNull, boolean onDemand, String dataSourceName, String fetchGroup,
+                               boolean required, boolean onDemand, String dataSourceName, String fetchGroup,
                                String refTypeName, boolean multiRow, String reverseProperty) {
       this.propertyName = propertyName;
       this.columnName = columnName;
       this.columnType = columnType;
       this.tableName = tableName;
-      this.allowNull = allowNull;
+      this.required = required;
       this.onDemand = onDemand;
       this.dataSourceName = dataSourceName;
       this.fetchGroup = fetchGroup;
@@ -203,17 +212,20 @@ public class DBPropertyDescriptor {
       return columnType;
    }
 
-   /** This is called when we determine that this property's value is derived from the table provided. If this table is
-    * already an aux or multi table, just give it the new name.  If it is a primary table for this type, need to create a new
-    * aux/multi table
+   /**
+    * This is called when we determine that this property's value is derived from the table provided. If this table is
+    * already an aux table, or one-to-many relationship, this property's table takes the name of the other table.
+    * If it is a primary table for this type, need to create a new aux/multi table
+    * If this is a many-to-many relationship, both tables get reconfigured to use the property names as the id columns
+    * although each table uses the opposite column for the id
     */
-   public void resetTable(TableDescriptor table) {
+   public void resetTable(TableDescriptor mainPropTable) {
       if (tableDesc != null) {
          if (tableDesc.primary) {
             TableDescriptor primaryTable = tableDesc;
             if (!primaryTable.columns.remove(this))
                System.err.println("*** Unable to find column to remove for resetTable");
-            tableDesc = new TableDescriptor(table.tableName);
+            tableDesc = new TableDescriptor(mainPropTable.tableName);
             tableDesc.reference = true;
             tableDesc.dbTypeDesc = dbTypeDesc;
             tableDesc.idColumns = new ArrayList<IdPropertyDescriptor>(primaryTable.idColumns);
@@ -225,8 +237,13 @@ public class DBPropertyDescriptor {
                dbTypeDesc.addAuxTable(tableDesc);
          }
          else {
-            tableDesc.tableName = table.tableName;
+            tableDesc.tableName = mainPropTable.tableName;
             tableDesc.reference = true;
+            // We are going to turn mainPropTable into a many-to-many table using mainProp's join name
+            if (tableDesc.multiRow && mainPropTable.multiRow) {
+               tableDesc.idColumns.get(0).columnName = mainPropTable.columns.get(0).columnName;
+               mainPropTable.idColumns.get(0).columnName = tableDesc.columns.get(0).columnName;
+            }
          }
       }
    }

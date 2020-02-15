@@ -4,6 +4,10 @@
       <%= formatDBTypeDescriptorDefinition() %>
    }
 
+   public static <%= typeBaseName %> findById(<%= formatIdParams(false) %>) {
+      return (<%= typeBaseName %>) sc.db.DBTypeDescriptor.getByType(<%= typeIsDynamic ? "sc.dyn.DynUtil.findType(\"" + typeName + "\")" : typeBaseName + ".class" %>).findById(<%= formatIdParams(true) %>);
+   }
+
    <%    if (dbTypeDescriptor.baseType == null) { %>
       // Stores persistent state for the instance
       protected sc.db.DBObject _dbObject = new sc.db.DBObject(this);
@@ -28,6 +32,12 @@
       }
       public String getObjectId() {
          return _dbObject.getObjectId();
+      }
+      public Object getDBId() {
+         return _dbObject.getDBId();
+      }
+      public void stop() {
+         _dbObject.stop();
       }
    <%    }
          if (dbTypeDescriptor.needsAutoId) { %>

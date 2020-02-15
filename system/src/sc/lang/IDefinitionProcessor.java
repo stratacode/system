@@ -44,4 +44,6 @@ public interface IDefinitionProcessor {
    public void setProcessorName(String name);
 
    public String getProcessorName();
+
+   public boolean getDefinesNewMembers();
 }

@@ -81,7 +81,7 @@ public class DBTypeDescriptor {
 
       if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
          needsAutoId = true;
-         primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "serial", true));
+         primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "bigserial", true));
       }
    }
 
@@ -295,8 +295,21 @@ public class DBTypeDescriptor {
       return sb.toString();
    }
 
-   public Object getInstById(Object id) {
+   public Object findById(Object... idArgs) {
+      Object id;
+      if (idArgs.length == 1)
+         id = idArgs[0];
+      else
+         id = new MultiColIdentity(idArgs);
+
       return lookupInstById(id, true, true);
+   }
+
+   private void initTypeInstances() {
+      synchronized (this) {
+         if (typeInstances == null)
+            typeInstances = new ConcurrentHashMap<Object,IDBObject>();
+      }
    }
 
    /**
@@ -310,10 +323,7 @@ public class DBTypeDescriptor {
     */
    public Object lookupInstById(Object id, boolean createProto, boolean fetchDefault) {
       if (typeInstances == null) {
-         synchronized (this) {
-            if (typeInstances == null)
-               typeInstances = new ConcurrentHashMap<Object,IDBObject>();
-         }
+         initTypeInstances();
       }
       // TODO: do we need to do dbRefresh() on the returned instance - check the status and return null if the item no longer exists?
       // check cache mode here to determine what to fetch?
@@ -326,6 +336,7 @@ public class DBTypeDescriptor {
          inst = (IDBObject) DynUtil.createInstance(typeDecl, null);
          dbObj = inst.getDBObject();
          dbObj.setPrototype(true);
+         dbObj.setDBId(id);
          typeInstances.put(id, inst);
       }
 
@@ -335,6 +346,30 @@ public class DBTypeDescriptor {
             return null;
       }
       return inst;
+   }
+
+   public IDBObject registerInstance(IDBObject inst) {
+      if (typeInstances == null) {
+         initTypeInstances();
+      }
+      Object id = inst.getDBId();
+      IDBObject res = typeInstances.get(id);
+      if (res != null)
+         return res;
+      typeInstances.put(id, inst);
+      return null;
+   }
+
+   public boolean removeInstance(DBObject dbObj) {
+      if (typeInstances == null)
+         return false;
+      Object id = dbObj.getDBId();
+      Object res = typeInstances.get(id);
+      if (res == dbObj.getInst()) {
+         typeInstances.remove(id);
+         return true;
+      }
+      return false;
    }
 
    public Object getIdColumnValue(Object inst, int ci) {

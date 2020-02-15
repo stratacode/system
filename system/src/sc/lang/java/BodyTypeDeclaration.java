@@ -8344,6 +8344,36 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (ent != null)  // Some TemplateDeclaration types don't represent real types and don't have index entries
             layer.updateTypeIndex(ent, getJavaModel().lastModifiedTime);
       }
+
+      initStaticMixinTemplates();
+   }
+
+   private void initStaticMixinTemplates() {
+      JavaModel model = getJavaModel();
+      if (replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
+         ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors();
+         if (defProcs != null) {
+            for (IDefinitionProcessor defProc : defProcs) {
+               // If we are a dynamic type, we need to add any definition processor code that needs to be run for this type.
+               // This may work in "start" if we need it earlier but replacedByType is not consistently set until the validate stage.
+               if (isDynamicType() || defProc.getDefinesNewMembers()) {
+                  String procStaticMixin = defProc.getStaticMixinTemplate();
+                  if (procStaticMixin != null) {
+                     TransformUtil.applyTemplateToType((TypeDeclaration) this, procStaticMixin, "staticMixinTemplate", false);
+                  }
+                  String procPostAssign = defProc.getPostAssignment();
+                  // TODO: the sync annotation processor doesn't work with constructor args when applied as an instance body.
+                  // One fix: add a hiddenBody to ConstructorDefinition similar to hiddenBody in the type.  Make sure isSemanticChildValue is implemented.
+                  // loop over the constructors (or just add to the type body if there is no constructor).  For each constructor, append the types but after setting
+                  // params.constructor and the args.  For now, dynamic types implement the sync constructor using special code in createInstance.
+                  if (procPostAssign != null && !(defProc instanceof SyncAnnotationProcessor)) {
+                     TransformUtil.applyTemplateStringToType((TypeDeclaration) this, procPostAssign, "postAssign", true);
+                  }
+               }
+            }
+         }
+      }
+
    }
 
    public void validate() {
@@ -8395,27 +8425,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // is best run top-down so we pick up all parent modify types to figure out which types are excluded before we do the 'automatic' sync mode.
       super.validate();
 
-      // If we are a dynamic type, we need to add any definition processor code that needs to be run for this type.  This may work in "start" if we need it earlier but replacedByType is not consistntly set by then.
-      JavaModel model = getJavaModel();
-      if (isDynamicType() && replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
-         ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors();
-         if (defProcs != null) {
-            for (IDefinitionProcessor defProc : defProcs) {
-               String procStaticMixin = defProc.getStaticMixinTemplate();
-               if (procStaticMixin != null) {
-                  TransformUtil.applyTemplateToType((TypeDeclaration) this, procStaticMixin, "staticMixinTemplate", false);
-               }
-               String procPostAssign = defProc.getPostAssignment();
-               // TODO: the sync annotation processor doesn't work with constructor args when applied as an instance body.
-               // One fix: add a hiddenBody to ConstructorDefinition similar to hiddenBody in the type.  Make sure isSemanticChildValue is implemented.
-               // loop over the constructors (or just add to the type body if there is no constructor).  For each constructor, append the types but after setting
-               // params.constructor and the args.  For now, dynamic types implement the sync constructor using special code in createInstance.
-               if (procPostAssign != null && !(defProc instanceof SyncAnnotationProcessor)) {
-                  TransformUtil.applyTemplateStringToType((TypeDeclaration) this, procPostAssign, "postAssign", true);
-               }
-            }
-         }
-      }
+      //initStaticMixinTemplates();
 
       // Need to do this so that we detect duplicate method errors
       if (methodsByName == null)

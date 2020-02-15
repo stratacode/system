@@ -177,11 +177,27 @@ public class DBUtil {
          return null;
    }
 
-   public static String getKeyIdColumnType(String type) {
-      if (type.equals("serial"))
-         return "integer";
-      else if (type.equals("bigserial"))
+   public static String getJavaTypeFromSQLType(String type) {
+      if (type.equalsIgnoreCase("serial") || type.equalsIgnoreCase("integer"))
+         return "int";
+      else if (type.equalsIgnoreCase("bigserial") || type.equalsIgnoreCase("bigint"))
          return "long";
+      else if (type.startsWith("varchar") || type.equals("text"))
+         return "String";
+      else if (type.equals("boolean"))
+         return "boolean";
+      else if (type.equals("real"))
+         return "float";
+      else if (type.equals("double"))
+         return "double";
+      throw new UnsupportedOperationException();
+   }
+
+   public static String getKeyIdColumnType(String type) {
+      if (type.equalsIgnoreCase("serial"))
+         return "integer";
+      else if (type.equalsIgnoreCase("bigserial"))
+         return "bigint";
       return type;
    }
 

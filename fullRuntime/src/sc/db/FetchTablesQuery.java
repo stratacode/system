@@ -86,6 +86,11 @@ public class FetchTablesQuery {
 
          StringBuilder logSB = logStr != null ? new StringBuilder(logStr) : null;
 
+         if (logSB != null)
+            logSB.append(" -> ");
+
+         transaction.applyingDBChanges = true;
+
          boolean res;
          if (!multiRow)
             res = processOneRowQueryResults(dbObj, inst, rs, logSB);
@@ -100,6 +105,7 @@ public class FetchTablesQuery {
          throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
       }
       finally {
+         transaction.applyingDBChanges = false;
          if (rs != null)
             DBUtil.close(rs);
       }
@@ -166,13 +172,13 @@ public class FetchTablesQuery {
     * The second and subsequent fetch tables are only there for onDemand=false references in the referenced object
     */
    boolean processMultiResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
-      List<Object> resList = null;
+      DBList<IDBObject> resList = null;
       DBPropertyDescriptor listProp = null;
       int rowCt = 0;
 
       while (rs.next()) {
          int rix = 1;
-         Object currentRowVal = null;
+         IDBObject currentRowVal = null;
 
          if (rowCt > 0) {
             logSB.append(",\n   ");
@@ -209,19 +215,19 @@ public class FetchTablesQuery {
                   }
                }
                if (fi == 0) {
-                  currentRowVal = val;
+                  currentRowVal = (IDBObject) val;
                   if (resList == null) {
                      resList = new DBList(10, dbObj, propDesc);
                      listProp = propDesc; // the first time through, the main property for this list
                   }
                   resList.add(currentRowVal);
-                  rowCt++;
                   if (logSB != null) {
                      logSB.append("[");
-                     logSB.append(currentRowVal);
+                     logSB.append(rowCt);
                      logSB.append("]: ");
                      logSB.append(currentRowVal);
                   }
+                  rowCt++;
                }
                else {
                   if (currentRowVal == null)
@@ -242,6 +248,7 @@ public class FetchTablesQuery {
          // TODO: handle arrays, incremental update of existing destination list for incremental 'refresh' when the list is
          //  bound to a UI, handle other concrete classes for the list type and IBeanIndexMapper.
          listProp.getPropertyMapper().setPropertyValue(inst, resList);
+         resList.trackingChanges = true;
       }
       return true;
    }

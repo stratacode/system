@@ -3,6 +3,12 @@ package sc.db;
 public class MultiColIdentity {
    int sz;
    Object[] vals;
+
+   public MultiColIdentity(Object[] vals) {
+      this.sz = vals.length;
+      this.vals = vals;
+   }
+
    public MultiColIdentity(int sz) {
       this.sz = sz;
       this.vals = new Object[sz];

@@ -48,7 +48,7 @@ public abstract class TxOperation {
       ArrayList<IdPropertyDescriptor> dbIdCols = null;
 
       List<String> nullProps = null;
-      Object inst = dbObject.getInst();
+      IDBObject inst = dbObject.getInst();
       for (int i = 0; i < idCols.size(); i++) {
          IdPropertyDescriptor idCol = idCols.get(i);
          if (isPrimary && idCol.definedByDB) {
@@ -172,6 +172,7 @@ public abstract class TxOperation {
          }
 
          if (isPrimary) {
+            dbTypeDesc.registerInstance(inst);
             dbObject.setTransient(false);
             // Mark all of the property queries in this type as fetched so we don't re-query them until the cache is invalidated
             int numFetchQueries = dbTypeDesc.getNumFetchPropQueries();
@@ -186,7 +187,15 @@ public abstract class TxOperation {
       return 1;
    }
 
-   protected int doMultiInsert(TableDescriptor insertTable) {
+   protected int doMultiDelete(TableDescriptor delTable, List<IDBObject> toRemove, boolean removeCurrent) {
+      if (delTable.isReadOnly())
+         return 0;
+      System.err.println("*** doMultiDelete not yet implemented");
+      return 0;
+   }
+
+   /** Called with null to insert the current property value, or a list of values to insert */
+   protected int doMultiInsert(TableDescriptor insertTable, List<IDBObject> propList, boolean useCurrent) {
       if (insertTable.isReadOnly())
          return 0;
 
@@ -198,7 +207,10 @@ public abstract class TxOperation {
 
       Object parentInst = dbObject.getInst();
 
-      List<IDBObject> propList = (List<IDBObject>) insertTable.columns.get(0).getPropertyMapper().getPropertyValue(parentInst, false, false);
+      DBPropertyDescriptor multiValueProp = insertTable.columns.get(0);
+      IBeanMapper multiValueMapper = multiValueProp.getPropertyMapper();
+      if (useCurrent)
+         propList = (List<IDBObject>) multiValueMapper.getPropertyValue(parentInst, false, false);
       int numInsts;
       if (propList == null || (numInsts = propList.size()) == 0)
          return 0;
@@ -287,6 +299,18 @@ public abstract class TxOperation {
          }
          append(sb, logSB, ")");
          toInsert++;
+      }
+
+      if (useCurrent && !(propList instanceof DBList)) {
+         DBList dbList = new DBList(propList, dbObject, multiValueProp);
+         transaction.applyingDBChanges = true;
+         try {
+            multiValueMapper.setPropertyValue(parentInst, dbList);
+            dbList.trackingChanges = true;
+         }
+         finally {
+            transaction.applyingDBChanges = false;
+         }
       }
 
       if (toInsert == 0)
@@ -407,10 +431,14 @@ public abstract class TxOperation {
                   if (ref == null)
                      continue;
                   DBObject refObj = ref.getDBObject();
-                  if (refObj.isTransient() && !refObj.isPendingInsert()) {
-                     if (DBUtil.verbose)
-                        DBUtil.verbose(" Inserting reference: " + ref.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper + "[]");
-                     ref.dbInsert();
+                  if (!refObj.isPendingInsert()) {
+                     if (refObj.isTransient()) {
+                        if (DBUtil.verbose)
+                           DBUtil.verbose(" Inserting reference: " + ref.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper + "[]");
+                        ref.dbInsert();
+                     }
+                     else
+                        refObj.dbUpdate();
                   }
                }
             }

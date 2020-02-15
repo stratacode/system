@@ -42,6 +42,7 @@ public class DBObject implements IDBObject {
    public static final int REMOVED = 2;
    public static final int PROTOTYPE = 4; // set when the instance is in 'prototype' mode - set id properties, or other properties and do 'dbRefresh()'
    public static final int PENDING_INSERT = 8;
+   public static final int STOPPED = 16;
 
    private int flags = TRANSIENT;
 
@@ -49,7 +50,7 @@ public class DBObject implements IDBObject {
     * The object used for storing properties for this DBObject. When null, this instance is used for properties.
     * When not null, this instance is stored as the _dbObject field in a "wrapper" instance where this is our pointer back.
     */
-   Object wrapper;
+   IDBObject wrapper;
 
    // Keep track of all of the transactions operation on this instance at one time - synchronized on this instance to access or update
    public final List<TxOperation> pendingOps = new ArrayList<TxOperation>();
@@ -66,7 +67,7 @@ public class DBObject implements IDBObject {
    }
 
    // Used in generated code with a new field 'DBObject _dbObject = new DBObject(this)' along with IDBObject wrapper methods
-   public DBObject(Object wrapper) {
+   public DBObject(IDBObject wrapper) {
       this.wrapper = wrapper;
       this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(getInst()));
    }
@@ -77,7 +78,7 @@ public class DBObject implements IDBObject {
    }
 
    /** Returns the persistent instance with the getX/setX methods */
-   public Object getInst() {
+   public IDBObject getInst() {
       return wrapper == null ? this : wrapper;
    }
 
@@ -98,6 +99,9 @@ public class DBObject implements IDBObject {
          }
          return propUpd;
       }
+      else if (op instanceof TxListUpdate) {
+         return ((TxListUpdate) op).getPropUpdate();
+      }
       else if (op instanceof TxInsert)
          return null; // The insert will insert the instance when the transaction is committed, so don't override the property value
       else if (op instanceof TxDelete)
@@ -107,8 +111,8 @@ public class DBObject implements IDBObject {
       return null;
    }
 
-   <E> TxListUpdate<E> getListUpdate(DBList<E> list, boolean create, boolean emptyList) {
-      if ((flags & (TRANSIENT | REMOVED)) != 0)
+   <E extends IDBObject> TxListUpdate<E> getListUpdate(DBList<E> list, boolean create, boolean emptyList) {
+      if (!list.trackingChanges || (flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return null;
       DBTransaction cur = create ? DBTransaction.getOrCreate() : DBTransaction.getCurrent();
       if (cur == null)
@@ -119,13 +123,14 @@ public class DBObject implements IDBObject {
             TxOperation c = pendingOps.get(i);
             if (c.transaction == cur && c instanceof TxListUpdate) {
                TxListUpdate<E> listUpdate = (TxListUpdate<E>) c;
-               if (listUpdate.listProp == list.listProp)
+               if (listUpdate.oldList.listProp == list.listProp)
                   return listUpdate;
             }
          }
 
          if (create) {
             TxListUpdate<E> listUpdate = new TxListUpdate<E>(cur, this, list, emptyList);
+            cur.addOp(listUpdate);
             pendingOps.add(listUpdate);
             return listUpdate;
          }
@@ -179,7 +184,7 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.dbFetch(property);
 
-      if ((flags & (TRANSIENT | REMOVED)) != 0)
+      if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return null;
 
       DBTransaction curTransaction = DBTransaction.getOrCreate();
@@ -187,6 +192,9 @@ public class DBObject implements IDBObject {
       PropUpdate pu = getPendingUpdate(curTransaction, property, false);
       if (pu != null)
          return pu;
+
+      if (curTransaction.applyingDBChanges)
+         return null;
 
       DBFetchGroupQuery fetchQuery = dbTypeDesc.getFetchQueryForProperty(property);
       if (fetchQuery == null)
@@ -206,7 +214,7 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.dbFetchDefault();
 
-      if ((flags & (TRANSIENT | REMOVED)) != 0)
+      if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return false;
 
       DBFetchGroupQuery fetchQuery = dbTypeDesc.getDefaultFetchQuery();
@@ -231,11 +239,12 @@ public class DBObject implements IDBObject {
       int errorCount = 0;
       boolean res = false;
       synchronized(this) {
-         if (fstate == 0) {
+         long state = fstate >> shift;
+         if (state == 0) {
             fstate = fstate | (PENDING << shift);
             doFetch = true;
          }
-         else if (fstate == PENDING) {
+         else if (state == PENDING) {
             try {
                wait();
             }
@@ -280,17 +289,29 @@ public class DBObject implements IDBObject {
       return res;
    }
 
-   /** Called to update the saved representation of the instance */
+   /**
+    * Called to update the saved representation of the instance. Returns null to allow the assignment
+    * in the field. If it returns non-null, the setX method will just return.
+    */
    public PropUpdate dbSetProp(String propertyName, Object propertyValue)  {
       if (replacedBy != null)
          return replacedBy.dbSetProp(propertyName, propertyValue);
 
-      if ((flags & (TRANSIENT | REMOVED)) != 0)
+      if ((flags & (TRANSIENT | REMOVED | STOPPED | PROTOTYPE)) != 0)
          return null;
       DBTransaction curr = DBTransaction.getOrCreate();
       // When we are applying this transaction, we need to return null here to allow the setX call to update the cached value
-      if (curr.commitInProgress)
+      if (curr.commitInProgress || curr.applyingDBChanges)
          return null;
+      DBFetchGroupQuery fetchQuery = dbTypeDesc.getFetchQueryForProperty(propertyName);
+      if (fetchQuery == null)
+         throw new IllegalArgumentException("Missing propQueries entry for property: " + propertyName);
+      int lockCt = fetchQuery.queryNumber;
+
+      // Setting a property that has not been fetched from the DB - possibly being fetched from a query
+      if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
+         return null;
+
       PropUpdate pu = getPendingUpdate(curr, propertyName, true);
       if (pu == null)
          return null;
@@ -306,6 +327,8 @@ public class DBObject implements IDBObject {
 
       if ((flags & REMOVED) != 0)
          throw new IllegalArgumentException("Attempting to insert removed instance");
+      if ((flags & STOPPED) != 0)
+         throw new IllegalArgumentException("Attempting to insert stopped instance");
       if ((flags & TRANSIENT) == 0) // TODO: Is this right?
          throw new IllegalArgumentException("Attempting to insert non-transient instance");
       if ((flags & PENDING_INSERT) != 0)
@@ -323,7 +346,7 @@ public class DBObject implements IDBObject {
 
    public int dbUpdate() {
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, false, true, false, true);
+      TxOperation op = getPendingOperation(curr, false, false, false, true);
       if (op != null)
          return op.apply();
       return 0;
@@ -335,6 +358,8 @@ public class DBObject implements IDBObject {
          return;
       }
 
+      if ((flags & STOPPED) != 0)
+         throw new IllegalArgumentException("Attempting to remove stopped instance");
       if ((flags & REMOVED) != 0)
          throw new IllegalArgumentException("Attempting to remove already removed instance");
       if ((flags & TRANSIENT) != 0)  // TODO: maybe this should be ok?
@@ -349,6 +374,8 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.dbRefresh();
 
+      if ((flags & STOPPED) != 0)
+         throw new IllegalArgumentException("dbRefresh called on stopped instance");
       if ((flags & TRANSIENT) != 0)
          throw new IllegalArgumentException("dbRefresh called on transient instance");
       if ((flags & REMOVED) != 0)
@@ -386,7 +413,7 @@ public class DBObject implements IDBObject {
 
    public void setTransient(boolean val) {
       if (val)
-         flags |= TRANSIENT;
+         flags = TRANSIENT;
       else
          flags &= ~TRANSIENT;
    }
@@ -396,8 +423,9 @@ public class DBObject implements IDBObject {
    }
 
    public void setPrototype(boolean val) {
-      if (val)
-         flags |= PROTOTYPE;
+      if (val) {
+         flags = PROTOTYPE;
+      }
       else
          flags &= ~PROTOTYPE;
    }
@@ -456,5 +484,46 @@ public class DBObject implements IDBObject {
 
    public DBObject getDBObject() {
       return this;
+   }
+
+   public Object getDBId() {
+      List<IdPropertyDescriptor> idProps = dbTypeDesc.primaryTable.idColumns;
+      int num = idProps.size();
+      if (num == 1) {
+         IdPropertyDescriptor idProp = idProps.get(0);
+         return idProp.getPropertyMapper().getPropertyValue(getInst(), false, false);
+      }
+      else {
+         MultiColIdentity res = new MultiColIdentity(num);
+         for (int i = 0; i < num; i++) {
+            IdPropertyDescriptor idProp = idProps.get(i);
+            res.setVal(idProp.getPropertyMapper().getPropertyValue(getInst(), false, false), i);
+         }
+         return res;
+      }
+   }
+
+   public void setDBId(Object dbId) {
+      List<IdPropertyDescriptor> idProps = dbTypeDesc.primaryTable.idColumns;
+      int num = idProps.size();
+      if (num == 1) {
+         IdPropertyDescriptor idProp = idProps.get(0);
+         idProp.getPropertyMapper().setPropertyValue(getInst(), dbId);
+      }
+      else {
+         MultiColIdentity id = (MultiColIdentity) dbId;
+         for (int i = 0; i < num; i++) {
+            IdPropertyDescriptor idProp = idProps.get(i);
+            idProp.getPropertyMapper().setPropertyValue(getInst(), id.vals[i]);
+         }
+      }
+
+   }
+
+   public void stop() {
+      if (isTransient())
+         return;
+      if (!dbTypeDesc.removeInstance(this))
+         DBUtil.error("Stopping instance not found in index!");
    }
 }

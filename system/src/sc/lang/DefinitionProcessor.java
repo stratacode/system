@@ -73,6 +73,8 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    /** Set to a template string evaluated using the object definition parameters placed after the instance has been created but before any post-constructor assignments have been run (i.e. before preInit for components, right after new X for classes) */
    public String preAssignment;
 
+   public boolean definesNewMembers = false;
+
    /** Corresponds to the string version - the template actually used */
    // TODO: cache this here and also allow it to be set as a template for when the string form is awkward?
    //public Template preAssignmentTemplate;
@@ -287,4 +289,7 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       return needsField;
    }
 
+   public boolean getDefinesNewMembers() {
+      return definesNewMembers;
+   }
 }

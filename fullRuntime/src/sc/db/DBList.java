@@ -1,27 +1,33 @@
 package sc.db;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  This acts like a java.util.ArrayList but is usable with data binding and persistence
  It does a 'copy on write' to manage a separate per-transaction view of each list that's being
  modified, and allows the underlying list to be updated when the transaction is committed.
- <p>
- Because it is synchronizable as a property and sends change events to propagate it's value, sync of
- the fields of this instance is turned off.
 
  TODO: need to add more ArrayList methods to reflect the current transaction state to support them with lists that have been
  modified by not yet committed.
  */
 @sc.obj.Sync(syncMode=sc.obj.SyncMode.Disabled)
-public class DBList<E> extends java.util.ArrayList<E> implements sc.bind.IChangeable {
+public class DBList<E extends IDBObject> extends java.util.ArrayList<E> implements sc.bind.IChangeable {
    DBObject dbObject;
    DBPropertyDescriptor listProp;
+   boolean trackingChanges = false;
 
    public DBList(int initialCapacity, DBObject dbObject, DBPropertyDescriptor listProp) {
       super(initialCapacity);
       this.dbObject = dbObject;
       this.listProp = listProp;
+   }
+
+   public DBList(List<E> value, DBObject dbObject, DBPropertyDescriptor listProp) {
+      super(value.size());
+      this.dbObject = dbObject;
+      this.listProp = listProp;
+      addAll(value);
    }
 
    public boolean add(E value) {
@@ -178,6 +184,13 @@ public class DBList<E> extends java.util.ArrayList<E> implements sc.bind.IChange
       if (listUpdate != null)
          return listUpdate.newList.lastIndexOf(o);
       return super.lastIndexOf(o);
+   }
+
+   public void updateToList(List<E> newList) {
+      // TODO: any reason to make this faster or more incremental?
+      super.clear();
+      super.addAll(newList);
+      sc.bind.Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, null);
    }
 
    // TODO: add subList, iterator, sort, and more - at least the methods that make sense on a modified list

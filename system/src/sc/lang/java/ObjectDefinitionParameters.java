@@ -438,6 +438,31 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return sb.toString();
    }
 
+   public String formatIdParams(boolean argMode) {
+      if (dbTypeDescriptor == null)
+         return "";
+      StringBuilder sb = new StringBuilder();
+
+      List<IdPropertyDescriptor> idCols = dbTypeDescriptor.primaryTable.idColumns;
+      for (int i = 0; i < idCols.size(); i++) {
+         if (i != 0)
+            sb.append(", ");
+         IdPropertyDescriptor idCol = idCols.get(i);
+         if (!argMode) {
+            // The property may be inserted and so has no mapper yet - use the SQL type to get the Java type
+            if (idCol.getPropertyMapper() == null) {
+               String javaType = DBUtil.getJavaTypeFromSQLType(idCol.columnType);
+               sb.append(javaType);
+            }
+            else
+               sb.append(ModelUtil.getTypeName(idCol.getPropertyMapper().getPropertyType()));
+            sb.append(" ");
+         }
+         sb.append(idCol.propertyName);
+      }
+      return sb.toString();
+   }
+
    public String formatDBTypeDescriptorDefinition() {
       if (dbTypeDescriptor == null)
          return "";
@@ -559,7 +584,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (!isIdProperty) {
          appendString(sb, propDesc.tableName, true);
          sb.append(", ");
-         sb.append(propDesc.allowNull);
+         sb.append(propDesc.required);
          sb.append(", ");
          sb.append(propDesc.onDemand);
          appendString(sb, propDesc.dataSourceName, true);

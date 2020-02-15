@@ -1316,8 +1316,8 @@ public class DynUtil {
          dynamicSystem.dispose(obj);
       else {
          // Even if it's dynamic we need to do super.stop() so call these first
-         if (obj instanceof IComponent)
-            ((IComponent) obj).stop();
+         if (obj instanceof IStoppable)
+            ((IStoppable) obj).stop();
          if (obj instanceof IAltComponent)
             ((IAltComponent) obj)._stop();
       }
