@@ -35,7 +35,9 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    /** Specifies the type name for a template file to use for class components */
    String newTemplate() default "";         
    /** A template merged into any subclass of this class, useful for collecting children */
-   String mixinTemplate() default "";       
+   String mixinTemplate() default "";
+   /** A template merged into any subclass of this class that includes code that changes the contract for the type - i.e. is applied during start. */
+   String defineTypesMixinTemplate() default "";
    /** A template merged into any subclass of this class that includes static code.  This code gets put into a static section of the outer-most class because inner classes cannot have static code sections. */
    String staticMixinTemplate() default ""; 
    /** A template used to define the default output method's definition for a type defined in the TemplateLanguage */

@@ -388,6 +388,7 @@ public class ClassDeclaration extends TypeDeclaration {
       Template customTemplate = null;
       List<Template> mixinTemplates = null;
       List<Template> staticMixinTemplates = null;
+      List<Template> defineTypesMixinTemplates = null;
 
       boolean isObject = getDeclarationType() == DeclarationType.OBJECT;
       String childTypeName = null;
@@ -441,6 +442,12 @@ public class ClassDeclaration extends TypeDeclaration {
             mixinTemplates.add(mixinTemplate);
          }
 
+         Template defineTypesMixinTemplate = findTemplate(compilerSettingsList, "defineTypesMixinTemplate", ObjectDefinitionParameters.class);
+         if (defineTypesMixinTemplate != null) {
+            staticMixinTemplates = new ArrayList<Template>();
+            staticMixinTemplates.add(defineTypesMixinTemplate);
+         }
+
          Template staticMixinTemplate = findTemplate(compilerSettingsList, "staticMixinTemplate", ObjectDefinitionParameters.class);
          if (staticMixinTemplate != null) {
             staticMixinTemplates = new ArrayList<Template>();
@@ -466,7 +473,7 @@ public class ClassDeclaration extends TypeDeclaration {
       }
 
       // Need to do this before we retrieve CompilerSettings so we can inherit settings via the interface we add below.
-      ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors();
+      ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors(false);
 
       String customResolver = null;
       String customSetter = null;
@@ -529,6 +536,13 @@ public class ClassDeclaration extends TypeDeclaration {
                mixinTemplates.add(findTemplatePath(procMixin, "mixinTemplate", ObjectDefinitionParameters.class));
             }
 
+            String defineTypesMixin = proc.getDefineTypesMixinTemplate();
+            if (defineTypesMixin != null) {
+               if (defineTypesMixinTemplates == null)
+                  defineTypesMixinTemplates = new ArrayList<Template>();
+               defineTypesMixinTemplates.add(findTemplatePath(defineTypesMixin, "defineTypesMixinTemplate", ObjectDefinitionParameters.class));
+            }
+
             String procStaticMixin = proc.getStaticMixinTemplate();
             if (procStaticMixin != null) {
                if (staticMixinTemplates == null)
@@ -574,7 +588,8 @@ public class ClassDeclaration extends TypeDeclaration {
       }
 
       boolean inHiddenBody = false;
-      if (((isObject || isComponent || hasSubobjects) && !hasModifier("abstract")) || customTemplate != null || mixinTemplates != null || staticMixinTemplates != null) {
+      if (((isObject || isComponent || hasSubobjects) && !hasModifier("abstract")) || customTemplate != null ||
+            mixinTemplates != null || staticMixinTemplates != null || defineTypesMixinTemplates != null) {
          TypeDeclaration outer = getEnclosingType();
          inHiddenBody = (outer != null && outer.hiddenBody != null && outer.hiddenBody.contains(this));
 
@@ -794,7 +809,7 @@ public class ClassDeclaration extends TypeDeclaration {
 
          // This template gives types the ability to override a method in each definition to collection the
          // children.
-         if (mixinTemplates != null || staticMixinTemplates != null) {
+         if (mixinTemplates != null || staticMixinTemplates != null || defineTypesMixinTemplates != null) {
             StringBuilder locChildNames = new StringBuilder();
             Map<String,StringBuilder> locChildNamesByScope = new HashMap<String,StringBuilder>();
             Set<String> locObjNames = new LinkedHashSet<String>();
@@ -810,6 +825,11 @@ public class ClassDeclaration extends TypeDeclaration {
             if (mixinTemplates != null) {
                for (Template mixinTemplate:mixinTemplates) {
                   TransformUtil.addObjectDefinition(this, this, params, assignments, mixinTemplate, false, isComponent, inHiddenBody, false);
+               }
+            }
+            if (defineTypesMixinTemplates != null) {
+               for (Template defineTypesMixinTemplate:defineTypesMixinTemplates) {
+                  TransformUtil.addObjectDefinition(this, this, params, assignments, defineTypesMixinTemplate, false, isComponent, inHiddenBody, false);
                }
             }
             if (staticMixinTemplates != null) {

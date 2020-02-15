@@ -6386,7 +6386,26 @@ public class ModelUtil {
       if (typeObj instanceof ParamTypeDeclaration)
          typeObj = ((ParamTypeDeclaration) typeObj).getBaseType();
       if (typeObj instanceof Class) {
-         return RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
+         Object[] res = RTypeUtil.getDeclaredProperties((Class) typeObj, modifier);
+         if (editorProperties) {
+            ArrayList<Object> newRes = null;
+            for (int i = 0; i < res.length; i++) {
+               Object prop = res[i];
+               Boolean vis = (Boolean) ModelUtil.getPropertyAnnotationValue(prop, "sc.obj.EditorSettings", "visible");
+               if (vis != null && !vis) {
+                  if (newRes == null) {
+                     newRes = new ArrayList<Object>();
+                     for (int j = 0; j < i; j++)
+                        newRes.add(res[j]);
+                  }
+               }
+               else if (newRes != null)
+                  newRes.add(prop);
+            }
+            if (newRes != null)
+               return newRes.toArray();
+         }
+         return res;
       }
       else if (typeObj instanceof BodyTypeDeclaration) {
          List<Object> props = ((BodyTypeDeclaration) typeObj).getDeclaredProperties(modifier, includeAssigns, includeModified, editorProperties);

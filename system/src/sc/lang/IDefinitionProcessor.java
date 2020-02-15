@@ -38,6 +38,8 @@ public interface IDefinitionProcessor {
 
    public String getStaticMixinTemplate();
 
+   public String getDefineTypesMixinTemplate();
+
    /** Returns a value of false for definitions which override the requirement of a field for an object definition. */
    public boolean getNeedsField();
 

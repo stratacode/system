@@ -1222,7 +1222,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return sys.getInheritedDefinitionProcessors(this);
    }
 
-   ArrayList<IDefinitionProcessor> getAllDefinitionProcessors() {
+   ArrayList<IDefinitionProcessor> getAllDefinitionProcessors(boolean doDefineTypes) {
       ArrayList<IDefinitionProcessor> res;
 
       res = getInheritedDefinitionProcessors();
@@ -1257,7 +1257,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             res.add(scopeProc);
          }
       }
-      if (!hasSync && isDefaultSync()) {
+      // TODO: The isDefaultSync call here will call initSyncProperties. But that needs the merged view of the type which is
+      // not available until 'validate'.  Right now, the sync template does not use the definesTypeMixin so no need to make the call on this pass.
+      if (!hasSync && !doDefineTypes && isDefaultSync()) {
          if (res == null)
             res = new ArrayList<IDefinitionProcessor>();
 
@@ -8345,29 +8347,31 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             layer.updateTypeIndex(ent, getJavaModel().lastModifiedTime);
       }
 
-      initStaticMixinTemplates();
+      initMixinTemplates(true);
    }
 
-   private void initStaticMixinTemplates() {
+   private void initMixinTemplates(boolean doDefineTypes) {
       JavaModel model = getJavaModel();
       if (replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
-         ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors();
+         ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors(doDefineTypes);
          if (defProcs != null) {
             for (IDefinitionProcessor defProc : defProcs) {
                // If we are a dynamic type, we need to add any definition processor code that needs to be run for this type.
                // This may work in "start" if we need it earlier but replacedByType is not consistently set until the validate stage.
-               if (isDynamicType() || defProc.getDefinesNewMembers()) {
-                  String procStaticMixin = defProc.getStaticMixinTemplate();
-                  if (procStaticMixin != null) {
-                     TransformUtil.applyTemplateToType((TypeDeclaration) this, procStaticMixin, "staticMixinTemplate", false);
+               if (isDynamicType() || doDefineTypes) {
+                  String procMixin = doDefineTypes ? defProc.getDefineTypesMixinTemplate() : defProc.getStaticMixinTemplate();
+                  if (procMixin != null) {
+                     TransformUtil.applyTemplateToType((TypeDeclaration) this, procMixin, doDefineTypes ? "defineTypesTemplate" : "staticMixinTemplate", false);
                   }
-                  String procPostAssign = defProc.getPostAssignment();
-                  // TODO: the sync annotation processor doesn't work with constructor args when applied as an instance body.
-                  // One fix: add a hiddenBody to ConstructorDefinition similar to hiddenBody in the type.  Make sure isSemanticChildValue is implemented.
-                  // loop over the constructors (or just add to the type body if there is no constructor).  For each constructor, append the types but after setting
-                  // params.constructor and the args.  For now, dynamic types implement the sync constructor using special code in createInstance.
-                  if (procPostAssign != null && !(defProc instanceof SyncAnnotationProcessor)) {
-                     TransformUtil.applyTemplateStringToType((TypeDeclaration) this, procPostAssign, "postAssign", true);
+                  if (!doDefineTypes) {
+                     String procPostAssign = defProc.getPostAssignment();
+                     // TODO: the sync annotation processor doesn't work with constructor args when applied as an instance body.
+                     // One fix: add a hiddenBody to ConstructorDefinition similar to hiddenBody in the type.  Make sure isSemanticChildValue is implemented.
+                     // loop over the constructors (or just add to the type body if there is no constructor).  For each constructor, append the types but after setting
+                     // params.constructor and the args.  For now, dynamic types implement the sync constructor using special code in createInstance.
+                     if (procPostAssign != null && !(defProc instanceof SyncAnnotationProcessor)) {
+                        TransformUtil.applyTemplateStringToType((TypeDeclaration) this, procPostAssign, "postAssign", true);
+                     }
                   }
                }
             }
@@ -8425,7 +8429,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // is best run top-down so we pick up all parent modify types to figure out which types are excluded before we do the 'automatic' sync mode.
       super.validate();
 
-      //initStaticMixinTemplates();
+      initMixinTemplates(false);
 
       // Need to do this so that we detect duplicate method errors
       if (methodsByName == null)

@@ -91,8 +91,11 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    /** Equivalent to CompilerSettings.mixinTemplate but set via an annotation */
    public String mixinTemplate;
 
-   /** Equivalent to CompilerSettings.staticMinTemplate but set via an annotation */
+   /** Equivalent to CompilerSettings.staticMixinTemplate but set via an annotation */
    public String staticMixinTemplate;
+
+   /** Equivalent to CompilerSettings.defineTypesMixinTemplate but set via an annotation */
+   public String defineTypesMixinTemplate;
 
    /** For JS transformation, any types that are injected through code generation we need for dependency purposes before the transformation step in which we discover these in the template */
    public Set<Object> dependentTypes;
@@ -283,6 +286,10 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
 
    public String getStaticMixinTemplate() {
       return staticMixinTemplate;
+   }
+
+   public String getDefineTypesMixinTemplate() {
+      return defineTypesMixinTemplate;
    }
 
    public boolean getNeedsField() {

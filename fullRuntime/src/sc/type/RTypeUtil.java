@@ -1363,8 +1363,9 @@ public class RTypeUtil {
       IBeanMapper[] allProps = TypeUtil.getProperties(typeObj, modifier);
       for (int i = 0; i < allProps.length; i++) {
          Object prop = allProps[i];
-         if (prop != null && getEnclosingType(prop) == typeObj)
+         if (prop != null && getEnclosingType(prop) == typeObj) {
             declProps.add(prop);
+         }
       }
       return declProps.toArray();
    }
