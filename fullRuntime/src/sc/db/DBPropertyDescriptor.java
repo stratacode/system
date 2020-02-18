@@ -3,7 +3,11 @@ package sc.db;
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Represents the metadata used for storing a property of a DBObject. It lives in a TableDescriptor and as part of a DBTypeDescriptor that corresponds to
@@ -92,7 +96,7 @@ public class DBPropertyDescriptor {
          if (refType == null)
             System.out.println("*** Ref type: " + refTypeName + " not found for property: " + propertyName);
          else {
-            this.refDBTypeDesc = DBTypeDescriptor.getByType(refType);
+            this.refDBTypeDesc = DBTypeDescriptor.getByType(refType, false);
             if (this.refDBTypeDesc == null)
                System.out.println("*** Ref type: " + refTypeName + ": no DBTypeDescriptor for property: " + propertyName);
             else
@@ -228,7 +232,14 @@ public class DBPropertyDescriptor {
             tableDesc = new TableDescriptor(mainPropTable.tableName);
             tableDesc.reference = true;
             tableDesc.dbTypeDesc = dbTypeDesc;
-            tableDesc.idColumns = new ArrayList<IdPropertyDescriptor>(primaryTable.idColumns);
+            if (!columnType.equals(reversePropDesc.columnType))
+               System.err.println("*** Relationships and reverse don't have matching columnTypes");
+
+            // The id property in this side's table is the value column in the reverse table
+            IdPropertyDescriptor thisIdProp = new IdPropertyDescriptor(primaryTable.idColumns.get(0).propertyName, reversePropDesc.columnName, columnType, false);
+            // The value column for this property is the reverse table's id column - TODO: deal with multi column primary keys by overriding this in MultiColPropertyDescriptor
+            columnName = mainPropTable.idColumns.get(0).columnName;
+            tableDesc.idColumns = Collections.singletonList(thisIdProp);
             tableDesc.columns = new ArrayList<DBPropertyDescriptor>();
             tableDesc.columns.add(this);
             if (multiRow)
@@ -248,4 +259,38 @@ public class DBPropertyDescriptor {
       }
    }
 
+   public Object getValueFromResultSet(ResultSet rs, int rix) throws SQLException {
+      Object val;
+      int numCols = getNumColumns();
+      if (numCols == 1)  {
+         val = DBUtil.getResultSetByIndex(rs, rix++, this);
+         if (refDBTypeDesc != null && val != null)
+            val = refDBTypeDesc.lookupInstById(val, true, false);
+      }
+      else {
+         if (refDBTypeDesc != null) {
+            List<IdPropertyDescriptor> refIdCols = refDBTypeDesc.primaryTable.getIdColumns();
+            if (numCols != refIdCols.size())
+               throw new UnsupportedOperationException();
+            MultiColIdentity idVals = new MultiColIdentity(numCols);
+            boolean nullId = true;
+            for (int i = 0; i < numCols; i++) {
+               IdPropertyDescriptor refIdCol = refIdCols.get(i);
+               Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
+               if (idVal != null)
+                  nullId = false;
+               idVals.setVal(idVal, i);
+            }
+            if (!nullId)
+               val = refDBTypeDesc.lookupInstById(idVals, true, false);
+            else
+               val = null;
+         }
+         else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
+            System.err.println("*** Unsupported case - multiCol property that's not a reference");
+            val = null;
+         }
+      }
+      return val;
+   }
 }

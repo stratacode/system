@@ -123,6 +123,8 @@ public class DBUtil {
       if (val instanceof String) {
          return "\"" + val + "\"";
       }
+      else if (val == null)
+         return "null";
       else
          return val.toString();
    }
@@ -148,8 +150,17 @@ public class DBUtil {
    public static Object getResultSetByIndex(ResultSet rs, int index, DBPropertyDescriptor dbProp) throws SQLException {
       IBeanMapper mapper = dbProp.getPropertyMapper();
       Object propertyType = mapper.getPropertyType();
-      if (propertyType == Integer.class || propertyType == Integer.TYPE)
-         return rs.getInt(index);
+      if (propertyType == Integer.class || propertyType == Integer.TYPE) {
+         Object res = rs.getObject(index);
+         if (res == null)
+            return res;
+         if (res instanceof Integer)
+            return res;
+         else {
+            System.err.println("*** Unrecognized result for integer property");
+            return res;
+         }
+      }
       else if (propertyType == String.class)
          return rs.getString(index);
       else if (propertyType == Long.class || propertyType == Long.TYPE)

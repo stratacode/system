@@ -123,14 +123,14 @@ public class TxUpdate extends TxOperation {
          if (ct == 0) {
             if (isPrimary)
                throw new IllegalArgumentException("Attempt to update primary table with non-existent row for type: " + dbTypeDesc + idVals);
-            dbObject.applyUpdates(updateList);
+            dbObject.applyUpdates(transaction, updateList);
             doInsert(updateTable);
          }
          else if (ct != 1) {
             throw new UnsupportedOperationException("Invalid return from executeUpdate in doUpdate(): " + ct);
          }
          else {
-            dbObject.applyUpdates(updateList);
+            dbObject.applyUpdates(transaction, updateList);
 
             if (logSB != null) {
                logSB.append(" updated: " + ct);
@@ -149,7 +149,11 @@ public class TxUpdate extends TxOperation {
          DBPropertyDescriptor prop = propUpdate.prop;
          if (prop.tableDesc == tableDesc) {
             columnProps.add(prop);
-            columnValues.add(propUpdate.value);
+            Object value = propUpdate.value;
+            if (prop.refDBTypeDesc != null && value != null) {
+               value = ((IDBObject) value).getDBId();
+            }
+            columnValues.add(value);
          }
       }
    }

@@ -1,6 +1,7 @@
 package sc.db;
 
 
+import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.type.CTypeUtil;
 
@@ -62,14 +63,14 @@ public class DBObject implements IDBObject {
 
    // We can also just extend DBObject to inherit - in this case wrapper is null.
    public DBObject() {
-      this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(this));
+      this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(this), true);
       init();
    }
 
    // Used in generated code with a new field 'DBObject _dbObject = new DBObject(this)' along with IDBObject wrapper methods
    public DBObject(IDBObject wrapper) {
       this.wrapper = wrapper;
-      this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(getInst()));
+      this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(getInst()), true);
    }
 
    public void init() {
@@ -83,16 +84,24 @@ public class DBObject implements IDBObject {
    }
 
    private PropUpdate getPendingUpdate(DBTransaction curr, String property, boolean createUpdateProp) {
+      DBPropertyDescriptor pdesc = dbTypeDesc.getPropertyDescriptor(property);
+      if (pdesc == null)
+         throw new IllegalArgumentException("Property update for: " + property + " without db property descriptor for type: " + dbTypeDesc);
+      if (pdesc instanceof IdPropertyDescriptor)
+         throw new IllegalArgumentException("Update for id property on persistent object: " + pdesc);
+
+      // Don't record changes to read-only properties.
+      if (pdesc.readOnly) {
+         if (pdesc.reversePropDesc == null)
+            throw new IllegalArgumentException("Attempt to update readOnly property that's not the reverse side of a relationship");
+         return null;
+      }
+
       TxOperation op = getPendingOperation(curr, createUpdateProp, false, false, false);
       if (op instanceof TxUpdate) {
          TxUpdate objUpd = (TxUpdate) op;
          PropUpdate propUpd = objUpd.updateIndex.get(property);
          if (propUpd == null) {
-            DBPropertyDescriptor pdesc = dbTypeDesc.getPropertyDescriptor(property);
-            if (pdesc == null)
-               throw new IllegalArgumentException("Property update for: " + property + " without db property descriptor for type: " + dbTypeDesc);
-            if (pdesc instanceof IdPropertyDescriptor)
-               throw new IllegalArgumentException("Update for id property on persistent object: " + pdesc);
             propUpd = new PropUpdate(pdesc);
             objUpd.updateIndex.put(property, propUpd);
             objUpd.updateList.add(propUpd);
@@ -274,6 +283,7 @@ public class DBObject implements IDBObject {
          }
          catch (RuntimeException exc) {
             System.err.println("*** Fetch query failed: " + exc);
+            exc.printStackTrace();
             errorCount++;
             if (errorCount == MAX_FETCH_ERROR_COUNT)
                throw exc;
@@ -292,6 +302,9 @@ public class DBObject implements IDBObject {
    /**
     * Called to update the saved representation of the instance. Returns null to allow the assignment
     * in the field. If it returns non-null, the setX method will just return.
+    * Note: In the current implementation if there's a change to the property made that's local to the thread, the
+    * Bind.sendEvent call should be made by the framework since the setX method won't do anything else... for example,
+    * in a reverse relationship change.
     */
    public PropUpdate dbSetProp(String propertyName, Object propertyValue)  {
       if (replacedBy != null)
@@ -316,6 +329,13 @@ public class DBObject implements IDBObject {
       if (pu == null)
          return null;
       pu.value = propertyValue;
+
+      // TODO: should we make this an option? If we don't; send this, reverse properties are not updated until after the
+      // commit. We should at least be able to make those changes visible by the current thread before the commit and it
+      // seems like code will behave better if it's notified sooner that a change is coming. If we notify other threads about a
+      // change in progress it's not a problem - locking will protect it in some cases or if the other thread sees the old value
+      // another change will be sent when we commit the property.
+      Bind.sendChange(getInst(), propertyName, propertyValue);
       return pu;
    }
 
@@ -474,10 +494,16 @@ public class DBObject implements IDBObject {
       return sb.toString();
    }
 
-   void applyUpdates(ArrayList<PropUpdate> updateList) {
+   void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList) {
       synchronized (pendingOps) {
-         for (PropUpdate propUpdate:updateList) {
-            propUpdate.prop.getPropertyMapper().setPropertyValue(getInst(), propUpdate.value);
+         transaction.commitInProgress = true;
+         try {
+            for (PropUpdate propUpdate:updateList) {
+               propUpdate.prop.getPropertyMapper().setPropertyValue(getInst(), propUpdate.value);
+            }
+         }
+         finally {
+            transaction.commitInProgress = false;
          }
       }
    }

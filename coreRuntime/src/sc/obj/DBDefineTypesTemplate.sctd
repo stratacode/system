@@ -1,11 +1,8 @@
 <% // This template gets merged into each persisted type - those with @DBTypeSettings on the type or layer for a provider that needs a the type descriptor
    if (dbTypeDescriptor != null) { %>
-   static {
-      <%= formatDBTypeDescriptorDefinition() %>
-   }
 
    public static <%= typeBaseName %> findById(<%= formatIdParams(false) %>) {
-      return (<%= typeBaseName %>) sc.db.DBTypeDescriptor.getByType(<%= typeIsDynamic ? "sc.dyn.DynUtil.findType(\"" + typeName + "\")" : typeBaseName + ".class" %>).findById(<%= formatIdParams(true) %>);
+      return (<%= typeBaseName %>) sc.db.DBTypeDescriptor.getByType(<%= typeIsDynamic ? "sc.dyn.DynUtil.findType(\"" + typeName + "\")" : typeBaseName + ".class" %>, true).findById(<%= formatIdParams(true) %>);
    }
 
    <%    if (dbTypeDescriptor.baseType == null) { %>

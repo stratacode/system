@@ -347,6 +347,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    protected void completeInitTypeInfo() {
+      initMixinTemplates(true);
       // When building templates, the findTypeDeclaration in this call can force access to the very types we are in the midst of building
       // higher up in the element chain.
       //JavaModel m = getJavaModel();

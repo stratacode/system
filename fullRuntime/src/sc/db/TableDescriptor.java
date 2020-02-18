@@ -116,4 +116,14 @@ public class TableDescriptor {
          System.err.println("*** no columns for table in isReadOnly?");
       return true;
    }
+
+   public boolean hasColumn(DBPropertyDescriptor prop) {
+      for (IdPropertyDescriptor idProp:idColumns)
+         if (idProp.columnName.equalsIgnoreCase(prop.columnName))
+            return true;
+      for (DBPropertyDescriptor colProp:columns)
+         if (colProp.columnName.equalsIgnoreCase(prop.columnName))
+            return true;
+      return false;
+   }
 }

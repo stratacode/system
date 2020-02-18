@@ -485,7 +485,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       if (dbTypeDescriptor.baseType != null) {
          sb.append("sc.db.DBTypeDescriptor.getByName(\"");
          sb.append(ModelUtil.getTypeName(dbTypeDescriptor.baseType.typeDecl));
-         sb.append("\")");
+         sb.append("\", false)");
       }
       else
          sb.append("null");

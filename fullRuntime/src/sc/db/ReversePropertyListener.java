@@ -1,6 +1,8 @@
 package sc.db;
 
 import sc.bind.AbstractListener;
+import sc.bind.Bind;
+import sc.bind.BindingListener;
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 
@@ -36,6 +38,10 @@ class ReversePropertyListener extends AbstractListener {
       IBeanMapper rmapper = rprop.getPropertyMapper();
       Object inst = obj.getInst();
       Object newVal = rmapper.getPropertyValue(inst, false, false);
+      if (newVal == lastValue) {
+         valid = true;
+         return false;
+      }
       DBPropertyDescriptor oprop = rprop.reversePropDesc;
       IBeanMapper omapper = oprop.getPropertyMapper();
 
@@ -187,11 +193,39 @@ class ReversePropertyListener extends AbstractListener {
 
             // Make the reverse direction change
             if (newVal != null) {
+               // Before we point the new value at this one, need to update that property's ReversePropertyListener
+               // so that it points to this one to avoid the recursive update going back.
+               ReversePropertyListener oListener = getReverseListener(newVal, omapper);
+               if (oListener != null)
+                  oListener.lastValue = inst;
+
                Object curVal = omapper.getPropertyValue(newVal, false, false);
                lastValue = newVal;
+               numUpdated = 0;
                if (curVal != inst) {
+                  if (curVal != null) {
+                     Object oldRVal = rmapper.getPropertyValue(curVal, false, false);
+                     if (oldRVal == newVal) {
+                        // Prevent the reverse side of this relationship from updating newVal again
+                        ReversePropertyListener rListener = getReverseListener(curVal, rmapper);
+                        if (rListener != null)
+                           rListener.lastValue = null;
+                        rmapper.setPropertyValue(curVal, null);
+                        numUpdated++;
+                     }
+                  }
                   omapper.setPropertyValue(newVal, inst);
-                  numUpdated = 1;
+                  numUpdated++;
+                  /*
+                  if (curVal != null) {
+                     Object oldRVal = rmapper.getPropertyValue(curVal, false, false);
+                     if (oldRVal == newVal) {
+                        System.out.println("***");
+                        rmapper.setPropertyValue(curVal, null);
+                        numUpdated++;
+                     }
+                  }
+                  */
                }
             }
             else
@@ -202,5 +236,15 @@ class ReversePropertyListener extends AbstractListener {
          DBUtil.verbose(relationType + " property " + DBUtil.toIdString(inst) + ":" + rmapper + " changed -" + (numUpdated > 0 ? " added: " + numUpdated : "") + (numRemoved > 0 ? " removed: " + numRemoved : "") + " reverse references to property: " + oprop.dbTypeDesc.getTypeName() + "." + omapper);
       valid = true;
       return true;
+   }
+
+   static ReversePropertyListener getReverseListener(Object obj, IBeanMapper mapper) {
+      BindingListener listenerList = Bind.getPropListeners(obj, mapper);
+      while (listenerList != null) {
+         if (listenerList.listener instanceof ReversePropertyListener)
+            return (ReversePropertyListener) listenerList.listener;
+         listenerList = listenerList.next;
+      }
+      return null;
    }
 }

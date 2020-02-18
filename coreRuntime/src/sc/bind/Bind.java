@@ -1294,9 +1294,17 @@ public class Bind {
 
    }
 
+   /** Returns the list of property listeners for a given bean mapper */
+   public static BindingListener getPropListeners(Object obj, IBeanMapper prop) {
+      BindingListener[] list = getBindingListeners(obj);
+      if (list == null)
+         return null;
+      return getPropListeners(obj, list, prop);
+   }
+
    /**
-    * First call getBindingListeners with the same object provided here.  Then call this method with the returned list to retrieve the listener linked list
-    * for the given property, or null if there are no binding listeners for this property on this object.
+    * Use this version when you have already called getBindingListeners and so have the array of listeners to get the list
+    * of listeners for more than one property in the object more efficiently.
     */
    public static BindingListener getPropListeners(Object obj, BindingListener[] listeners, IBeanMapper prop) {
       int propPos = prop == null ? 0 : DynUtil.isSType(obj) ? prop.getStaticPropertyPosition() : prop.getPropertyPosition(obj);
@@ -1305,6 +1313,7 @@ public class Bind {
 
       return listeners[propPos];
    }
+
 
    public static DestinationListener[] getBindings(Object dstObj) {
       List<DestinationListener> bindings;

@@ -10,6 +10,7 @@ public class SQLUtil {
    // so that we could modify those features as well.
    public static SQLFileModel convertTypeToSQLFileModel(JavaModel fromModel, DBTypeDescriptor typeDesc) {
       SQLFileModel res = new SQLFileModel();
+      typeDesc.start();
       res.layeredSystem = fromModel.layeredSystem;
       res.layer = fromModel.layer;
       res.addCreateTable(typeDesc.primaryTable);

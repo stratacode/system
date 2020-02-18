@@ -8346,11 +8346,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (ent != null)  // Some TemplateDeclaration types don't represent real types and don't have index entries
             layer.updateTypeIndex(ent, getJavaModel().lastModifiedTime);
       }
-
-      initMixinTemplates(true);
    }
 
-   private void initMixinTemplates(boolean doDefineTypes) {
+   void initMixinTemplates(boolean doDefineTypes) {
       JavaModel model = getJavaModel();
       if (replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
          ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors(doDefineTypes);
@@ -8569,8 +8567,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          DBTypeDescriptor typeDesc = getDBTypeDescriptor();
          if (typeDesc != null) {
-            typeDesc.init();
-            typeDesc.start();
             DBProvider dbProvider = ModelUtil.getDBProviderForType(getLayeredSystem(), getLayer(), this);
             if (dbProvider != null) {
                dbProvider.processGeneratedFiles(this, typeDesc);

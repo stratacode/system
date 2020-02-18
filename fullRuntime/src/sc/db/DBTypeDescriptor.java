@@ -27,25 +27,33 @@ public class DBTypeDescriptor {
       String typeName = DynUtil.getTypeName(typeDecl, false);
       DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, typeDescriptor);
       typeDescriptor.init();
-      typeDescriptor.start();
 
       if ((oldType != null && oldType != typeDescriptor) | (oldName != null && oldName != typeDescriptor)) {
          System.err.println("Replacing type descriptor for type: " + typeName);
       }
    }
 
-   public static DBTypeDescriptor getByType(Object type) {
+   public static DBTypeDescriptor getByType(Object type, boolean start) {
       DBTypeDescriptor res = typeDescriptorsByType.get(type);
-      if (res != null)
+      if (res != null) {
+         if (start && !res.started)
+            res.start();
          return res;
+      }
       Object superType = DynUtil.getExtendsType(type);
       if (superType != Object.class)
-         return getByType(superType);
+         return getByType(superType, start);
       return null;
    }
 
-   public static DBTypeDescriptor getByName(String typeName) {
-      return typeDescriptorsByName.get(typeName);
+   public static DBTypeDescriptor getByName(String typeName, boolean start) {
+      DBTypeDescriptor res = typeDescriptorsByName.get(typeName);
+      if (res != null) {
+         if (start && !res.started) {
+            res.start();
+         }
+      }
+      return res;
    }
 
    // Class or ITypeDeclaration for dynamic types
