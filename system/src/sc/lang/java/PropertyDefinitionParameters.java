@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.db.DBPropertyDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.db.DataSourceDef;
+import sc.db.IdPropertyDescriptor;
 import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -44,6 +45,7 @@ public class PropertyDefinitionParameters {
    public DBPropertyDescriptor dbPropDesc;
    public String dbGetProperty = "";
    public String dbSetProperty = "";
+   public String dbSetPropMethod = "";
 
    public String bindClass = "sc.bind.Bind";
    public String bindableClass = "sc.bind.Bindable";
@@ -101,6 +103,8 @@ public class PropertyDefinitionParameters {
          persist = true;
          dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
          dbPropDesc = ModelUtil.getDBPropertyDescriptor(sys, propLayer, varDef);
+         dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
+
          dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
          dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
       }

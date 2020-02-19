@@ -6699,7 +6699,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public String getNewLayerDir() {
       if (newLayerDir != null)
          return newLayerDir;
-      if (layerPath == null) {
+      if (layerPath == null || layerPathDirs == null) {
          return System.getProperty("user.dir");
       }
       else

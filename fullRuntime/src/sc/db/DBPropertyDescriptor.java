@@ -250,10 +250,27 @@ public class DBPropertyDescriptor {
          else {
             tableDesc.tableName = mainPropTable.tableName;
             tableDesc.reference = true;
-            // We are going to turn mainPropTable into a many-to-many table using mainProp's join name
-            if (tableDesc.multiRow && mainPropTable.multiRow) {
-               tableDesc.idColumns.get(0).columnName = mainPropTable.columns.get(0).columnName;
-               mainPropTable.idColumns.get(0).columnName = tableDesc.columns.get(0).columnName;
+            if (tableDesc.multiRow) {
+               if (mainPropTable.multiRow) {
+                  // We are going to turn mainPropTable into a many-to-many table using mainProp's join name
+                  tableDesc.idColumns.get(0).columnName = mainPropTable.columns.get(0).columnName;
+                  mainPropTable.idColumns.get(0).columnName = tableDesc.columns.get(0).columnName;
+               }
+               // Create the table descriptor for the many side of a one-to-many case
+               else {
+                  tableDesc.reverseProperty = this;
+                  tableDesc.idColumns.get(0).columnName = reversePropDesc.columnName;
+                  // First fetch the reverse props id as part of the reference so we can create the instance
+                  ArrayList<DBPropertyDescriptor> fetchCols = new ArrayList<DBPropertyDescriptor>(mainPropTable.idColumns);
+                  // Then fetch all of the properties in the default table for the reverse side of the reference
+                  for (int i = 0; i < mainPropTable.columns.size(); i++) {
+                     DBPropertyDescriptor mainProp = mainPropTable.columns.get(i);
+                     if (mainProp == reversePropDesc)
+                        continue;
+                     fetchCols.add(mainProp);
+                  }
+                  tableDesc.columns = fetchCols;
+               }
             }
          }
       }

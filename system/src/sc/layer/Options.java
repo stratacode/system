@@ -571,6 +571,7 @@ public class Options {
                   }
                   // Test in verify mode (headless)
                   else if (opt.equals("tv")) {
+                     testPattern = ".*";
                      testVerifyMode = true;
                      testMode = true;
                   }

@@ -377,7 +377,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public DBTypeDescriptor getDBTypeDescriptor() {
-      return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), baseType);
+      return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), baseType, false);
    }
 
    public boolean isLayerType() {

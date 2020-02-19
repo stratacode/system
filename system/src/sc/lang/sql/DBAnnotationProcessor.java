@@ -13,8 +13,6 @@ public class DBAnnotationProcessor extends DefaultAnnotationProcessor {
       staticMixinTemplate = "sc.obj.DBStaticTemplate";
       defineTypesMixinTemplate = "sc.obj.DBDefineTypesTemplate";
       setAppendInterfaces(new String[] {"sc.db.IDBObject", "sc.obj.IStoppable"});
-      // Because this template defines new methods in the interface contract, it needs to be processed and stored in the hiddenBody
-      definesNewMembers = true;
    }
 
    static DBAnnotationProcessor defaultProc = new DBAnnotationProcessor();

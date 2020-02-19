@@ -172,13 +172,7 @@ public abstract class TxOperation {
          }
 
          if (isPrimary) {
-            dbTypeDesc.registerInstance(inst);
-            dbObject.setTransient(false);
-            // Mark all of the property queries in this type as fetched so we don't re-query them until the cache is invalidated
-            int numFetchQueries = dbTypeDesc.getNumFetchPropQueries();
-            for (int f = 0; f < numFetchQueries; f++) {
-               dbObject.fstate |= DBObject.FETCHED << (f*2);
-            }
+            dbObject.registerNew();
          }
       }
       catch (SQLException exc) {
@@ -207,7 +201,9 @@ public abstract class TxOperation {
 
       Object parentInst = dbObject.getInst();
 
-      DBPropertyDescriptor multiValueProp = insertTable.columns.get(0);
+      DBPropertyDescriptor revProp = insertTable.reverseProperty;
+
+      DBPropertyDescriptor multiValueProp = revProp == null ? insertTable.columns.get(0) : revProp;
       IBeanMapper multiValueMapper = multiValueProp.getPropertyMapper();
       if (useCurrent)
          propList = (List<IDBObject>) multiValueMapper.getPropertyValue(parentInst, false, false);
@@ -217,13 +213,27 @@ public abstract class TxOperation {
 
       List<IdPropertyDescriptor> idCols = insertTable.getIdColumns();
 
+      // The list of 'definedByDB' id properties for the referenced type when this is a one-to-many inserting new instances
+      // of the referenced type
+      List<IdPropertyDescriptor> dbIdCols = null;
+      if (revProp != null) {
+         for (DBPropertyDescriptor colDesc:insertTable.columns) {
+            if (colDesc instanceof IdPropertyDescriptor) {
+               IdPropertyDescriptor idDesc = ((IdPropertyDescriptor) colDesc);
+               if (idDesc.definedByDB) {
+                  if (dbIdCols == null)
+                     dbIdCols = new ArrayList<IdPropertyDescriptor>();
+                  dbIdCols.add(idDesc);
+               }
+            }
+         }
+      }
+
       ArrayList<String> columnNames = new ArrayList<String>();
       ArrayList<Object> columnTypes = new ArrayList<Object>();
       ArrayList<Object> columnValues = new ArrayList<Object>();
 
       ArrayList<Object> idVals = new ArrayList<Object>();
-
-      ArrayList<IdPropertyDescriptor> dbIdCols = null;
 
       List<String> nullProps = null;
 
@@ -300,6 +310,15 @@ public abstract class TxOperation {
          append(sb, logSB, ")");
          toInsert++;
       }
+      if (dbIdCols != null) {
+         append(sb, logSB, " RETURNING ");
+         for (int ri = 0; ri < dbIdCols.size(); ri++)  {
+            if (ri != 0)
+               append(sb, logSB, ", ");
+            IdPropertyDescriptor dbIdCol = dbIdCols.get(ri);
+            DBUtil.appendIdent(sb, logSB, dbIdCol.columnName);
+         }
+      }
 
       if (useCurrent && !(propList instanceof DBList)) {
          DBList dbList = new DBList(propList, dbObject, multiValueProp);
@@ -316,6 +335,7 @@ public abstract class TxOperation {
       if (toInsert == 0)
          return 0;
 
+      ResultSet rs = null;
       try {
          Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
          String insertStr = sb.toString();
@@ -324,7 +344,37 @@ public abstract class TxOperation {
          for (int ci = 0; ci < columnValues.size(); ci++) {
             DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci));
          }
-         int numInserted = st.executeUpdate();
+         int numInserted;
+
+         if (dbIdCols != null) {
+            rs = st.executeQuery();
+            numInserted = 0;
+            // For each instance read back the returned 'definedByDB' id properties and set them
+            for (int ix = 0; ix < numInsts; ix++) {
+               if (!rs.next())
+                  throw new IllegalArgumentException("Unexpected end of query results: " + sb + " expected to return: " + numInsts + " and did not return: " + ix);
+               IDBObject arrInst = propList.get(ix);
+               for (int idx = 0; idx < dbIdCols.size(); idx++) {
+                  IdPropertyDescriptor dbIdCol = dbIdCols.get(idx);
+                  IBeanMapper mapper = dbIdCol.getPropertyMapper();
+                  Object id = DBUtil.getResultSetByIndex(rs, idx+1, dbIdCol);
+                  mapper.setPropertyValue(arrInst, id);
+
+                  if (logSB != null) {
+                     if (idx == 0) {
+                        logSB.append(" -> (");
+                     }
+                     else
+                        logSB.append(", ");
+                     logSB.append(id);
+                  }
+               }
+               numInserted++;
+            }
+         }
+         else {
+            numInserted = st.executeUpdate();
+         }
          if (numInserted != toInsert)
             DBUtil.error("Insert of: " + toInsert + " rows inserted: " + numInserted + " instead for: " + dbTypeDesc);
 
@@ -334,17 +384,25 @@ public abstract class TxOperation {
             DBUtil.info(logSB);
          }
 
+         for (int ix = 0; ix < numInsts; ix++) {
+            IDBObject arrInst = propList.get(ix);
+            arrInst.getDBObject().registerNew();
+         }
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert: " + dbTypeDesc + " with dbIdCols: " + dbIdCols + " returned failed: " + exc);
+      }
+      finally {
+         DBUtil.close(rs);
       }
       return 1;
    }
 
    static void append(StringBuilder sb, StringBuilder logSB, CharSequence val) {
       sb.append(val);
-      if (logSB != null)
-         logSB.append(val);
+      if (logSB != null) {
+         DBUtil.appendVal(logSB, val);
+      }
    }
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
@@ -380,15 +438,25 @@ public abstract class TxOperation {
 
    private void addArrayValues(DBTypeDescriptor dbTypeDesc, IDBObject arrInst, List<? extends DBPropertyDescriptor> cols,
                                     ArrayList<String> columnNames, ArrayList<Object> columnTypes, ArrayList<Object> columnValues) {
-      if (cols.size() != 1)
-         throw new IllegalArgumentException("Only one multi-property supported for now!");
       for (DBPropertyDescriptor col:cols) {
          int numCols = col.getNumColumns();
          IBeanMapper mapper = col.getPropertyMapper();
          Object val = arrInst;
+         boolean reverseItem = col.dbTypeDesc != dbTypeDesc;
          if (numCols == 1) {
             if (arrInst != null) {
-               if (col.refDBTypeDesc != null) {
+               if (reverseItem) {
+                  if (col instanceof IdPropertyDescriptor) {
+                     // The database will provide this one - its not defined in
+                     if (((IdPropertyDescriptor) col).definedByDB)
+                        continue;
+                     val = col.dbTypeDesc.getIdColumnValue(val, 0);
+                  }
+                  else {
+                     val = mapper.getPropertyValue(arrInst, false, false);
+                  }
+               }
+               else if (col.refDBTypeDesc != null) {
                   val = col.refDBTypeDesc.getIdColumnValue(val, 0);
                }
                if (columnNames != null)
@@ -398,12 +466,21 @@ public abstract class TxOperation {
             }
          }
          else {
-            if (col.refDBTypeDesc != null) {
+            DBTypeDescriptor arrDesc = col.refDBTypeDesc;
+            if (reverseItem) {
+               if (col instanceof IdPropertyDescriptor) {
+                  // The database will provide this one - its not defined in
+                  if (((IdPropertyDescriptor) col).definedByDB)
+                     continue;
+               }
+               arrDesc = col.dbTypeDesc;
+            }
+            if (arrDesc != null) {
                for (int ci = 0; ci < numCols; ci++) {
                   if (columnNames != null)
                      columnNames.add(col.getColumnName(ci));
-                  columnTypes.add(col.refDBTypeDesc.getIdColumnType(ci));
-                  columnValues.add(col.refDBTypeDesc.getIdColumnValue(val, ci));
+                  columnTypes.add(arrDesc.getIdColumnType(ci));
+                  columnValues.add(arrDesc.getIdColumnValue(val, ci));
                }
             }
             else

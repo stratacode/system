@@ -445,7 +445,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
    public DBTypeDescriptor getDBTypeDescriptor() {
       if (rootType != null)
-         return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), rootType);
+         return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), rootType, false);
       return null;
    }
 

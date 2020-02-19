@@ -39,59 +39,72 @@ public class FetchTablesQuery {
          if (table.primary)
             includesPrimary = true;
       }
-      ftd.props.add(prop);
 
-      // When the reference is not onDemand, add the primary+aux tables from the referenced type to the query for this property
-      // so that we do one query to fetch the list of instances - rather than the 1 + N queries if we did them one-by-one
-      DBTypeDescriptor refType = prop.refDBTypeDesc;
-      if (!prop.onDemand && refType != null) {
-         // For the read-only side of the reverse relationship, the property's table is the primary table of the other
-         // side so add the additional properties to define the other side to the properties we fetch with this table
-         if (prop.reversePropDesc != null) {
-            TableDescriptor revTable = prop.reversePropDesc.dbTypeDesc.primaryTable;
-            if (!revTable.tableName.equals(tableName)) {
-               ftd = fetchTablesIndex.get(revTable.tableName);
-               if (ftd == null) {
-                  ftd = new FetchTableDesc();
-                  ftd.table = revTable;
-                  ftd.props = Collections.emptyList();
-                  ftd.revProps = new ArrayList<DBPropertyDescriptor>();
-                  ftd.revColumns = new ArrayList<DBPropertyDescriptor>(revTable.columns);
-                  for (int i = 0; i < revTable.columns.size(); i++) {
+      // For the one-to-many case, the table is just the reverse table
+      if (table.reverseProperty != null) {
+         if (prop != table.reverseProperty)
+            System.err.println("*** Unrecognized case in setting up one-to-many multi case");
+         ftd.revColumns = table.columns;
+         ftd.revProps = new ArrayList<DBPropertyDescriptor>();
+         for (int i = 0; i < table.columns.size(); i++) {
+            ftd.revProps.add(prop);
+         }
+      }
+      else {
+         ftd.props.add(prop);
+
+         // When the reference is not onDemand, add the primary+aux tables from the referenced type to the query for this property
+         // so that we do one query to fetch the list of instances - rather than the 1 + N queries if we did them one-by-one
+         DBTypeDescriptor refType = prop.refDBTypeDesc;
+         if (!prop.onDemand && refType != null) {
+            // For the read-only side of the reverse relationship, the property's table is the primary table of the other
+            // side so add the additional properties to define the other side to the properties we fetch with this table
+            if (prop.reversePropDesc != null) {
+               TableDescriptor revTable = prop.reversePropDesc.dbTypeDesc.primaryTable;
+               if (!revTable.tableName.equals(tableName)) {
+                  ftd = fetchTablesIndex.get(revTable.tableName);
+                  if (ftd == null) {
+                     ftd = new FetchTableDesc();
+                     ftd.table = revTable;
+                     ftd.props = Collections.emptyList();
+                     ftd.revProps = new ArrayList<DBPropertyDescriptor>();
+                     ftd.revColumns = new ArrayList<DBPropertyDescriptor>(revTable.columns);
+                     for (int i = 0; i < revTable.columns.size(); i++) {
+                        ftd.revProps.add(prop);
+                     }
+                     fetchTables.add(ftd);
+                     fetchTablesIndex.put(tableName, ftd);
+                  }
+                  else // TODO: do we add to the column set here?
+                     System.err.println("*** Table fetch table of reverse table already exists");
+               }
+               else {
+                  for (DBPropertyDescriptor revCol:revTable.columns) {
+                     if (table.hasColumn(revCol))
+                        continue;
+                     if (ftd.revColumns == null) {
+                        ftd.revColumns = new ArrayList<DBPropertyDescriptor>();
+                        ftd.revProps = new ArrayList<DBPropertyDescriptor>();
+                     }
+                     ftd.revColumns.add(revCol);
                      ftd.revProps.add(prop);
                   }
-                  fetchTables.add(ftd);
-                  fetchTablesIndex.put(tableName, ftd);
-               }
-               else // TODO: do we add to the column set here?
-                  System.err.println("*** Table fetch table of reverse table already exists");
-            }
-            else {
-               for (DBPropertyDescriptor revCol:revTable.columns) {
-                  if (table.hasColumn(revCol))
-                     continue;
-                  if (ftd.revColumns == null) {
-                     ftd.revColumns = new ArrayList<DBPropertyDescriptor>();
-                     ftd.revProps = new ArrayList<DBPropertyDescriptor>();
-                  }
-                  ftd.revColumns.add(revCol);
-                  ftd.revProps.add(prop);
                }
             }
-         }
-         else { // TODO: is this right - a completely separate 1-1 query we just tack onto the current one by adding more join tables?
-            refType.initFetchGroups();
-            DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
-            for (FetchTablesQuery defQuery:defaultRefQuery.queries) {
-               if (!defQuery.multiRow) {
-                  for (FetchTableDesc defQueryFetch:defQuery.fetchTables) {
-                     // Skip any references back to the table of the property
-                     // TODO: should this be a comparison against the primary table of the type of the property?
-                     if (defQueryFetch.table.tableName.equalsIgnoreCase(table.tableName))
-                        continue;
-                     FetchTableDesc refQueryFetch = defQueryFetch.copyForRef(prop);
-                     fetchTables.add(refQueryFetch);
-                     fetchTablesIndex.put(refQueryFetch.table.tableName, refQueryFetch);
+            else { // TODO: is this right - a completely separate 1-1 query we just tack onto the current one by adding more join tables?
+               refType.initFetchGroups();
+               DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
+               for (FetchTablesQuery defQuery:defaultRefQuery.queries) {
+                  if (!defQuery.multiRow) {
+                     for (FetchTableDesc defQueryFetch:defQuery.fetchTables) {
+                        // Skip any references back to the table of the property
+                        // TODO: should this be a comparison against the primary table of the type of the property?
+                        if (defQueryFetch.table.tableName.equalsIgnoreCase(table.tableName))
+                           continue;
+                        FetchTableDesc refQueryFetch = defQueryFetch.copyForRef(prop);
+                        fetchTables.add(refQueryFetch);
+                        fetchTablesIndex.put(refQueryFetch.table.tableName, refQueryFetch);
+                     }
                   }
                }
             }
@@ -189,7 +202,7 @@ public class FetchTablesQuery {
             propMapper.setPropertyValue(fetchInst, val);
 
             if (logSB != null) {
-               logSB.append(val);
+               DBUtil.appendVal(logSB, val);
             }
          }
          if (ftd.revColumns != null) {
@@ -215,7 +228,7 @@ public class FetchTablesQuery {
                   System.err.println("*** Error - value for reverse reference property where there's no reverse instance");
 
                if (logSB != null) {
-                  logSB.append(val);
+                  DBUtil.appendVal(logSB, val);
                }
             }
          }
@@ -280,7 +293,7 @@ public class FetchTablesQuery {
                   }
                   resList.add(currentRowVal);
                   if (logSB != null) {
-                     logSB.append("[");
+                     logSB.append("\n   [");
                      logSB.append(rowCt);
                      logSB.append("]: ");
                      logSB.append(currentRowVal);
@@ -296,9 +309,77 @@ public class FetchTablesQuery {
                      logSB.append(", ");
                      logSB.append(propMapper.getPropertyName());
                      logSB.append("=");
-                     logSB.append(val);
+                     DBUtil.appendVal(logSB, val);
                   }
                }
+            }
+            if (fetchTable.revColumns != null) {
+               DBPropertyDescriptor revProp = fetchTable.revProps.get(0);
+               for (int rci = 0; rci < fetchTable.revColumns.size(); rci++) {
+                  DBPropertyDescriptor propDesc = fetchTable.revColumns.get(rci);
+                  IBeanMapper propMapper = propDesc.getPropertyMapper();
+                  Object val;
+                  int numCols = propDesc.getNumColumns();
+
+                  // If this is the first fetchTable and the first column in the revProps list is the id of the reverse property instance
+                  DBTypeDescriptor refTypeDesc = rci == 0 && fi == 0 ? revProp.refDBTypeDesc : propDesc.refDBTypeDesc;
+                  if (numCols == 1)  {
+                     val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
+
+                     if (refTypeDesc != null)
+                        val = refTypeDesc.lookupInstById(val, true, false);
+                  }
+                  else {
+                     if (refTypeDesc != null) {
+                        List<IdPropertyDescriptor> refIdCols = refTypeDesc.primaryTable.getIdColumns();
+                        if (numCols != refIdCols.size())
+                           throw new UnsupportedOperationException();
+                        MultiColIdentity idVals = new MultiColIdentity(numCols);
+                        for (int ci = 0; ci < numCols; ci++) {
+                           IdPropertyDescriptor refIdCol = refIdCols.get(ci);
+                           Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
+                           idVals.setVal(idVal, ci);
+                        }
+                        val = refTypeDesc.lookupInstById(idVals, true, false);
+                     }
+                     else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
+                        System.err.println("*** Unsupported case - multiCol property that's not a reference");
+                        val = null;
+                     }
+                  }
+                  if (rci == 0 && fi == 0) {
+                     currentRowVal = (IDBObject) val;
+                     if (resList == null) {
+                        resList = new DBList(10, dbObj, propDesc);
+                        listProp = revProp; // For reverse properties, it's always the reverse prop - waiting for the first element to set the list
+                     }
+                     resList.add(currentRowVal);
+                     if (logSB != null) {
+                        logSB.append("[");
+                        logSB.append(rowCt);
+                        logSB.append("]:");
+                        logSB.append(currentRowVal);
+                        logSB.append(": ");
+                     }
+                     rowCt++;
+                  }
+                  else {
+                     if (currentRowVal == null)
+                        throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
+                     propMapper.setPropertyValue(currentRowVal, val);
+
+                     if (logSB != null) {
+                        if (rci > 1)
+                           logSB.append(", ");
+                        logSB.append(revProp.refDBTypeDesc);
+                        logSB.append(".");
+                        logSB.append(propMapper.getPropertyName());
+                        logSB.append("=");
+                        DBUtil.appendVal(logSB, val);
+                     }
+                  }
+               }
+
             }
          }
       }
@@ -350,15 +431,30 @@ public class FetchTablesQuery {
       return res;
    }
 
+   static List<? extends DBPropertyDescriptor> getJoinColumns(TableDescriptor mainTable, TableDescriptor joinTable) {
+      if (mainTable.dbTypeDesc == joinTable.dbTypeDesc) {
+         return mainTable.getIdColumns();
+      }
+      else {
+         for (DBPropertyDescriptor col:mainTable.columns) {
+            if (col.refDBTypeDesc == joinTable.dbTypeDesc)
+               return Collections.singletonList(col);
+         }
+      }
+      throw new UnsupportedOperationException();
+   }
+
    private static void appendJoinTable(StringBuilder queryStr, TableDescriptor mainTable, TableDescriptor joinTable) {
-      List<IdPropertyDescriptor> mainIdCols = mainTable.getIdColumns();
-      int sz = mainIdCols.size();
+      List<? extends DBPropertyDescriptor> mainJoinCols = getJoinColumns(mainTable, joinTable);
+      int sz = mainJoinCols.size();
       for (int i = 0; i < sz; i++) {
          if (i != 0)
             queryStr.append(" AND ");
          DBUtil.appendIdent(queryStr, null, mainTable.tableName);
          queryStr.append(".");
-         DBUtil.appendIdent(queryStr, null, mainIdCols.get(i).columnName);
+         //DBUtil.appendIdent(queryStr, null, mainIdCols.get(i).columnName);
+         //DBUtil.appendIdent(queryStr, null, mainTable.columns.get(i).columnName);
+         DBUtil.appendIdent(queryStr, null, mainJoinCols.get(i).columnName);
          queryStr.append(" = ");
          DBUtil.appendIdent(queryStr, null, joinTable.tableName);
          queryStr.append(".");

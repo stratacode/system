@@ -159,7 +159,7 @@ public class SQLFileModel extends SCModel {
                System.err.println("*** Failed to find refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
             }
             else {
-               DBTypeDescriptor refTypeDesc = ModelUtil.getDBTypeDescriptor(layeredSystem, getLayer(), refType);
+               DBTypeDescriptor refTypeDesc = ModelUtil.getDBTypeDescriptor(layeredSystem, getLayer(), refType, true);
                if (refTypeDesc == null) {
                   System.err.println("*** Failed to find DBTypeDescriptor for refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
                }

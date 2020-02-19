@@ -172,7 +172,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       else if (customResolver != null)
          customSetter = TransformUtil.evalTemplate(this, customSetter, true, false, null);
 
-      dbTypeDescriptor = ModelUtil.getDBTypeDescriptor(objType.getLayeredSystem(), objType.getLayer(), objType);
+      dbTypeDescriptor = ModelUtil.getDBTypeDescriptor(objType.getLayeredSystem(), objType.getLayer(), objType, false);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -450,12 +450,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          IdPropertyDescriptor idCol = idCols.get(i);
          if (!argMode) {
             // The property may be inserted and so has no mapper yet - use the SQL type to get the Java type
-            if (idCol.getPropertyMapper() == null) {
-               String javaType = DBUtil.getJavaTypeFromSQLType(idCol.columnType);
-               sb.append(javaType);
-            }
-            else
-               sb.append(ModelUtil.getTypeName(idCol.getPropertyMapper().getPropertyType()));
+            String javaType = DBUtil.getJavaTypeFromSQLType(idCol.columnType);
+            sb.append(javaType);
             sb.append(" ");
          }
          sb.append(idCol.propertyName);
@@ -466,6 +462,11 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public String formatDBTypeDescriptorDefinition() {
       if (dbTypeDescriptor == null)
          return "";
+
+      if (!dbTypeDescriptor.tablesInitialized) {
+         Layer layer = getLayer();
+         ModelUtil.completeDBTypeDescriptor(dbTypeDescriptor, layer.getLayeredSystem(), layer, objType);
+      }
 
       dbTypeDescriptor.init();
       dbTypeDescriptor.start();
@@ -545,6 +546,11 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       appendPropertyList(sb, tableDesc.idColumns, true);
       sb.append(", ");
       appendPropertyList(sb, tableDesc.columns, false);
+      sb.append(", ");
+      if (tableDesc.reverseProperty == null)
+         sb.append("null");
+      else
+         appendProperty(sb, tableDesc.reverseProperty, false, "sc.db.DBPropertyDescriptor");
 
       sb.append(")");
    }

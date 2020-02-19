@@ -25,23 +25,36 @@ public class TableDescriptor {
    /** Set to true for descriptors that refer to tables defined elsewhere - so no schema is generated */
    public boolean reference = false;
 
+   /**
+    * Set for the 'many' side of a 1-many case where the id column here is used for the 'value' of the reverse property, so
+    * there is no reverse property descriptor in the columns list. We still need to look up this property descriptor from
+    * the reverse side.
+     */
+   public DBPropertyDescriptor reverseProperty;
+
    public TableDescriptor(String tableName) {
       this.tableName = tableName;
       this.columns = new ArrayList<DBPropertyDescriptor>();
    }
 
-   public TableDescriptor(String tableName, List<IdPropertyDescriptor> idColumns, List<DBPropertyDescriptor> columns) {
+   public TableDescriptor(String tableName, List<IdPropertyDescriptor> idColumns, List<DBPropertyDescriptor> columns,
+                          DBPropertyDescriptor reverseProp) {
       this.tableName = tableName;
       this.idColumns = idColumns;
       this.columns = columns;
+      this.reverseProperty = reverseProp;
    }
 
    void init(DBTypeDescriptor dbTypeDesc) {
       this.dbTypeDesc = dbTypeDesc;
       if (this == dbTypeDesc.primaryTable)
          insertWithNullValues = true;
-      for (DBPropertyDescriptor col:columns) {
-         col.init(dbTypeDesc, this);
+      if (reverseProperty != null)
+         reverseProperty.init(dbTypeDesc, this);
+      else {
+         for (DBPropertyDescriptor col:columns) {
+            col.init(dbTypeDesc, this);
+         }
       }
       if (idColumns != null) {
          for (IdPropertyDescriptor idcol:idColumns)
@@ -72,6 +85,8 @@ public class TableDescriptor {
             if (col.propertyName.equals(propName))
                return col;
       }
+      if (reverseProperty != null && reverseProperty.propertyName.equals(propName))
+         return reverseProperty;
       return null;
    }
 
@@ -100,7 +115,7 @@ public class TableDescriptor {
    }
 
    public String toString() {
-      return "table " + tableName;
+      return "table " + tableName + (multiRow ? " (multi)" : "");
    }
 
    public void initIdColumns() {

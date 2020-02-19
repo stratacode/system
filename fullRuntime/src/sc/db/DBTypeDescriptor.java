@@ -3,6 +3,7 @@ package sc.db;
 import sc.bind.Bind;
 import sc.bind.IListener;
 import sc.dyn.DynUtil;
+import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 
 import java.util.*;
@@ -20,6 +21,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DBTypeDescriptor {
    static Map<Object,DBTypeDescriptor> typeDescriptorsByType = new HashMap<Object,DBTypeDescriptor>();
    static Map<String,DBTypeDescriptor> typeDescriptorsByName = new HashMap<String,DBTypeDescriptor>();
+
+   public static void clearAllCaches() {
+      for (DBTypeDescriptor dbTypeDesc:typeDescriptorsByName.values()) {
+         dbTypeDesc.clearTypeCache();
+      }
+   }
 
    public static void add(DBTypeDescriptor typeDescriptor) {
       Object typeDecl = typeDescriptor.typeDecl;
@@ -75,6 +82,8 @@ public class DBTypeDescriptor {
 
    private boolean initialized = false, started = false;
 
+   public boolean tablesInitialized = false;
+
    /**
     * Defines the type with the id properties of the primary table in tact so it can be used to create references from other types.
     * Properties may be later added to the primary table and other tables added with initTables
@@ -99,13 +108,16 @@ public class DBTypeDescriptor {
    }
 
    public void initTables( List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
+      tablesInitialized = true;
       if (auxTables != null) {
          for (TableDescriptor auxTable:auxTables)
             auxTable.init(this);
       }
       if (multiTables != null) {
-         for (TableDescriptor multiTable:multiTables)
+         for (TableDescriptor multiTable:multiTables) {
+            multiTable.multiRow = true;
             multiTable.init(this);
+         }
       }
       this.multiTables = multiTables;
       this.auxTables = auxTables;
@@ -123,7 +135,12 @@ public class DBTypeDescriptor {
       if (multiTables != null) {
          for (TableDescriptor mtd:multiTables) {
             mtd.initIdColumns();
-            allDBProps.addAll(mtd.columns);
+            // For the many property of a one-to-many, the table columns belong to the other side so don't add them here -
+            // instead add the reverse property
+            if (mtd.reverseProperty != null)
+               allDBProps.add(mtd.reverseProperty);
+            else
+               allDBProps.addAll(mtd.columns);
          }
       }
       for (DBPropertyDescriptor prop:allDBProps) {
@@ -297,9 +314,8 @@ public class DBTypeDescriptor {
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("DBTypeDesc:");
       if (typeDecl != null)
-         sb.append(DynUtil.getTypeName(typeDecl, false));
+         sb.append(CTypeUtil.getClassName(DynUtil.getTypeName(typeDecl, false)));
       return sb.toString();
    }
 
@@ -361,10 +377,12 @@ public class DBTypeDescriptor {
          initTypeInstances();
       }
       Object id = inst.getDBId();
-      IDBObject res = typeInstances.get(id);
-      if (res != null)
-         return res;
-      typeInstances.put(id, inst);
+      synchronized (this) {
+         IDBObject res = typeInstances.get(id);
+         if (res != null)
+            return res;
+         typeInstances.put(id, inst);
+      }
       return null;
    }
 
@@ -372,12 +390,30 @@ public class DBTypeDescriptor {
       if (typeInstances == null)
          return false;
       Object id = dbObj.getDBId();
-      Object res = typeInstances.get(id);
-      if (res == dbObj.getInst()) {
-         typeInstances.remove(id);
-         return true;
+      IDBObject removed = null;
+      synchronized (this) {
+         Object res = typeInstances.get(id);
+         if (res == dbObj.getInst()) {
+            removed = typeInstances.remove(id);
+            if (removed != null) {
+               removed.getDBObject().markStopped();
+               return true;
+            }
+         }
       }
       return false;
+   }
+
+   public void clearTypeCache() {
+      if (typeInstances == null)
+         return;
+
+      synchronized (this) {
+         for (IDBObject dbObj:typeInstances.values()) {
+            dbObj.getDBObject().markStopped();
+         }
+         typeInstances.clear();
+      }
    }
 
    public Object getIdColumnValue(Object inst, int ci) {
@@ -398,6 +434,18 @@ public class DBTypeDescriptor {
 
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.resolve();
+      }
+      if (multiTables != null) {
+         for (TableDescriptor multiTable:multiTables) {
+            DBPropertyDescriptor revProp = multiTable.reverseProperty;
+            if (multiTable.reverseProperty != null) {
+
+               for (DBPropertyDescriptor revPropCol:multiTable.columns) {
+                  revPropCol.dbTypeDesc = revProp.refDBTypeDesc;
+               }
+            }
+         }
+
       }
    }
 

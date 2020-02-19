@@ -449,7 +449,9 @@ public class TransformUtil {
       PerfMon.start("addObjectDefinition");
       Template template = customTemplate;
       String templateFromStr = null;
-      if (assignments != null || parameters.overrideGet || ModelUtil.getCompileLiveDynamicTypes(objType) || parameters.getNeedsCustomResolver() || objType.needsSync()) {
+      if (assignments != null ||
+              ((template == null && isObject) &&
+               (parameters.overrideGet || ModelUtil.getCompileLiveDynamicTypes(objType) || parameters.getNeedsCustomResolver() || objType.needsSync()))) {
          if (assignments != null)
             parameters.propertyAssignments = ParseUtil.toLanguageString(SCLanguage.INSTANCE.blockStatements, assignments);
          if (template == null && isObject) {

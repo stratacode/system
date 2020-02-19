@@ -9544,15 +9544,19 @@ public class ModelUtil {
       }
    }
 
-   public static DBTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
+   public static DBTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, boolean initTables) {
       if (typeDecl instanceof ITypeDeclaration) {
-         return ((ITypeDeclaration) typeDecl).getDBTypeDescriptor();
+         DBTypeDescriptor res = ((ITypeDeclaration) typeDecl).getDBTypeDescriptor();
+         if (res != null && initTables && !res.tablesInitialized)
+            completeDBTypeDescriptor(res, sys, refLayer, typeDecl);
+         return res;
       }
       else {
-         System.err.println("*** Not caching DB type descriptor");
-         return initDBTypeDescriptor(sys, refLayer, typeDecl);
+         DBTypeDescriptor res = initDBTypeDescriptor(sys, refLayer, typeDecl);
+         if (res != null && initTables && !res.tablesInitialized)
+            completeDBTypeDescriptor(res, sys, refLayer, typeDecl);
+         return res;
       }
-
    }
 
    public static DBTypeDescriptor initDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
@@ -9562,8 +9566,7 @@ public class ModelUtil {
       if (typeSettings != null) {
          boolean persist = true;
          String dataSourceName = null;
-         String versionProp = null, primaryTableName = null;
-         List<String> auxTableNames = null;
+         String primaryTableName = null;
          for (Object annot:typeSettings) {
             Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
             if (tmpPersist != null)
@@ -9571,17 +9574,9 @@ public class ModelUtil {
             String tmpDataSourceName  = (String) ModelUtil.getAnnotationValue(annot, "dataSourceName");
             if (tmpDataSourceName != null)
                dataSourceName = tmpDataSourceName;
-            String tmpVersionProp = (String) ModelUtil.getAnnotationValue(annot, "versionProp");
-            if (tmpVersionProp != null) {
-               versionProp = tmpVersionProp;
-            }
             String tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "primaryTable");
             if (tmpPrimaryTableName != null) {
                primaryTableName = tmpPrimaryTableName;
-            }
-            String tmpAuxTableNames = (String) ModelUtil.getAnnotationValue(annot, "auxTables");
-            if (tmpAuxTableNames != null) {
-               auxTableNames = new ArrayList<String>(Arrays.asList(tmpAuxTableNames.split(",")));
             }
          }
 
@@ -9593,7 +9588,7 @@ public class ModelUtil {
                   return null;
             }
             Object baseType = ModelUtil.getExtendsClass(typeDecl);
-            DBTypeDescriptor baseTD = baseType != null && baseType != Object.class ? ModelUtil.getDBTypeDescriptor(sys, refLayer, baseType) : null;
+            DBTypeDescriptor baseTD = baseType != null && baseType != Object.class ? ModelUtil.getDBTypeDescriptor(sys, refLayer, baseType, false) : null;
 
             String fullTypeName = ModelUtil.getTypeName(typeDecl);
 
@@ -9604,16 +9599,7 @@ public class ModelUtil {
             String typeName = CTypeUtil.getClassName(fullTypeName);
             if (primaryTableName == null)
                primaryTableName = DBUtil.getSQLName(typeName);
-            ArrayList<TableDescriptor> auxTables = new ArrayList<TableDescriptor>();
-            Map<String,TableDescriptor> auxTablesIndex = new TreeMap<String,TableDescriptor>();
-            ArrayList<TableDescriptor> multiTables = new ArrayList<TableDescriptor>();
-            if (auxTableNames != null) {
-               for (String auxTableName:auxTableNames)
-                  auxTables.add(new TableDescriptor(auxTableName));
-            }
             TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
-
-            ArrayList<Object> persistProps = new ArrayList<Object>();
 
             Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
             if (properties != null) {
@@ -9664,189 +9650,223 @@ public class ModelUtil {
 
             sys.addDBTypeDescriptor(fullTypeName, dbTypeDesc);
 
-            if (properties != null) {
-               for (Object property:properties) {
-                  Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
-                  String propName = ModelUtil.getPropertyName(property);
-                  Object propType = ModelUtil.getPropertyType(property);
-
-                  if (propName == null || propType == null)
-                     continue;
-
-                  if (idSettings != null) { // handled above
-                     continue;
-                  }
-                  // Skip transient fields
-                  if (ModelUtil.hasModifier(property, "transient"))
-                     continue;
-                  Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
-                  String propTableName = null;
-                  String propColumnName = null;
-                  String propColumnType = null;
-                  boolean propOnDemand = false;
-                  boolean propRequired = false;
-                  String propDataSourceName = null;
-                  String propFetchGroup = null;
-                  String propReverseProperty = null;
-                  if (propSettings != null) {
-                     Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
-                     if (tmpPersist != null && !tmpPersist) {
-                        continue;
-                     }
-
-                     String tmpTableName = (String) ModelUtil.getAnnotationValue(propSettings, "tableName");
-                     if (tmpTableName != null) {
-                        propTableName = tmpTableName;
-                     }
-
-                     // TODO: should we specify columnNames and Types here as comma separated lists to deal with multi-column primary key properties (and possibly others that need more than one column?)
-                     String tmpColumnName = (String) ModelUtil.getAnnotationValue(propSettings, "columnName");
-                     if (tmpColumnName != null) {
-                        propColumnName = tmpColumnName;
-                     }
-
-                     String tmpColumnType = (String) ModelUtil.getAnnotationValue(propSettings, "columnType");
-                     if (tmpColumnType != null) {
-                        propColumnType = tmpColumnType;
-                     }
-
-                     Boolean tmpOnDemand  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "onDemand");
-                     if (tmpOnDemand != null) {
-                        propOnDemand = tmpOnDemand;
-                     }
-                     Boolean tmpRequired  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "required");
-                     if (tmpRequired != null) {
-                        propRequired = tmpRequired;
-                     }
-
-                     String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
-                     if (tmpDataSourceName != null) {
-                        propDataSourceName = tmpDataSourceName;
-                     }
-
-                     String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
-                     if (tmpFetchGroup != null) {
-                        propFetchGroup = tmpFetchGroup;
-                     }
-
-                     String tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSettings, "reverseProperty");
-                     if (tmpReverseProperty != null) {
-                        propReverseProperty = tmpReverseProperty;
-                     }
-                  }
-
-                  if (propColumnName == null)
-                     propColumnName = DBUtil.getSQLName(propName);
-                  DBTypeDescriptor refDBTypeDesc = null;
-
-                  boolean isMultiCol = false;
-
-                  // TODO: should we handle array and set properties here?
-                  boolean isArrayProperty = ModelUtil.isAssignableFrom(List.class, propType);
-                  if (isArrayProperty) {
-                     if (hasTypeParameters(propType)) {
-                        propType = getTypeParameter(propType, 0);
-                     }
-                     else
-                        propType = Object.class;
-                  }
-
-                  if (propColumnType == null) {
-                     propColumnType = DBUtil.getDefaultSQLType(propType);
-                     if (propColumnType == null) {
-                        refDBTypeDesc = getDBTypeDescriptor(sys, refLayer, propType);
-                        if (refDBTypeDesc == null) {
-                           propColumnType = "json";
-                        }
-                        else {
-                           TableDescriptor refTable = refDBTypeDesc.primaryTable;
-                           if (refTable.idColumns.size() == 1)
-                              propColumnType = DBUtil.getKeyIdColumnType(refTable.getIdColumns().get(0).columnType);
-                           else {
-                              isMultiCol = true;
-                              StringBuilder cns = new StringBuilder();
-                              StringBuilder cts = new StringBuilder();
-                              for (int idx = 0; idx < refTable.idColumns.size(); idx++) {
-                                 if (idx != 0) {
-                                    cns.append(",");
-                                    cts.append(",");
-                                 }
-                                 IdPropertyDescriptor idCol = refTable.idColumns.get(idx);
-                                 cns.append(propColumnName);
-                                 cns.append("_");
-                                 cns.append(idCol.columnName);
-                                 cts.append(DBUtil.getKeyIdColumnType(idCol.columnType));
-                              }
-                              propColumnName = cns.toString();
-                              propColumnType = cts.toString();
-                           }
-                        }
-                     }
-                  }
-
-                  boolean multiRow = false;
-                  // TODO: should we allow scalar arrays - arrays of strings and stuff like that?
-                  if (isArrayProperty && refDBTypeDesc != null)
-                     multiRow = true;
-
-                  DBPropertyDescriptor propDesc;
-
-                  if (isMultiCol) {
-                     propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
-                                                               propColumnType, propTableName, propRequired, propOnDemand,
-                                                               propDataSourceName, propFetchGroup,
-                                                               refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                                                               multiRow, propReverseProperty);
-                  }
-                  else {
-                     propDesc = new DBPropertyDescriptor(propName, propColumnName,
-                                                         propColumnType, propTableName, propRequired, propOnDemand,
-                                                         propDataSourceName, propFetchGroup,
-                                                         refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                                                         multiRow, propReverseProperty);
-                  }
-
-                  propDesc.refDBTypeDesc = refDBTypeDesc;
-
-                  TableDescriptor propTable = primaryTable;
-
-                  if (multiRow) {
-                     // NOTE: this table name may be reassigned after we resolve references to other type descriptors
-                     // since the reference semantics determine how the reference is stored.  For example, if this is a
-                     // one-to-many relationship, we'll use the table for the 'one' side to avoid an extra multi-table
-                     if (propTableName == null)
-                        propTableName = primaryTableName + "_" + propColumnName;
-
-                     TableDescriptor multiTable = new TableDescriptor(propTableName);
-                     propTable = multiTable;
-                     multiTable.multiRow = true;
-                     multiTables.add(multiTable);
-                  }
-                  else if (propTableName != null && !propTableName.equals(propTable.tableName)) {
-                     propTable = auxTablesIndex.get(propTableName);
-                     if (propTable == null) {
-                        TableDescriptor auxTable = new TableDescriptor(propTableName);
-                        auxTablesIndex.put(propTableName, auxTable);
-                        auxTables.add(auxTable);
-                        propTable = auxTable;
-                     }
-                  }
-                  propTable.addColumnProperty(propDesc);
-               }
-            }
-
-            dbTypeDesc.initTables(auxTables, multiTables, versionProp);
-
             return dbTypeDesc;
          }
       }
       return null;
    }
 
+   public static void completeDBTypeDescriptor(DBTypeDescriptor dbTypeDesc, LayeredSystem sys, Layer refLayer, Object typeDecl) {
+      if (dbTypeDesc == null)
+         return;
+
+      ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
+      dbTypeDesc.tablesInitialized = true;
+
+      Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
+
+      String versionProp = null;
+      ArrayList<String> auxTableNames = null;
+
+      TableDescriptor primaryTable = dbTypeDesc.primaryTable;
+
+      if (typeSettings != null) {
+         for (Object annot:typeSettings) {
+            String tmpVersionProp = (String) ModelUtil.getAnnotationValue(annot, "versionProp");
+            if (tmpVersionProp != null) {
+               versionProp = tmpVersionProp;
+            }
+            String tmpAuxTableNames = (String) ModelUtil.getAnnotationValue(annot, "auxTables");
+            if (tmpAuxTableNames != null) {
+               auxTableNames = new ArrayList<String>(Arrays.asList(tmpAuxTableNames.split(",")));
+            }
+         }
+
+         ArrayList<TableDescriptor> auxTables = new ArrayList<TableDescriptor>();
+         Map<String,TableDescriptor> auxTablesIndex = new TreeMap<String,TableDescriptor>();
+         ArrayList<TableDescriptor> multiTables = new ArrayList<TableDescriptor>();
+         if (auxTableNames != null) {
+            for (String auxTableName:auxTableNames)
+               auxTables.add(new TableDescriptor(auxTableName));
+         }
+         if (properties != null) {
+            for (Object property:properties) {
+               Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
+               String propName = ModelUtil.getPropertyName(property);
+               Object propType = ModelUtil.getPropertyType(property);
+
+               if (propName == null || propType == null)
+                  continue;
+
+               if (idSettings != null) { // handled above
+                  continue;
+               }
+               // Skip transient fields
+               if (ModelUtil.hasModifier(property, "transient"))
+                  continue;
+               Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
+               String propTableName = null;
+               String propColumnName = null;
+               String propColumnType = null;
+               boolean propOnDemand = false;
+               boolean propRequired = false;
+               String propDataSourceName = null;
+               String propFetchGroup = null;
+               String propReverseProperty = null;
+               if (propSettings != null) {
+                  Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
+                  if (tmpPersist != null && !tmpPersist) {
+                     continue;
+                  }
+
+                  String tmpTableName = (String) ModelUtil.getAnnotationValue(propSettings, "tableName");
+                  if (tmpTableName != null) {
+                     propTableName = tmpTableName;
+                  }
+
+                  // TODO: should we specify columnNames and Types here as comma separated lists to deal with multi-column primary key properties (and possibly others that need more than one column?)
+                  String tmpColumnName = (String) ModelUtil.getAnnotationValue(propSettings, "columnName");
+                  if (tmpColumnName != null) {
+                     propColumnName = tmpColumnName;
+                  }
+
+                  String tmpColumnType = (String) ModelUtil.getAnnotationValue(propSettings, "columnType");
+                  if (tmpColumnType != null) {
+                     propColumnType = tmpColumnType;
+                  }
+
+                  Boolean tmpOnDemand  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "onDemand");
+                  if (tmpOnDemand != null) {
+                     propOnDemand = tmpOnDemand;
+                  }
+                  Boolean tmpRequired  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "required");
+                  if (tmpRequired != null) {
+                     propRequired = tmpRequired;
+                  }
+
+                  String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
+                  if (tmpDataSourceName != null) {
+                     propDataSourceName = tmpDataSourceName;
+                  }
+
+                  String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
+                  if (tmpFetchGroup != null) {
+                     propFetchGroup = tmpFetchGroup;
+                  }
+
+                  String tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSettings, "reverseProperty");
+                  if (tmpReverseProperty != null) {
+                     propReverseProperty = tmpReverseProperty;
+                  }
+               }
+
+               if (propColumnName == null)
+                  propColumnName = DBUtil.getSQLName(propName);
+               DBTypeDescriptor refDBTypeDesc = null;
+
+               boolean isMultiCol = false;
+
+               // TODO: should we handle array and set properties here?
+               boolean isArrayProperty = ModelUtil.isAssignableFrom(List.class, propType);
+               if (isArrayProperty) {
+                  if (hasTypeParameters(propType)) {
+                     propType = getTypeParameter(propType, 0);
+                  }
+                  else
+                     propType = Object.class;
+               }
+
+               if (propColumnType == null) {
+                  propColumnType = DBUtil.getDefaultSQLType(propType);
+                  if (propColumnType == null) {
+                     refDBTypeDesc = getDBTypeDescriptor(sys, refLayer, propType, true);
+                     if (refDBTypeDesc == null) {
+                        propColumnType = "json";
+                     }
+                     else {
+                        TableDescriptor refTable = refDBTypeDesc.primaryTable;
+                        if (refTable.idColumns.size() == 1)
+                           propColumnType = DBUtil.getKeyIdColumnType(refTable.getIdColumns().get(0).columnType);
+                        else {
+                           isMultiCol = true;
+                           StringBuilder cns = new StringBuilder();
+                           StringBuilder cts = new StringBuilder();
+                           for (int idx = 0; idx < refTable.idColumns.size(); idx++) {
+                              if (idx != 0) {
+                                 cns.append(",");
+                                 cts.append(",");
+                              }
+                              IdPropertyDescriptor idCol = refTable.idColumns.get(idx);
+                              cns.append(propColumnName);
+                              cns.append("_");
+                              cns.append(idCol.columnName);
+                              cts.append(DBUtil.getKeyIdColumnType(idCol.columnType));
+                           }
+                           propColumnName = cns.toString();
+                           propColumnType = cts.toString();
+                        }
+                     }
+                  }
+               }
+
+               boolean multiRow = false;
+               // TODO: should we allow scalar arrays - arrays of strings and stuff like that?
+               if (isArrayProperty && refDBTypeDesc != null)
+                  multiRow = true;
+
+               DBPropertyDescriptor propDesc;
+
+               if (isMultiCol) {
+                  propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
+                          propColumnType, propTableName, propRequired, propOnDemand,
+                          propDataSourceName, propFetchGroup,
+                          refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
+                          multiRow, propReverseProperty);
+               }
+               else {
+                  propDesc = new DBPropertyDescriptor(propName, propColumnName,
+                          propColumnType, propTableName, propRequired, propOnDemand,
+                          propDataSourceName, propFetchGroup,
+                          refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
+                          multiRow, propReverseProperty);
+               }
+
+               propDesc.refDBTypeDesc = refDBTypeDesc;
+
+               TableDescriptor propTable = primaryTable;
+
+               if (multiRow) {
+                  // NOTE: this table name may be reassigned after we resolve references to other type descriptors
+                  // since the reference semantics determine how the reference is stored.  For example, if this is a
+                  // one-to-many relationship, we'll use the table for the 'one' side to avoid an extra multi-table
+                  if (propTableName == null)
+                     propTableName = primaryTable.tableName + "_" + propColumnName;
+
+                  TableDescriptor multiTable = new TableDescriptor(propTableName);
+                  propTable = multiTable;
+                  multiTable.multiRow = true;
+                  multiTables.add(multiTable);
+               }
+               else if (propTableName != null && !propTableName.equals(propTable.tableName)) {
+                  propTable = auxTablesIndex.get(propTableName);
+                  if (propTable == null) {
+                     TableDescriptor auxTable = new TableDescriptor(propTableName);
+                     auxTablesIndex.put(propTableName, auxTable);
+                     auxTables.add(auxTable);
+                     propTable = auxTable;
+                  }
+               }
+               propTable.addColumnProperty(propDesc);
+            }
+         }
+         dbTypeDesc.initTables(auxTables, multiTables, versionProp);
+      }
+   }
+
    public static DBPropertyDescriptor getDBPropertyDescriptor(LayeredSystem sys, Layer refLayer, Object propObj) {
       Object enclType = getEnclosingType(propObj);
       if (enclType != null) {
-         DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType);
+         DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType, true);
          String propName = ModelUtil.getPropertyName(propObj);
          if (typeDesc != null) {
             typeDesc.init();
@@ -9857,7 +9877,7 @@ public class ModelUtil {
    }
 
    public static DBProvider getDBProviderForType(LayeredSystem sys, Layer refLayer, Object typeObj) {
-      DBTypeDescriptor typeDesc = ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj);
+      DBTypeDescriptor typeDesc = ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj, false);
       if (typeDesc != null) {
          String dataSourceName = typeDesc.dataSourceName;
          DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
@@ -9882,7 +9902,7 @@ public class ModelUtil {
    public static DBProvider getDBProviderForProperty(LayeredSystem sys, Layer refLayer, Object propObj) {
       Object enclType = ModelUtil.getEnclosingType(propObj);
       String propName = ModelUtil.getPropertyName(propObj);
-      DBTypeDescriptor typeDesc = enclType == null ? null : ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForMember(sys, propObj), enclType);
+      DBTypeDescriptor typeDesc = enclType == null ? null : ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForMember(sys, propObj), enclType, true);
       if (typeDesc != null) {
          DBPropertyDescriptor propDesc = typeDesc.getPropertyDescriptor(propName);
          if (propDesc != null) {

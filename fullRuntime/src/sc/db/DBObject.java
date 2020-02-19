@@ -59,7 +59,7 @@ public class DBObject implements IDBObject {
    /** This will be set when this DBObject has been replaced for some reason by another one.
     *  Each operation will be redirected to the replaced version... maybe due to a race condition during the creation,
     *  because an instance was deserialized using the existing version. */
-   public DBObject replacedBy = null;
+   public IDBObject replacedBy = null;
 
    // We can also just extend DBObject to inherit - in this case wrapper is null.
    public DBObject() {
@@ -124,7 +124,7 @@ public class DBObject implements IDBObject {
       if (!list.trackingChanges || (flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return null;
       DBTransaction cur = create ? DBTransaction.getOrCreate() : DBTransaction.getCurrent();
-      if (cur == null)
+      if (cur == null || cur.applyingDBChanges)
          return null;
       synchronized (pendingOps) {
          int txSz = pendingOps.size();
@@ -191,7 +191,7 @@ public class DBObject implements IDBObject {
 
    public PropUpdate dbFetch(String property) {
       if (replacedBy != null)
-         return replacedBy.dbFetch(property);
+         return replacedBy.getDBObject().dbFetch(property);
 
       if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return null;
@@ -221,7 +221,7 @@ public class DBObject implements IDBObject {
 
    public boolean dbFetchDefault() {
       if (replacedBy != null)
-         return replacedBy.dbFetchDefault();
+         return replacedBy.getDBObject().dbFetchDefault();
 
       if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return false;
@@ -299,6 +299,16 @@ public class DBObject implements IDBObject {
       return res;
    }
 
+   public PropUpdate dbSetIdProp(String propertyName, Object propertyValue)  {
+      if (replacedBy != null)
+         return replacedBy.getDBObject().dbSetIdProp(propertyName, propertyValue);
+
+      if ((flags & (TRANSIENT | REMOVED | STOPPED | PROTOTYPE)) != 0)
+         return null;
+
+      throw new IllegalStateException("Id property values can't be changed on a persistent instance");
+   }
+
    /**
     * Called to update the saved representation of the instance. Returns null to allow the assignment
     * in the field. If it returns non-null, the setX method will just return.
@@ -308,18 +318,27 @@ public class DBObject implements IDBObject {
     */
    public PropUpdate dbSetProp(String propertyName, Object propertyValue)  {
       if (replacedBy != null)
-         return replacedBy.dbSetProp(propertyName, propertyValue);
+         return replacedBy.getDBObject().dbSetProp(propertyName, propertyValue);
 
-      if ((flags & (TRANSIENT | REMOVED | STOPPED | PROTOTYPE)) != 0)
+      if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
          return null;
       DBTransaction curr = DBTransaction.getOrCreate();
       // When we are applying this transaction, we need to return null here to allow the setX call to update the cached value
-      if (curr.commitInProgress || curr.applyingDBChanges)
+      if (curr.commitInProgress) {
          return null;
+      }
       DBFetchGroupQuery fetchQuery = dbTypeDesc.getFetchQueryForProperty(propertyName);
       if (fetchQuery == null)
          throw new IllegalArgumentException("Missing propQueries entry for property: " + propertyName);
       int lockCt = fetchQuery.queryNumber;
+
+      // For the case where we are populating a newly fetched instance, mark the property as fetched and update the field
+      if (curr.applyingDBChanges || (flags & PROTOTYPE) != 0) {
+         synchronized (this) {
+            fstate |= FETCHED << (lockCt *2);
+         }
+         return null;
+      }
 
       // Setting a property that has not been fetched from the DB - possibly being fetched from a query
       if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
@@ -431,7 +450,7 @@ public class DBObject implements IDBObject {
       return (flags & TRANSIENT) != 0;
    }
 
-   public void setTransient(boolean val) {
+   public synchronized void setTransient(boolean val) {
       if (val)
          flags = TRANSIENT;
       else
@@ -442,7 +461,7 @@ public class DBObject implements IDBObject {
       return (flags & PROTOTYPE) != 0;
    }
 
-   public void setPrototype(boolean val) {
+   public synchronized void setPrototype(boolean val) {
       if (val) {
          flags = PROTOTYPE;
       }
@@ -452,6 +471,33 @@ public class DBObject implements IDBObject {
 
    public boolean isPendingInsert() {
       return (flags & PENDING_INSERT) != 0;
+   }
+
+   public void registerNew() {
+      IDBObject curInst = getInst();
+      IDBObject newInst = dbTypeDesc.registerInstance(curInst);
+      if (newInst != null) {
+         if (newInst != curInst) {
+            System.err.println("*** Warning - registering new instance that has already been replaced!");
+            replacedBy = newInst;
+         }
+         // else - this instance has already been registered so don't do anything
+         return;
+      }
+      // Mark all of the property queries in this type as fetched so we don't re-query them until the cache is invalidated
+      int numFetchQueries = dbTypeDesc.getNumFetchPropQueries();
+      synchronized (this) {
+         setTransient(false);
+         for (int f = 0; f < numFetchQueries; f++) {
+            fstate |= DBObject.FETCHED << (f*2);
+         }
+      }
+   }
+
+   public synchronized void markStopped() {
+      if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE)) != 0)
+         throw new IllegalArgumentException("Invalid state for markStopped");
+      flags = STOPPED;
    }
 
    public String getObjectId() {
@@ -479,18 +525,22 @@ public class DBObject implements IDBObject {
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      if (wrapper == null) {
-         sb.append("DBObject: class: " + DynUtil.getType(this));
-      }
-      else {
-         sb.append("DB store for: " + DynUtil.getType(wrapper));
-      }
-      if ((flags & TRANSIENT) == 0) {
+      sb.append(CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getType(getInst()), false)));
+      if ((flags & (TRANSIENT|PROTOTYPE)) == 0) {
          sb.append(": ");
          sb.append(getObjectId());
+
+         if ((flags & REMOVED) != 0)
+            sb.append(" - removed");
+         if ((flags & STOPPED) != 0)
+            sb.append(" - stopped");
       }
-      else
-         sb.append(" - transient");
+      else {
+         if ((flags & TRANSIENT) != 0)
+            sb.append(" - transient");
+         if ((flags & PROTOTYPE) != 0)
+            sb.append(" - prototype");
+      }
       return sb.toString();
    }
 

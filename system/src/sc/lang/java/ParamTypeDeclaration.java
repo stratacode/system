@@ -655,7 +655,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public DBTypeDescriptor getDBTypeDescriptor() {
-      return ModelUtil.getDBTypeDescriptor(system, getRefLayer(), baseType);
+      return ModelUtil.getDBTypeDescriptor(system, getRefLayer(), baseType, false);
    }
 
    public String toString() {

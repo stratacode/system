@@ -101,13 +101,13 @@ public class DBUtil {
     }
   }
 
-   public static void close(AutoCloseable conn) {
+   public static void close(AutoCloseable cl) {
       try {
-         if (conn != null)
-            conn.close();
+         if (cl != null)
+            cl.close();
       }
       catch (Exception exc) {
-         System.err.println("*** error closing item: " + exc);
+         System.err.println("*** db error closing: " + exc);
       }
    }
 
@@ -247,5 +247,12 @@ public class DBUtil {
          return ((IObjectId) inst).getObjectId();
       else
          return inst.toString();
+   }
+
+   public static void appendVal(StringBuilder logSB, Object val) {
+     if (val instanceof IDBObject)
+        logSB.append(((IDBObject) val).getDBObject());
+     else
+        logSB.append(val);
    }
 }

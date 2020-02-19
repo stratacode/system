@@ -15,6 +15,8 @@ class FetchTableDesc {
    // Only set if this table corresponds to a reference property of the parent type
    DBPropertyDescriptor refProp;
 
+   DBPropertyDescriptor joinProp;
+
    FetchTableDesc copyForRef(DBPropertyDescriptor refProp) {
       FetchTableDesc res = new FetchTableDesc();
       res.table = table;

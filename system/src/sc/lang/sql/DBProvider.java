@@ -24,7 +24,7 @@ public class DBProvider {
    private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = <%= dbObjPrefix%>dbFetch(\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
-   private static String UPDATE_PROP_TEMPLATE = "\n      if (<%= dbObjPrefix%>dbSetProp(\"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";
+   private static String UPDATE_PROP_TEMPLATE = "\n      if (<%= dbObjPrefix%><%= dbSetPropMethod %>(\"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";
 
    private static Template getPropertyTemplate;
    private static Template updatePropertyTemplate;
