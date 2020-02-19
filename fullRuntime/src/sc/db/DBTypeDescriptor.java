@@ -72,6 +72,7 @@ public class DBTypeDescriptor {
    public String dataSourceName;
 
    public boolean queueInserts = false;
+   public boolean queueDeletes = false;
 
    /** Set to true for types where the source has no 'id' property */
    public boolean needsAutoId = false;
@@ -386,7 +387,7 @@ public class DBTypeDescriptor {
       return null;
    }
 
-   public boolean removeInstance(DBObject dbObj) {
+   public boolean removeInstance(DBObject dbObj, boolean remove) {
       if (typeInstances == null)
          return false;
       Object id = dbObj.getDBId();
@@ -396,7 +397,10 @@ public class DBTypeDescriptor {
          if (res == dbObj.getInst()) {
             removed = typeInstances.remove(id);
             if (removed != null) {
-               removed.getDBObject().markStopped();
+               if (remove)
+                  removed.getDBObject().markRemoved();
+               else
+                  removed.getDBObject().markStopped();
                return true;
             }
          }

@@ -44,6 +44,7 @@ public class DBObject implements IDBObject {
    public static final int PROTOTYPE = 4; // set when the instance is in 'prototype' mode - set id properties, or other properties and do 'dbRefresh()'
    public static final int PENDING_INSERT = 8;
    public static final int STOPPED = 16;
+   public static final int PENDING_DELETE = 32;
 
    private int flags = TRANSIENT;
 
@@ -181,8 +182,12 @@ public class DBObject implements IDBObject {
          }
          if (createDelete) {
             TxDelete del = new TxDelete(curr, this);
-            curr.addOp(del);
-            pendingOps.add(del);
+            if (dbTypeDesc.queueDeletes) {
+               curr.addOp(del);
+               pendingOps.add(del);
+            }
+            else
+               del.apply();
             return del;
          }
       }
@@ -193,8 +198,11 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.getDBObject().dbFetch(property);
 
-      if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
+      if ((flags & (TRANSIENT)) != 0)
          return null;
+
+      if ((flags & (REMOVED | STOPPED)) != 0)
+         throw new IllegalStateException("GetProperty on: " + getStateString() + " dbObject: " + this);
 
       DBTransaction curTransaction = DBTransaction.getOrCreate();
 
@@ -223,8 +231,11 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.getDBObject().dbFetchDefault();
 
-      if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
+      if ((flags & TRANSIENT) != 0)
          return false;
+
+      if ((flags & (REMOVED | STOPPED)) != 0)
+         throw new IllegalStateException("GetDefaultProperties on: " + getStateString() + " dbObject: " + this);
 
       DBFetchGroupQuery fetchQuery = dbTypeDesc.getDefaultFetchQuery();
       if (fetchQuery == null)
@@ -320,7 +331,10 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.getDBObject().dbSetProp(propertyName, propertyValue);
 
-      if ((flags & (TRANSIENT | REMOVED | STOPPED)) != 0)
+      if ((flags & (REMOVED | STOPPED)) != 0)
+         throw new IllegalStateException("setProperty on: " + getStateString() + " dbObject: " + this);
+
+      if ((flags & TRANSIENT) != 0)
          return null;
       DBTransaction curr = DBTransaction.getOrCreate();
       // When we are applying this transaction, we need to return null here to allow the setX call to update the cached value
@@ -364,23 +378,24 @@ public class DBObject implements IDBObject {
          return;
       }
 
-      if ((flags & REMOVED) != 0)
-         throw new IllegalArgumentException("Attempting to insert removed instance");
-      if ((flags & STOPPED) != 0)
-         throw new IllegalArgumentException("Attempting to insert stopped instance");
-      if ((flags & TRANSIENT) == 0) // TODO: Is this right?
-         throw new IllegalArgumentException("Attempting to insert non-transient instance");
-      if ((flags & PENDING_INSERT) != 0)
-         throw new IllegalArgumentException("Attempting to insert instance with pending insert");
-      flags |= PENDING_INSERT;
+      synchronized (this) {
+         if ((flags & (REMOVED | STOPPED | PENDING_INSERT | PENDING_DELETE)) != 0)
+            throw new IllegalStateException("dbInsert on " + getStateString() + " instance: " + this);
+         if ((flags & TRANSIENT) == 0) // TODO: Is this right?
+            throw new IllegalArgumentException("Attempting to insert non-transient instance");
+         flags |= PENDING_INSERT;
+      }
       DBTransaction curr = DBTransaction.getOrCreate();
       TxOperation op = getPendingOperation(curr, false, true, false, false);
       // The createInsert flag should return a new TxInsert, unless there's another operation already associated
       // to this instance in this transaction which I think should flag an error.
       if (!(op instanceof TxInsert))
          throw new UnsupportedOperationException();
-      if (op.applied)
-         flags &= ~PENDING_INSERT;
+      if (op.applied) {
+         synchronized (this) {
+            flags &= ~PENDING_INSERT;
+         }
+      }
    }
 
    public int dbUpdate() {
@@ -396,29 +411,32 @@ public class DBObject implements IDBObject {
          replacedBy.dbDelete();
          return;
       }
-
-      if ((flags & STOPPED) != 0)
-         throw new IllegalArgumentException("Attempting to remove stopped instance");
-      if ((flags & REMOVED) != 0)
-         throw new IllegalArgumentException("Attempting to remove already removed instance");
-      if ((flags & TRANSIENT) != 0)  // TODO: maybe this should be ok?
-         throw new IllegalArgumentException("Attempting to remove instance never added");
       DBTransaction curr = DBTransaction.getOrCreate();
+
+      synchronized (this) {
+         if ((flags & (STOPPED | REMOVED)) != 0)
+           throw new IllegalStateException("dbDelete for " + getStateString() + " instance: " + this);
+         if ((flags & TRANSIENT) != 0)  // TODO: maybe this should be ok?
+            throw new IllegalStateException("Attempting to remove instance never added");
+         flags |= PENDING_DELETE;
+      }
       TxOperation op = getPendingOperation(curr, false, false, true, false);
       if (!(op instanceof TxDelete))
          throw new UnsupportedOperationException();
+
+      if (op.applied) {
+         synchronized(this) {
+            flags &= ~PENDING_DELETE;
+         }
+      }
    }
 
    public boolean dbRefresh() {
       if (replacedBy != null)
          return replacedBy.dbRefresh();
 
-      if ((flags & STOPPED) != 0)
-         throw new IllegalArgumentException("dbRefresh called on stopped instance");
-      if ((flags & TRANSIENT) != 0)
-         throw new IllegalArgumentException("dbRefresh called on transient instance");
-      if ((flags & REMOVED) != 0)
-         throw new IllegalArgumentException("dbRefresh called on removed instance");
+      if ((flags & (STOPPED | TRANSIENT | REMOVED)) != 0)
+         throw new IllegalStateException("dbRefresh for: " + getStateString() + " instance: " + this);
 
       if ((flags & PROTOTYPE) != 0) {
          // TODO: if the id properties are not set, and other properties have been set, we could do a query using those properties here
@@ -495,9 +513,15 @@ public class DBObject implements IDBObject {
    }
 
    public synchronized void markStopped() {
-      if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE)) != 0)
+      if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | REMOVED)) != 0)
          throw new IllegalArgumentException("Invalid state for markStopped");
       flags = STOPPED;
+   }
+
+   public synchronized void markRemoved() {
+      if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | STOPPED)) != 0)
+         throw new IllegalArgumentException("Invalid state for markRemoved");
+      flags = REMOVED;
    }
 
    public String getObjectId() {
@@ -599,7 +623,21 @@ public class DBObject implements IDBObject {
    public void stop() {
       if (isTransient())
          return;
-      if (!dbTypeDesc.removeInstance(this))
+      if (!dbTypeDesc.removeInstance(this, false))
          DBUtil.error("Stopping instance not found in index!");
+   }
+
+   public String getStateString() {
+      if ((flags & REMOVED) != 0)
+         return "removed";
+      else if ((flags & STOPPED) != 0)
+         return "stopped";
+      else if ((flags & TRANSIENT) != 0)
+         return "transient";
+      else if ((flags & PENDING_INSERT) != 0)
+         return "pending-insert";
+      else if ((flags & PROTOTYPE) != 0)
+         return "prototype";
+      return "persistent";
    }
 }

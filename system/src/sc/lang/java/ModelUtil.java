@@ -9559,6 +9559,10 @@ public class ModelUtil {
       }
    }
 
+   /**
+    * Defines the part of the DBTypeDescriptor that includes the primaryTable and idColumns - but does not try to resolve
+    * other DBTypeDescriptors for references. This part only can be used to define new interface methods in the DBDefinesTypeTemplate
+    */
    public static DBTypeDescriptor initDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
       ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
       // TODO: should check for annotations on the Layer of all types in the type tree. For each attribute, check the layer annotation if it's not set at the type level
@@ -9757,6 +9761,15 @@ public class ModelUtil {
                   String tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSettings, "reverseProperty");
                   if (tmpReverseProperty != null) {
                      propReverseProperty = tmpReverseProperty;
+                  }
+               }
+               else {
+                  // By default if there's a forward binding the value is derived and so more often than not does not have to be stored
+                  // Use the forward bindings to add new 'rule' properties to the model that can be used easily as query properties
+                  if (property instanceof VariableDefinition) {
+                     VariableDefinition varDef = (VariableDefinition) property;
+                     if (varDef.bindingDirection != null && varDef.bindingDirection.doForward())
+                        continue;
                   }
                }
 

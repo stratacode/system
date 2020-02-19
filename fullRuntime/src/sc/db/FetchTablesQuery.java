@@ -163,6 +163,9 @@ public class FetchTablesQuery {
 
    boolean processOneRowQueryResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       if (!rs.next()) {
+         if (dbObj.isPrototype())
+            return false;
+
          dbObj.setTransient(true);
          return false;
       }

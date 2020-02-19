@@ -10,7 +10,19 @@ public class TxDelete extends TxOperation {
          throw new IllegalArgumentException("Already applied delete!");
       applied = true;
 
-      System.err.println("TXdelete - TBI");
-      return 0;
+      //deleteOwnedRefs(true);
+      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+      int ct = 0;
+      if (dbTypeDesc.auxTables != null) {
+         for (TableDescriptor table:dbTypeDesc.auxTables)
+            ct += doDelete(table);
+      }
+      if (dbTypeDesc.multiTables != null) {
+         for (TableDescriptor table:dbTypeDesc.multiTables)
+            ct += doMultiDelete(table, null, true);
+      }
+      ct += doDelete(dbTypeDesc.primaryTable);
+      //deleteOwnedRefs(false);
+      return ct;
    }
 }

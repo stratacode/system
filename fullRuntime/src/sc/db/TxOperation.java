@@ -184,8 +184,8 @@ public abstract class TxOperation {
    protected int doMultiDelete(TableDescriptor delTable, List<IDBObject> toRemove, boolean removeCurrent) {
       if (delTable.isReadOnly())
          return 0;
-      System.err.println("*** doMultiDelete not yet implemented");
-      return 0;
+      // TODO: any differences we need to add here?
+      return doDelete(delTable);
    }
 
    /** Called with null to insert the current property value, or a list of values to insert */
@@ -532,6 +532,97 @@ public abstract class TxOperation {
             }
          }
       }
+   }
+
+   protected int doDelete(TableDescriptor deleteTable) {
+      if (deleteTable.isReadOnly())
+         return 0;
+
+      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+      TableDescriptor primaryTable = dbTypeDesc.primaryTable;
+      boolean isPrimary = primaryTable == deleteTable;
+
+      List<IdPropertyDescriptor> idCols = deleteTable.getIdColumns();
+
+      ArrayList<String> columnNames = new ArrayList<String>();
+      ArrayList<Object> columnTypes = new ArrayList<Object>();
+      ArrayList<Object> columnValues = new ArrayList<Object>();
+
+      List<String> nullProps = null;
+      IDBObject inst = dbObject.getInst();
+      for (int i = 0; i < idCols.size(); i++) {
+         IdPropertyDescriptor idCol = idCols.get(i);
+         IBeanMapper mapper = idCol.getPropertyMapper();
+         Object val = mapper.getPropertyValue(inst, false, false);
+         if (val == null) {
+            if (nullProps == null)
+               nullProps = new ArrayList<String>();
+            nullProps.add(idCol.propertyName);
+         }
+         columnValues.add(val);
+         columnNames.add(idCol.columnName);
+         columnTypes.add(idCol.getPropertyMapper().getPropertyType());
+      }
+
+      if (nullProps != null)
+         throw new IllegalArgumentException("Null id properties for DBObject in delete: " + nullProps);
+
+      int numCols = columnNames.size();
+
+      StringBuilder sb = new StringBuilder();
+      sb.append("DELETE FROM ");
+      DBUtil.appendIdent(sb, null, deleteTable.tableName);
+      sb.append(" WHERE ");
+
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(sb) : null;
+
+      for (int i = 0; i < numCols; i++) {
+         if (i != 0) {
+            append(sb, logSB, "AND ");
+         }
+         DBUtil.appendIdent(sb, logSB, columnNames.get(i));
+         sb.append(" = ?");
+         if (logSB != null) {
+            logSB.append(" = ");
+            logSB.append(DBUtil.formatValue(columnValues.get(i)));
+         }
+      }
+
+      try {
+         Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
+         String statementStr = sb.toString();
+         PreparedStatement st = conn.prepareStatement(statementStr);
+
+         for (int i = 0; i < numCols; i++) {
+            DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
+         }
+
+         int numInserted = st.executeUpdate();
+
+         if (numInserted != 1) {
+            if (numInserted == 0)
+               DBUtil.error("Delete failed to remove row for: " + dbObject);
+            else
+               DBUtil.error("Delete expected to remove one row actually removed: " + numInserted + " for: " + dbObject);
+         }
+
+         if (logSB != null) {
+            if (numInserted == 1)
+               logSB.append(" -> removed one row");
+            else
+               logSB.append(" -> ***error - delete removed " + numInserted + " rows") ;
+
+            DBUtil.info(logSB);
+         }
+
+         if (deleteTable.primary) {
+            dbTypeDesc.removeInstance(dbObject, true);
+         }
+      }
+      catch (SQLException exc) {
+         throw new IllegalArgumentException("*** Delete: " + dbObject + " failed with DB error: " + exc);
+      }
+      return 1;
    }
 }
 
