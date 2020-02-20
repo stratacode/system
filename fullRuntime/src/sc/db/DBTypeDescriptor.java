@@ -165,27 +165,41 @@ public class DBTypeDescriptor {
       if (defaultFetchGroup != null)
          return;
       defaultFetchGroup = primaryTable.getJavaName();
+      String firstFetchGroup = null;
       // Build up the set of 'fetchGroups' - the queries to fetch properties for a given item
       for (DBPropertyDescriptor prop:allDBProps) {
          String fetchGroup = prop.fetchGroup;
+         boolean fetchable = false;
          if (prop.multiRow) {
             TableDescriptor mvTable = getMultiTableByName(prop.getTableName(), prop);
             if (mvTable == null)
                System.err.println("*** No multi-value table for property: " + prop.propertyName);
             else
-               addToFetchGroup(mvTable.getJavaName(), prop);
+               fetchable = addToFetchGroup(mvTable.getJavaName(), prop);
          }
          else {
-            if (fetchGroup != null) {
-               addToFetchGroup(fetchGroup, prop);
+            if (fetchGroup == null) {
+               if (prop.onDemand) {
+                  fetchGroup = prop.propertyName;
+               }
+               else {
+                  TableDescriptor table = getTableByName(prop.tableName);
+                  fetchGroup = table.getJavaName();
+               }
             }
-            else if (prop.onDemand)
-               addToFetchGroup(prop.propertyName, prop);
-            else {
-               TableDescriptor table = getTableByName(prop.tableName);
-               addToFetchGroup(table.getJavaName(), prop);
-            }
+            fetchable = addToFetchGroup(fetchGroup, prop);
          }
+         if (firstFetchGroup == null && fetchable) {
+            firstFetchGroup = fetchGroup;
+         }
+      }
+      // All properties are on-demand or in some other fetch group. Pick the first one to use as the default so that
+      // we have some property to load to validate that the item exists.
+      if (fetchGroups.get(defaultFetchGroup) == null) {
+         if (firstFetchGroup == null)
+            DBUtil.error("No main table properties for persistent type: " + this);
+         else
+            fetchGroups.put(defaultFetchGroup, fetchGroups.get(firstFetchGroup));
       }
    }
 
@@ -193,9 +207,9 @@ public class DBTypeDescriptor {
       return DynUtil.getTypeName(typeDecl, false);
    }
 
-   private void addToFetchGroup(String fetchGroup, DBPropertyDescriptor prop) {
+   private boolean addToFetchGroup(String fetchGroup, DBPropertyDescriptor prop) {
       if (prop.isId()) // Don't fetch ids since they don't change
-         return;
+         return false;
       DBFetchGroupQuery query = fetchGroups.get(fetchGroup);
       if (query == null) {
          query = new DBFetchGroupQuery();
@@ -206,6 +220,7 @@ public class DBTypeDescriptor {
       }
       query.addProperty(prop);
       propQueriesIndex.put(prop.propertyName, query);
+      return true;
    }
 
    public TableDescriptor primaryTable;

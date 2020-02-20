@@ -5,6 +5,8 @@
       return (<%= typeBaseName %>) sc.db.DBTypeDescriptor.getByType(<%= typeIsDynamic ? "sc.dyn.DynUtil.findType(\"" + typeName + "\")" : typeBaseName + ".class" %>, true).findById(<%= formatIdParams(true) %>);
    }
 
+   public static sc.db.DBTypeDescriptor dbTypeDesc;
+
    <%    if (dbTypeDescriptor.baseType == null) { %>
       // Stores persistent state for the instance
       protected sc.db.DBObject _dbObject = new sc.db.DBObject(this);

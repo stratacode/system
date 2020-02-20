@@ -514,13 +514,13 @@ public class DBObject implements IDBObject {
 
    public synchronized void markStopped() {
       if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | REMOVED)) != 0)
-         throw new IllegalArgumentException("Invalid state for markStopped");
+         throw new IllegalArgumentException("Invalid state for markStopped: " + getStateString());
       flags = STOPPED;
    }
 
    public synchronized void markRemoved() {
       if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | STOPPED)) != 0)
-         throw new IllegalArgumentException("Invalid state for markRemoved");
+         throw new IllegalArgumentException("Invalid state for markRemoved: " + getStateString());
       flags = REMOVED;
    }
 
@@ -549,21 +549,15 @@ public class DBObject implements IDBObject {
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getType(getInst()), false)));
       if ((flags & (TRANSIENT|PROTOTYPE)) == 0) {
-         sb.append(": ");
          sb.append(getObjectId());
-
-         if ((flags & REMOVED) != 0)
-            sb.append(" - removed");
-         if ((flags & STOPPED) != 0)
-            sb.append(" - stopped");
       }
       else {
-         if ((flags & TRANSIENT) != 0)
-            sb.append(" - transient");
-         if ((flags & PROTOTYPE) != 0)
-            sb.append(" - prototype");
+         sb.append(CTypeUtil.getClassName(DynUtil.getTypeName(DynUtil.getType(getInst()), false)));
+      }
+      if (flags != 0) {
+         sb.append(" - ");
+         sb.append(getStateString());
       }
       return sb.toString();
    }

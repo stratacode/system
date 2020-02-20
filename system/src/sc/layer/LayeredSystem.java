@@ -4118,9 +4118,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          if (options.testPattern != null) {
             // First run the unit tests which match (i.e. those installed with the @Test annotation)
-            if (sys.buildInfo == null)
-               sys.error("No build - unable to run tests with pattern: " + options.testPattern);
-            else
+            if (sys.buildInfo != null)
                sys.buildInfo.runMatchingTests(options.testPattern);
          }
 

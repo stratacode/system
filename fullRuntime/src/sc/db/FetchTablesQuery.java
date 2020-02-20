@@ -257,6 +257,8 @@ public class FetchTablesQuery {
          if (rowCt > 0) {
             logSB.append(",\n   ");
          }
+         else
+            logSB.append("\n   ");
 
          for (int fi = 0; fi < fetchTables.size(); fi++) {
             FetchTableDesc fetchTable = fetchTables.get(fi);
@@ -267,8 +269,19 @@ public class FetchTablesQuery {
                int numCols = propDesc.getNumColumns();
                if (numCols == 1)  {
                   val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
-                  if (propDesc.refDBTypeDesc != null)
+                  if (propDesc.refDBTypeDesc != null) {
                      val = propDesc.refDBTypeDesc.lookupInstById(val, true, false);
+
+                     if (val != null) {
+                        IDBObject valObj = (IDBObject) val;
+                        DBObject valDBObj = valObj.getDBObject();
+                        if (valDBObj.isPrototype()) {
+                           if (propDesc.reversePropDesc != null)
+                              System.out.println("***"); // Set reverse property here?
+                           valDBObj.setPrototype(false);
+                        }
+                     }
+                  }
                }
                else {
                   if (propDesc.refDBTypeDesc != null) {
@@ -282,6 +295,16 @@ public class FetchTablesQuery {
                         idVals.setVal(idVal, ci);
                      }
                      val = propDesc.refDBTypeDesc.lookupInstById(idVals, true, false);
+
+                     if (val != null) {
+                        IDBObject valObj = (IDBObject) val;
+                        DBObject valDBObj = valObj.getDBObject();
+                        if (valDBObj.isPrototype()) {
+                           if (propDesc.reversePropDesc != null)
+                              System.out.println("***"); // Set reverse property here?
+                           valDBObj.setPrototype(false);
+                        }
+                     }
                   }
                   else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
                      System.err.println("*** Unsupported case - multiCol property that's not a reference");
@@ -296,10 +319,10 @@ public class FetchTablesQuery {
                   }
                   resList.add(currentRowVal);
                   if (logSB != null) {
-                     logSB.append("\n   [");
+                     logSB.append(")\n   [");
                      logSB.append(rowCt);
-                     logSB.append("]: ");
-                     logSB.append(currentRowVal);
+                     logSB.append("](");
+                     logSB.append(currentRowVal == null ? null : currentRowVal.getDBObject());
                   }
                   rowCt++;
                }
@@ -318,7 +341,8 @@ public class FetchTablesQuery {
             }
             if (fetchTable.revColumns != null) {
                DBPropertyDescriptor revProp = fetchTable.revProps.get(0);
-               for (int rci = 0; rci < fetchTable.revColumns.size(); rci++) {
+               int numToFetch = fetchTable.revColumns.size();
+               for (int rci = 0; rci < numToFetch; rci++) {
                   DBPropertyDescriptor propDesc = fetchTable.revColumns.get(rci);
                   IBeanMapper propMapper = propDesc.getPropertyMapper();
                   Object val;
@@ -329,8 +353,19 @@ public class FetchTablesQuery {
                   if (numCols == 1)  {
                      val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
 
-                     if (refTypeDesc != null)
+                     if (refTypeDesc != null) {
                         val = refTypeDesc.lookupInstById(val, true, false);
+
+                        if (val != null) {
+                           IDBObject valObj = (IDBObject) val;
+                           DBObject valDBObj = valObj.getDBObject();
+                           if (valDBObj.isPrototype()) {
+                              if (propDesc.reversePropDesc != null)
+                                 System.out.println("***"); // Set reverse property here?
+                              valDBObj.setPrototype(false);
+                           }
+                        }
+                     }
                   }
                   else {
                      if (refTypeDesc != null) {
@@ -344,6 +379,16 @@ public class FetchTablesQuery {
                            idVals.setVal(idVal, ci);
                         }
                         val = refTypeDesc.lookupInstById(idVals, true, false);
+
+                        if (val != null) {
+                           IDBObject valObj = (IDBObject) val;
+                           DBObject valDBObj = valObj.getDBObject();
+                           if (valDBObj.isPrototype()) {
+                              if (propDesc.reversePropDesc != null)
+                                 System.out.println("***"); // Set reverse property here?
+                              valDBObj.setPrototype(false);
+                           }
+                        }
                      }
                      else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
                         System.err.println("*** Unsupported case - multiCol property that's not a reference");
@@ -361,8 +406,8 @@ public class FetchTablesQuery {
                         logSB.append("[");
                         logSB.append(rowCt);
                         logSB.append("]:");
-                        logSB.append(currentRowVal);
-                        logSB.append(": ");
+                        logSB.append(currentRowVal == null ? null : currentRowVal.getDBObject());
+                        logSB.append("(");
                      }
                      rowCt++;
                   }
@@ -374,11 +419,12 @@ public class FetchTablesQuery {
                      if (logSB != null) {
                         if (rci > 1)
                            logSB.append(", ");
-                        logSB.append(revProp.refDBTypeDesc);
-                        logSB.append(".");
                         logSB.append(propMapper.getPropertyName());
                         logSB.append("=");
                         DBUtil.appendVal(logSB, val);
+
+                        if (rci == numToFetch - 1)
+                           logSB.append(")");
                      }
                   }
                }

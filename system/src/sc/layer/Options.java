@@ -571,7 +571,8 @@ public class Options {
                   }
                   // Test in verify mode (headless)
                   else if (opt.equals("tv")) {
-                     testPattern = ".*";
+                     // TODO: shouldn't we set the testPattern for this and tw? It breaks unitDemoScript2 though
+                     //testPattern = ".*";
                      testVerifyMode = true;
                      testMode = true;
                   }

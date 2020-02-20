@@ -472,7 +472,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       dbTypeDescriptor.start();
 
       StringBuilder sb = new StringBuilder();
-      sb.append("sc.db.DBTypeDescriptor.add(new sc.db.DBTypeDescriptor(");
+      sb.append("sc.db.DBTypeDescriptor.add(dbTypeDesc = new sc.db.DBTypeDescriptor(");
 
       if (typeIsDynamic)
          sb.append("sc.dyn.DynUtil.findType(\\\"\" + typeName + \"\\\")\"");

@@ -135,6 +135,8 @@ public abstract class TxOperation {
             ResultSet rs = st.executeQuery();
             if (!rs.next())
                throw new IllegalArgumentException("Missing returned id result for insert with definedByDB ids: " + dbIdCols);
+            if (logSB != null)
+               logSB.append(" -> ");
             for (int i = 0; i < dbIdCols.size(); i++) {
                IdPropertyDescriptor dbIdCol = dbIdCols.get(i);
                IBeanMapper mapper = dbIdCol.getPropertyMapper();
@@ -142,17 +144,13 @@ public abstract class TxOperation {
                mapper.setPropertyValue(inst, id);
 
                if (logSB != null) {
-                  if (i == 0) {
-                     logSB.append(" -> (");
-                  }
-                  else
+                  if (i != 0)
                      logSB.append(", ");
                   logSB.append(id);
                }
             }
 
             if (logSB != null) {
-               logSB.append(")");
                DBUtil.info(logSB);
             }
          }
@@ -350,9 +348,14 @@ public abstract class TxOperation {
             rs = st.executeQuery();
             numInserted = 0;
             // For each instance read back the returned 'definedByDB' id properties and set them
+            if (logSB != null) {
+               logSB.append(" -> ");
+            }
             for (int ix = 0; ix < numInsts; ix++) {
                if (!rs.next())
                   throw new IllegalArgumentException("Unexpected end of query results: " + sb + " expected to return: " + numInsts + " and did not return: " + ix);
+               if (logSB != null && ix != 0)
+                  logSB.append(", ");
                IDBObject arrInst = propList.get(ix);
                for (int idx = 0; idx < dbIdCols.size(); idx++) {
                   IdPropertyDescriptor dbIdCol = dbIdCols.get(idx);
@@ -361,10 +364,7 @@ public abstract class TxOperation {
                   mapper.setPropertyValue(arrInst, id);
 
                   if (logSB != null) {
-                     if (idx == 0) {
-                        logSB.append(" -> (");
-                     }
-                     else
+                     if (idx != 0)
                         logSB.append(", ");
                      logSB.append(id);
                   }
@@ -374,13 +374,15 @@ public abstract class TxOperation {
          }
          else {
             numInserted = st.executeUpdate();
+            if (logSB != null) {
+               logSB.append(" -> inserted ");
+               logSB.append(numInserted);
+            }
          }
          if (numInserted != toInsert)
             DBUtil.error("Insert of: " + toInsert + " rows inserted: " + numInserted + " instead for: " + dbTypeDesc);
 
          if (logSB != null) {
-            logSB.append(" -> inserted ");
-            logSB.append(numInserted);
             DBUtil.info(logSB);
          }
 
@@ -597,20 +599,24 @@ public abstract class TxOperation {
             DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
          }
 
-         int numInserted = st.executeUpdate();
+         int numDeleted = st.executeUpdate();
 
-         if (numInserted != 1) {
-            if (numInserted == 0)
-               DBUtil.error("Delete failed to remove row for: " + dbObject);
-            else
-               DBUtil.error("Delete expected to remove one row actually removed: " + numInserted + " for: " + dbObject);
+         if (deleteTable.primary) {
+            if (numDeleted != 1) {
+               if (numDeleted == 0)
+                  DBUtil.error("Delete from primary table failed to remove row for: " + dbObject);
+               else
+                  DBUtil.error("Delete from primary table expected to remove one row actually removed: " + numDeleted + " for: " + dbObject);
+            }
          }
 
          if (logSB != null) {
-            if (numInserted == 1)
+            if (numDeleted == 1)
                logSB.append(" -> removed one row");
+            else if (!deleteTable.multiRow)
+               logSB.append(" -> ***error - delete removed " + numDeleted + " rows") ;
             else
-               logSB.append(" -> ***error - delete removed " + numInserted + " rows") ;
+               logSB.append(" -> multi table removed: " + numDeleted);
 
             DBUtil.info(logSB);
          }
