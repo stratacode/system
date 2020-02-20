@@ -14,20 +14,28 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.Set;
 
-/** The base class for both annotation processors and scope processors.  Framework components register these classes in the layer definition file to manage the behavior of an annotation like @Sync
- * which has compile time behavior.
+/**
+ * The base class for both annotation processors and scope processors, ways to process code that have a specific annotation
+ * or use the scope keyword for a specific scope.
+ * Frameworks can register scope or annotation processors in the layer definition file. See for example SyncAnnotationProcessor
+ * that manages the code generation added to the class for the @Sync tag.
  */
 public abstract class DefinitionProcessor implements IDefinitionProcessor {
    /**
-    * Allows you to group the types attached to this definition into a single global list.
-    * If this is set on an annotation processor associated with a method
-    * Field, etc. the enclosing type is added to the group.   From the type, you can find the list of methods or fields
-    * or whatever in the type inside of your template.
+    * Allows the grouping of types with this definition - a global list of types of a given variety (e.g. URL handlers,
+    * objects to create at startup, and more). Frameworks can then generate assets from this list - e.g. a web.xml file to
+    * map servlets to paths, or code to initialize the list of startup components.
+    *
+    * If type groups are used with methods or fields, the enclosing type is added to the group.
+    * From the type, the framework code can lookup the field with the particular annotation.
     */
    public String typeGroupName;
 
-   /** If set to true, and definition is an object, do not generate the static getX method.  Treat it as a class for code-gen purposes */
-
+   /**
+    * The valid flags can be set when an annotation processor is not valid for all definition types. This overlaps with
+    * the way that Java can restrict annotations to a class, field, etc, but applies to scopes as well and provides more valid cases
+    * like object and dynamic type
+    */
    public boolean validOnObject = true;
    public boolean validOnClass = true;
    public boolean validOnField = true;

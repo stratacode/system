@@ -11,11 +11,20 @@ import java.lang.annotation.Target;
 
 /**
  * CompilerSettings is placed on classes in sc layers to affect the generated code for this class when it's processed by scc.
- * Many of the attributes are inherited by a subclass.   So you can set it on a base-class to affect the whole type hierarchy - e.g. all
- * swing components.   You can set this annotation for a compiled class using an annotation layers - a layer which only annotates classes
- * for special processing during code-generation.  That way, you can control the code-generated for libraries even when you do not have the source code.
+ * Many of the attributes are also inherited by a subclass. It's most commonly set on the base-class of a framework layer,
+ * to affect all implementations of that class. For example, it can be set on a base UI component class to affect all UI widgets
+ * and their instances to control how inner objects are added as child widgets.
  * <p>
- * Via the objectTemplate and newTemplate attributes, you can specify code templates used to turn this class into a component or object instance.
+ * You can also set this annotation on a compiled class using an annotation layer.
+ * This allows subclasses of even compiled classes to have special code generated for them when including a compiled version
+ * of that framework jar. Annotation layers don't actually generate new source versions of the code they annotate.
+ * It is instead an easy way to control the generated code for applications using framework classes directly - without
+ * a wrapper class for each framework class.
+ * <p>
+ * Using the objectTemplate and newTemplate, specify the code templates used to turn this class into a component or object instance.
+ * The output from the code template is merged into the original source during code-processing.  Other code templates such as
+ * mixinTemplate, defineTypesTemplate, and staticMixinTemplate are options for augmenting the generated code in a structured
+ * way.
  * <p>
  * Set the liveDynamicTypes attribute to enable or disable the liveDynamicTypes feature.
  * <p>
@@ -34,9 +43,18 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    String objectTemplate() default "";      
    /** Specifies the type name for a template file to use for class components */
    String newTemplate() default "";         
-   /** A template merged into any subclass of this class, useful for collecting children */
+   /** A template merged into any subclass of this class, useful for collecting children. When this template is run, the types have been fully
+    * merged and so represent the final contract, but that means that new members like methods, or fields added in this template will
+    * not be visible to the source code. Use defineTypesMixinTemplate to define new methods, fields, etc. which are needed as part of
+    * the API contract of the type. The catch is that this template can not resolve foreign types - it can lookup fields, and base types
+    * of the current type.
+    */
    String mixinTemplate() default "";
-   /** A template merged into any subclass of this class that includes code that changes the contract for the type - i.e. is applied during start. */
+   /**
+    * A template merged into any subclass of this class that can include code that changes the contract for the type -
+    * i.e. it is applied during the initTypeInfo. Because of that, it cannot resolve referenced types in the class - it can
+    * only lookup fields, annotations etc. on this type and any base types of this type.
+    */
    String defineTypesMixinTemplate() default "";
    /** A template merged into any subclass of this class that includes static code.  This code gets put into a static section of the outer-most class because inner classes cannot have static code sections. */
    String staticMixinTemplate() default ""; 
