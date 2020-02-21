@@ -84,6 +84,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    /** In addition to generating Javascript should we also compile the equivalent Java files?  Though it takes longer, the Java compiler performs more error detection.  Also to generate the initial .html files (when just running the client layers, not using a server), you need the .java files there and compiled so we can use them to evaluate the template. */
    public boolean compileJavaFiles = true;
 
+   public Set<String> excludeCompilePackages = new TreeSet<String>();
+   {
+      excludeCompilePackages.add("java.util");
+      excludeCompilePackages.add("java.lang");
+   }
+
    /** Set this option to true to generate one big file from your entry points that includes only the classes you use. */
    public boolean disableModules = false;
 
@@ -532,8 +538,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          // First transform to Java but the java files are not part of the build themselves so just ignore them here
          List<SrcEntry> javaFiles = model.getProcessedFiles(genLayer, buildSrcDir, generate);
-         if (compileJavaFiles && javaFiles != null)
-            resFiles.addAll(javaFiles);
+         if (compileJavaFiles && javaFiles != null) {
+            String pkg = javaModel.getPackagePrefix();
+            if (pkg == null || !excludeCompilePackages.contains(pkg))
+               resFiles.addAll(javaFiles);
+         }
 
          if (proc instanceof TemplateLanguage) {
             TemplateLanguage tl = (TemplateLanguage) proc;
