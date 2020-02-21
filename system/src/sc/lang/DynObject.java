@@ -564,7 +564,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          // Static inner types do not have the this property.
          if ((cl.getModifiers() & Modifier.STATIC) != 0)
             return null;
-         if (cl.isEnum())
+         if (cl.isEnum() || srcObj instanceof java.lang.Enum)
             return null;
          Class encl;
          if ((encl = cl.getEnclosingClass()) == null)
