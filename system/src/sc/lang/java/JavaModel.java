@@ -54,7 +54,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    transient Map<String,Object> staticImportProperties;// Property name to beanmapper or Get/Set MethodDefinition
    transient Map<String,List<Object>> staticImportMethods;   // Method name, value is type object
 
-   transient List<String> globalTypes = new ArrayList<String>();
+   transient List<String> globalPackages = new ArrayList<String>();
 
    // Includes inner types as well as regular ones
    transient HashMap<String,TypeDeclaration> definedTypesByName = new HashMap<String,TypeDeclaration>();
@@ -397,11 +397,12 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                      importsByName.put(impName, new WildcardImport(CTypeUtil.prefixPath(pkgName, impName)));
                }
             }
-            else {
-               if (globalTypes == null)
-                  globalTypes = new ArrayList<String>();
-               globalTypes.add(CTypeUtil.getPackageName(impStr));
-            }
+            // Note: even when there are files in the package, it might not be all of the types defined in that package
+            // so still need to treat these as 'global packages'. This in particular happens because of annotation layers
+            // that might add some source types to a package while overriding others that still need to be searched manually.
+            if (globalPackages == null)
+               globalPackages = new ArrayList<String>();
+            globalPackages.add(CTypeUtil.getPackageName(impStr));
          }
          /*
           * This happens too early to validate the imports so we do it later on
@@ -964,8 +965,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             }
             if (td == null) {
                /* Handles .* imports in this package */
-               if (globalTypes != null) {
-                  for (String gpkg:globalTypes) {
+               if (!imported && globalPackages != null) {
+                  for (String gpkg: globalPackages) {
                      String globalName = CTypeUtil.prefixPath(gpkg, typeName);
                      if (!skipSrc) {
                         if ((td = layeredSystem.getTypeForCompile(globalName, null, true, false, srcOnly, layer, isLayerModel)) != null) {
@@ -2992,7 +2993,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       if ((options & CopyInitLevels) != 0) {
          // For transform at least, these are data structures that should be immutable so we are copying by reference.
          copy.externalReferences = externalReferences;
-         copy.globalTypes = globalTypes;
+         copy.globalPackages = globalPackages;
 
          // Register just the imports before the transform  During transform, importsByName gets updated to include imports in merged types.
          // so we need to make a copy.
