@@ -1296,7 +1296,7 @@ public class ModelUtil {
             }
          }
 
-         // First if any of the parameters is a lambda expression, we need to ensure the
+         // If any of the parameters is a lambda expression, we need to ensure the
          // lambda expression parameters match the parameters of the single-interface method
          // defined for this parameter type.
          for (int i = 0; i < param1Len; i++) {
@@ -1424,6 +1424,25 @@ public class ModelUtil {
                // If the arg is an array pick the array type
                else if (argIsArray && ModelUtil.isArray(c2Arg) && !ModelUtil.isArray(c1Arg))
                   return c2;
+
+               boolean forward = ModelUtil.isAssignableFrom(c1Arg, c2Arg);
+               boolean backward = ModelUtil.isAssignableFrom(c2Arg, c1Arg);
+               if (forward && !backward)
+                  return c2;
+               if (backward && !forward)
+                  return c1;
+
+               Object e1 = ModelUtil.getEnclosingType(c1);
+               Object e2 = ModelUtil.getEnclosingType(c2);
+               if (e1 != e2 && e1 != null && e2 != null) {
+                  forward = ModelUtil.isAssignableFrom(e1, e2);
+                  backward = ModelUtil.isAssignableFrom(e2, e1);
+                  if (forward && !backward)
+                     return c2;
+                  if (backward && !forward)
+                     return c1;
+               }
+
                return defaultType;
             }
          }
