@@ -45,6 +45,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.regex.Pattern;
 
+import static sc.layer.RuntimeModuleType.CoreRuntime;
+import static sc.layer.RuntimeModuleType.FullRuntime;
 import static sc.type.RTypeUtil.systemClasses;
 
 /**
@@ -2638,6 +2640,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** This should ideally be synchronized with coreRuntime's Bind classes CompilerSettings - the two ways we build this src jar file */
    private final static String[] runtimePackages = {"sc/util", "sc/type", "sc/bind", "sc/obj", "sc/dyn", "sc/js", "sc/sync"};
+   /**
+    * Packages uses to assemble the dynamic runtime jar files for including SC in the application. Normally sc itself is built in sc.jar that can be included
+    * itself but when building a program from Java, in the IDE or the sc source we find these packages in the classpath and include their directories
+    */
+   private final static String[] dynRuntimePackages = {"sc/layer", "sc/parser", "sc/lang", "sc/db", "jline/console"};
 
    private final static String[] layerModelPackages = {"java.lang", "java.util", "sc.lang", "sc.lang.sc", "sc.lang.html", "sc.lang.template",
            "sc.layer" /* For LayeredSystem in layerDef files */, "sc",  "java" /* need the root name of the package name in here */};
@@ -2660,6 +2667,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private class RuntimeRootInfo {
       String zipFileName;
       String buildDirName;
+      List<String> systemBuildDirs;
    }
 
    public String getStrataCodeRuntimePath(RuntimeModuleType moduleType, boolean src) {
@@ -2667,34 +2675,34 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String basePropName;
       String baseFileName;
       String ideModuleName;
+      String ideDirectoryName;
       switch (moduleType) {
          case None:
             return null;
          case CoreRuntime:
             basePropName = "sc.core.";
             baseFileName = "scrt-core";
-            ideModuleName = "coreRuntime";
             break;
          case FullRuntime:
             basePropName = "sc.full.";
             baseFileName = "scrt";
-            ideModuleName = "fullRuntime";
             break;
          case DynamicRuntime:
             basePropName = "sc.";
             baseFileName = "sc";
-            ideModuleName = "sc";
             break;
          default:
             throw new UnsupportedOperationException();
       }
+      ideModuleName = moduleType.ideModuleName;
+      ideDirectoryName = moduleType.ideDirectoryName;
       String propName = basePropName + (src ? "src." : "") + "path";
       String path;
       if ((path = System.getProperty(propName)) != null)
          return path;
       // We want scSourcePath to override the install directory if both are set
       if (!src || scSourcePath == null) {
-         RuntimeRootInfo info = getRuntimeRootInfo();
+         RuntimeRootInfo info = getRuntimeRootInfo(moduleType == RuntimeModuleType.DynamicRuntime);
          if (info.zipFileName != null) {
             String dir = FileUtil.getParentPath(info.zipFileName);
             String res = FileUtil.concat(dir, baseFileName + (src ? "-src" : "") + ".jar");
@@ -2702,16 +2710,26 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                return res;
          }
          if (info.buildDirName != null) {
-            String sysRoot;
-            if ((sysRoot = getSystemBuildLayer(info.buildDirName)) != null) {
-               if (!src)
-                  return FileUtil.concat(sysRoot, ideModuleName, !isIDEBuildLayer(info.buildDirName) ? "build" : null);
+            StringBuilder resPath = new StringBuilder();
+            // Going in reverse order to build up the path so that fullRuntime overrides files in coreRuntime
+            for (int i = info.systemBuildDirs.size() - 1; i >= 0; i--) {
+               String systemBuildDir = info.systemBuildDirs.get(i);
+               if (resPath.length() > 0)
+                  resPath.append(FileUtil.PATH_SEPARATOR);
+               if (systemBuildDir.endsWith(".jar") || isIDEBuildLayer(systemBuildDir)) {
+                  resPath.append(systemBuildDir);
+               }
+               else {
+                  String sysRoot = getSystemBuildLayer(systemBuildDir);
+                  resPath.append(FileUtil.concat(sysRoot, ideModuleName, !isIDEBuildLayer(systemBuildDir) ? "build" : null));
+               }
             }
+            return resPath.toString();
          }
       }
 
       if (scSourcePath != null) {
-         String scRuntimePath = FileUtil.concat(scSourcePath, ideModuleName, "src");
+         String scRuntimePath = FileUtil.concat(scSourcePath, ideDirectoryName, "src");
          File f = new File(scRuntimePath);
          if (!f.canRead())
             System.err.println("*** Unable to determine SCRuntimePath due to non-standard location of the sc.util, type, binding obj, and dyn packages - missing: " + scRuntimePath + " inside of scSourcePath: " + scSourcePath);
@@ -2734,14 +2752,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // The IntelliJ IDE stores files in modules in parallel directory trees.  We rely on that to cobble together locations
    // for the runtime files when building projects of various kinds.
    private static boolean isIDEBuildLayer(String buildDirName) {
-      String file;
-      if ((file = FileUtil.getFileName(buildDirName)).equals("coreRuntime") || file.equals("fullRuntime") || file.equals("system"))
-         return true;
-      return false;
+      String file =  FileUtil.getFileName(buildDirName);
+      return RuntimeModuleType.isIdeModuleName(file);
    }
 
    /** Locates the StrataCode runtime in the system paths so that we can use this to ensure generated scripts pick up the sc libraries */
-   public RuntimeRootInfo getRuntimeRootInfo() {
+   public RuntimeRootInfo getRuntimeRootInfo(boolean includeDyn) {
       RuntimeRootInfo rootInfo = new RuntimeRootInfo();
       String propName = "sc.core.path";
       String path;
@@ -2762,9 +2778,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          rootInfo.zipFileName = mainJarFile;
          return rootInfo;
       }
+      ArrayList<String> allPackages = new ArrayList<String>(Arrays.asList(runtimePackages));
+      if (includeDyn)
+         allPackages.addAll(Arrays.asList(dynRuntimePackages));
       /** We were not configured with an install dir so look to find sc.jar in the class index and create it from that */
-      for (int i = 0; i < runtimePackages.length; i++) {
-         String pkg = runtimePackages[i];
+      for (int i = 0; i < allPackages.size(); i++) {
+         String pkg = allPackages.get(i);
          pkg = FileUtil.unnormalize(pkg);
          HashMap<String,PackageEntry> pkgContents = packageIndex.get(pkg);
          if (pkgContents == null) {
@@ -2782,38 +2801,41 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                continue;
             else if (ent.zip) {
                if (rootInfo.zipFileName == null) {
-                  if (rootInfo.buildDirName != null) {
-                     if (!warned)
-                        System.err.println("*** Warning - sc runtime files split across multiple build directories and zip file: " + rootInfo.buildDirName + " and: " + ent.fileName);
-                     warned = true;
+                  if (rootInfo.systemBuildDirs != null) {
+                     if (!rootInfo.systemBuildDirs.contains(ent.fileName))
+                        rootInfo.systemBuildDirs.add(ent.fileName);
                   }
                   else
                      rootInfo.zipFileName = ent.fileName;
                }
                else if (!rootInfo.zipFileName.equals(ent.fileName)) {
-                  if (!warned)
-                     System.err.println("*** Warning - sc runtime files split across multiple zip files: " + rootInfo.zipFileName + " and: " + ent.fileName);
-                  warned = true;
+                  if (rootInfo.systemBuildDirs == null) {
+                     rootInfo.systemBuildDirs = new ArrayList<String>();
+                  }
+                  rootInfo.systemBuildDirs.add(rootInfo.zipFileName);
+                  rootInfo.systemBuildDirs.add(ent.fileName);
+                  rootInfo.zipFileName = null;
                }
             }
             else {
                if (rootInfo.buildDirName == null) {
                   if (rootInfo.zipFileName != null) {
-                     if (!warned)
-                        System.err.println("*** Warning - sc runtime files split across multiple build directories and zip file: " + rootInfo.zipFileName + " and: " + ent.fileName);
-                     warned = true;
+                     if (rootInfo.systemBuildDirs == null) {
+                        rootInfo.systemBuildDirs = new ArrayList<String>();
+                     }
+                     rootInfo.systemBuildDirs.add(rootInfo.zipFileName);
+                     rootInfo.systemBuildDirs.add(ent.fileName);
+                     rootInfo.zipFileName = null;
                   }
                   else {
                      rootInfo.buildDirName = ent.fileName;
+                     rootInfo.systemBuildDirs = new ArrayList<String>();
+                     rootInfo.systemBuildDirs.add(ent.fileName);
                   }
                }
                else if (!rootInfo.buildDirName.equals(ent.fileName)) {
-                  String oldSysRoot = getSystemBuildLayer(rootInfo.buildDirName);
-                  String newSysRoot = getSystemBuildLayer(ent.fileName);
-                  if (oldSysRoot == null || newSysRoot == null || !oldSysRoot.equals(newSysRoot)) {
-                     if (!warned)
-                        System.err.println("*** Warning - sc runtime files split across multiple build directories: " + rootInfo.buildDirName + " and: " + ent.fileName);
-                     warned = true;
+                  if (!rootInfo.systemBuildDirs.contains(ent.fileName)) {
+                     rootInfo.systemBuildDirs.add(ent.fileName);
                   }
                }
             }
@@ -2825,7 +2847,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private final static String STRATACODE_RUNTIME_FILE = "scrt.jar";
 
    private void syncRuntimeLibraries(String dir) {
-      RuntimeRootInfo info = getRuntimeRootInfo();
+      RuntimeRootInfo info = getRuntimeRootInfo(false);
       String outJarName = FileUtil.concat(dir, STRATACODE_RUNTIME_FILE);
       if (dir != null && dir.length() > 0) {
          File f = new File(dir);
@@ -2837,7 +2859,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (sysBuildDir != null) {
             // Merge coreRuntime and fullRuntime and copy that to the runtime libs dir.
 
-            String scSourcePath = FileUtil.concat(sysBuildDir, "coreRuntime") + FileUtil.PATH_SEPARATOR + FileUtil.concat(sysBuildDir, "fullRuntime");
+            String scSourcePath = FileUtil.concat(sysBuildDir, RuntimeModuleType.CoreRuntime.ideModuleName) + FileUtil.PATH_SEPARATOR +
+                                                   FileUtil.concat(sysBuildDir, RuntimeModuleType.FullRuntime.ideModuleName);
             if (LayerUtil.buildJarFile(null, getRuntimePrefix(), outJarName, null, runtimePackages, null, scSourcePath, LayerUtil.CLASSES_JAR_FILTER, options.verbose) != 0)
                System.err.println("*** Unable to create jar of sc runtime files. dest path: " + outJarName + " from buildDir: " + info.buildDirName + " merging with path: " + scSourcePath);
 
@@ -2865,7 +2888,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private final static String STRATACODE_RUNTIME_SRC_FILE = "scrt-core-src.jar";
 
    private void syncRuntimeSrc(String dir) {
-      String srcDir = getStrataCodeRuntimePath(RuntimeModuleType.CoreRuntime, true);
+      String srcDir = getStrataCodeRuntimePath(CoreRuntime, true);
       File srcDirFile = new File(srcDir);
 
       String outJarName = FileUtil.concat(dir, STRATACODE_RUNTIME_SRC_FILE);
@@ -2902,7 +2925,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (srcDirFile.isDirectory()) {
          String srcRoot = FileUtil.getParentPath(fullRuntimeDir);
-         String[] srcSubDirs = new String[] {"coreRuntime", "fullRuntime", "sc"};
+         String[] srcSubDirs = RuntimeModuleType.getIdeModuleNames();
          File tempDir = FileUtil.createTempDir("scbuild");
          String tempDirPath = tempDir.getPath();
          for (String srcSubDir:srcSubDirs) {
@@ -6833,14 +6856,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void initClassIndex(String rootCP) {
       rootClassPath = rootCP;
       addPathToIndex(null, rootCP);
-      // Ordinarily the classes.jar is in the classpath.  But if not (like in the -jar option used in layerCake), we need to
-      // find the classes in the boot class path.
+      // Ordinarily the classes.jar is in the classpath.  But if not (like in the -jar option used in the scc script), we check the sun.boot.class.path
+      // TODO: in JDK13 there's no way to find the classes.jar - we now always use the globalPackages for x.* and maybe this is no longer needed
+      // TODO: do we need this anymore?
       if (packageIndex.get("java" + FileUtil.FILE_SEPARATOR + "awt") == null) {
          boolean jdkFound = false;
          String bootPath = System.getProperty("sun.boot.class.path");
-         if (bootPath == null)
-            System.err.println("*** No boot classpath found in properties: " + System.getProperties() + " not adding jdk classes to class index");
-         else {
+         if (bootPath != null) {
+            // TODO: not sure we need this anymore
             String[] pathEntries = StringUtil.split(bootPath, FileUtil.PATH_SEPARATOR);
             // Only add the JDK.  This is needed for importing "*" on system packages.
             for (String p:pathEntries) {
@@ -6849,8 +6872,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   addPathToIndex(null, p);
                }
             }
+            /*
             if (!jdkFound)
-               System.err.println("*** Did not find classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + pathEntries);
+               verbose("No classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + pathEntries);
+             */
          }
       }
    }
