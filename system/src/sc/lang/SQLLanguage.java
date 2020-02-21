@@ -91,6 +91,7 @@ public class SQLLanguage extends BaseLanguage {
    ICSymbolSpace ifKeyword = new ICSymbolSpace("if");
    ICSymbolSpace ofKeyword = new ICSymbolSpace("of");
    ICSymbolSpace asKeyword = new ICSymbolSpace("as");
+   ICSymbolSpace tableKeyword = new ICSymbolSpace("table");
    ICSymbolSpace typeKeyword = new ICSymbolSpace("type");
    ICSymbolSpace existsKeyword = new ICSymbolSpace("exists");
    ICSymbolSpace dollarKeyword = new ICSymbolSpace("$");
@@ -297,8 +298,12 @@ public class SQLLanguage extends BaseLanguage {
    // TODO: create type 'as enum' and 'as range' and with input/output params
    Sequence createType = new Sequence("CreateType(,typeName,,,tableDefs,)", typeKeyword, sqlIdentifier, asKeyword, openParen, tableDefList, closeParen);
 
+   Sequence dropTable = new Sequence("DropTable(,tableNameList,dropOptions)", tableKeyword, sqlIdentifierList, new ICSymbolChoiceSpace("cascade", "restrict"));
+
    OrderedChoice createChoice = new OrderedChoice("(.,.)", createTable, createType);
    Sequence createCommand = new Sequence("(,.,)", new ICSymbolSpace("create"), createChoice, semicolonEOL);
+   OrderedChoice dropChoice = new OrderedChoice("(.,.)", dropTable);
+   Sequence dropCommand = new Sequence("(,.,)", new ICSymbolSpace("drop"), dropChoice, semicolonEOL);
 
    public OrderedChoice sqlCommands = new OrderedChoice( "([])", REPEAT | OPTIONAL, createCommand);
 
