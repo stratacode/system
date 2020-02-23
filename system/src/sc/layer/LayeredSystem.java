@@ -246,11 +246,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Each LayeredSystem stores the layers for one process.  This holds the configuration info for that process.  */
    public IProcessDefinition processDefinition = null;
 
-   public List<DataSourceDef> dataSources = null;
+   public List<DataSourceDef> activeDataSources = null;
+   public List<DataSourceDef> inactiveDataSources = null;
    // TODO: move this to the 'layer' and only inherit it if your layer extends the one that sets it so that we can assembly stacks with more than one default that still work.
    /** Set this to support @DBTypeSettings with no dataSourceName, to more easily aggregate components into one default db without having to set all of the types individually */
    public DataSourceDef defaultDataSource;
-   public Map<String,DBProvider> dbProviders = new TreeMap<String,DBProvider>();
+   public Map<String,DBProvider> inactiveDBProviders = new TreeMap<String,DBProvider>();
+   public Map<String,DBProvider> activeDBProviders = new TreeMap<String,DBProvider>();
 
    public String serverName = "localhost";  /** The hostname for accessing this system */
 
@@ -3422,6 +3424,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       addBuildCommand(phase, BuildCommandTypes.PreBuild, bch);
    }
 
+   /**
+    * Like addPreBuildCommand but takes a typeGroup name to check to determine when to run this command on an
+    * incremental build. If members of the type group have changed, the command is re-run. If not then the command
+    * is not re-run.
+    */
    public void addPreBuildCommand(String checkTypeGroup, BuildPhase phase, Layer layer, String...args) {
       BuildCommandHandler bch = new BuildCommandHandler();
       bch.args = args;
@@ -9552,6 +9559,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       if (phase == BuildPhase.Process) {
          if (!bd.anyError) {
+            if (activeDBProviders != null) {
+               for (DBProvider dbProvider:activeDBProviders.values()) {
+                  dbProvider.generateSchemas(buildLayer);
+               }
+            }
             // Run the runtimeProcessor hook, e.g. to roll up the java script files generated for each type into a file which can be loaded
             // Do this before we save the build info in case the hook needs to add more info.
             if (runtimeProcessor != null)
@@ -15997,23 +16009,53 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return langRT.getCompiledFiles(lang, typeName);
    }
 
-   public void addDataSource(DataSourceDef newDataSource) {
-      if (this.dataSources == null)
-         this.dataSources = new ArrayList<DataSourceDef>();
-      this.dataSources.add(newDataSource);
+   public void addDataSource(DataSourceDef newDataSource, Layer definedInLayer) {
+      if (definedInLayer.activated) {
+         if (this.activeDataSources == null)
+            this.activeDataSources = new ArrayList<DataSourceDef>();
+         this.activeDataSources.add(newDataSource);
+      }
+      else {
+         if (this.inactiveDataSources == null)
+            this.inactiveDataSources = new ArrayList<DataSourceDef>();
+         this.inactiveDataSources.add(newDataSource);
+      }
    }
 
-   public DataSourceDef getDataSourceDef(String dataSourceName) {
-      if (this.dataSources == null)
-         return null;
-      for (DataSourceDef def:dataSources)
-         if (def.jndiName.equals(dataSourceName))
-            return def;
+   public DBProvider getDBProvider(String provider, Layer refLayer) {
+      if (refLayer.activated)
+         return activeDBProviders.get(provider);
+      else
+         return inactiveDBProviders.get(provider);
+   }
+
+
+   public DataSourceDef getDataSourceDef(String dataSourceName, boolean active) {
+      if (active) {
+         if (this.activeDataSources == null)
+            return null;
+         for (DataSourceDef def:activeDataSources)
+            if (def.jndiName.equals(dataSourceName))
+               return def;
+      }
+      else {
+         if (this.inactiveDataSources == null)
+            return null;
+         for (DataSourceDef def:inactiveDataSources)
+            if (def.jndiName.equals(dataSourceName))
+               return def;
+      }
       return null;
    }
 
-   public void addDBProvider(DBProvider provider) {
-      this.dbProviders.put(provider.providerName, provider);
+   public void addDBProvider(DBProvider provider, Layer definedInLayer) {
+      provider.definedInLayer = definedInLayer;
+      if (definedInLayer.activated) {
+         this.activeDBProviders.put(provider.providerName, provider);
+      }
+      else {
+         this.inactiveDBProviders.put(provider.providerName, provider);
+      }
    }
 }
 

@@ -14,9 +14,12 @@ import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.TreeSet;
 
 public class SQLFileModel extends SCModel {
    public List<SQLCommand> sqlCommands;
+
+   public transient BodyTypeDeclaration srcType;
 
    public void init() {
       if (initialized) return;
@@ -183,5 +186,18 @@ public class SQLFileModel extends SCModel {
          }
          tableDefs.add(colDef);
       }
+   }
+
+   public boolean hasTableReference(SQLFileModel other) {
+      TreeSet<String> tableRefs = new TreeSet<String>();
+      for (SQLCommand cmd:sqlCommands)
+         cmd.addTableReferences(tableRefs);
+      for (SQLCommand cmd:other.sqlCommands) {
+         if (cmd instanceof CreateTable) {
+            if (tableRefs.contains(((CreateTable) cmd).tableName.toString()))
+               return true;
+         }
+      }
+      return false;
    }
 }

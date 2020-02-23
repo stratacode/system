@@ -4,6 +4,7 @@ import sc.lang.SemanticNode;
 import sc.util.StringUtil;
 
 import java.util.List;
+import java.util.Set;
 
 public class ColumnDef extends TableDef {
    public SQLIdentifier columnName;
@@ -23,5 +24,12 @@ public class ColumnDef extends TableDef {
 
    public String toString() {
       return columnName + " " + columnType + (collation == null ? "" : collation) + (constraintName == null ? "" : constraintName) + (columnConstraints == null ? "" : " " + StringUtil.argsToString(columnConstraints));
+   }
+
+   public void addTableReferences(Set<String> refTableNames) {
+      if (columnConstraints != null) {
+         for (SQLConstraint c:columnConstraints)
+            c.addTableReferences(refTableNames);
+      }
    }
 }

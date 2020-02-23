@@ -2,6 +2,8 @@ package sc.lang.sql;
 
 import sc.lang.SemanticNode;
 
+import java.util.Set;
+
 public class ReferencesConstraint extends SQLConstraint {
    public SQLIdentifier refTable;
    public SQLIdentifier columnRef;
@@ -13,6 +15,10 @@ public class ReferencesConstraint extends SQLConstraint {
       rc.setProperty("refTable", SQLIdentifier.create(tableName));
       rc.setProperty("columnRef", SQLIdentifier.create(columnName));
       return rc;
+   }
 
+   public void addTableReferences(Set<String> refTableNames) {
+      if (refTable != null)
+         refTableNames.add(refTable.toString());
    }
 }

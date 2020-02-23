@@ -9912,9 +9912,9 @@ public class ModelUtil {
       DBTypeDescriptor typeDesc = ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj, false);
       if (typeDesc != null) {
          String dataSourceName = typeDesc.dataSourceName;
-         DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
+         DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
          if (dataSource != null) {
-            return sys.dbProviders.get(dataSource.provider);
+            return sys.getDBProvider(dataSource.provider, refLayer);
          }
       }
       return null;
@@ -9924,9 +9924,9 @@ public class ModelUtil {
       String dataSourceName = propDesc.dataSourceName;
       if (dataSourceName == null)
          dataSourceName = propDesc.dbTypeDesc.dataSourceName;
-      DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
+      DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
       if (dataSource != null) {
-         return sys.dbProviders.get(dataSource.provider);
+         return sys.getDBProvider(dataSource.provider, refLayer);
       }
       return null;
    }
@@ -9941,9 +9941,9 @@ public class ModelUtil {
             String dataSourceName = propDesc.dataSourceName;
             if (dataSourceName == null)
                dataSourceName = typeDesc.dataSourceName;
-            DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName);
+            DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
             if (dataSource != null) {
-               return sys.dbProviders.get(dataSource.provider);
+               return sys.getDBProvider(dataSource.provider, refLayer);
             }
          }
       }

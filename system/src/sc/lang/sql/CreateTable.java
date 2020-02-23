@@ -4,6 +4,7 @@ import sc.lang.SemanticNode;
 import sc.parser.IString;
 
 import java.util.List;
+import java.util.Set;
 
 public class CreateTable extends SQLCommand {
    public List<IString> tableOptions;
@@ -15,4 +16,11 @@ public class CreateTable extends SQLCommand {
    public TablePartition tablePartition;
    public IndexParameters storageParams;
    public String tableSpace;
+
+   void addTableReferences(Set<String> refTableNames) {
+      if (tableDefs != null) {
+         for (TableDef def:tableDefs)
+            def.addTableReferences(refTableNames);
+      }
+   }
 }

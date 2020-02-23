@@ -9,23 +9,23 @@ public class SQLUtil {
    // TODO: if we already have a SQLFileModel, we could modify the existing one to preserve aspects of the SQL we don't
    // capture in the DBTypeDescriptor. Or we could add those features to the DBTypeDescriptor and pass them through here
    // so that we could modify those features as well.
-   public static SQLFileModel convertTypeToSQLFileModel(JavaModel fromModel, DBTypeDescriptor typeDesc) {
+   public static SQLFileModel convertTypeToSQLFileModel(JavaModel fromModel, DBTypeDescriptor dbTypeDesc) {
       SQLFileModel res = new SQLFileModel();
-      if (!typeDesc.tablesInitialized)
-         ModelUtil.completeDBTypeDescriptor(typeDesc, fromModel.layeredSystem, fromModel.layer, typeDesc);
-      typeDesc.init();
-      typeDesc.start();
+      if (!dbTypeDesc.tablesInitialized)
+         ModelUtil.completeDBTypeDescriptor(dbTypeDesc, fromModel.layeredSystem, fromModel.layer, dbTypeDesc);
+      dbTypeDesc.init();
+      dbTypeDesc.start();
       res.layeredSystem = fromModel.layeredSystem;
       res.layer = fromModel.layer;
-      res.addCreateTable(typeDesc.primaryTable);
-      if (typeDesc.auxTables != null) {
-         for (TableDescriptor auxTable:typeDesc.auxTables) {
+      res.addCreateTable(dbTypeDesc.primaryTable);
+      if (dbTypeDesc.auxTables != null) {
+         for (TableDescriptor auxTable:dbTypeDesc.auxTables) {
             if (!auxTable.reference)
                res.addCreateTable(auxTable);
          }
       }
-      if (typeDesc.multiTables != null) {
-         for (TableDescriptor multiTable:typeDesc.multiTables) {
+      if (dbTypeDesc.multiTables != null) {
+         for (TableDescriptor multiTable:dbTypeDesc.multiTables) {
             if (!multiTable.reference)
                res.addCreateTable(multiTable);
          }
