@@ -35,10 +35,10 @@ public class BuildTag {
    public String layerNames; // list of build layers
    //public List<LayerDepTag> layerDepTags; // the library and version of all dependencies added by each layer
    public String getBuildTag() {
-      return getBuildTagString(version, tag, revision, buildNumber, timeStamp, scmVersion);
+      return getBuildTagString(version, tag, revision, buildNumber, timeStamp, scmVersion, javaVersion);
    }
 
-   public static String getBuildTagString(String version, String tag, String revision, String buildNumber, String timeStamp, String scmVersion) {
+   public static String getBuildTagString(String version, String tag, String revision, String buildNumber, String timeStamp, String scmVersion, String javaVersion) {
       StringBuilder sb = new StringBuilder();
       if (version != null) {
          sb.append("v");
@@ -63,6 +63,10 @@ public class BuildTag {
       if (scmVersion != null) {
          sb.append(", ");
          sb.append(scmVersion);
+      }
+      if (javaVersion != null) {
+         sb.append(", java:");
+         sb.append(javaVersion);
       }
       return sb.toString();
    }

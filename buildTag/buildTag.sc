@@ -18,6 +18,7 @@ public buildTag {
 
    String buildTagProduct = "scc";
    String scmVersion;
+   String javaVersion;
    String buildVersion;
    String buildTagName;
    String buildRevision;
@@ -72,6 +73,9 @@ public buildTag {
       else {
          scmVersion = "not built from git dir";
       }
+      javaVersion = System.getProperty("java.version");
+      if (javaVersion == null)
+         javaVersion = System.getProperty("java.runtime.version");
       buildVersion = getLayerProperty("build","version"); 
       if (buildVersion == null)
          buildVersion = "<build.version>";
@@ -82,7 +86,7 @@ public buildTag {
    }
 
    String getCurrentBuildTagString() {
-      return sc.util.BuildTag.getBuildTagString(buildVersion, buildTagName, buildRevision, buildNumber, buildTime, scmVersion);
+      return sc.util.BuildTag.getBuildTagString(buildVersion, buildTagName, buildRevision, buildNumber, buildTime, scmVersion, javaVersion);
    }
 
    void process() {

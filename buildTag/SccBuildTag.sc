@@ -18,4 +18,5 @@ object SccBuildTag extends sc.util.BuildTag {
    override @BuildInit("buildTime") timeStamp;
    // Evaluates a layer variable scmVersion
    override @BuildInit("scmVersion") scmVersion;
+   override @BuildInit("javaVersion") javaVersion;
 }
