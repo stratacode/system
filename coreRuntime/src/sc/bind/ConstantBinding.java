@@ -67,4 +67,8 @@ public class ConstantBinding implements IBinding {
    public boolean isReversible() {
       return false;
    }
+
+   public Object getConstantValue() {
+      return value;
+   }
 }

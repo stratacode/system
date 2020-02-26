@@ -14,7 +14,7 @@ import sc.util.SingleElementSet;
 import static sc.bind.Bind.trace;
 
 /**
- * The VariableBinding represents binding expression of the form "a.b.c".  It has a direction attribute -
+ * VariableBinding manages an instance of a binding expression like "a.b.c".  It has a direction attribute -
  * for which way to apply the binding: forward, reverse, or bi-directional.  It has a list of the properties
  * "a.b.c" in the binding.  It computes the current array of intermediate or last known values of the binding
  * and stores them in the bound values.  The dstObj is the object who "owns" the binding - the one which defined
@@ -210,6 +210,16 @@ public class VariableBinding extends DestinationListener {
       }
       */
       valid = true;
+   }
+
+   /** Number of properties in the binding - e.g. a.b.c = 3 */
+   public int getNumInChain() {
+      return boundProps.length;
+   }
+
+   /** Returns the String property name, IBinding, or IBeanMapper */
+   public Object getChainElement(int ix) {
+      return boundProps[ix];
    }
 
    /** Returns the last property in the chain */

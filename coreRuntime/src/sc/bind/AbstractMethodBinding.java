@@ -8,7 +8,7 @@ import sc.dyn.DynUtil;
 import sc.sync.SyncManager;
 
 public abstract class AbstractMethodBinding extends DestinationListener {
-   Object methObj; // Usually equal to dstObj but can be different with nested types
+   Object methObj; // Same as dstObj for a simple method call or the current 'this' object for the method for nested types
    IBinding[] boundParams;
    Object[] paramValues;
    Object boundValue;

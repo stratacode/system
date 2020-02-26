@@ -9,7 +9,7 @@ import static sc.bind.Bind.trace;
 import sc.dyn.DynUtil;
 
 public class ConditionalBinding extends AbstractMethodBinding {
-   String operator;
+   public String operator;
    public ConditionalBinding(String op, IBinding[] parameterBindings) {
       super(parameterBindings);
       operator = op;
