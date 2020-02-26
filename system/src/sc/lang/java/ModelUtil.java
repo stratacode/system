@@ -9621,7 +9621,7 @@ public class ModelUtil {
 
             String typeName = CTypeUtil.getClassName(fullTypeName);
             if (primaryTableName == null)
-               primaryTableName = DBUtil.getSQLName(typeName);
+               primaryTableName = SQLUtil.getSQLName(typeName);
             TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
 
             Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
@@ -9655,7 +9655,7 @@ public class ModelUtil {
                      }
 
                      if (idColumnName == null)
-                        idColumnName = DBUtil.getSQLName(propName);
+                        idColumnName = SQLUtil.getSQLName(propName);
                      if (idColumnType == null) {
                         idColumnType = DBUtil.getDefaultSQLType(propType);
                         if (idColumnType == null)
@@ -9733,6 +9733,7 @@ public class ModelUtil {
                String propColumnType = null;
                boolean propOnDemand = false;
                boolean propRequired = false;
+               boolean propUnique = false;
                String propDataSourceName = null;
                String propFetchGroup = null;
                String propReverseProperty = null;
@@ -9766,6 +9767,10 @@ public class ModelUtil {
                   if (tmpRequired != null) {
                      propRequired = tmpRequired;
                   }
+                  Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
+                  if (tmpUnique != null) {
+                     propUnique = tmpUnique;
+                  }
 
                   String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
                   if (tmpDataSourceName != null) {
@@ -9793,7 +9798,7 @@ public class ModelUtil {
                }
 
                if (propColumnName == null)
-                  propColumnName = DBUtil.getSQLName(propName);
+                  propColumnName = SQLUtil.getSQLName(propName);
                DBTypeDescriptor refDBTypeDesc = null;
 
                boolean isMultiCol = false;
@@ -9850,14 +9855,14 @@ public class ModelUtil {
 
                if (isMultiCol) {
                   propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
-                          propColumnType, propTableName, propRequired, propOnDemand,
+                          propColumnType, propTableName, propRequired, propUnique, propOnDemand,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty);
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
-                          propColumnType, propTableName, propRequired, propOnDemand,
+                          propColumnType, propTableName, propRequired, propUnique, propOnDemand,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty);
@@ -9921,9 +9926,7 @@ public class ModelUtil {
    }
 
    public static DBProvider getDBProviderForPropertyDesc(LayeredSystem sys, Layer refLayer, DBPropertyDescriptor propDesc) {
-      String dataSourceName = propDesc.dataSourceName;
-      if (dataSourceName == null)
-         dataSourceName = propDesc.dbTypeDesc.dataSourceName;
+      String dataSourceName = propDesc.getDataSourceForProp();
       DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
       if (dataSource != null) {
          return sys.getDBProvider(dataSource.provider, refLayer);
@@ -9938,9 +9941,7 @@ public class ModelUtil {
       if (typeDesc != null) {
          DBPropertyDescriptor propDesc = typeDesc.getPropertyDescriptor(propName);
          if (propDesc != null) {
-            String dataSourceName = propDesc.dataSourceName;
-            if (dataSourceName == null)
-               dataSourceName = typeDesc.dataSourceName;
+            String dataSourceName = propDesc.getDataSourceForProp();
             DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
             if (dataSource != null) {
                return sys.getDBProvider(dataSource.provider, refLayer);

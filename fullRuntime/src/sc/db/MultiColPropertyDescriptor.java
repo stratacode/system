@@ -6,9 +6,11 @@ public class MultiColPropertyDescriptor extends DBPropertyDescriptor {
    String[] extraColNames;
    String[] extraColTypes;
 
-   public MultiColPropertyDescriptor(String propertyName, String columnNames, String columnTypes, String tableName, boolean required, boolean onDemand, String dataSourceName, String fetchGroup, String refTypeName, boolean multiRow,
-                                     String reverseProperty) {
-      super(propertyName, splitFirst(columnNames), splitFirst(columnTypes), tableName, required, onDemand, dataSourceName, fetchGroup, refTypeName, multiRow, reverseProperty);
+   public MultiColPropertyDescriptor(String propertyName, String columnNames, String columnTypes, String tableName,
+                                     boolean required, boolean unique, boolean onDemand, String dataSourceName,
+                                     String fetchGroup, String refTypeName, boolean multiRow, String reverseProperty) {
+      super(propertyName, splitFirst(columnNames), splitFirst(columnTypes), tableName, required, unique, onDemand,
+            dataSourceName, fetchGroup, refTypeName, multiRow, reverseProperty);
       extraColNames = splitRest(columnNames);
       extraColTypes = splitRest(columnTypes);
    }

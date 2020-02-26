@@ -293,26 +293,26 @@ public abstract class TxOperation {
          }
 
          if (ix != 0) {
-            append(sb, logSB, ", ");
+            DBUtil.append(sb, logSB, ", ");
          }
 
-         append(sb, logSB, "(");
+         DBUtil.append(sb, logSB, "(");
          for (int ci = 0; ci < numCols; ci++) {
             if (ci != 0) {
-               append(sb, logSB, ",");
+               DBUtil.append(sb, logSB, ",");
             }
             sb.append("?");
             if (logSB != null)
                logSB.append(DBUtil.formatValue(columnValues.get(ci+toInsert*numCols)));
          }
-         append(sb, logSB, ")");
+         DBUtil.append(sb, logSB, ")");
          toInsert++;
       }
       if (dbIdCols != null) {
-         append(sb, logSB, " RETURNING ");
+         DBUtil.append(sb, logSB, " RETURNING ");
          for (int ri = 0; ri < dbIdCols.size(); ri++)  {
             if (ri != 0)
-               append(sb, logSB, ", ");
+               DBUtil.append(sb, logSB, ", ");
             IdPropertyDescriptor dbIdCol = dbIdCols.get(ri);
             DBUtil.appendIdent(sb, logSB, dbIdCol.columnName);
          }
@@ -398,13 +398,6 @@ public abstract class TxOperation {
          DBUtil.close(rs);
       }
       return 1;
-   }
-
-   static void append(StringBuilder sb, StringBuilder logSB, CharSequence val) {
-      sb.append(val);
-      if (logSB != null) {
-         DBUtil.appendVal(logSB, val);
-      }
    }
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
@@ -580,7 +573,7 @@ public abstract class TxOperation {
 
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
-            append(sb, logSB, "AND ");
+            DBUtil.append(sb, logSB, "AND ");
          }
          DBUtil.appendIdent(sb, logSB, columnNames.get(i));
          sb.append(" = ?");

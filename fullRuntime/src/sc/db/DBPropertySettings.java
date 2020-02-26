@@ -5,6 +5,7 @@ public @interface DBPropertySettings {
    String columnName() default "";
    String columnType() default "";
    boolean required() default false;
+   boolean unique() default false;
    String fetchGroup() default "";
    String tableName() default "";
    String dataSourceName() default "";

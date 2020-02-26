@@ -1,5 +1,7 @@
 package sc.db;
 
+import java.util.List;
+
 public class TxInsert extends TxOperation {
    public TxInsert(DBTransaction tx, DBObject inst) {
       super(tx, inst);
@@ -11,14 +13,16 @@ public class TxInsert extends TxOperation {
       applied = true;
       insertTransientRefs(true);
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+      List<TableDescriptor> tables = dbTypeDesc.auxTables;
       int ct = doInsert(dbTypeDesc.primaryTable);
       if (ct > 0) {
-         if (dbTypeDesc.auxTables != null) {
-            for (TableDescriptor table:dbTypeDesc.auxTables)
+         if (tables != null) {
+            for (TableDescriptor table:tables)
                ct += doInsert(table);
          }
-         if (dbTypeDesc.multiTables != null) {
-            for (TableDescriptor table:dbTypeDesc.multiTables)
+         tables = dbTypeDesc.multiTables;
+         if (tables != null) {
+            for (TableDescriptor table:tables)
                ct += doMultiInsert(table, null, true);
          }
       }

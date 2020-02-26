@@ -1,9 +1,12 @@
 package sc.lang.sql;
 
 import sc.db.DBTypeDescriptor;
+import sc.db.DBUtil;
 import sc.db.TableDescriptor;
+import sc.lang.SQLLanguage;
 import sc.lang.java.JavaModel;
 import sc.lang.java.ModelUtil;
+import sc.parser.PString;
 
 public class SQLUtil {
    // TODO: if we already have a SQLFileModel, we could modify the existing one to preserve aspects of the SQL we don't
@@ -31,6 +34,14 @@ public class SQLUtil {
          }
       }
       return res;
+   }
+
+   public static String getSQLName(String javaName) {
+      String res = DBUtil.getSQLName(javaName);
+      if (SQLLanguage.getSQLLanguage().getKeywords().contains(PString.toIString(res)))
+         return res + "_";
+      else
+         return res;
    }
 
 }

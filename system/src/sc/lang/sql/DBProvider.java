@@ -32,7 +32,7 @@ public class DBProvider {
       return true;
    }
 
-   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = <%= dbObjPrefix%>dbFetch(\"<%= lowerPropertyName %>\");\n" +
+   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.fetch(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
    private static String UPDATE_PROP_TEMPLATE = "\n      if (<%= dbObjPrefix%><%= dbSetPropMethod %>(\"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";

@@ -21,6 +21,8 @@ public class DBPropertyDescriptor {
    public String tableName;
    // If required, the column gets a NOT NULL constraint
    public boolean required;
+   // If unique gets a 'UNIQUE' constraint
+   public boolean unique;
    /** For relationships, should the referenced value be fetched in-line, or should we wait till the properties of the referenced object are access to fetch them */
    public boolean onDemand;
 
@@ -69,13 +71,14 @@ public class DBPropertyDescriptor {
    private boolean started = false;
 
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
-                               boolean required, boolean onDemand, String dataSourceName, String fetchGroup,
+                               boolean required, boolean unique, boolean onDemand, String dataSourceName, String fetchGroup,
                                String refTypeName, boolean multiRow, String reverseProperty) {
       this.propertyName = propertyName;
       this.columnName = columnName;
       this.columnType = columnType;
       this.tableName = tableName;
       this.required = required;
+      this.unique = unique;
       this.onDemand = onDemand;
       this.dataSourceName = dataSourceName;
       this.fetchGroup = fetchGroup;
@@ -309,5 +312,15 @@ public class DBPropertyDescriptor {
          }
       }
       return val;
+   }
+
+   public String getDataSourceForProp() {
+      if (dataSourceName != null)
+         return dataSourceName;
+      return dbTypeDesc.dataSourceName;
+   }
+
+   public DBTypeDescriptor getColTypeDesc() {
+      return refDBTypeDesc;
    }
 }

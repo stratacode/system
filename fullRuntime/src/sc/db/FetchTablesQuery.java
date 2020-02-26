@@ -1,6 +1,7 @@
 package sc.db;
 
 import sc.type.IBeanMapper;
+import sc.util.StringUtil;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,7 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-/** Corresponds to a single property fetch query against a single data source - either for a single row or multi-row */
+/** Corresponds to a single database query - either for a single row or multi-row but not both */
 public class FetchTablesQuery {
    public String dataSourceName;
    public boolean multiRow;
@@ -17,6 +18,16 @@ public class FetchTablesQuery {
 
    List<FetchTableDesc> fetchTables = new ArrayList<FetchTableDesc>();
    Map<String, FetchTableDesc> fetchTablesIndex = new TreeMap<String, FetchTableDesc>();
+
+   /**
+    * For queries that have a custom where clause, these properties provide the extra info required to make the query
+    */
+   public StringBuilder whereSB;
+   public StringBuilder logSB;
+
+   public int numWhereColumns = 0;
+   public List<Object> paramValues;
+   public List<Object> paramTypes;
 
    public FetchTablesQuery(String dataSourceName, boolean multiRow) {
       this.dataSourceName = dataSourceName;
@@ -51,6 +62,8 @@ public class FetchTablesQuery {
          }
       }
       else {
+         if (ftd.props.contains(prop))
+            return;
          ftd.props.add(prop);
 
          // When the reference is not onDemand, add the primary+aux tables from the referenced type to the query for this property
@@ -112,6 +125,14 @@ public class FetchTablesQuery {
       }
    }
 
+   public boolean containsProperty(DBPropertyDescriptor pdesc) {
+      for (FetchTableDesc ftd:fetchTables) {
+         if (ftd.containsProperty(pdesc))
+            return true;
+      }
+      return false;
+   }
+
    public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {
       TableDescriptor mainTable = fetchTables.get(0).table;
       Connection conn = transaction.getConnection(mainTable.getDataSourceName());
@@ -142,10 +163,10 @@ public class FetchTablesQuery {
          transaction.applyingDBChanges = true;
 
          boolean res;
-         if (!multiRow)
+         if (!multiRow) // populate properties of dbObj from the tables in this query
             res = processOneRowQueryResults(dbObj, inst, rs, logSB);
-         else
-            res = processMultiResults(dbObj, inst, rs, logSB);
+         else // fetch a multi-valued property
+            res = processMultiResults(null, dbObj, inst, rs, logSB);
          if (logSB != null) {
             DBUtil.info(logSB.toString());
          }
@@ -159,6 +180,69 @@ public class FetchTablesQuery {
          if (rs != null)
             DBUtil.close(rs);
       }
+   }
+
+   public List<IDBObject> query(DBTransaction transaction, DBObject proto) {
+      TableDescriptor mainTable = fetchTables.get(0).table;
+      Connection conn = transaction.getConnection(mainTable.getDataSourceName());
+      StringBuilder qsb = buildTableQueryBase(mainTable, fetchTables);
+      ResultSet rs = null;
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(qsb) : null;
+      DBUtil.append(qsb, logSB, " WHERE ");
+      qsb.append(whereSB);
+      if (logSB != null)
+         logSB.append(this.logSB);
+
+      try {
+         String queryStr = qsb.toString();
+         PreparedStatement st = conn.prepareStatement(queryStr);
+         Object inst = proto.getInst();
+         for (int i = 0; i < paramValues.size(); i++) {
+            Object paramValue = paramValues.get(i);
+            Object propType = paramTypes.get(i);
+            DBUtil.setStatementValue(st, i+1, propType, paramValue);
+         }
+
+         rs = st.executeQuery();
+
+         if (logSB != null)
+            logSB.append(" -> ");
+
+         transaction.applyingDBChanges = true;
+
+         ArrayList<IDBObject> res = new ArrayList<IDBObject>();
+         if (!multiRow) {
+            if (!processOneRowQueryResults(proto, inst, rs, logSB))
+               return null;
+            res.add(proto);
+            return res;
+         }
+         else {
+            res = new ArrayList<IDBObject>();
+            processMultiResults(res, null, inst, rs, logSB);
+         }
+         if (logSB != null) {
+            DBUtil.info(logSB.toString());
+         }
+         return res;
+      }
+      catch (SQLException exc) {
+         throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
+      }
+      finally {
+         transaction.applyingDBChanges = false;
+         if (rs != null)
+            DBUtil.close(rs);
+      }
+   }
+
+   public IDBObject queryOne(DBTransaction transaction, DBObject proto) {
+      List<IDBObject> res = query(transaction, proto);
+      if (res == null)
+         return null;
+      if (res.size() > 1)
+         throw new IllegalArgumentException("Invalid return list for single query: " + res.size());
+      return res.size() == 0 ? null : res.get(0);
    }
 
    boolean processOneRowQueryResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
@@ -245,8 +329,7 @@ public class FetchTablesQuery {
     * Here the first fetchTable defines the list/array value - fetchTables.get(0).props.get(0).
     * The second and subsequent fetch tables are only there for onDemand=false references in the referenced object
     */
-   boolean processMultiResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
-      DBList<IDBObject> resList = null;
+   boolean processMultiResults(List<IDBObject> resList, DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       DBPropertyDescriptor listProp = null;
       int rowCt = 0;
 
@@ -254,38 +337,43 @@ public class FetchTablesQuery {
          int rix = 1;
          IDBObject currentRowVal = null;
 
-         if (rowCt > 0) {
-            logSB.append(",\n   ");
+         if (logSB != null) {
+            if (rowCt > 0) {
+               logSB.append(",\n   ");
+            }
+            else
+               logSB.append("\n   ");
          }
-         else
-            logSB.append("\n   ");
 
          for (int fi = 0; fi < fetchTables.size(); fi++) {
             FetchTableDesc fetchTable = fetchTables.get(fi);
 
+            boolean rowValSet = false;
             for (DBPropertyDescriptor propDesc:fetchTable.props) {
                IBeanMapper propMapper = propDesc.getPropertyMapper();
                Object val;
                int numCols = propDesc.getNumColumns();
+               DBTypeDescriptor colTypeDesc = propDesc.getColTypeDesc();
                if (numCols == 1)  {
                   val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
-                  if (propDesc.refDBTypeDesc != null) {
-                     val = propDesc.refDBTypeDesc.lookupInstById(val, true, false);
+                  if (colTypeDesc != null) {
+                     val = colTypeDesc.lookupInstById(val, true, false);
 
                      if (val != null) {
                         IDBObject valObj = (IDBObject) val;
                         DBObject valDBObj = valObj.getDBObject();
                         if (valDBObj.isPrototype()) {
-                           if (propDesc.reversePropDesc != null)
-                              System.out.println("***"); // Set reverse property here?
+                           // TODO: if this has a reverse property, do we want to update the other side - in this case, add it to the reverseProperty which is a list here
+                           //if (propDesc.reversePropDesc != null)  {
+                           //}
                            valDBObj.setPrototype(false);
                         }
                      }
                   }
                }
                else {
-                  if (propDesc.refDBTypeDesc != null) {
-                     List<IdPropertyDescriptor> refIdCols = propDesc.refDBTypeDesc.primaryTable.getIdColumns();
+                  if (colTypeDesc != null) {
+                     List<IdPropertyDescriptor> refIdCols = colTypeDesc.primaryTable.getIdColumns();
                      if (numCols != refIdCols.size())
                         throw new UnsupportedOperationException();
                      MultiColIdentity idVals = new MultiColIdentity(numCols);
@@ -294,14 +382,15 @@ public class FetchTablesQuery {
                         Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
                         idVals.setVal(idVal, ci);
                      }
-                     val = propDesc.refDBTypeDesc.lookupInstById(idVals, true, false);
+                     val = colTypeDesc.lookupInstById(idVals, true, false);
 
                      if (val != null) {
                         IDBObject valObj = (IDBObject) val;
                         DBObject valDBObj = valObj.getDBObject();
                         if (valDBObj.isPrototype()) {
-                           if (propDesc.reversePropDesc != null)
-                              System.out.println("***"); // Set reverse property here?
+                           // TODO: update the reverse property (a list at this point)?
+                           //if (propDesc.reversePropDesc != null)
+                           //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
                            valDBObj.setPrototype(false);
                         }
                      }
@@ -311,15 +400,16 @@ public class FetchTablesQuery {
                      val = null;
                   }
                }
-               if (fi == 0) {
+               if (fi == 0 && !rowValSet) {
                   currentRowVal = (IDBObject) val;
+                  rowValSet = true;
                   if (resList == null) {
                      resList = new DBList(10, dbObj, propDesc);
                      listProp = propDesc; // the first time through, the main property for this list
                   }
                   resList.add(currentRowVal);
                   if (logSB != null) {
-                     logSB.append(")\n   [");
+                     logSB.append("[");
                      logSB.append(rowCt);
                      logSB.append("](");
                      logSB.append(currentRowVal == null ? null : currentRowVal.getDBObject());
@@ -360,8 +450,9 @@ public class FetchTablesQuery {
                            IDBObject valObj = (IDBObject) val;
                            DBObject valDBObj = valObj.getDBObject();
                            if (valDBObj.isPrototype()) {
-                              if (propDesc.reversePropDesc != null)
-                                 System.out.println("***"); // Set reverse property here?
+                              // TODO: do we need to update the reverse property
+                              //if (propDesc.reversePropDesc != null)
+                              //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
                               valDBObj.setPrototype(false);
                            }
                         }
@@ -384,8 +475,8 @@ public class FetchTablesQuery {
                            IDBObject valObj = (IDBObject) val;
                            DBObject valDBObj = valObj.getDBObject();
                            if (valDBObj.isPrototype()) {
-                              if (propDesc.reversePropDesc != null)
-                                 System.out.println("***"); // Set reverse property here?
+                              //if (propDesc.reversePropDesc != null)
+                              //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
                               valDBObj.setPrototype(false);
                            }
                         }
@@ -422,21 +513,19 @@ public class FetchTablesQuery {
                         logSB.append(propMapper.getPropertyName());
                         logSB.append("=");
                         DBUtil.appendVal(logSB, val);
-
-                        if (rci == numToFetch - 1)
-                           logSB.append(")");
                      }
                   }
                }
-
             }
+            if (logSB != null)
+               logSB.append(")");
          }
       }
       if (listProp != null) {
          // TODO: handle arrays, incremental update of existing destination list for incremental 'refresh' when the list is
          //  bound to a UI, handle other concrete classes for the list type and IBeanIndexMapper.
          listProp.getPropertyMapper().setPropertyValue(inst, resList);
-         resList.trackingChanges = true;
+         ((DBList) resList).trackingChanges = true;
       }
       return true;
    }
@@ -539,10 +628,87 @@ public class FetchTablesQuery {
    public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append("select ");
-      if (fetchTables != null)
-         sb.append(fetchTables);
+      if (fetchTables != null) {
+         for (int i = 0; i < fetchTables.size(); i++) {
+            FetchTableDesc fetchTable = fetchTables.get(i);
+            if (i != 0)
+               sb.append(", ");
+            sb.append(fetchTable);
+         }
+      }
+      if (whereSB != null) {
+         sb.append(" WHERE ");
+         sb.append(whereSB);
+      }
+      if (paramValues != null) {
+         sb.append(" (");
+         sb.append(StringUtil.arrayToString(paramValues.toArray()));
+         sb.append(" )");
+      }
       if (multiRow)
-         sb.append(" - multi");
+         sb.append(" (multiRow)");
       return sb.toString();
+   }
+
+   public FetchTablesQuery clone() {
+      FetchTablesQuery res = new FetchTablesQuery(dataSourceName, multiRow);
+      res.includesPrimary = includesPrimary;
+      for (FetchTableDesc ftd:fetchTables) {
+         FetchTableDesc nftd = ftd.clone();
+         res.fetchTables.add(nftd);
+         res.fetchTablesIndex.put(ftd.table.tableName, ftd);
+      }
+      return res;
+   }
+
+   public void appendWhereColumn(String tableName, String colName) {
+      initWhereQuery();
+      numWhereColumns++;
+      if (fetchTables.size() > 1) {
+         whereAppendIdent(tableName);
+         DBUtil.append(whereSB, null, ".");
+      }
+      DBUtil.appendIdent(whereSB, null, colName);
+   }
+
+   public void appendLogWhereColumn(StringBuilder logSB, String tableName, String colName) {
+      initWhereQuery();
+      if (logSB == null)
+         return;
+      if (fetchTables.size() > 1) {
+         DBUtil.appendIdent(logSB, null, tableName);
+         logSB.append(".");
+      }
+      DBUtil.appendIdent(logSB, null, colName);
+   }
+
+   private void initWhereQuery() {
+      if (whereSB == null) {
+         whereSB = new StringBuilder();
+         logSB = DBUtil.verbose ? new StringBuilder() : null;
+         paramValues = new ArrayList<Object>();
+         paramTypes = new ArrayList<Object>();
+      }
+   }
+
+   public void whereAppend(String s) {
+      initWhereQuery();
+      whereSB.append(s);
+   }
+
+   public void whereAppendIdent(String ident) {
+      initWhereQuery();
+      DBUtil.appendIdent(whereSB, null, ident);
+   }
+
+   public void insertIdProperty() {
+      FetchTableDesc mainTableFetch = fetchTables.get(0);
+      List<IdPropertyDescriptor> idCols = mainTableFetch.table.getIdColumns();
+      int idSz = idCols.size();
+      for (int i = idSz - 1; i >= 0; i--) {
+         IdPropertyDescriptor idCol = idCols.get(i);
+         if (!mainTableFetch.props.contains(idCol))
+            mainTableFetch.props.add(0, idCol);
+      }
    }
 }

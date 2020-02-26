@@ -14,8 +14,10 @@ public class TxDelete extends TxOperation {
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       int ct = 0;
       if (dbTypeDesc.auxTables != null) {
-         for (TableDescriptor table:dbTypeDesc.auxTables)
+         for (int i = 0; i < dbTypeDesc.auxTables.size(); i++) {
+            TableDescriptor table = dbTypeDesc.auxTables.get(i);
             ct += doDelete(table);
+         }
       }
       if (dbTypeDesc.multiTables != null) {
          for (TableDescriptor table:dbTypeDesc.multiTables)

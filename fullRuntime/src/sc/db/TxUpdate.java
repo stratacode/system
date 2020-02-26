@@ -82,22 +82,22 @@ public class TxUpdate extends TxOperation {
 
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
-            append(sb, logSB, ", ");
+            DBUtil.append(sb, logSB, ", ");
          }
          DBUtil.appendIdent(sb, logSB, columnProps.get(i).columnName);
-         append(sb, logSB, " = ");
+         DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
             logSB.append(DBUtil.formatValue(columnValues.get(i)));
       }
-      append(sb, logSB, " WHERE ");
+      DBUtil.append(sb, logSB, " WHERE ");
 
       for (int i = 0; i < numIdCols; i++) {
          if (i != 0) {
-            append(sb, logSB, ", ");
+            DBUtil.append(sb, logSB, ", ");
          }
          DBUtil.appendIdent(sb, logSB, idCols.get(i).columnName);
-         append(sb, logSB, " = ");
+         DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
             logSB.append(DBUtil.formatValue(idVals.get(i)));

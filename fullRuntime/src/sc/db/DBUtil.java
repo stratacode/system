@@ -252,7 +252,31 @@ public class DBUtil {
    public static void appendVal(StringBuilder logSB, Object val) {
      if (val instanceof IDBObject)
         logSB.append(((IDBObject) val).getDBObject());
+     else if (val instanceof CharSequence) {
+        logSB.append("'");
+        logSB.append(val);
+        logSB.append("'");
+     }
      else
         logSB.append(val);
+   }
+
+   static void append(StringBuilder sb, StringBuilder logSB, CharSequence val) {
+      sb.append(val);
+      if (logSB != null) {
+         logSB.append(val);
+      }
+   }
+
+   public static CharSequence cvtJavaToSQLOperator(String operator) {
+      if (operator.equals("instanceof"))
+         throw new UnsupportedOperationException();
+      if (operator.equals("=="))
+         return "=";
+      else if (operator.equals("&&"))
+         return "AND";
+      else if (operator.equals("||"))
+         return "OR";
+      return operator;
    }
 }

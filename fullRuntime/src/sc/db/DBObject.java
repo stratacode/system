@@ -198,7 +198,7 @@ public class DBObject implements IDBObject {
       if (replacedBy != null)
          return replacedBy.getDBObject().dbFetch(property);
 
-      if ((flags & (TRANSIENT)) != 0)
+      if ((flags & (TRANSIENT | PROTOTYPE)) != 0)
          return null;
 
       if ((flags & (REMOVED | STOPPED)) != 0)
@@ -633,5 +633,11 @@ public class DBObject implements IDBObject {
       else if ((flags & PROTOTYPE) != 0)
          return "prototype";
       return "persistent";
+   }
+
+   public static PropUpdate fetch(DBObject obj, String prop) {
+      if (obj != null)
+         return obj.dbFetch(prop);
+      return null;
    }
 }

@@ -42,6 +42,7 @@ public class PropertyDefinitionParameters {
    public boolean useIndexSetForArrays = true;
 
    public String dbObjPrefix ="";
+   public String dbObjVarName ="";
    public DBPropertyDescriptor dbPropDesc;
    public String dbGetProperty = "";
    public String dbSetProperty = "";
@@ -101,6 +102,7 @@ public class PropertyDefinitionParameters {
       DBProvider dbProvider = ModelUtil.getDBProviderForProperty(sys, propLayer, varDef);
       if (dbProvider != null && dbProvider.getNeedsGetSet()) {
          persist = true;
+         dbObjVarName = "_dbObject";
          dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
          dbPropDesc = ModelUtil.getDBPropertyDescriptor(sys, propLayer, varDef);
          dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";

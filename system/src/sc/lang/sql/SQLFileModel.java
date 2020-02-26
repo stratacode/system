@@ -32,7 +32,7 @@ public class SQLFileModel extends SCModel {
          return;
       }
 
-      String sqlName = DBUtil.getSQLName(typeName);
+      String sqlName = SQLUtil.getSQLName(typeName);
       String auxPrefix = sqlName + "_";
       CreateTable primaryTable = null;
       List<CreateTable> auxTables = new ArrayList<CreateTable>();
@@ -181,6 +181,17 @@ public class SQLFileModel extends SCModel {
                setProp = true;
             }
             constraints.add(new NotNullConstraint());
+            if (setProp)
+               colDef.setProperty("columnConstraints", constraints);
+         }
+         if (propDesc.unique && !isId) {
+            List<SQLConstraint> constraints = colDef.columnConstraints;
+            boolean setProp = false;
+            if (constraints == null) {
+               constraints = new SemanticNodeList<SQLConstraint>();
+               setProp = true;
+            }
+            constraints.add(new UniqueConstraint());
             if (setProp)
                colDef.setProperty("columnConstraints", constraints);
          }
