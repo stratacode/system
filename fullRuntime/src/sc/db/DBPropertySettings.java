@@ -10,5 +10,4 @@ public @interface DBPropertySettings {
    String tableName() default "";
    String dataSourceName() default "";
    String reverseProperty() default "";
-   // TODO: add unique
 }

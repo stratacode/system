@@ -86,15 +86,18 @@ public class DBTypeDescriptor {
 
    public boolean tablesInitialized = false;
 
+   public List<FindByDescriptor> findByQueries = null;
+
    /**
     * Defines the type with the id properties of the primary table in tact so it can be used to create references from other types.
     * Properties may be later added to the primary table and other tables added with initTables
     */
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary) {
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<FindByDescriptor> findByQueries) {
       this.typeDecl = typeDecl;
       this.baseType = baseType;
       this.dataSourceName = dataSourceName;
       this.primaryTable = primary;
+      this.findByQueries = findByQueries;
       primary.init(this);
       primary.primary = true;
 
@@ -104,12 +107,12 @@ public class DBTypeDescriptor {
       }
    }
 
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
-      this(typeDecl, baseType, dataSourceName, primary);
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<FindByDescriptor> findByQueries, String versionPropName) {
+      this(typeDecl, baseType, dataSourceName, primary, findByQueries);
       initTables(auxTables, multiTables, versionPropName);
    }
 
-   public void initTables( List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
+   public void initTables(List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
       tablesInitialized = true;
       if (auxTables != null) {
          for (TableDescriptor auxTable:auxTables)
@@ -160,6 +163,12 @@ public class DBTypeDescriptor {
       if (auxTables == null)
          auxTables = new ArrayList<TableDescriptor>();
       auxTables.add(table);
+   }
+
+   public void addFindByQuery(FindByDescriptor findByDesc) {
+      if (findByQueries == null)
+         findByQueries = new ArrayList<FindByDescriptor>();
+      findByQueries.add(findByDesc);
    }
 
    void initFetchGroups() {
@@ -467,6 +476,11 @@ public class DBTypeDescriptor {
                }
             }
          }
+      }
+      if (findByQueries != null) {
+         for (FindByDescriptor fbDesc:findByQueries)
+            if (fbDesc.propTypes == null)
+               fbDesc.initTypes(typeDecl);
       }
    }
 

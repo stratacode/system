@@ -2003,17 +2003,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * modifier is supplied, only methods with that modifier are returned.
     */
    public List<Object> getAllMethods(String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
-      if (body == null)
-         return null;
-
       List<Object> methods = new ArrayList<Object>();
-      addAllMethods(methods, modifier, hasModifier, isDyn, overridesComp);
+      if (body != null)
+         addAllMethods(body, methods, modifier, hasModifier, isDyn, overridesComp);
+      if (hiddenBody != null)
+         addAllMethods(hiddenBody, methods, modifier, hasModifier, isDyn, overridesComp);
       return methods.size() > 0 ? methods : null;
    }
 
-   void addAllMethods(List<Object> methods, String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
-      for (int i = 0; i < body.size(); i++) {
-         Definition member = body.get(i);
+   static void addAllMethods(List<Statement> bodyList, List<Object> methods, String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
+      for (int i = 0; i < bodyList.size(); i++) {
+         Definition member = bodyList.get(i);
          if (member instanceof MethodDefinition && (modifier == null || hasModifier == member.hasModifier(modifier)) &&
                  (!isDyn || ModelUtil.isDynamicType(member)) && (!overridesComp || ((MethodDefinition) member).getOverridesCompiled()))
             methods.add(member);
@@ -2094,6 +2094,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       List<Object> props = new ArrayList<Object>();
       addAllProperties(body, props, modifier, includeAssigns);
+      if (hiddenBody != null)
+         addAllProperties(hiddenBody, props, modifier, includeAssigns);
       return props.size() > 0 ? props : null;
    }
 

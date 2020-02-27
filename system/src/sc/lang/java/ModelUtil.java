@@ -9624,16 +9624,56 @@ public class ModelUtil {
                primaryTableName = SQLUtil.getSQLName(typeName);
             TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
 
+            List<FindByDescriptor> findByQueries = null;
+
             Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
             if (properties != null) {
                for (Object property:properties) {
-                  Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
                   String propName = ModelUtil.getPropertyName(property);
                   Object propType = ModelUtil.getPropertyType(property);
 
                   if (propName == null || propType == null)
                      continue;
 
+                  Object findByProp = ModelUtil.getAnnotation(property, "sc.db.FindByProp");
+                  if (findByProp != null) {
+                     ArrayList<String> fbProps = new ArrayList<String>();
+                     List<String> fbOptions = null;
+                     fbProps.add(propName);
+                     String andPropsStr = (String) ModelUtil.getAnnotationValue(findByProp, "and");
+                     if (andPropsStr != null && andPropsStr.length() > 0) {
+                        String[] andProps = andPropsStr.split(",");
+                        fbProps.addAll(Arrays.asList(andProps));
+                     }
+
+                     boolean multiRow = true;
+                     String fetchGroup = null;
+                     Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
+                     if (propSettings != null) {
+                        Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
+                        if (tmpUnique != null && tmpUnique) {
+                           multiRow = false;
+                        }
+                        String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
+                        if (tmpFetchGroup != null) {
+                           fetchGroup = tmpFetchGroup;
+                        }
+                     }
+
+                     String optionPropsStr = (String) ModelUtil.getAnnotationValue(findByProp, "options");
+                     if (optionPropsStr != null && optionPropsStr.length() > 0) {
+                        String[] optProps = optionPropsStr.split(",");
+                        fbOptions = Arrays.asList(optProps);
+                     }
+                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, multiRow, fetchGroup);
+                     if (findByQueries == null)
+                        findByQueries = new ArrayList<FindByDescriptor>();
+                     findByQueries.add(fbDesc);
+
+                     ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc);
+                  }
+
+                  Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
                   if (idSettings != null) {
                      String idColumnName = null;
                      String idColumnType = null;
@@ -9669,7 +9709,7 @@ public class ModelUtil {
                }
             }
 
-            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable);
+            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, findByQueries);
 
             sys.addDBTypeDescriptor(fullTypeName, dbTypeDesc);
 
@@ -9677,6 +9717,29 @@ public class ModelUtil {
          }
       }
       return null;
+   }
+
+   private static void initFindByParamTypes(LayeredSystem sys, Object typeDecl, FindByDescriptor fbDesc) {
+      List<Object> propTypes = new ArrayList<Object>(fbDesc.propNames.size());
+      for (String propName:fbDesc.propNames) {
+         Object propMember = ModelUtil.definesMember(typeDecl, propName, JavaSemanticNode.MemberType.PropertyAnySet, typeDecl, null, sys);
+         if (propMember == null) {
+            sys.error("FindByProp - no property named: " + propName);
+            return;
+         }
+         else {
+            Object propType = ModelUtil.getPropertyType(propMember);
+            propTypes.add(propType);
+         }
+      }
+      fbDesc.propTypes = propTypes;
+      if (fbDesc.optionNames != null) {
+         fbDesc.optionTypes = new ArrayList<Object>(fbDesc.optionNames.size());
+         for (String optName:fbDesc.optionNames) {
+            Object propType = ModelUtil.definesMember(typeDecl, optName, JavaSemanticNode.MemberType.PropertyAnySet, typeDecl, null, sys);
+            fbDesc.optionTypes.add(propType);
+         }
+      }
    }
 
    public static void completeDBTypeDescriptor(DBTypeDescriptor dbTypeDesc, LayeredSystem sys, Layer refLayer, Object typeDecl) {
@@ -9788,7 +9851,7 @@ public class ModelUtil {
                   }
                }
                else {
-                  // By default if there's a forward binding the value is derived and so more often than not does not have to be stored
+                  // By default if there's a forward binding the value is derived and so usually does not have to be stored
                   // Use the forward bindings to add new 'rule' properties to the model that can be used easily as query properties
                   if (property instanceof VariableDefinition) {
                      VariableDefinition varDef = (VariableDefinition) property;

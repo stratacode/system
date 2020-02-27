@@ -659,10 +659,10 @@ public class DynStubParameters extends AbstractTemplateParameters {
 
       declStaticMeths = new ArrayList<Object>();
       declInstMeths = new ArrayList<Object>();
-      objTypeDecl.addAllMethods(declStaticMeths, "static", true, false, false);
+      BodyTypeDeclaration.addAllMethods(objTypeDecl.body, declStaticMeths, "static", true, false, false);
       if (constructors != null)
          declStaticMeths.addAll(constructors);
-      objTypeDecl.addAllMethods(declInstMeths, "static", false, false, false);
+      BodyTypeDeclaration.addAllMethods(objTypeDecl.body, declInstMeths, "static", false, false, false);
 
       List<Object> methArr = objTypeDecl.getAllMethods("static", true, false, false);
       allStaticMethods = methArr == null ? new ArrayList<Object>() : new ArrayList<Object>(methArr);

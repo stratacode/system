@@ -459,6 +459,115 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return sb.toString();
    }
 
+   public String formatFindByQueries() {
+      if (dbTypeDescriptor == null || dbTypeDescriptor.findByQueries == null)
+         return "";
+
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < dbTypeDescriptor.findByQueries.size(); i++) {
+         FindByDescriptor fbDesc = dbTypeDescriptor.findByQueries.get(i);
+         sb.append("public static ");
+         if (fbDesc.multiRow) {
+            sb.append("java.util.List<");
+            sb.append(typeBaseName);
+            sb.append(">");
+         }
+         else {
+            sb.append(typeBaseName);
+         }
+         sb.append(" findBy");
+         sb.append(CTypeUtil.capitalizePropertyName(fbDesc.name));
+         sb.append("(");
+         int numProps = fbDesc.propNames.size();
+         int numOpts = fbDesc.optionNames == null ? 0 : fbDesc.optionNames.size();
+         for (int j = 0; j < numProps; j++) {
+            if (j != 0)
+               sb.append(", ");
+            String propName = fbDesc.propNames.get(j);
+            Object propType = fbDesc.propTypes.get(j);
+            sb.append(ModelUtil.getTypeName(propType));
+            sb.append(" ");
+            sb.append(propName);
+         }
+         if (numOpts > 0) {
+            for (int j = 0; j < numOpts; j++) {
+               if (j != 0)
+                  sb.append(", ");
+               String propName = fbDesc.optionNames.get(j);
+               Object propType = fbDesc.optionTypes.get(j);
+               sb.append("boolean include");
+               sb.append(propName);
+               sb.append(", ");
+               sb.append(ModelUtil.getTypeName(propType));
+               sb.append(" ");
+               sb.append(propName);
+            }
+         }
+         sb.append(") {\n");
+
+         sb.append("      ");
+         sb.append(typeBaseName);
+         sb.append(" proto = new ");
+         sb.append(typeBaseName);
+         sb.append("();\n");
+         sb.append("      proto.getDBObject().setPrototype(true);\n");
+         for (int j = 0; j < numProps; j++) {
+            String propName = fbDesc.propNames.get(j);
+            sb.append("         proto." + propName + " = " + propName + ";\n");
+            /*
+            sb.append("      proto.set");
+            sb.append(CTypeUtil.capitalizePropertyName(propName));
+            sb.append("(");
+            sb.append(propName);
+            sb.append(");\n");
+            */
+         }
+         sb.append("      java.util.List<String> propList = ");
+         if (numOpts > 0)
+            sb.append("new java.util.ArrayList<String>(");
+         appendStringList(sb, fbDesc.propNames);
+         if (numOpts > 0)
+            sb.append(")");
+         sb.append(";\n");
+         for (int j = 0; j < numOpts; j++) {
+            String propName = fbDesc.optionNames.get(j);
+            String capPropName = CTypeUtil.capitalizePropertyName(propName);
+            sb.append("      if (include");
+            sb.append(capPropName);
+            sb.append("){\n");
+            //sb.append("         proto.set");
+            //sb.append(capPropName);
+            //sb.append("(");
+            //sb.append(propName);
+            //sb.append(");\n");
+            sb.append("         proto." + propName + " = " + propName + ";\n");
+
+            sb.append("         propList.add(");
+            appendString(sb, propName, false);
+            sb.append(");\n      }\n");
+         }
+         sb.append("      return (");
+         if (fbDesc.multiRow) {
+            sb.append("java.util.List<");
+            sb.append(typeBaseName);
+            sb.append(">");
+         }
+         else {
+            sb.append(typeBaseName);
+         }
+         sb.append(") dbTypeDesc.");
+         if (fbDesc.multiRow)
+            sb.append("query(");
+         else
+            sb.append("queryOne(");
+         sb.append("proto.getDBObject(),");
+         appendString(sb, fbDesc.fetchGroup, false);
+         sb.append(", propList);\n");
+         sb.append("   }\n\n");
+      }
+      return sb.toString();
+   }
+
    public String formatDBTypeDescriptorDefinition() {
       if (dbTypeDescriptor == null)
          return "";
@@ -502,6 +611,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       sb.append(", ");
       appendTableList(sb, dbTypeDescriptor.multiTables, true);
       sb.append(", ");
+      appendFindByQueries(sb, dbTypeDescriptor.findByQueries);
+      sb.append(", ");
       DBPropertyDescriptor versionProp = dbTypeDescriptor.versionProperty;
       if (versionProp == null)
          sb.append("null");
@@ -515,12 +626,50 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return sb.toString();
    }
 
+   private void appendFindByQueries(StringBuilder sb, List<FindByDescriptor> findByQueries) {
+      if (findByQueries == null || findByQueries.size() == 0) {
+         sb.append("null");
+         return;
+      }
+      sb.append("java.util.Arrays.asList(");
+
+      for (int i = 0; i < findByQueries.size(); i++) {
+         if (i != 0)
+            sb.append(", ");
+         sb.append("new sc.db.FindByDescriptor(");
+         FindByDescriptor fbDesc = findByQueries.get(i);
+         appendString(sb, fbDesc.name, false);
+         sb.append(", ");
+         appendStringList(sb, fbDesc.propNames);
+         sb.append(", ");
+         appendStringList(sb, fbDesc.optionNames);
+         sb.append(", ");
+         sb.append(fbDesc.multiRow);
+         appendString(sb, fbDesc.fetchGroup, true);
+         sb.append(")");
+      }
+      sb.append(")");
+   }
+
+   private void appendStringList(StringBuilder sb, List<String> properties) {
+      if (properties == null) {
+         sb.append("null");
+         return;
+      }
+      sb.append("java.util.Arrays.asList(");
+      for (int j = 0; j < properties.size(); j++) {
+         appendString(sb, properties.get(j), j != 0);
+      }
+      sb.append(")");
+   }
+
    private void appendTableList(StringBuilder sb, List<? extends TableDescriptor> tableList, boolean multi) {
       if (tableList == null || tableList.size() == 0) {
          sb.append("null");
          return;
       }
       String className = "TableDescriptor";
+      // TODO: simplify this to just use Arrays.asList
       sb.append("new java.util.ArrayList<sc.db.");
       sb.append(className);
       sb.append(">(java.util.Arrays.asList(new sc.db.");
@@ -560,6 +709,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("null");
          return;
       }
+      // TODO: simplify!
       String descClassName = isIdProperty ? "sc.db.IdPropertyDescriptor" : "sc.db.DBPropertyDescriptor";
       sb.append("new java.util.ArrayList<");
       sb.append(descClassName);
