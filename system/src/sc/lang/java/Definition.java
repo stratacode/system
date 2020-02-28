@@ -543,6 +543,26 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       return null;
    }
 
+   // TODO: should be using the full type name here and in getAnnotation
+   // otherwise, two annotations with the same name but in different packages will get merged.
+   public List<Object> getRepeatingAnnotation(String annotationName) {
+      if (modifiers == null)
+         return null;
+      List<Object> res = null;
+      for (Object modifier:modifiers) {
+         if (modifier instanceof Annotation) {
+            Annotation annotation = (Annotation) modifier;
+            String ftn;
+            if (annotation.typeName != null && annotation.typeName.equals(annotationName) || (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName)) {
+               if (res == null)
+                  res = new ArrayList<Object>();
+               res.add(annotation);
+            }
+         }
+      }
+      return res;
+   }
+
    public boolean hasAnnotation(String annotName) {
       return getAnnotation(annotName) != null;
    }

@@ -102,6 +102,10 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getAnnotation(wrapped, annotName);
    }
 
+   public List<Object> getRepeatingAnnotation(String annotName) {
+      return ModelUtil.getRepeatingAnnotation(wrapped, annotName);
+   }
+
    public Map<String,Object> getAnnotations() {
       return ModelUtil.getAnnotations(wrapped);
    }

@@ -191,6 +191,13 @@ public class ClassFile {
          return aa.getAnnotation(annotName);
       }
 
+      public List<Object> getRepeatingAnnotation(String annotName) {
+         AnnotationsAttribute aa = AnnotationsAttribute.getAttribute(attributes);
+         if (aa == null)
+            return null;
+         return aa.getRepeatingAnnotation(annotName);
+      }
+
       public Map<String,Object> getAnnotations() {
          AnnotationsAttribute aa = AnnotationsAttribute.getAttribute(attributes);
          if (aa == null)
@@ -240,6 +247,13 @@ public class ClassFile {
       if (aa == null)
          return null;
       return aa.getAnnotation(annotName);
+   }
+
+   public List<Object> getRepeatingAnnotation(String annotName) {
+      AnnotationsAttribute aa = AnnotationsAttribute.getAttribute(attributesByName);
+      if (aa == null)
+         return null;
+      return aa.getRepeatingAnnotation(annotName);
    }
 
    public FieldMethodInfo readFieldMethodInfo(boolean fld) throws IOException {
@@ -764,6 +778,7 @@ public class ClassFile {
       }
 
       LinkedHashMap<String, CFAnnotation> annotations;
+      LinkedHashMap<String, List<Object>> repeatingAnnotations;
 
       Object readElementValue(ClassFile file) throws IOException {
          char valueCode = (char) file.input.readUnsignedByte();
@@ -827,7 +842,24 @@ public class ClassFile {
             annotations = new LinkedHashMap<String, CFAnnotation>();
          for (int i = 0; i < numAnnotations; i++) {
             CFAnnotation annot = readAnnotation(file);
-            annotations.put(annot.getTypeName(), annot);
+            String typeName = annot.getTypeName();
+            CFAnnotation old = annotations.put(typeName, annot);
+            if (old != annot && old != null) {
+               List<Object> repeatList;
+               if (repeatingAnnotations == null) {
+                  repeatingAnnotations = new LinkedHashMap<String,List<Object>>();
+                  repeatList = null;
+               }
+               else {
+                  repeatList = repeatingAnnotations.get(typeName);
+               }
+               if (repeatList == null) {
+                  repeatList = new ArrayList<Object>();
+                  repeatingAnnotations.put(typeName, repeatList);
+                  repeatList.add(old);
+               }
+               repeatList.add(annot);
+            }
          }
       }
 
@@ -835,6 +867,15 @@ public class ClassFile {
          if (annotations == null)
             return null;
          return annotations.get(name);
+      }
+
+      public List<Object> getRepeatingAnnotation(String name) {
+         if (repeatingAnnotations != null)
+            return repeatingAnnotations.get(name);
+         CFAnnotation res = getAnnotation(name);
+         if (res != null)
+            return Collections.singletonList(res);
+         return null;
       }
 
       public Map<String,Object> getAnnotations() {

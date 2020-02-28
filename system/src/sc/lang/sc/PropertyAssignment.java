@@ -789,6 +789,23 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       return thisAnnot;
    }
 
+   public List<Object> getRepeatingAnnotation(String annotation) {
+      List<Object> thisAnnot = super.getRepeatingAnnotation(annotation);
+      if (assignedProperty != null) {
+         List<Object> overriddenAnnotation = ModelUtil.getRepeatingAnnotation(assignedProperty, annotation);
+
+         if (thisAnnot == null) {
+            return overriddenAnnotation == null ? null : Annotation.toAnnotationList(overriddenAnnotation);
+         }
+         if (overriddenAnnotation == null)
+            return thisAnnot;
+
+         thisAnnot = ModelUtil.mergeAnnotationLists(thisAnnot, overriddenAnnotation, false);
+         return thisAnnot;
+      }
+      return thisAnnot;
+   }
+
    public void styleNode(IStyleAdapter adapter) {
       ParentParseNode pnode = (ParentParseNode) parseNode;
       if (!pnode.isErrorNode() && errorArgs == null)

@@ -834,6 +834,10 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.getAnnotation(method, annotName);
    }
 
+   public List<Object> getRepeatingAnnotation(String annotName) {
+      return ModelUtil.getRepeatingAnnotation(method, annotName);
+   }
+
    public Map<String,Object> getAnnotations() {
       return ModelUtil.getAnnotations(method);
    }

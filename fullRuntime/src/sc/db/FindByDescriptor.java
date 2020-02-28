@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * The metadata for a FindBy query - generated from the FindByProp annotation
+ * The metadata for a FindBy query - generated from the @FindBy annotation
  */
 public class FindByDescriptor {
    public String name;

@@ -36,11 +36,13 @@ public class DBUtil {
       boolean upper = false;
       for (int i = 0; i < javaName.length(); i++) {
          char c = javaName.charAt(i);
-         if (Character.isUpperCase(c) && !upper) {
-            if (i > 0)
-               sb.append("_");
+         if (Character.isUpperCase(c)) {
+            if (!upper) {
+               if (i > 0)
+                  sb.append("_");
+               upper = true;
+            }
             sb.append(Character.toLowerCase(c));
-            upper = true;
          }
          else {
             if (upper) {

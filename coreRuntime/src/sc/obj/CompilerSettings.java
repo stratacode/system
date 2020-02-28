@@ -73,11 +73,9 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
     * Setting this for a class generates a constructor with the given set of parameter types in any sub-classes of the
     * given type unless that sub-class has a matching constructor defined explicitly.
     * When you set this on a class, it should define a matching constructor
+    * TODO: change to @PropagateConstructor and make it Repeatable to support more than one and/or @Propagate on the constructor definition itself.
     */
    String propagateConstructor() default "";
-   /** Specify a list of strings where each string contains the comma separated list of parameter types for constructor signatures that should be propagated */
-   // TODO: should we add support for propagating more than one constructor, either with propagateConstructors or with an @Propagate annotation on the method itself?
-   //String[] propagateConstructors() default {};
    /** If your class has a final start method but calls some other method, it can still be a component.  Set this property to the name of a method called by start and that method is overridden instead of start. */
    String overrideStartName() default "";    
    /** Name of a jar file relative to the build directory */
@@ -117,7 +115,11 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
    /** Controls the order in which and initOnStartup and createOnStartup types are initialized or started.  Higher priority types are initialized or started first. */
    int startPriority() default 0;
 
-   /** Set this to a comma separated list of properties that should be defined as part of the constructor of this type. Use for properties that are initializable before the instance is created (i.e. the initializer does not refer to this) */
+   /**
+    * For 'object' types, provides a comma separated list of property names that are set as part of the constructor for the
+    * object instance, rather than being initialized later. It's helpful for properties that should never be null and whose
+    * value is available when the instance is created - i.e. it's initialization expression cannot refer to other 'this' properties.
+    */
    String constructorProperties() default "";
 
    /** Set to false on a type, or a base-type so that properties in the base-type are inherited by sub-classes in the editor's view of the type */

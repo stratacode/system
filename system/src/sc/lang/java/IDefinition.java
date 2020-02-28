@@ -4,10 +4,12 @@
 
 package sc.lang.java;
 
+import java.util.List;
 import java.util.Map;
 
 public interface IDefinition {
    Object getAnnotation(String annotName);
+   List<Object> getRepeatingAnnotation(String annotName);
    Map<String,Object> getAnnotations();
    boolean hasModifier(String modifierName);
    AccessLevel getAccessLevel(boolean explicitOnly);

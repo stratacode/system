@@ -11,7 +11,7 @@
 
    <%    if (dbTypeDescriptor.baseType == null) { %>
       // Stores persistent state for the instance
-      protected sc.db.DBObject _dbObject = new sc.db.DBObject(this);
+      protected transient sc.db.DBObject _dbObject = new sc.db.DBObject(this);
       {
          _dbObject.init();
       }

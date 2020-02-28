@@ -485,7 +485,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                sb.append(", ");
             String propName = fbDesc.propNames.get(j);
             Object propType = fbDesc.propTypes.get(j);
-            sb.append(ModelUtil.getTypeName(propType));
+            String typeName = ModelUtil.getTypeName(propType);
+            if (typeName.startsWith("java.lang"))
+               typeName = CTypeUtil.getClassName(typeName);
+            sb.append(typeName);
             sb.append(" ");
             sb.append(propName);
          }
@@ -494,9 +497,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                if (j != 0)
                   sb.append(", ");
                String propName = fbDesc.optionNames.get(j);
+               String capPropName = CTypeUtil.capitalizePropertyName(propName);
                Object propType = fbDesc.optionTypes.get(j);
                sb.append("boolean include");
-               sb.append(propName);
+               sb.append(capPropName);
                sb.append(", ");
                sb.append(ModelUtil.getTypeName(propType));
                sb.append(" ");
@@ -525,7 +529,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("      java.util.List<String> propList = ");
          if (numOpts > 0)
             sb.append("new java.util.ArrayList<String>(");
-         appendStringList(sb, fbDesc.propNames);
+         if (fbDesc.propNames.size() > 0)
+            appendStringList(sb, fbDesc.propNames);
          if (numOpts > 0)
             sb.append(")");
          sb.append(";\n");

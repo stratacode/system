@@ -117,9 +117,9 @@ public class DBProvider {
 
             boolean any = false;
             StringBuilder schemaSB = new StringBuilder();
-            schemaSB.append("// Database schema for datasource: " + dataSource + "\n");
+            schemaSB.append("/* Database schema for datasource: " + dataSource + "*/\n");
             for (SQLFileModel sqlFileModel:sqlFileModels) {
-               schemaSB.append("\n\n// schema for type: " + sqlFileModel.srcType.getFullTypeName() + "\n\n");
+               schemaSB.append("\n\n/* schema for type: " + sqlFileModel.srcType.getFullTypeName() + "*/\n\n");
                schemaSB.append(sqlFileModel.toLanguageString());
                schemaSB.append("\n");
                any = true;

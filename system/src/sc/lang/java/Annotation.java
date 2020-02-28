@@ -12,10 +12,7 @@ import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 
 import java.lang.reflect.Array;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeMap;
+import java.util.*;
 
 public class Annotation extends ErrorSemanticNode implements IAnnotation {
    public String typeName;
@@ -275,6 +272,22 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
          return createFromElement((IAnnotation) elem);
 
       throw new UnsupportedOperationException();
+   }
+
+   /** Converts to an Annotation f needed */
+   public static List<Object> toAnnotationList(List<Object> list) {
+      ArrayList<Object> res = new ArrayList<Object>();
+      for (Object elem:list) {
+         if (elem instanceof Annotation)
+            res.add(elem);
+         else if (elem instanceof java.lang.annotation.Annotation)
+            res.add(createFromElement((java.lang.annotation.Annotation) elem));
+         else if (elem instanceof CFAnnotation)
+            res.add(createFromElement((IAnnotation) elem));
+         else
+            throw new UnsupportedOperationException();
+      }
+      return res;
    }
 
    /** Like toAnnotation but guarantees a copy */

@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 
+import java.util.List;
 import java.util.Map;
 
 public class ParamTypedMember implements ITypedObject, IDefinition {
@@ -45,6 +46,10 @@ public class ParamTypedMember implements ITypedObject, IDefinition {
 
    public Object getAnnotation(String annotName) {
       return ModelUtil.getAnnotation(member, annotName);
+   }
+
+   public List<Object> getRepeatingAnnotation(String annotName) {
+      return ModelUtil.getRepeatingAnnotation(member, annotName);
    }
 
    public Map<String,Object> getAnnotations() {

@@ -2718,6 +2718,21 @@ public class ModelUtil {
       return mainAnnot;
    }
 
+   /**
+    * For repeating annotations, it seems like we merge the definitions unless we add smarts for a specific annotation.
+    * For now, we just append the lists and return all of them.
+    */
+   public static List<Object> mergeAnnotationLists(List<Object> mainAnnot, List<Object> overAnnot, boolean replace) {
+      if (mainAnnot == null)
+         return overAnnot;
+      if (overAnnot == null)
+         return mainAnnot;
+      ArrayList<Object> res = new ArrayList<Object>();
+      res.addAll(mainAnnot);
+      res.addAll(overAnnot);
+      return res;
+   }
+
    public static Object getPropertyAnnotation(Object property, String annotationName) {
       Object res = getAnnotation(property, annotationName);
       if (res != null)
@@ -2790,13 +2805,8 @@ public class ModelUtil {
       else {
          Class annotationClass = RDynUtil.loadClass(annotationName);
          if (annotationClass == null) {
-            annotationClass = RDynUtil.loadClass("sc.obj." + annotationName);
-            if (annotationClass == null) {
-               // NOTE: assuming that the layers are defined properly, compiled classes can't have non-compiled annotations so just return null, e.g. searching for a JSSettings or MainInit annotation on a compiled class.
-               return null;
-            }
-            else
-               System.err.println("*** Using auto-imported sc.obj annoatation: " + annotationName);
+            // NOTE: assuming that the layers are defined properly, compiled classes can't have non-compiled annotations so just return null, e.g. searching for a JSSettings or MainInit annotation on a compiled class.
+            return null;
          }
 
          if (definition instanceof ParameterizedType) {
@@ -2842,6 +2852,61 @@ public class ModelUtil {
       }
       finally {
          PerfMon.end("getAnnotation");
+      }
+   }
+
+   public static List<Object> getRepeatingAnnotation(Object definition, String annotationName) {
+      if (definition instanceof IDefinition) {
+         return ((IDefinition) definition).getRepeatingAnnotation(annotationName);
+      }
+      else if (definition instanceof VariableDefinition)
+         return getRepeatingAnnotation(((VariableDefinition) definition).getDefinition(), annotationName);
+      else {
+         Class annotationClass = RDynUtil.loadClass(annotationName);
+         if (annotationClass == null) {
+            // NOTE: assuming that the layers are defined properly, compiled classes can't have non-compiled annotations so just return null, e.g. searching for a JSSettings or MainInit annotation on a compiled class.
+            return null;
+         }
+
+         if (definition instanceof ParameterizedType) {
+            definition = ((ParameterizedType) definition).getRawType();
+         }
+
+         java.lang.annotation.Annotation[] jlannot;
+         if (definition instanceof Class)
+            jlannot = ((Class) definition).getAnnotationsByType(annotationClass);
+         else if (definition instanceof AnnotatedElement)
+            jlannot = ((AnnotatedElement) definition).getAnnotationsByType(annotationClass);
+            // For bindable annotation at least, we need to get the setter and right now getPropertyMember returns the get over the set
+         else if (definition instanceof IBeanMapper) {
+            IBeanMapper mapper = (IBeanMapper) definition;
+            List<Object> ret = null;
+            Object sel;
+            if ((sel = mapper.getGetSelector()) != null) {
+               ret = getRepeatingAnnotation(sel, annotationName);
+               if (ret != null)
+                  return ret;
+            }
+            if ((sel = mapper.getSetSelector()) != null) {
+               ret = getRepeatingAnnotation(sel, annotationName);
+               if (ret != null)
+                  return ret;
+            }
+            if ((sel = mapper.getField()) != null) {
+               ret = getRepeatingAnnotation(sel, annotationName);
+               if (ret != null)
+                  return ret;
+            }
+            return null;
+         }
+         else if (definition instanceof java.lang.Enum || definition instanceof ITypeDeclaration || ModelUtil.isTypeVariable(definition))
+            return null;
+         else if (definition instanceof PrimitiveType)
+            return null;
+         else
+            throw new UnsupportedOperationException();
+
+         return Arrays.asList(jlannot);
       }
    }
 
@@ -9635,37 +9700,39 @@ public class ModelUtil {
                   if (propName == null || propType == null)
                      continue;
 
-                  Object findByProp = ModelUtil.getAnnotation(property, "sc.db.FindByProp");
+                  if (ModelUtil.hasModifier(property, "static"))
+                     continue;
+
+                  Object findByProp = ModelUtil.getAnnotation(property, "sc.db.FindBy");
                   if (findByProp != null) {
                      ArrayList<String> fbProps = new ArrayList<String>();
-                     List<String> fbOptions = null;
                      fbProps.add(propName);
-                     String andPropsStr = (String) ModelUtil.getAnnotationValue(findByProp, "and");
-                     if (andPropsStr != null && andPropsStr.length() > 0) {
-                        String[] andProps = andPropsStr.split(",");
-                        fbProps.addAll(Arrays.asList(andProps));
-                     }
+                     boolean multiRowQuery = initFindByPropertyList(sys, fbProps, "with", findByProp, propName, properties, typeName);
 
-                     boolean multiRow = true;
-                     String fetchGroup = null;
+                     String fetchGroup = (String) ModelUtil.getAnnotationValue(findByProp, "fetchGroup");
+
+                     ArrayList<String> fbOptions = new ArrayList<String>();
+                     // Even if an options property is unique, we don't consider that a single value query because that
+                     // property might not be in the query and so we might need to return more than one result.
+                     initFindByPropertyList(sys, fbOptions, "options", findByProp, propName, properties, typeName);
+                     if (fbOptions.size() == 0)
+                        fbOptions = null;
+
                      Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
                      if (propSettings != null) {
                         Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
                         if (tmpUnique != null && tmpUnique) {
-                           multiRow = false;
+                           multiRowQuery = false;
                         }
-                        String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
-                        if (tmpFetchGroup != null) {
-                           fetchGroup = tmpFetchGroup;
+                        if (fetchGroup == null) {
+                           String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
+                           if (tmpFetchGroup != null) {
+                              fetchGroup = tmpFetchGroup;
+                           }
                         }
                      }
 
-                     String optionPropsStr = (String) ModelUtil.getAnnotationValue(findByProp, "options");
-                     if (optionPropsStr != null && optionPropsStr.length() > 0) {
-                        String[] optProps = optionPropsStr.split(",");
-                        fbOptions = Arrays.asList(optProps);
-                     }
-                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, multiRow, fetchGroup);
+                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, multiRowQuery, fetchGroup);
                      if (findByQueries == null)
                         findByQueries = new ArrayList<FindByDescriptor>();
                      findByQueries.add(fbDesc);
@@ -9709,12 +9776,82 @@ public class ModelUtil {
                }
             }
 
+            List<Object> findByClList = ModelUtil.getRepeatingAnnotation(typeDecl, "sc.db.FindBy");
+            if (findByClList != null) {
+               for (Object findByCl:findByClList) {
+                  String name = (String) ModelUtil.getAnnotationValue(findByCl, "name");
+                  if (name == null) {
+                     sys.error("@FindBy annotation on class: " + typeDecl + " missing name for findBy method");
+                     continue;
+                  }
+                  ArrayList<String> fbProps = new ArrayList<String>();
+                  boolean multiRowQuery = initFindByPropertyList(sys, fbProps, "with", findByCl, null, properties, typeName);
+
+                  ArrayList<String> fbOptions = new ArrayList<String>();
+                  // Even if an options property is unique, we don't consider that a single value query because that
+                  // property might not be in the query and so we might need to return more than one result.
+                  initFindByPropertyList(sys, fbOptions, "options", findByCl, null, properties, typeName);
+                  if (fbOptions.size() == 0)
+                     fbOptions = null;
+
+                  String fetchGroup = (String) ModelUtil.getAnnotationValue(findByCl, "fetchGroup");
+
+                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, multiRowQuery, fetchGroup);
+                  if (findByQueries == null)
+                     findByQueries = new ArrayList<FindByDescriptor>();
+                  findByQueries.add(fbDesc);
+
+                  ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc);
+               }
+            }
+
             dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, findByQueries);
 
             sys.addDBTypeDescriptor(fullTypeName, dbTypeDesc);
 
             return dbTypeDesc;
          }
+      }
+      return null;
+   }
+
+   private static boolean initFindByPropertyList(LayeredSystem sys, ArrayList<String> fbProps, String attName, Object findByAnnot, String propName, Object[] properties, String typeName) {
+      boolean multiRowQuery = true;
+      String withPropsStr = (String) ModelUtil.getAnnotationValue(findByAnnot, attName);
+      if (withPropsStr != null && withPropsStr.length() > 0) {
+         String[] withPropNames = withPropsStr.split(",");
+         for (String withPropName:withPropNames) {
+            Object withProp = findPropertyInList(properties, withPropName);
+            if (withProp == null) {
+               sys.error("No '" + attName + "' property: " + withPropName + " for @FindBy " +
+                       (propName == null ? "for class: " + typeName : "for property: " + typeName + "." + propName));
+            }
+            else {
+               if (isUniqueProperty(withProp))
+                  multiRowQuery = false;
+               fbProps.add(withPropName);
+            }
+         }
+      }
+      return multiRowQuery;
+
+   }
+
+   private static boolean isUniqueProperty(Object property) {
+      Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
+      if (propSettings != null) {
+         Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
+         if (tmpUnique != null && tmpUnique) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   private static Object findPropertyInList(Object[] properties, String propName) {
+      for (Object prop:properties) {
+         if (ModelUtil.getPropertyName(prop).equals(propName))
+            return prop;
       }
       return null;
    }
@@ -9790,6 +9927,13 @@ public class ModelUtil {
                // Skip transient fields
                if (ModelUtil.hasModifier(property, "transient"))
                   continue;
+
+               if (ModelUtil.hasModifier(property, "static"))
+                  continue;
+
+               if (!isWritableProperty(property))
+                  continue;
+
                Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
                String propTableName = null;
                String propColumnName = null;

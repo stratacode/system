@@ -967,6 +967,26 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
+   public List<Object> getRepeatingAnnotation(String annotationName) {
+      List<Object> annot = super.getRepeatingAnnotation(annotationName);
+
+      // Then the modified type
+      Object superType = getDerivedTypeDeclaration();
+      if (superType != null) {
+         // We should not be modifying .classes so any annotation we pull off of a modified type should be in src
+         List<Object> superAnnot = ModelUtil.getRepeatingAnnotation(superType, annotationName);
+
+         if (annot != null && superAnnot != null) {
+            return ModelUtil.mergeAnnotationLists(annot, superAnnot, false);
+         }
+         else if (annot != null)
+            return annot;
+         else
+            return superAnnot;
+      }
+      return null;
+   }
+
    public String getInheritedScopeName() {
       // First check this definition
       String s = getScopeName();

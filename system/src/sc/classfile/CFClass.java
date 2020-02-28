@@ -780,6 +780,10 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return classFile.getAnnotation(annotName);
    }
 
+   public List<Object> getRepeatingAnnotation(String annotName) {
+      return classFile.getRepeatingAnnotation(annotName);
+   }
+
    public Collection<IAnnotation> getAnnotationsList(){
       if (classFile.attributes == null) {
          return Collections.emptyList();

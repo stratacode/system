@@ -541,6 +541,10 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.getAnnotation(baseType, annotName);
    }
 
+   public List<Object> getRepeatingAnnotation(String annotName) {
+      return ModelUtil.getRepeatingAnnotation(baseType, annotName);
+   }
+
    public Map<String,Object> getAnnotations() {
       return ModelUtil.getAnnotations(baseType);
    }

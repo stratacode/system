@@ -1041,4 +1041,11 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       }
       return null;
    }
+
+   public List<Object> getRepeatingAnnotation(String annotationName) {
+      List<Object> res = super.getRepeatingAnnotation(annotationName);
+      if (res != null)
+         return res;
+      return null;
+   }
 }
