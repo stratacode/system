@@ -65,7 +65,7 @@ public class BuildTag {
          sb.append(scmVersion);
       }
       if (javaVersion != null) {
-         sb.append(", java:");
+         sb.append(", from java:");
          sb.append(javaVersion);
       }
       return sb.toString();
