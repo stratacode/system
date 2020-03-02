@@ -5,6 +5,7 @@ import sc.dyn.DynUtil;
 import sc.obj.Constant;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
+import sc.util.StringUtil;
 
 import javax.print.attribute.standard.Destination;
 import java.util.*;
@@ -310,28 +311,43 @@ public class DBTypeDescriptor {
       return queriesList.size();
    }
 
-   public DBPropertyDescriptor getPropertyDescriptor(String propName) {
+   public DBPropertyDescriptor getPropertyDescriptor(String propNamePath) {
+      String[] propNameList = StringUtil.split(propNamePath, '.');
       DBPropertyDescriptor res = null;
-      if (primaryTable != null) {
-         res = primaryTable.getPropertyDescriptor(propName);
-         if (res != null)
-            return res;
-      }
-      if (auxTables != null) {
-         for (TableDescriptor tableDesc:auxTables) {
-            res = tableDesc.getPropertyDescriptor(propName);
-            if (res != null)
-               return res;
+      DBTypeDescriptor curType = this;
+      int pix = 0;
+      int numInChain = propNameList.length;
+      do {
+         String propName = propNameList[pix++];
+         if (curType.primaryTable != null) {
+            res = curType.primaryTable.getPropertyDescriptor(propName);
          }
-      }
-      if (multiTables != null) {
-         for (TableDescriptor tableDesc:multiTables) {
-            res = tableDesc.getPropertyDescriptor(propName);
-            if (res != null)
-               return res;
+         if (res == null && curType.auxTables != null) {
+            for (TableDescriptor tableDesc:curType.auxTables) {
+               res = tableDesc.getPropertyDescriptor(propName);
+            }
          }
-      }
-      return null;
+         if (res == null && curType.multiTables != null) {
+            for (TableDescriptor tableDesc:curType.multiTables) {
+               res = tableDesc.getPropertyDescriptor(propName);
+            }
+         }
+         if (res == null) {
+            if (pix < numInChain) {
+               DBUtil.error("Property path name: " + propNamePath + " missing property: " + propName + " in chain");
+            }
+            return null; // More detailed error printed by caller
+         }
+         if (pix < numInChain) {
+            DBTypeDescriptor nextType = res.refDBTypeDesc;
+            if (nextType == null) {
+               DBUtil.error("Property path name: " + propNamePath + " no DB ref type for: " + propName);
+               return null;
+            }
+            curType = nextType;
+         }
+      } while (pix < numInChain);
+      return res;
    }
 
    public void addQuery(DBQuery query) {
@@ -379,15 +395,14 @@ public class DBTypeDescriptor {
       }
       // TODO: do we need to do dbRefresh() on the returned instance - check the status and return null if the item no longer exists?
       // check cache mode here to determine what to fetch?
-      IDBObject inst = (IDBObject) typeInstances.get(id);
+      IDBObject inst = typeInstances.get(id);
       if (inst != null || !createProto) {
          return inst;
       }
       DBObject dbObj;
       synchronized (this) {
-         inst = (IDBObject) DynUtil.createInstance(typeDecl, null);
+         inst = createPrototype();
          dbObj = inst.getDBObject();
-         dbObj.setPrototype(true);
          dbObj.setDBId(id);
          typeInstances.put(id, inst);
       }
@@ -397,6 +412,13 @@ public class DBTypeDescriptor {
          if (!dbObj.dbFetchDefault())
             return null;
       }
+      return inst;
+   }
+
+   public IDBObject createPrototype() {
+      IDBObject inst = (IDBObject) DynUtil.createInstance(typeDecl, null);
+      DBObject dbObj = inst.getDBObject();
+      dbObj.setPrototype(true);
       return inst;
    }
 
@@ -570,23 +592,27 @@ public class DBTypeDescriptor {
       return groupQuery.queryOne(curTx, proto.getDBObject());
    }
 
+   private void appendDBPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
+      if (logSB != null) {
+         if (compareVal) {
+            DBUtil.appendVal(logSB, propValue);
+            logSB.append(" = ");
+         }
+         curQuery.appendLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName);
+      }
+      if (compareVal) {
+         curQuery.paramValues.add(propValue);
+         curQuery.paramTypes.add(dbProp.getPropertyMapper().getPropertyType());
+      }
+   }
+
    private void appendPropParamValues(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propName, boolean needsParens, boolean compareVal) {
-      DBPropertyDescriptor dbProp = getPropertyDescriptor(propName);
-      Object propValue = DynUtil.getPropertyValue(curObj.getInst(), propName);
+      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propName);
+      Object propValue = curObj.getPropertyInPath(propName);
       FetchTablesQuery curQuery = groupQuery.curQuery;
       StringBuilder logSB = curQuery.logSB;
       if (dbProp != null) {
-         if (logSB != null) {
-            if (compareVal) {
-               DBUtil.appendVal(logSB, propValue);
-               logSB.append(" = ");
-            }
-            curQuery.appendLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName);
-         }
-         if (compareVal) {
-            curQuery.paramValues.add(propValue);
-            curQuery.paramTypes.add(dbProp.getPropertyMapper().getPropertyType());
-         }
+         appendDBPropParamValue(curQuery, dbProp, logSB, compareVal, propValue);
       }
       else {
          DestinationListener binding = Bind.getBinding(curObj.getInst(), propName);
@@ -602,7 +628,7 @@ public class DBTypeDescriptor {
 
          Object inst = curObj.getInst();
 
-         Object propVal = DynUtil.getPropertyValue(curObj.getInst(), propName);
+         Object propVal = curObj.getPropertyInPath(propName);
          Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
          boolean needsInnerParen = false;
          if ((propType == Boolean.class || propType == Boolean.TYPE)) {
@@ -666,36 +692,43 @@ public class DBTypeDescriptor {
          VariableBinding varBind = (VariableBinding) binding;
          int numInChain = varBind.getNumInChain();
          FetchTablesQuery curQuery = groupQuery.curQuery;
-         for (int i = 0; i < numInChain; i++) {
-            Object chainProp = varBind.getChainElement(i);
-            if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
-               String nextPropName = chainProp instanceof String ? (String) chainProp : ((IBeanMapper) chainProp).getPropertyName();
-               if (i == 0 && numInChain == 1) {
-                  appendPropParamValues(groupQuery, curTypeDesc, curObj, nextPropName, false, false);
+         DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
+         // This is an a.b.c that corresponds to a column in the DB
+         if (queryProp != null) {
+            Object propValue = DynUtil.getPropertyValue(curObj.getInst(), queryProp.propertyName);
+            appendDBPropParamValue(curQuery, queryProp, curQuery.logSB, false, propValue);
+         }
+         else {
+            if (numInChain == 1) {
+               Object lastBinding = varBind.getChainElement(1);
+               // A binding to a method with no prefix
+               if (lastBinding instanceof MethodBinding) {
+                  System.err.println("*** Unhandled method in appendParamValues");
+
                }
-               else {
-                  if (numInChain == 2) {
-                     Object lastBinding = varBind.getChainElement(1);
-                     if (lastBinding instanceof MethodBinding) {
-                        MethodBinding methBind = (MethodBinding) lastBinding;
-                        String methName = DynUtil.getMethodName(methBind.getMethod());
-                        IBinding[] boundParams = methBind.getBoundParams();
-                        if (methName.equals("equals") && boundParams.length == 1) {
-                           appendPropParamValues(groupQuery, curTypeDesc, curObj, nextPropName, false, false);
-                           if (curQuery.logSB != null)
-                              curQuery.logSB.append(" = ");
-                           appendParamValues(groupQuery, curTypeDesc, curObj, boundParams[0]);
-                           return;
-                        }
-                     }
+               else if (lastBinding instanceof String || lastBinding instanceof IBeanMapper){
+                  System.err.println("*** Unhandled property in appendParamValues");
+               }
+            }
+            else if (numInChain == 2) {
+               Object lastBinding = varBind.getChainElement(1);
+               if (lastBinding instanceof MethodBinding) {
+                  // This is var.method(...)
+                  MethodBinding methBind = (MethodBinding) lastBinding;
+                  String methName = DynUtil.getMethodName(methBind.getMethod());
+                  IBinding[] boundParams = methBind.getBoundParams();
+                  // var.equals(...)
+                  if (methName.equals("equals") && boundParams.length == 1) {
+                     appendPropParamValues(groupQuery, curTypeDesc, curObj, getPathPropertyName(varBind, 0), false, false);
+                     if (curQuery.logSB != null)
+                        curQuery.logSB.append(" = ");
+                     appendParamValues(groupQuery, curTypeDesc, curObj, boundParams[0]);
+                     return;
                   }
-                  // If 'a' is a ref to another persistent property 'b' this should add a join between those two tables
-                  // and here we'll include just 'bTable.bCol' for the value of this binding
-                  throw new UnsupportedOperationException("Bindings with a.b not yet supported in queries");
                }
             }
             else {
-               throw new UnsupportedOperationException("Variable binding type not yet supported in queries");
+               throw new UnsupportedOperationException("TODO: need to support more variable binding cases");
             }
          }
       }
@@ -721,7 +754,7 @@ public class DBTypeDescriptor {
    }
 
    private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propName) {
-      DBPropertyDescriptor dbProp = getPropertyDescriptor(propName);
+      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propName);
       if (dbProp != null) {
          FetchTablesQuery newQuery = groupQuery.addProperty(dbProp, true);
          if (newQuery != groupQuery.curQuery) {
@@ -742,6 +775,42 @@ public class DBTypeDescriptor {
       }
    }
 
+   DBPropertyDescriptor getDBColumnProperty(VariableBinding  varBind) {
+      int pathLen = varBind.getNumInChain();
+      DBTypeDescriptor curTypeDesc = this;
+      DBPropertyDescriptor curProp = null;
+      for (int i = 0; i < pathLen; i++) {
+         Object pathProp = varBind.getChainElement(i);
+         if (pathProp instanceof String || pathProp instanceof IBeanMapper) {
+            String nextPropName = pathProp instanceof String ? (String) pathProp : ((IBeanMapper) pathProp).getPropertyName();
+            curProp = curTypeDesc.getPropertyDescriptor(nextPropName);
+            if (curProp == null) {
+               return null;
+            }
+            else {
+               if (i != pathLen - 1) {
+                  curTypeDesc = curProp.refDBTypeDesc;
+                  if (curTypeDesc == null) {
+                     return null;
+                  }
+               }
+            }
+         }
+         else
+            return null;
+      }
+      return curProp;
+   }
+
+   private static String getPathPropertyName(VariableBinding varBind, int ix) {
+      Object chainProp = varBind.getChainElement(ix);
+      if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
+         String propName = chainProp instanceof String ? (String) chainProp : ((IBeanMapper) chainProp).getPropertyName();
+         return propName;
+      }
+      return null;
+   }
+
    private void appendBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor startTypeDesc, DBObject curObj, IBinding binding) {
       if (binding instanceof IBeanMapper) {
          appendPropBindingTables(groupQuery, startTypeDesc, curObj, ((IBeanMapper) binding).getPropertyName());
@@ -750,35 +819,51 @@ public class DBTypeDescriptor {
          VariableBinding varBind = (VariableBinding) binding;
          int numInChain = varBind.getNumInChain();
          DBTypeDescriptor curTypeDesc = startTypeDesc;
-         for (int i = 0; i < numInChain; i++) {
-            Object chainProp = varBind.getChainElement(i);
-            if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
-               String nextPropName = chainProp instanceof String ? (String) chainProp : ((IBeanMapper) chainProp).getPropertyName();
-               DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(nextPropName);
-               if (nextPropDesc == null) {
-                  if (i == 0) {
-                     appendPropBindingTables(groupQuery, curTypeDesc, curObj, nextPropName);
+         DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
+         // Does this a.b.c map to a column for the entire path including 'c'?  If so, add joins for each of the intermediate
+         // property tables
+         if (queryProp != null) {
+            for (int i = 0; i < numInChain; i++) {
+               Object chainProp = varBind.getChainElement(i);
+               if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
+                  String nextPropName = getPathPropertyName(varBind, i);
+                  DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(nextPropName);
+                  FetchTablesQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
+                  if (newQuery != groupQuery.curQuery) {
+                     if (groupQuery.curQuery != null) {
+                        throw new UnsupportedOperationException("Add code to do join for different data sources here!");
+                     }
+                     else {
+                        groupQuery.curQuery = newQuery;
+                     }
                   }
-                  else {
-                     // Reference to a non-persistent property -
-                     // TODO: if the object holding this property is persistent, it could be a rule off of the other type - if so, validate
-                     // that we can join to this other property and if so, generate the where clause for that join
-                     throw new IllegalArgumentException("Unable to query non-DB property: " + nextPropName + " used in path for: " + binding);
+                  curTypeDesc = nextPropDesc.refDBTypeDesc;
+               }
+               else if (chainProp instanceof IBinding) {
+                  appendBindingTables(groupQuery, curTypeDesc, curObj, (IBinding) chainProp);
+               }
+            }
+         }
+         else {
+            if (numInChain == 1) {
+               String propName = getPathPropertyName(varBind, 0);
+               if (propName != null) {
+                  DestinationListener propBinding = Bind.getBinding(curObj.getInst(), propName);
+                  if (propBinding == null) {
+                     throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
                   }
+                  appendBindingTables(groupQuery, curTypeDesc, curObj, propBinding);
                }
                else {
-                  if (nextPropDesc.refDBTypeDesc != null) {
-                     // Allow the prototype to have a reference to another prototype so we can build up graph style queries
-                     IDBObject nextObj = curObj == null ? null : (IDBObject) nextPropDesc.getPropertyMapper().getPropertyValue(curObj.getInst(), false, false);
-                     if (nextObj != null)
-                        appendPropBindingTables(groupQuery, curTypeDesc, nextObj.getDBObject(), nextPropName);
-                     curTypeDesc = nextPropDesc.refDBTypeDesc;
-                     if (curTypeDesc == null && i != numInChain - 1) // TODO: handle other cases like a JSON property or a rule that's chained through some other component?
-                        throw new UnsupportedOperationException("Property reference to non-db association");
-                  }
-                  else {
-                     appendPropBindingTables(groupQuery, curTypeDesc, curObj, nextPropName);
-                  }
+                  // Could be a method with no prefix
+                  throw new UnsupportedOperationException("Unhandled binding case");
+               }
+            }
+            else {
+               for (int i = 0; i < numInChain; i++) {
+                  Object chainProp = varBind.getChainElement(i);
+                  if (chainProp instanceof IBinding)
+                     appendBindingTables(groupQuery, curTypeDesc, curObj, (IBinding) chainProp);
                }
             }
          }
@@ -822,36 +907,27 @@ public class DBTypeDescriptor {
          VariableBinding varBind = (VariableBinding) binding;
          int numInChain = varBind.getNumInChain();
          FetchTablesQuery curQuery = groupQuery.curQuery;
-         for (int i = 0; i < numInChain; i++) {
-            Object chainProp = varBind.getChainElement(i);
-            if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
-               String nextPropName = chainProp instanceof String ? (String) chainProp : ((IBeanMapper) chainProp).getPropertyName();
-               if (i == 0 && numInChain == 1) {
-                  appendPropToWhereClause(groupQuery, curTypeDesc, curObj, nextPropName, false, false);
-               }
-               else {
-                  if (numInChain == 2) {
-                     Object lastBinding = varBind.getChainElement(1);
-                     if (lastBinding instanceof MethodBinding) {
-                        MethodBinding methBind = (MethodBinding) lastBinding;
-                        String methName = DynUtil.getMethodName(methBind.getMethod());
-                        IBinding[] boundParams = methBind.getBoundParams();
-                        if (methName.equals("equals") && boundParams.length == 1) {
-                           appendPropToWhereClause(groupQuery, curTypeDesc, curObj, nextPropName, false, false);
-                           curQuery.whereAppend(" = ");
-                           appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, boundParams[0]);
-                           return;
-                        }
-                     }
+         DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
+         if (queryProp != null) {
+            appendPropToWhereClause(groupQuery, queryProp.dbTypeDesc, curObj, queryProp.propertyName, false, false);
+         }
+         else {
+            if (numInChain == 2) {
+               Object lastBinding = varBind.getChainElement(1);
+               if (lastBinding instanceof MethodBinding) {
+                  MethodBinding methBind = (MethodBinding) lastBinding;
+                  String methName = DynUtil.getMethodName(methBind.getMethod());
+                  IBinding[] boundParams = methBind.getBoundParams();
+                  if (methName.equals("equals") && boundParams.length == 1) {
+                     appendPropToWhereClause(groupQuery, curTypeDesc, curObj, getPathPropertyName(varBind, 0), false, false);
+                     curQuery.whereAppend(" = ");
+                     appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, boundParams[0]);
+                     return;
                   }
-                  // If 'a' is a ref to another persistent property 'b' this should add a join between those two tables
-                  // and here we'll include just 'bTable.bCol' for the value of this binding
-                  throw new UnsupportedOperationException("Bindings with a.b not yet supported in queries");
                }
             }
-            else {
-               throw new UnsupportedOperationException("Variable binding type not yet supported in queries");
-            }
+            else
+               throw new UnsupportedOperationException("Binding not yet supported in query");
          }
       }
       else if (binding instanceof ConstantBinding) {
@@ -874,7 +950,7 @@ public class DBTypeDescriptor {
 
    private void appendPropToWhereClause(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propName, boolean needsParens, boolean compareVal) {
       FetchTablesQuery curQuery = groupQuery.curQuery;
-      DBPropertyDescriptor dbProp = getPropertyDescriptor(propName);
+      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propName);
       if (dbProp != null) {
          FetchTablesQuery newQuery = groupQuery.findQueryForProperty(dbProp, true);
          if (newQuery == null) // should have been added in the first pass

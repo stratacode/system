@@ -9707,14 +9707,14 @@ public class ModelUtil {
                   if (findByProp != null) {
                      ArrayList<String> fbProps = new ArrayList<String>();
                      fbProps.add(propName);
-                     boolean multiRowQuery = initFindByPropertyList(sys, fbProps, "with", findByProp, propName, properties, typeName);
+                     boolean multiRowQuery = initFindByPropertyList(sys, typeDecl, fbProps, "with", findByProp, propName, properties, typeName);
 
                      String fetchGroup = (String) ModelUtil.getAnnotationValue(findByProp, "fetchGroup");
 
                      ArrayList<String> fbOptions = new ArrayList<String>();
                      // Even if an options property is unique, we don't consider that a single value query because that
                      // property might not be in the query and so we might need to return more than one result.
-                     initFindByPropertyList(sys, fbOptions, "options", findByProp, propName, properties, typeName);
+                     initFindByPropertyList(sys, typeDecl, fbOptions, "options", findByProp, propName, properties, typeName);
                      if (fbOptions.size() == 0)
                         fbOptions = null;
 
@@ -9737,7 +9737,7 @@ public class ModelUtil {
                         findByQueries = new ArrayList<FindByDescriptor>();
                      findByQueries.add(fbDesc);
 
-                     ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc);
+                     ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc, false);
                   }
 
                   Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
@@ -9785,12 +9785,12 @@ public class ModelUtil {
                      continue;
                   }
                   ArrayList<String> fbProps = new ArrayList<String>();
-                  boolean multiRowQuery = initFindByPropertyList(sys, fbProps, "with", findByCl, null, properties, typeName);
+                  boolean multiRowQuery = initFindByPropertyList(sys, typeDecl, fbProps, "with", findByCl, null, properties, typeName);
 
                   ArrayList<String> fbOptions = new ArrayList<String>();
                   // Even if an options property is unique, we don't consider that a single value query because that
                   // property might not be in the query and so we might need to return more than one result.
-                  initFindByPropertyList(sys, fbOptions, "options", findByCl, null, properties, typeName);
+                  initFindByPropertyList(sys, typeDecl, fbOptions, "options", findByCl, null, properties, typeName);
                   if (fbOptions.size() == 0)
                      fbOptions = null;
 
@@ -9801,7 +9801,7 @@ public class ModelUtil {
                      findByQueries = new ArrayList<FindByDescriptor>();
                   findByQueries.add(fbDesc);
 
-                  ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc);
+                  ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc, false);
                }
             }
 
@@ -9815,13 +9815,13 @@ public class ModelUtil {
       return null;
    }
 
-   private static boolean initFindByPropertyList(LayeredSystem sys, ArrayList<String> fbProps, String attName, Object findByAnnot, String propName, Object[] properties, String typeName) {
+   private static boolean initFindByPropertyList(LayeredSystem sys, Object typeDecl, ArrayList<String> fbProps, String attName, Object findByAnnot, String propName, Object[] properties, String typeName) {
       boolean multiRowQuery = true;
       String withPropsStr = (String) ModelUtil.getAnnotationValue(findByAnnot, attName);
       if (withPropsStr != null && withPropsStr.length() > 0) {
-         String[] withPropNames = withPropsStr.split(",");
+         String[] withPropNames = StringUtil.split(withPropsStr, ',');
          for (String withPropName:withPropNames) {
-            Object withProp = findPropertyInList(properties, withPropName);
+            Object withProp = findPropertyInList(sys, typeDecl, properties, withPropName);
             if (withProp == null) {
                sys.error("No '" + attName + "' property: " + withPropName + " for @FindBy " +
                        (propName == null ? "for class: " + typeName : "for property: " + typeName + "." + propName));
@@ -9848,34 +9848,88 @@ public class ModelUtil {
       return false;
    }
 
-   private static Object findPropertyInList(Object[] properties, String propName) {
-      for (Object prop:properties) {
-         if (ModelUtil.getPropertyName(prop).equals(propName))
-            return prop;
-      }
-      return null;
-   }
-
-   private static void initFindByParamTypes(LayeredSystem sys, Object typeDecl, FindByDescriptor fbDesc) {
-      List<Object> propTypes = new ArrayList<Object>(fbDesc.propNames.size());
-      for (String propName:fbDesc.propNames) {
-         Object propMember = ModelUtil.definesMember(typeDecl, propName, JavaSemanticNode.MemberType.PropertyAnySet, typeDecl, null, sys);
-         if (propMember == null) {
-            sys.error("FindByProp - no property named: " + propName);
-            return;
+   private static Object findPropertyInList(LayeredSystem sys, Object startType, Object[] properties, String propNamePath) {
+      String[] propNameArr = StringUtil.split(propNamePath, '.');
+      int ix = 0;
+      Object curProp = null;
+      Object curType = startType;
+      int pathLen = propNameArr.length;
+      while (ix < pathLen) {
+         String propName = propNameArr[ix++];
+         if (ix == 1) {
+            for (Object prop:properties) {
+               if (ModelUtil.getPropertyName(prop).equals(propName)) {
+                  curProp = prop;
+                  Object propType = ModelUtil.getPropertyType(prop);
+                  if (propType == null)
+                     return ix < pathLen ? null : prop;
+                  curType = propType;
+                  break;
+               }
+            }
          }
          else {
-            Object propType = ModelUtil.getPropertyType(propMember);
-            propTypes.add(propType);
+            curProp = ModelUtil.definesMember(curType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
          }
       }
-      fbDesc.propTypes = propTypes;
+      return curProp;
+   }
+
+   private static void initFindByParamTypes(LayeredSystem sys, Object typeDecl, FindByDescriptor fbDesc, boolean resolve) {
+      fbDesc.propTypes = new ArrayList<Object>(fbDesc.propNames.size());
+      initFindByPropListTypes(sys, typeDecl, fbDesc, fbDesc.propNames, fbDesc.propTypes, resolve);
       if (fbDesc.optionNames != null) {
          fbDesc.optionTypes = new ArrayList<Object>(fbDesc.optionNames.size());
-         for (String optName:fbDesc.optionNames) {
-            Object propType = ModelUtil.definesMember(typeDecl, optName, JavaSemanticNode.MemberType.PropertyAnySet, typeDecl, null, sys);
-            fbDesc.optionTypes.add(propType);
+         initFindByPropListTypes(sys, typeDecl, fbDesc, fbDesc.optionNames, fbDesc.optionTypes, resolve);
+      }
+   }
+
+   private static void initFindByPropListTypes(LayeredSystem sys, Object typeDecl, FindByDescriptor fbDesc, List<String> propNameList, List<Object> resTypesList, boolean resolve) {
+      for (String propNamePath:propNameList) {
+         String[] propNameArr = StringUtil.split(propNamePath, '.');
+         int pathLen = propNameArr.length;
+         Object curType = typeDecl;
+         String curPrefix = null;
+         if (!resolve && pathLen > 1) {
+            curType = Object.class;
          }
+         else {
+            for (int p = 0; p < pathLen; p++) {
+               String propName = propNameArr[p];
+               Object propMember = ModelUtil.definesMember(curType, propName, JavaSemanticNode.MemberType.PropertyAnySet, curType, null, sys);
+               if (propMember == null) {
+                  if (p == pathLen - 1)
+                     sys.error("FindByProp - no property named: " + propName);
+                  else
+                     sys.error("FindByProp - no property named: " + propName + " in type: " + curType + " for: " + propNamePath + " on type: " + typeDecl);
+                  return;
+               }
+               else {
+                  Object propType = ModelUtil.getPropertyType(propMember);
+                  if (propType == null) {
+                     sys.error("Missing type for property: " + propName);
+                     return;
+                  }
+                  curType = propType;
+               }
+
+               if (pathLen > 1 && p != pathLen - 1) {
+                  if (p == 0) {
+                     curPrefix = propName;
+                  }
+                  else {
+                     curPrefix = curPrefix + '.' + propName;
+                  }
+                  if (fbDesc.protoProps == null) {
+                     fbDesc.protoProps = new ArrayList<String>();
+                  }
+                  if (!fbDesc.protoProps.contains(curPrefix))
+                     fbDesc.protoProps.add(curPrefix);
+               }
+            }
+         }
+         if (curType != null)
+            resTypesList.add(curType);
       }
    }
 
@@ -9901,7 +9955,7 @@ public class ModelUtil {
             }
             String tmpAuxTableNames = (String) ModelUtil.getAnnotationValue(annot, "auxTables");
             if (tmpAuxTableNames != null) {
-               auxTableNames = new ArrayList<String>(Arrays.asList(tmpAuxTableNames.split(",")));
+               auxTableNames = new ArrayList<String>(Arrays.asList(StringUtil.split(tmpAuxTableNames, ',')));
             }
          }
 
@@ -10104,6 +10158,11 @@ public class ModelUtil {
             }
          }
          dbTypeDesc.initTables(auxTables, multiTables, versionProp);
+
+         if (dbTypeDesc.findByQueries != null) {
+            for (FindByDescriptor fbDesc:dbTypeDesc.findByQueries)
+               ModelUtil.initFindByParamTypes(sys, typeDecl, fbDesc, true);
+         }
       }
    }
 

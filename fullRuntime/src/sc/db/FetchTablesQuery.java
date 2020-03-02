@@ -417,9 +417,10 @@ public class FetchTablesQuery {
                   rowCt++;
                }
                else {
+                  Object propInst = fetchTable.refProp == null || listProp != null ? currentRowVal : fetchTable.refProp.getPropertyMapper().getPropertyValue(currentRowVal, false, false);
                   if (currentRowVal == null)
                      throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
-                  propMapper.setPropertyValue(currentRowVal, val);
+                  propMapper.setPropertyValue(propInst, val);
 
                   if (logSB != null) {
                      logSB.append(", ");

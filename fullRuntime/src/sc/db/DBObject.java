@@ -4,6 +4,7 @@ package sc.db;
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.type.CTypeUtil;
+import sc.util.StringUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -486,6 +487,41 @@ public class DBObject implements IDBObject {
       else
          flags &= ~PROTOTYPE;
    }
+
+   public void initProtoProperties(String... protoProps) {
+      for (String protoProp:protoProps) {
+         DBPropertyDescriptor pdesc = dbTypeDesc.getPropertyDescriptor(protoProp);
+         if (pdesc.refDBTypeDesc != null) {
+            setPropertyInPath(protoProp, pdesc.refDBTypeDesc.createPrototype());
+         }
+         else
+            DBUtil.error("Failed to init parent prototype: " + protoProp + ": " + pdesc + " not a reference type");
+      }
+   }
+
+   public void setPropertyInPath(String propPath, Object value) {
+      String[] propArr = StringUtil.split(propPath, '.');
+      Object curInst = getInst();
+      int pathLen = propArr.length;
+      int lastIx = pathLen - 1;
+      for (int i = 0; i < lastIx; i++) {
+         curInst = DynUtil.getPropertyValue(curInst, propArr[i]);
+         if (curInst == null)
+            throw new NullPointerException("Null reference in DBObject.setPropertyInPath path");
+      }
+      DynUtil.setPropertyValue(curInst, propArr[lastIx], value);
+   }
+
+   public Object getPropertyInPath(String propPath) {
+      String[] propArr = StringUtil.split(propPath, '.');
+      Object curInst = getInst();
+      int pathLen = propArr.length;
+      for (int i = 0; i < pathLen; i++) {
+         curInst = DynUtil.getPropertyValue(curInst, propArr[i]);
+      }
+      return curInst;
+   }
+
 
    public boolean isPendingInsert() {
       return (flags & PENDING_INSERT) != 0;

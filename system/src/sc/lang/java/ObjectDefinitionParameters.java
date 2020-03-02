@@ -480,44 +480,64 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("(");
          int numProps = fbDesc.propNames.size();
          int numOpts = fbDesc.optionNames == null ? 0 : fbDesc.optionNames.size();
+         ArrayList<String> propVarNames = new ArrayList<String>(numProps);
          for (int j = 0; j < numProps; j++) {
             if (j != 0)
                sb.append(", ");
-            String propName = fbDesc.propNames.get(j);
+            String propPathName = fbDesc.propNames.get(j);
+            String propVarName = propPathName.replace(".", "_");
+            propVarNames.add(propVarName);
+
             Object propType = fbDesc.propTypes.get(j);
-            String typeName = ModelUtil.getTypeName(propType);
-            if (typeName.startsWith("java.lang"))
-               typeName = CTypeUtil.getClassName(typeName);
-            sb.append(typeName);
+            sb.append(getTypeName(propType));
             sb.append(" ");
-            sb.append(propName);
+            sb.append(propVarName);
+
          }
+         ArrayList<String> optVarNames = new ArrayList<String>(numOpts);
          if (numOpts > 0) {
             for (int j = 0; j < numOpts; j++) {
                if (j != 0)
                   sb.append(", ");
-               String propName = fbDesc.optionNames.get(j);
-               String capPropName = CTypeUtil.capitalizePropertyName(propName);
+               String optName = fbDesc.optionNames.get(j);
+               String optVarName = optName.replace(".","_");
+               optVarNames.add(optVarName);
+               String capVarName = CTypeUtil.capitalizePropertyName(optVarName);
                Object propType = fbDesc.optionTypes.get(j);
-               sb.append("boolean include");
-               sb.append(capPropName);
+               sb.append("boolean _opt");
+               sb.append(j);
+               sb.append("_");
+               sb.append(CTypeUtil.getClassName(optName));
                sb.append(", ");
-               sb.append(ModelUtil.getTypeName(propType));
+               sb.append(getTypeName(propType));
                sb.append(" ");
-               sb.append(propName);
+               sb.append(optVarName);
             }
          }
          sb.append(") {\n");
+
+         if (!objType.isStarted()) {
+            sb.append("  return null;\n");
+            sb.append("}\n\n");
+            continue;
+         }
 
          sb.append("      ");
          sb.append(typeBaseName);
          sb.append(" proto = new ");
          sb.append(typeBaseName);
          sb.append("();\n");
-         sb.append("      proto.getDBObject().setPrototype(true);\n");
+         sb.append("      sc.db.DBObject dbObj = proto.getDBObject();\n");
+         sb.append("      dbObj.setPrototype(true);\n");
+         if (fbDesc.protoProps != null) {
+            sb.append("      dbObj.initProtoProperties(");
+            appendStringArgs(sb, fbDesc.protoProps);
+            sb.append(");\n");
+         }
+
          for (int j = 0; j < numProps; j++) {
             String propName = fbDesc.propNames.get(j);
-            sb.append("         proto." + propName + " = " + propName + ";\n");
+            sb.append("      proto." + propName + " = " + propVarNames.get(j) + ";\n");
             /*
             sb.append("      proto.set");
             sb.append(CTypeUtil.capitalizePropertyName(propName));
@@ -536,16 +556,19 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(";\n");
          for (int j = 0; j < numOpts; j++) {
             String propName = fbDesc.optionNames.get(j);
-            String capPropName = CTypeUtil.capitalizePropertyName(propName);
-            sb.append("      if (include");
-            sb.append(capPropName);
-            sb.append("){\n");
+            String propVarName = optVarNames.get(j);
+            String capPropName = CTypeUtil.capitalizePropertyName(propVarName);
+            sb.append("      if (_opt");
+            sb.append(j);
+            sb.append("_");
+            sb.append(CTypeUtil.getClassName(propName));
+            sb.append(") {\n");
             //sb.append("         proto.set");
             //sb.append(capPropName);
             //sb.append("(");
             //sb.append(propName);
             //sb.append(");\n");
-            sb.append("         proto." + propName + " = " + propName + ";\n");
+            sb.append("         proto." + propName + " = " + propVarName + ";\n");
 
             sb.append("         propList.add(");
             appendString(sb, propName, false);
@@ -571,6 +594,13 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("   }\n\n");
       }
       return sb.toString();
+   }
+
+   private String getTypeName(Object type) {
+      String typeName = ModelUtil.getTypeName(type);
+      if (typeName.startsWith("java.lang"))
+         typeName = CTypeUtil.getClassName(typeName);
+      return typeName;
    }
 
    public String formatDBTypeDescriptorDefinition() {
@@ -662,10 +692,14 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          return;
       }
       sb.append("java.util.Arrays.asList(");
+      appendStringArgs(sb, properties);
+      sb.append(")");
+   }
+
+   private void appendStringArgs(StringBuilder sb, List<String> properties) {
       for (int j = 0; j < properties.size(); j++) {
          appendString(sb, properties.get(j), j != 0);
       }
-      sb.append(")");
    }
 
    private void appendTableList(StringBuilder sb, List<? extends TableDescriptor> tableList, boolean multi) {
