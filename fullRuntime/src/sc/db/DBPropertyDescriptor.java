@@ -2,6 +2,7 @@ package sc.db;
 
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
+import sc.util.StringUtil;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -322,5 +323,36 @@ public class DBPropertyDescriptor {
 
    public DBTypeDescriptor getColTypeDesc() {
       return refDBTypeDesc;
+   }
+
+
+   public DBColumnType getDBColumnType() {
+      if (refDBTypeDesc != null)
+         return DBColumnType.Reference;
+      Object propertyType = getPropertyMapper().getPropertyType();
+      DBColumnType res = DBColumnType.fromJavaType(propertyType);
+      // TODO: should we have an annotation for this and print an error if it's not set?  Not all objects can be converted
+      // to JSON
+      if (res == null)
+         res = DBColumnType.Json;
+      return res;
+   }
+
+   public DBColumnType getSubDBColumnType(String propPath) {
+      if (getDBColumnType() == DBColumnType.Json) {
+         Object propertyType = getPropertyMapper().getPropertyType();
+         String[] propNames = StringUtil.split(propPath, '.');
+         for (int i = 0; i < propNames.length; i++) {
+            String propName = propNames[i];
+            if (propertyType == null)
+               break;
+            Object nextType = DynUtil.getPropertyType(propertyType, propName);
+            propertyType = nextType;
+         }
+         if (propertyType == null)
+            throw new IllegalArgumentException("Sub-property path: " + propPath + " not found in type: " + this);
+         return DBColumnType.fromJavaType(propertyType);
+      }
+      throw new UnsupportedOperationException("Unhandled case");
    }
 }

@@ -130,13 +130,6 @@ public class JSONDeserializer {
          throw new IllegalArgumentException("Expecting string at: " + parser);
    }
 
-   // parses: , "name":
-   public CharSequence parseNextName() {
-      if (!parser.parseCharToken(','))
-         throw new IllegalArgumentException("Missing comma in JSON: " + parser);
-      return parser.parseName();
-   }
-
    public void setCurrentObjByName(String name) {
       Object newObj = resolveObject(name, true);
       pushCurrentObj(newObj, name);
@@ -188,7 +181,7 @@ public class JSONDeserializer {
       boolean first = true;
 
       while (!parser.parseCharToken('}')) {
-         CharSequence nextName = first ? parser.parseName() : parseNextName();
+         CharSequence nextName = first ? parser.parseName() : parser.parseNextName();
          if (nextName == null || nextName.length() == 0)
             throw new IllegalArgumentException("Expecting name at: " + parser);
 

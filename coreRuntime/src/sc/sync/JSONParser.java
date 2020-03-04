@@ -17,6 +17,7 @@ public class JSONParser {
    CharSequence input;
    int len;
    int curPos;
+   /** Optional component to support resolving references with 'ref:' as used in the sync system */
    JSONDeserializer dser;
 
    public JSONParser(CharSequence input, JSONDeserializer dser) {
@@ -76,11 +77,12 @@ public class JSONParser {
       return null;
    }
 
-   /** The JSON format does not natively support references so we need to use a string with a special prefix 'ref:'.  This also allows null */
+   /** The JSON format does not natively support references so when JSONDeserializer is present,
+    *  use a string with a special prefix 'ref:'.  This also allows null */
    public Object parseRefOrString() {
       CharSequence val = parseString(true);
       int len;
-      if (val != null && (len = val.length()) > 4) {
+      if (dser != null && val != null && (len = val.length()) > 4) {
          if (isRefPrefix(val, 0)) {
             return resolveRefString(val, len);
          }
@@ -109,6 +111,12 @@ public class JSONParser {
       return res;
    }
 
+   public CharSequence parseNextName() {
+      if (!parseCharToken(','))
+         throw new IllegalArgumentException("Missing comma in JSON: " + this);
+      return parseName();
+   }
+
    private void skipWhitespace() {
       char nextChar = input.charAt(curPos);
       while (Character.isWhitespace(nextChar)) {
@@ -119,14 +127,16 @@ public class JSONParser {
    public Map parseObject() {
       if (parseCharToken('{')) {
          HashMap map = new HashMap();
+         boolean first = true;
          while (!parseCharToken('}')) {
-            CharSequence name = parseName();
+            CharSequence name = first ? parseName() : parseNextName();
             if (name == null) {
                throw new IllegalArgumentException("Expected string name value at: " + this);
             }
             Object val = parseJSONValue();
 
             map.put(name, val);
+            first = false;
          }
          return map;
       }

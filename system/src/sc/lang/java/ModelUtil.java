@@ -10079,7 +10079,7 @@ public class ModelUtil {
                   if (propColumnType == null) {
                      refDBTypeDesc = getDBTypeDescriptor(sys, refLayer, propType, true);
                      if (refDBTypeDesc == null) {
-                        propColumnType = "json";
+                        propColumnType = "jsonb";
                      }
                      else {
                         TableDescriptor refTable = refDBTypeDesc.primaryTable;

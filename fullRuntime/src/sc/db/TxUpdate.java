@@ -88,7 +88,7 @@ public class TxUpdate extends TxOperation {
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(columnValues.get(i)));
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnProps.get(i).getDBColumnType()));
       }
       DBUtil.append(sb, logSB, " WHERE ");
 
@@ -100,7 +100,7 @@ public class TxUpdate extends TxOperation {
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(idVals.get(i)));
+            logSB.append(DBUtil.formatValue(idVals.get(i), idCols.get(i).getDBColumnType()));
       }
 
       try {
@@ -110,11 +110,12 @@ public class TxUpdate extends TxOperation {
          int pos = 1;
          for (int i = 0; i < numCols; i++) {
             DBPropertyDescriptor colProp = columnProps.get(i);
-            DBUtil.setStatementValue(st,  pos++, colProp.getPropertyMapper().getPropertyType(), columnValues.get(i));
+            DBColumnType colType = colProp.refDBTypeDesc == null ? colProp.getDBColumnType() : colProp.refDBTypeDesc.getIdDBColumnType(0);
+            DBUtil.setStatementValue(st,  pos++, colType, columnValues.get(i));
          }
          for (int i = 0; i < numIdCols; i++) {
             IdPropertyDescriptor idProp = idCols.get(i);
-            DBUtil.setStatementValue(st,  pos++, idProp.getPropertyMapper().getPropertyType(), idVals.get(i));
+            DBUtil.setStatementValue(st,  pos++, idProp.getDBColumnType(), idVals.get(i));
          }
 
          int ct = st.executeUpdate();

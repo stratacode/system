@@ -27,7 +27,7 @@ public class FetchTablesQuery {
 
    public int numWhereColumns = 0;
    public List<Object> paramValues;
-   public List<Object> paramTypes;
+   public List<DBColumnType> paramTypes;
 
    public FetchTablesQuery(String dataSourceName, boolean multiRow) {
       this.dataSourceName = dataSourceName;
@@ -148,9 +148,10 @@ public class FetchTablesQuery {
             DBPropertyDescriptor propDesc = idColumns.get(i);
             IBeanMapper propMapper = propDesc.getPropertyMapper();
             Object colVal = propMapper.getPropertyValue(inst, false, false);
-            DBUtil.setStatementValue(st, i+1, propMapper.getPropertyType(), colVal);
+            DBColumnType colType = propDesc.getDBColumnType();
+            DBUtil.setStatementValue(st, i+1, colType, colVal);
             if (logStr != null)
-               logStr = DBUtil.replaceNextParam(logStr, colVal);
+               logStr = DBUtil.replaceNextParam(logStr, colVal, colType);
          }
 
          rs = st.executeQuery();
@@ -199,7 +200,7 @@ public class FetchTablesQuery {
          Object inst = proto.getInst();
          for (int i = 0; i < paramValues.size(); i++) {
             Object paramValue = paramValues.get(i);
-            Object propType = paramTypes.get(i);
+            DBColumnType propType = paramTypes.get(i);
             DBUtil.setStatementValue(st, i+1, propType, paramValue);
          }
 
@@ -672,6 +673,33 @@ public class FetchTablesQuery {
       DBUtil.appendIdent(whereSB, null, colName);
    }
 
+   public void appendJSONWhereColumn(String tableName, String colName, String propPath) {
+      initWhereQuery();
+      numWhereColumns++;
+      if (fetchTables.size() > 1) {
+         whereAppendIdent(tableName);
+         DBUtil.append(whereSB, null, ".");
+      }
+      DBUtil.appendIdent(whereSB, null, colName);
+      whereSB.append("->>");
+      whereSB.append("'");
+      whereSB.append(propPath);
+      whereSB.append("'");
+   }
+
+   public void appendJSONLogWhereColumn(StringBuilder logSB, String tableName, String colName, String propPath) {
+      initWhereQuery();
+      if (fetchTables.size() > 1) {
+         DBUtil.appendIdent(logSB, null, tableName);
+         DBUtil.append(logSB, null, ".");
+      }
+      DBUtil.appendIdent(logSB, null, colName);
+      logSB.append("->>");
+      logSB.append("'");
+      logSB.append(propPath);
+      logSB.append("'");
+   }
+
    public void appendLogWhereColumn(StringBuilder logSB, String tableName, String colName) {
       initWhereQuery();
       if (logSB == null)
@@ -688,7 +716,7 @@ public class FetchTablesQuery {
          whereSB = new StringBuilder();
          logSB = DBUtil.verbose ? new StringBuilder() : null;
          paramValues = new ArrayList<Object>();
-         paramTypes = new ArrayList<Object>();
+         paramTypes = new ArrayList<DBColumnType>();
       }
    }
 

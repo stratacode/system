@@ -341,7 +341,8 @@ public class DBTypeDescriptor {
          if (pix < numInChain) {
             DBTypeDescriptor nextType = res.refDBTypeDesc;
             if (nextType == null) {
-               DBUtil.error("Property path name: " + propNamePath + " no DB ref type for: " + propName);
+               if (res.getDBColumnType() != DBColumnType.Json)
+                  DBUtil.error("Property path name: " + propNamePath + " no DB ref type for: " + propName);
                return null;
             }
             curType = nextType;
@@ -479,6 +480,10 @@ public class DBTypeDescriptor {
       return mapper.getPropertyType();
    }
 
+   public DBColumnType getIdDBColumnType(int ci) {
+      return primaryTable.idColumns.get(ci).getDBColumnType();
+   }
+
    public void init() {
       if (initialized)
          return;
@@ -602,65 +607,94 @@ public class DBTypeDescriptor {
       }
       if (compareVal) {
          curQuery.paramValues.add(propValue);
-         curQuery.paramTypes.add(dbProp.getPropertyMapper().getPropertyType());
+         curQuery.paramTypes.add(dbProp.getDBColumnType());
       }
    }
 
-   private void appendPropParamValues(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propName, boolean needsParens, boolean compareVal) {
-      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propName);
-      Object propValue = curObj.getPropertyInPath(propName);
+   private void appendJSONPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue, String propPath) {
+      if (logSB != null) {
+         if (compareVal) {
+            DBUtil.appendVal(logSB, propValue);
+            logSB.append(" = ");
+         }
+         curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName, propPath);
+      }
+      if (compareVal) {
+         curQuery.paramValues.add(propValue);
+         curQuery.paramTypes.add(dbProp.getSubDBColumnType(propPath));
+      }
+   }
+
+   private void appendPropParamValues(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, boolean compareVal) {
+      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
+      Object propValue = curObj.getPropertyInPath(propNamePath);
       FetchTablesQuery curQuery = groupQuery.curQuery;
       StringBuilder logSB = curQuery.logSB;
       if (dbProp != null) {
          appendDBPropParamValue(curQuery, dbProp, logSB, compareVal, propValue);
       }
       else {
-         DestinationListener binding = Bind.getBinding(curObj.getInst(), propName);
-         if (binding == null) {
-            throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
-         }
-
-         int closeParenCt = 0;
-         if (needsParens && logSB != null) {
-            logSB.append("(");
-            closeParenCt = 1;
-         }
-
-         Object inst = curObj.getInst();
-
-         Object propVal = curObj.getPropertyInPath(propName);
-         Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
-         boolean needsInnerParen = false;
-         if ((propType == Boolean.class || propType == Boolean.TYPE)) {
-            if (propVal == null)
-               propVal = Boolean.TRUE;
-
-            // For boolean properties we could write it out as: TRUE = (a > b) but we can simplify that
-            // to just the RHS. For
-            if (logSB != null && !((Boolean)propVal)) {
-               logSB.append("NOT ");
-               needsInnerParen = true;
+         String[] propNames = StringUtil.split(propNamePath, '.');
+         int pathLen = propNames.length;
+         for (int i = 0; i < pathLen; i++) {
+            String propName = propNames[i];
+            DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(propName);
+            if (pathProp != null) {
+               if (pathProp.getDBColumnType() == DBColumnType.Json) {
+                  StringBuilder pathRes = getPathRes(propNames, i+1);
+                  appendJSONPropParamValue(curQuery, pathProp, logSB, compareVal, propValue, pathRes.toString());
+                  return;
+               }
             }
-         }
-         else {
-            curQuery.paramValues.add(propVal);
-            curQuery.paramTypes.add(propType);
+            if (i == 0) {
+               DestinationListener binding = Bind.getBinding(curObj.getInst(), propName);
+               if (binding == null) {
+                  throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
+               }
 
-            if (logSB != null) {
-               DBUtil.appendVal(logSB, propVal);
-               logSB.append(" = ");
+               int closeParenCt = 0;
+               if (needsParens && logSB != null) {
+                  logSB.append("(");
+                  closeParenCt = 1;
+               }
+
+               Object inst = curObj.getInst();
+
+               Object propVal = curObj.getPropertyInPath(propName);
+               Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
+               boolean needsInnerParen = false;
+               if ((propType == Boolean.class || propType == Boolean.TYPE)) {
+                  if (propVal == null)
+                     propVal = Boolean.TRUE;
+
+                  // For boolean properties we could write it out as: TRUE = (a > b) but we can simplify that
+                  // to just the RHS. For
+                  if (logSB != null && !((Boolean)propVal)) {
+                     logSB.append("NOT ");
+                     needsInnerParen = true;
+                  }
+               }
+               else {
+                  curQuery.paramValues.add(propVal);
+                  curQuery.paramTypes.add(DBColumnType.fromJavaType(propType));
+
+                  if (logSB != null) {
+                     DBUtil.appendVal(logSB, propVal);
+                     logSB.append(" = ");
+                  }
+               }
+
+               if (logSB != null && needsInnerParen) {
+                  logSB.append("(");
+                  closeParenCt++;
+               }
+
+               appendParamValues(groupQuery, curTypeDesc, curObj, binding);
+               if (logSB != null) {
+                  while (closeParenCt-- > 0)
+                     logSB.append(")");
+               }
             }
-         }
-
-         if (logSB != null && needsInnerParen) {
-            logSB.append("(");
-            closeParenCt++;
-         }
-
-         appendParamValues(groupQuery, curTypeDesc, curObj, binding);
-         if (logSB != null) {
-            while (closeParenCt-- > 0)
-               logSB.append(")");
          }
       }
    }
@@ -699,20 +733,9 @@ public class DBTypeDescriptor {
             appendDBPropParamValue(curQuery, queryProp, curQuery.logSB, false, propValue);
          }
          else {
-            if (numInChain == 1) {
-               Object lastBinding = varBind.getChainElement(1);
-               // A binding to a method with no prefix
-               if (lastBinding instanceof MethodBinding) {
-                  System.err.println("*** Unhandled method in appendParamValues");
-
-               }
-               else if (lastBinding instanceof String || lastBinding instanceof IBeanMapper){
-                  System.err.println("*** Unhandled property in appendParamValues");
-               }
-            }
-            else if (numInChain == 2) {
-               Object lastBinding = varBind.getChainElement(1);
-               if (lastBinding instanceof MethodBinding) {
+            Object lastBinding = varBind.getChainElement(numInChain-1);
+            if (lastBinding instanceof MethodBinding) {
+               if (numInChain == 2) {
                   // This is var.method(...)
                   MethodBinding methBind = (MethodBinding) lastBinding;
                   String methName = DynUtil.getMethodName(methBind.getMethod());
@@ -726,10 +749,27 @@ public class DBTypeDescriptor {
                      return;
                   }
                }
+               throw new UnsupportedOperationException("Unhandled method binding");
             }
             else {
-               throw new UnsupportedOperationException("TODO: need to support more variable binding cases");
+               for (int i = 0; i < numInChain; i++) {
+                  Object nextInChain = varBind.getChainElement(i);
+                  // The JSON property case
+                  if (nextInChain instanceof IBeanMapper) {
+                     IBeanMapper nextMapper = (IBeanMapper) nextInChain;
+                     DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(nextMapper.getPropertyName());
+                     if (pathProp != null && pathProp.getDBColumnType() == DBColumnType.Json) {
+                        StringBuilder logSB = curQuery.logSB;
+                        if (logSB != null) {
+                           StringBuilder propPath = getVarBindPropPath(varBind, i + 1);
+                           curQuery.appendJSONLogWhereColumn(logSB, pathProp.getTableName(), pathProp.columnName, propPath.toString());
+                        }
+                     }
+                     return;
+                  }
+               }
             }
+            throw new UnsupportedOperationException("TODO: need to support more variable binding cases");
          }
       }
       else if (binding instanceof ConstantBinding) {
@@ -753,8 +793,8 @@ public class DBTypeDescriptor {
          throw new IllegalArgumentException("Unsupport binding type for query");
    }
 
-   private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propName) {
-      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propName);
+   private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath) {
+      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
          FetchTablesQuery newQuery = groupQuery.addProperty(dbProp, true);
          if (newQuery != groupQuery.curQuery) {
@@ -767,11 +807,35 @@ public class DBTypeDescriptor {
          }
       }
       else {
-         DestinationListener propBinding = Bind.getBinding(curObj.getInst(), propName);
-         if (propBinding == null) {
-            throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
+         String[] propNames = StringUtil.split(propNamePath, '.');
+         for (int i = 0; i < propNames.length; i++) {
+            String propName = propNames[i];
+            DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(propName);
+            if (pathProp != null) {
+               FetchTablesQuery newQuery = groupQuery.addProperty(pathProp, true);
+               if (newQuery != groupQuery.curQuery) {
+                  if (groupQuery.curQuery != null) {
+                     throw new UnsupportedOperationException("Add code to do join for different data sources here!");
+                  }
+                  else {
+                     groupQuery.curQuery = newQuery;
+                  }
+               }
+               if (pathProp.getDBColumnType() == DBColumnType.Json) {
+                  return;
+               }
+               throw new UnsupportedOperationException("Unhandled query property");
+            }
+            if (i == 0) {
+               DestinationListener propBinding = Bind.getBinding(curObj.getInst(), propName);
+               if (propBinding == null) {
+                  throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
+               }
+               appendBindingTables(groupQuery, curTypeDesc, curObj, propBinding);
+            }
+            else
+               throw new UnsupportedOperationException("Unhandled path query");
          }
-         appendBindingTables(groupQuery, curTypeDesc, curObj, propBinding);
       }
    }
 
@@ -862,8 +926,27 @@ public class DBTypeDescriptor {
             else {
                for (int i = 0; i < numInChain; i++) {
                   Object chainProp = varBind.getChainElement(i);
-                  if (chainProp instanceof IBinding)
+                  if (chainProp instanceof IBeanMapper) {
+                     IBeanMapper nextProp = (IBeanMapper) chainProp;
+                     String propName = nextProp.getPropertyName();
+                     DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(propName);
+                     if (nextPropDesc != null && nextPropDesc.getDBColumnType() == DBColumnType.Json) {
+                        FetchTablesQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
+                        if (newQuery != groupQuery.curQuery) {
+                           if (groupQuery.curQuery != null) {
+                              throw new UnsupportedOperationException("Add code to do join for different data sources here!");
+                           }
+                           else {
+                              groupQuery.curQuery = newQuery;
+                           }
+                        }
+                        return; // No more tables in this expression
+                     }
+                  }
+                  else if (chainProp instanceof IBinding)
                      appendBindingTables(groupQuery, curTypeDesc, curObj, (IBinding) chainProp);
+                  else
+                     throw new IllegalArgumentException("Unsupported binding path element");
                }
             }
          }
@@ -913,6 +996,7 @@ public class DBTypeDescriptor {
          }
          else {
             if (numInChain == 2) {
+               // TODO: generalize this case into the code below for handling arbitrary a.b.c chains
                Object lastBinding = varBind.getChainElement(1);
                if (lastBinding instanceof MethodBinding) {
                   MethodBinding methBind = (MethodBinding) lastBinding;
@@ -926,8 +1010,23 @@ public class DBTypeDescriptor {
                   }
                }
             }
-            else
-               throw new UnsupportedOperationException("Binding not yet supported in query");
+            for (int i = 0; i < numInChain; i++) {
+               Object chainProp = varBind.getChainElement(i);
+               if (chainProp instanceof IBeanMapper) {
+                  IBeanMapper nextProp = (IBeanMapper) chainProp;
+                  String propName = nextProp.getPropertyName();
+                  DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(propName);
+                  if (nextPropDesc != null && nextPropDesc.getDBColumnType() == DBColumnType.Json) {
+                     StringBuilder propPath = getVarBindPropPath(varBind, i + 1);
+                     curQuery.appendJSONWhereColumn(nextPropDesc.getTableName(), nextPropDesc.columnName, propPath.toString());
+                     return;
+                  }
+               }
+               else if (chainProp instanceof IBinding)
+                  appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, (IBinding) chainProp);
+               else
+                  throw new UnsupportedOperationException("Error should have been thrown before");
+            }
          }
       }
       else if (binding instanceof ConstantBinding) {
@@ -948,13 +1047,26 @@ public class DBTypeDescriptor {
          throw new IllegalArgumentException("Unsupport binding type for query");
    }
 
-   private void appendPropToWhereClause(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propName, boolean needsParens, boolean compareVal) {
+   private StringBuilder getVarBindPropPath(VariableBinding varBind, int startIx) {
+      StringBuilder propPath = new StringBuilder();
+      int numInChain = varBind.getNumInChain();
+      for (int j = startIx; j < numInChain; j++) {
+         Object nextChainProp = varBind.getChainElement(j);
+         if (j > startIx)
+            propPath.append(".");
+         if (nextChainProp instanceof IBeanMapper)
+            propPath.append(((IBeanMapper) nextChainProp).getPropertyName());
+      }
+      return propPath;
+   }
+
+   private void appendPropToWhereClause(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, boolean compareVal) {
       FetchTablesQuery curQuery = groupQuery.curQuery;
-      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propName);
+      DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
          FetchTablesQuery newQuery = groupQuery.findQueryForProperty(dbProp, true);
          if (newQuery == null) // should have been added in the first pass
-            throw new IllegalArgumentException("Missing query for db property: " + propName);
+            throw new IllegalArgumentException("Missing query for db property: " + propNamePath);
 
          if (newQuery != groupQuery.curQuery) {
             if (curQuery != null) {
@@ -971,45 +1083,77 @@ public class DBTypeDescriptor {
          curQuery.appendWhereColumn(dbProp.getTableName(), dbProp.columnName);
       }
       else {
-         DestinationListener binding = Bind.getBinding(curObj.getInst(), propName);
-         if (binding == null) {
-            throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
-         }
-         int closeParenCt = 0;
-         if (needsParens) {
-            curQuery.whereAppend("(");
-            closeParenCt = 1;
-         }
-
-         Object inst = curObj.getInst();
-
-         Object propVal = DynUtil.getPropertyValue(inst, propName);
-         Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
-         boolean needsInnerParen = false;
-         if ((propType == Boolean.class || propType == Boolean.TYPE)) {
-            if (propVal == null)
-               propVal = Boolean.TRUE;
-
-            // For boolean properties we could write it out as: TRUE = (a > b) but we can simplify that
-            // to just the RHS. For
-            if (!((Boolean)propVal)) {
-               curQuery.whereAppend("NOT ");
-               needsInnerParen = true;
+         String[] propNames = StringUtil.split(propNamePath, '.');
+         int pathLen = propNames.length;
+         for (int i = 0; i < pathLen; i++) {
+            String propName = propNames[i];
+            DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(propName);
+            if (pathProp != null) {
+               if (pathProp.getDBColumnType() == DBColumnType.Json) {
+                  if (compareVal) {
+                     curQuery.whereAppend("? = ");
+                  }
+                  StringBuilder pathRes = getPathRes(propNames, i+1);
+                  curQuery.appendJSONWhereColumn(pathProp.getTableName(), pathProp.columnName, pathRes.toString());
+                  return;
+               }
             }
-         }
-         else {
-            // We'll put propVal into this parameter spot on the next pass
-            curQuery.whereAppend(" ? = ");
-         }
+            if (i == 0) {
+               DestinationListener binding = Bind.getBinding(curObj.getInst(), propName);
 
-         if (needsInnerParen) {
-            curQuery.whereAppend("(");
-            closeParenCt++;
-         }
+               if (binding == null) {
+                  throw new IllegalArgumentException("No column or binding for property: " + this + "." + propName);
+               }
+               int closeParenCt = 0;
+               if (needsParens) {
+                  curQuery.whereAppend("(");
+                  closeParenCt = 1;
+               }
 
-         appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, binding);
-         while (closeParenCt-- > 0)
-            curQuery.whereAppend(")");
+               Object inst = curObj.getInst();
+
+               Object propVal = DynUtil.getPropertyValue(inst, propName);
+               Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
+               boolean needsInnerParen = false;
+               if ((propType == Boolean.class || propType == Boolean.TYPE)) {
+                  if (propVal == null)
+                     propVal = Boolean.TRUE;
+
+                  // For boolean properties we could write it out as: TRUE = (a > b) but we can simplify that
+                  // to just the RHS. For
+                  if (!((Boolean)propVal)) {
+                     curQuery.whereAppend("NOT ");
+                     needsInnerParen = true;
+                  }
+               }
+               else {
+                  // We'll put propVal into this parameter spot on the next pass
+                  curQuery.whereAppend(" ? = ");
+               }
+
+               if (needsInnerParen) {
+                  curQuery.whereAppend("(");
+                  closeParenCt++;
+               }
+
+               appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, binding);
+               while (closeParenCt-- > 0)
+                  curQuery.whereAppend(")");
+            }
+            else
+               throw new UnsupportedOperationException("Unhandled case");
+         }
       }
+   }
+
+   private StringBuilder getPathRes(String[] pathName, int startIx) {
+      StringBuilder pathRes = new StringBuilder();
+      int pathLen = pathName.length;
+      for (int j = startIx; j < pathLen; j++) {
+         if (j > startIx)
+            pathRes.append(".");
+         pathRes.append(pathName[j]);
+      }
+      return pathRes;
    }
 }

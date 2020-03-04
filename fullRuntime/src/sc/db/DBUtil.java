@@ -1,17 +1,17 @@
 package sc.db;
 
+import sc.dyn.DynUtil;
 import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
 
 import javax.naming.InitialContext;
 import javax.sql.DataSource;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
+
 import sc.db.DataSourceManager;
 import sc.util.IMessageHandler;
+import sc.util.JSON;
 import sc.util.MessageHandler;
 
 public class DBUtil {
@@ -121,56 +121,123 @@ public class DBUtil {
          logSB.append(ident);
    }
 
-   public static String formatValue(Object val) {
-      if (val instanceof String) {
-         return "\"" + val + "\"";
-      }
-      else if (val == null)
+   public static String formatValue(Object val, DBColumnType type) {
+      if (val == null)
          return "null";
-      else
-         return val.toString();
+      switch (type) {
+         case String:
+            return "\"" + val + "\"";
+         case Json:
+            StringBuilder jsonSB = JSON.toJSON(val);
+            return jsonSB.toString();
+      }
+      return val.toString();
    }
 
-   public static void setStatementValue(PreparedStatement st, int index, Object propertyType, Object val) throws SQLException {
-      if (propertyType == Integer.class || propertyType == Integer.TYPE) {
-         st.setInt(index, (Integer) val);
+   private static Class pgObject = null;
+
+   public static void setStatementValue(PreparedStatement st, int index, DBColumnType dbColumnType, Object val) throws SQLException {
+      if (val == null) {
+         st.setNull(index, dbColumnType.getSQLType());
+         return;
       }
-      else if (propertyType == String.class) {
-         st.setString(index, (String) val);
-      }
-      else if (propertyType == Long.class || propertyType == Long.TYPE) {
-         st.setLong(index, (Long) val);
-      }
-      else if (propertyType == Boolean.class || propertyType == Boolean.TYPE) {
-         st.setBoolean(index, (Boolean) val);
-      }
-      else {
-         st.setObject(index, val);
+      switch (dbColumnType) {
+         case Int:
+            st.setInt(index, (Integer) val);
+            break;
+         case String:
+            st.setString(index, (String) val);
+            break;
+         case Long:
+            st.setLong(index, (Long) val);
+            break;
+         case Boolean:
+            st.setBoolean(index, (Boolean) val);
+            break;
+         case Float:
+            st.setFloat(index, (Float) val);
+            break;
+         case Double:
+            st.setDouble(index, (Double) val);
+            break;
+         case Reference:
+            throw new IllegalArgumentException("type should be the id column type");
+         case Json:
+            String jsonStr = JSON.toJSON(val).toString();
+            // TODO: using reflection here because we don't want this dependency unless using the postgresql driver.
+            // We should add a general 'value converter' interface and register an implementation from the pgsql layer
+            if (pgObject == null) {
+               pgObject = (Class) DynUtil.findType("org.postgresql.util.PGobject");
+               if (pgObject == null)
+                  throw new IllegalArgumentException("Missing postgresql class: org.postgresql.util.PGobject");
+            }
+            Object pgo = DynUtil.createInstance(pgObject, null);
+            DynUtil.setProperty(pgo, "type", "jsonb");
+            DynUtil.setProperty(pgo, "value", jsonStr);
+            st.setObject(index, pgo, Types.OTHER);
+            break;
+         default:
+            throw new IllegalArgumentException("unrecognized type in setStatementValue");
       }
    }
 
    public static Object getResultSetByIndex(ResultSet rs, int index, DBPropertyDescriptor dbProp) throws SQLException {
       IBeanMapper mapper = dbProp.getPropertyMapper();
       Object propertyType = mapper.getPropertyType();
-      if (propertyType == Integer.class || propertyType == Integer.TYPE) {
-         Object res = rs.getObject(index);
-         if (res == null)
-            return res;
-         if (res instanceof Integer)
-            return res;
-         else {
-            System.err.println("*** Unrecognized result for integer property");
-            return res;
-         }
+      DBColumnType colType = dbProp.getDBColumnType();
+      switch (colType) {
+         case Int:
+            Object res = rs.getObject(index);
+            if (res == null || rs.wasNull())
+               return res;
+            if (res instanceof Integer)
+               return res;
+            else {
+               System.err.println("*** Unrecognized result for integer property");
+               return res;
+            }
+         case String:
+            String sres = rs.getString(index);
+            if (rs.wasNull())
+               return null;
+            return sres;
+         case Long:
+            Long lres = rs.getLong(index);
+            if (rs.wasNull())
+               return null;
+            return lres;
+         case Boolean:
+            Boolean bres = rs.getBoolean(index);
+            if (rs.wasNull())
+               return null;
+            return bres;
+         case Float:
+            Float fres = rs.getFloat(index);
+            if (rs.wasNull())
+               return null;
+            return fres;
+         case Double:
+            Double dres = rs.getDouble(index);
+            if (rs.wasNull())
+               return null;
+            return dres;
+         case Json:
+            Object ores = rs.getObject(index);
+            if (ores == null)
+               return null;
+            if (ores.getClass().getName().contains("PGobject")) {
+               String jsonStr = (String) DynUtil.getPropertyValue(ores, "value");
+               if (jsonStr == null || jsonStr.length() == 0)
+                  return null;
+               return JSON.toObject(propertyType, jsonStr);
+            }
+            else
+               throw new UnsupportedOperationException("Unrecognized type from getObject");
+         case Reference:
+            return getResultSetByIndex(rs, index, dbProp.refDBTypeDesc.primaryTable.idColumns.get(0));
+         default:
+            throw new UnsupportedOperationException("Unrecognized type from getObject");
       }
-      else if (propertyType == String.class)
-         return rs.getString(index);
-      else if (propertyType == Long.class || propertyType == Long.TYPE)
-         return rs.getLong(index);
-      else if (propertyType == Boolean.class || propertyType == Boolean.TYPE)
-         return rs.getBoolean(index);
-      else
-         return rs.getObject(index);
    }
 
    public static String getDefaultSQLType(Object propertyType) {
@@ -231,7 +298,7 @@ public class DBUtil {
       MessageHandler.error(msgHandler, msgs);
    }
 
-   public static String replaceNextParam(String logStr, Object colVal) {
+   public static String replaceNextParam(String logStr, Object colVal, DBColumnType colType) {
       int ix = logStr.indexOf('?');
       if (ix == -1) {
          System.err.println("*** replaceNextParam - found no param");
@@ -239,7 +306,7 @@ public class DBUtil {
       }
       StringBuilder res = new StringBuilder();
       res.append(logStr.substring(0, ix));
-      res.append(DBUtil.formatValue(colVal));
+      res.append(DBUtil.formatValue(colVal, colType));
       res.append(logStr.substring(ix+1));
       return res.toString();
    }

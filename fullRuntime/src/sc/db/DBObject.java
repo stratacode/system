@@ -494,6 +494,10 @@ public class DBObject implements IDBObject {
          if (pdesc.refDBTypeDesc != null) {
             setPropertyInPath(protoProp, pdesc.refDBTypeDesc.createPrototype());
          }
+         else if (pdesc.getDBColumnType() == DBColumnType.Json) {
+            Object inst = DynUtil.createInstance(pdesc.getPropertyMapper().getPropertyType(), null);
+            setPropertyInPath(protoProp, inst);
+         }
          else
             DBUtil.error("Failed to init parent prototype: " + protoProp + ": " + pdesc + " not a reference type");
       }
