@@ -526,6 +526,9 @@ public class DBObject implements IDBObject {
       return curInst;
    }
 
+   public Object getProperty(String propName) {
+      return DynUtil.getPropertyValue(getInst(), propName);
+   }
 
    public boolean isPendingInsert() {
       return (flags & PENDING_INSERT) != 0;
@@ -602,13 +605,16 @@ public class DBObject implements IDBObject {
       return sb.toString();
    }
 
-   void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList) {
+   void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList, DBPropertyDescriptor versProp, long newVersion) {
       synchronized (pendingOps) {
          transaction.commitInProgress = true;
          try {
+            Object inst = getInst();
             for (PropUpdate propUpdate:updateList) {
-               propUpdate.prop.getPropertyMapper().setPropertyValue(getInst(), propUpdate.value);
+               propUpdate.prop.getPropertyMapper().setPropertyValue(inst, propUpdate.value);
             }
+            if (versProp != null)
+               versProp.getPropertyMapper().setPropertyValue(inst, newVersion);
          }
          finally {
             transaction.commitInProgress = false;

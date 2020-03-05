@@ -1,6 +1,6 @@
 package sc.db;
 
-public class TxDelete extends TxOperation {
+public class TxDelete extends VersionedOperation {
    public TxDelete(DBTransaction tx, DBObject inst) {
       super(tx, inst);
    }

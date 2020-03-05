@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
-public class TxUpdate extends TxOperation {
+public class TxUpdate extends VersionedOperation {
    public ArrayList<PropUpdate> updateList = new ArrayList<PropUpdate>();
    public TreeMap<String, PropUpdate> updateIndex = new TreeMap<String, PropUpdate>();
 
@@ -46,6 +46,9 @@ public class TxUpdate extends TxOperation {
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
       boolean isPrimary = primaryTable == updateTable;
+      // TODO: if we are only updating a non-aux or multi table in a transaction, do we always join in the primary
+      // table just to check and update the version
+      DBPropertyDescriptor versProp = isPrimary ? dbTypeDesc.versionProperty : null;
 
       List<IdPropertyDescriptor> idCols = updateTable.getIdColumns();
       List<Object> idVals = new ArrayList<Object>();
@@ -72,6 +75,13 @@ public class TxUpdate extends TxOperation {
       if (columnProps.size() == 0)
          return 0;
 
+      long newVersion = -1;
+      if (versProp != null && !columnProps.contains(versProp)) {
+         columnProps.add(versProp);
+         newVersion = version + 1;
+         columnValues.add(newVersion);
+      }
+
       StringBuilder sb = new StringBuilder();
       sb.append("UPDATE ");
       DBUtil.appendIdent(sb, null, updateTable.tableName);
@@ -94,13 +104,22 @@ public class TxUpdate extends TxOperation {
 
       for (int i = 0; i < numIdCols; i++) {
          if (i != 0) {
-            DBUtil.append(sb, logSB, ", ");
+            DBUtil.append(sb, logSB, " AND ");
          }
          DBUtil.appendIdent(sb, logSB, idCols.get(i).columnName);
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
             logSB.append(DBUtil.formatValue(idVals.get(i), idCols.get(i).getDBColumnType()));
+      }
+      if (versProp != null) {
+         long opVersion = version;
+         DBUtil.append(sb, logSB, " AND ");
+         DBUtil.appendIdent(sb, logSB, versProp.columnName);
+         DBUtil.append(sb, logSB, " = ");
+         sb.append("?");
+         if (logSB != null)
+            logSB.append(DBUtil.formatValue(opVersion, versProp.getDBColumnType()));
       }
 
       try {
@@ -117,24 +136,30 @@ public class TxUpdate extends TxOperation {
             IdPropertyDescriptor idProp = idCols.get(i);
             DBUtil.setStatementValue(st,  pos++, idProp.getDBColumnType(), idVals.get(i));
          }
+         if (versProp != null) {
+            DBUtil.setStatementValue(st,  pos++, versProp.getDBColumnType(), version);
+         }
 
          int ct = st.executeUpdate();
          // TODO: for auxTables we should track whether we fetched the row or not to avoid the extra statement and instead do an 'upsert' - insert with an update on conflict since
          // in the case we are setting properties which were not fetched, it's much more likely the row does not exist.
          if (ct == 0) {
-            if (isPrimary)
-               throw new IllegalArgumentException("Attempt to update primary table with non-existent row for type: " + dbTypeDesc + idVals);
-            dbObject.applyUpdates(transaction, updateList);
+            if (versProp != null || isPrimary) {
+               throw new StaleDataException(dbObject, version);
+            }
+            dbObject.applyUpdates(transaction, updateList, null, 0);
             doInsert(updateTable);
          }
          else if (ct != 1) {
             throw new UnsupportedOperationException("Invalid return from executeUpdate in doUpdate(): " + ct);
          }
          else {
-            dbObject.applyUpdates(transaction, updateList);
+            dbObject.applyUpdates(transaction, updateList, versProp, newVersion);
 
             if (logSB != null) {
                logSB.append(" updated: " + ct);
+               if (versProp != null)
+                  logSB.append(" new version: " + newVersion);
                DBUtil.info(logSB);
             }
          }

@@ -548,7 +548,11 @@ public abstract class TxOperation {
          return 0;
 
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
-      TableDescriptor primaryTable = dbTypeDesc.primaryTable;
+      boolean isPrimary = deleteTable.primary;
+      DBPropertyDescriptor versProp = isPrimary && this instanceof VersionedOperation ? dbTypeDesc.versionProperty : null;
+      long version = -1;
+      if (versProp != null)
+         version = ((VersionedOperation) this).version;
 
       List<IdPropertyDescriptor> idCols = deleteTable.getIdColumns();
 
@@ -586,13 +590,23 @@ public abstract class TxOperation {
 
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
-            DBUtil.append(sb, logSB, "AND ");
+            DBUtil.append(sb, logSB, " AND ");
          }
          DBUtil.appendIdent(sb, logSB, columnNames.get(i));
          sb.append(" = ?");
          if (logSB != null) {
             logSB.append(" = ");
             logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i)));
+         }
+      }
+
+      if (versProp != null) {
+         DBUtil.append(sb, logSB, " AND ");
+         DBUtil.appendIdent(sb, logSB, versProp.columnName);
+         sb.append(" = ?");
+         if (logSB != null) {
+            logSB.append(" = ");
+            logSB.append(DBUtil.formatValue(version, versProp.getDBColumnType()));
          }
       }
 
@@ -604,13 +618,20 @@ public abstract class TxOperation {
          for (int i = 0; i < numCols; i++) {
             DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
          }
+         if (versProp != null)
+            DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
 
          int numDeleted = st.executeUpdate();
 
          if (deleteTable.primary) {
             if (numDeleted != 1) {
-               if (numDeleted == 0)
-                  DBUtil.error("Delete from primary table failed to remove row for: " + dbObject);
+               if (numDeleted == 0) {
+                  if (versProp == null)
+                     DBUtil.error("Delete from primary table failed to remove row for: " + dbObject);
+                  else
+                     DBUtil.info("Delete - StaleDataException for versioned object: " + dbObject);
+                  throw new StaleDataException(dbObject, version);
+               }
                else
                   DBUtil.error("Delete from primary table expected to remove one row actually removed: " + numDeleted + " for: " + dbObject);
             }
@@ -623,6 +644,8 @@ public abstract class TxOperation {
                logSB.append(" -> ***error - delete removed " + numDeleted + " rows") ;
             else
                logSB.append(" -> multi table removed: " + numDeleted);
+            if (versProp != null)
+               logSB.append("  - version: " + version);
 
             DBUtil.info(logSB);
          }

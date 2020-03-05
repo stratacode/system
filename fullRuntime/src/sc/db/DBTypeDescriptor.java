@@ -70,7 +70,7 @@ public class DBTypeDescriptor {
 
    public DBTypeDescriptor baseType;
 
-   // Name for the connection to the database
+   // Name for the primary data source
    public String dataSourceName;
 
    public boolean queueInserts = false;
