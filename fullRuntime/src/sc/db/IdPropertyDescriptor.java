@@ -29,4 +29,12 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
    public DBTypeDescriptor getColTypeDesc() {
       return dbTypeDesc;
    }
+
+   private int currentMemoryId = 0;
+
+   public synchronized int allocMemoryId() {
+      currentMemoryId++;
+      return currentMemoryId;
+   }
+
 }

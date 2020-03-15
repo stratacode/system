@@ -123,41 +123,52 @@ public class TxUpdate extends VersionedOperation {
       }
 
       try {
-         Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         String updateStr = sb.toString();
-         PreparedStatement st = conn.prepareStatement(updateStr);
-         int pos = 1;
-         for (int i = 0; i < numCols; i++) {
-            DBPropertyDescriptor colProp = columnProps.get(i);
-            DBColumnType colType = colProp.refDBTypeDesc == null ? colProp.getDBColumnType() : colProp.refDBTypeDesc.getIdDBColumnType(0);
-            DBUtil.setStatementValue(st,  pos++, colType, columnValues.get(i));
-         }
-         for (int i = 0; i < numIdCols; i++) {
-            IdPropertyDescriptor idProp = idCols.get(i);
-            DBUtil.setStatementValue(st,  pos++, idProp.getDBColumnType(), idVals.get(i));
-         }
-         if (versProp != null) {
-            DBUtil.setStatementValue(st,  pos++, versProp.getDBColumnType(), version);
-         }
-
-         int ct = st.executeUpdate();
-         // TODO: for auxTables we should track whether we fetched the row or not to avoid the extra statement and instead do an 'upsert' - insert with an update on conflict since
-         // in the case we are setting properties which were not fetched, it's much more likely the row does not exist.
-         if (ct == 0) {
-            if (versProp != null || isPrimary) {
-               throw new StaleDataException(dbObject, version);
+         if (!dbTypeDesc.dbReadOnly) {
+            Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
+            String updateStr = sb.toString();
+            PreparedStatement st = conn.prepareStatement(updateStr);
+            int pos = 1;
+            for (int i = 0; i < numCols; i++) {
+               DBPropertyDescriptor colProp = columnProps.get(i);
+               DBColumnType colType = colProp.refDBTypeDesc == null ? colProp.getDBColumnType() : colProp.refDBTypeDesc.getIdDBColumnType(0);
+               DBUtil.setStatementValue(st,  pos++, colType, columnValues.get(i));
             }
-            dbObject.applyUpdates(transaction, updateList, null, 0);
-            doInsert(updateTable);
-         }
-         else if (ct != 1) {
-            throw new UnsupportedOperationException("Invalid return from executeUpdate in doUpdate(): " + ct);
+            for (int i = 0; i < numIdCols; i++) {
+               IdPropertyDescriptor idProp = idCols.get(i);
+               DBUtil.setStatementValue(st,  pos++, idProp.getDBColumnType(), idVals.get(i));
+            }
+            if (versProp != null) {
+               DBUtil.setStatementValue(st,  pos++, versProp.getDBColumnType(), version);
+            }
+
+            int ct = st.executeUpdate();
+            // TODO: for auxTables we should track whether we fetched the row or not to avoid the extra statement and instead do an 'upsert' - insert with an update on conflict since
+            // in the case we are setting properties which were not fetched, it's much more likely the row does not exist.
+            if (ct == 0) {
+               if (versProp != null || isPrimary) {
+                  throw new StaleDataException(dbObject, version);
+               }
+               dbObject.applyUpdates(transaction, updateList, null, 0);
+               doInsert(updateTable);
+            }
+            else if (ct != 1) {
+               throw new UnsupportedOperationException("Invalid return from executeUpdate in doUpdate(): " + ct);
+            }
+            else {
+               dbObject.applyUpdates(transaction, updateList, versProp, newVersion);
+
+               if (logSB != null) {
+                  logSB.append(" updated: " + ct);
+                  if (versProp != null)
+                     logSB.append(" new version: " + newVersion);
+                  DBUtil.info(logSB);
+               }
+            }
          }
          else {
             dbObject.applyUpdates(transaction, updateList, versProp, newVersion);
-
             if (logSB != null) {
-               logSB.append(" updated: " + ct);
+               logSB.append(" updated - dbDisabled ");
                if (versProp != null)
                   logSB.append(" new version: " + newVersion);
                DBUtil.info(logSB);
@@ -167,6 +178,7 @@ public class TxUpdate extends VersionedOperation {
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert without ids sql error: " + exc);
       }
+
       return 1;
    }
 

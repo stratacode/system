@@ -9,7 +9,8 @@ import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
 import sc.db.DBTypeDescriptor;
-import sc.db.DataSourceDef;
+import sc.db.DBDataSource;
+import sc.db.DataSourceManager;
 import sc.js.URLPath;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSRuntimeProcessor;
@@ -246,11 +247,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** Each LayeredSystem stores the layers for one process.  This holds the configuration info for that process.  */
    public IProcessDefinition processDefinition = null;
 
-   public List<DataSourceDef> activeDataSources = null;
-   public List<DataSourceDef> inactiveDataSources = null;
+   public List<DBDataSource> activeDataSources = null;
+   public List<DBDataSource> inactiveDataSources = null;
    // TODO: move this to the 'layer' and only inherit it if your layer extends the one that sets it so that we can assembly stacks with more than one default that still work.
    /** Set this to support @DBTypeSettings with no dataSourceName, to more easily aggregate components into one default db without having to set all of the types individually */
-   public DataSourceDef defaultDataSource;
+   public DBDataSource defaultDataSource;
    public Map<String,DBProvider> inactiveDBProviders = new TreeMap<String,DBProvider>();
    public Map<String,DBProvider> activeDBProviders = new TreeMap<String,DBProvider>();
 
@@ -1182,7 +1183,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
       "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
       "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil",
-      "sc.layer.RuntimeModuleType", "sc.lang.sql.DBProvider", "sc.db.DataSourceDef"};
+      "sc.layer.RuntimeModuleType", "sc.lang.sql.DBProvider", "sc.db.DBDataSource"};
 
    // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
@@ -4792,6 +4793,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       changedTypes.clear();
       processedModels.clear();
       allToGenerateFiles.clear();
+
+      if (options.dbDisabled) {
+         if (defaultDataSource == null)
+            error("No default data source - ndb otion ignored");
+         else {
+            DataSourceManager.dbDisabled = true;
+         }
+      }
 
       // Clear out any build state for any layers to reset for the next build
       for (int i = 0; i < layers.size(); i++) {
@@ -16009,15 +16018,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return langRT.getCompiledFiles(lang, typeName);
    }
 
-   public void addDataSource(DataSourceDef newDataSource, Layer definedInLayer) {
+   public void addDataSource(DBDataSource newDataSource, Layer definedInLayer) {
       if (definedInLayer.activated) {
          if (this.activeDataSources == null)
-            this.activeDataSources = new ArrayList<DataSourceDef>();
+            this.activeDataSources = new ArrayList<DBDataSource>();
          this.activeDataSources.add(newDataSource);
       }
       else {
          if (this.inactiveDataSources == null)
-            this.inactiveDataSources = new ArrayList<DataSourceDef>();
+            this.inactiveDataSources = new ArrayList<DBDataSource>();
          this.inactiveDataSources.add(newDataSource);
       }
    }
@@ -16030,18 +16039,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
 
-   public DataSourceDef getDataSourceDef(String dataSourceName, boolean active) {
+   public DBDataSource getDataSource(String dataSourceName, boolean active) {
       if (active) {
          if (this.activeDataSources == null)
             return null;
-         for (DataSourceDef def:activeDataSources)
+         for (DBDataSource def:activeDataSources)
             if (def.jndiName.equals(dataSourceName))
                return def;
       }
       else {
          if (this.inactiveDataSources == null)
             return null;
-         for (DataSourceDef def:inactiveDataSources)
+         for (DBDataSource def:inactiveDataSources)
             if (def.jndiName.equals(dataSourceName))
                return def;
       }

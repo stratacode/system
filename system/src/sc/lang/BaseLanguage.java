@@ -299,8 +299,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       identifier.cacheResults = true;
    }
 
-   Sequence alphaNumString = new Sequence("<anyName>('','',)", alphaNumChar,
+   /**
+    * Used for skipOnError parselet and for TestLogFilter to match {alphaNumChar}_{id} - where normal identifier
+    * would consume the _id part
+    */
+   public Sequence alphaNumString = new Sequence("<alphaNumString>('','',)", alphaNumChar,
            new Sequence("('')", REPEAT | OPTIONAL, alphaNumChar), spacing);
+
+   /** Used for log filter patterns - to match either quote character */
+   public SymbolChoice quoteChar = new SymbolChoice("\"", "'");
 
    /**
     * Use this to create a parselet for your repeating parselets skipOnError parselet.  It's used to consume the next error token while trying to skip out

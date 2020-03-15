@@ -25,6 +25,7 @@ public class FetchTablesQuery {
    public StringBuilder whereSB;
    public StringBuilder logSB;
 
+   public List<String> propNames;
    public int numWhereColumns = 0;
    public List<Object> paramValues;
    public List<DBColumnType> paramTypes;
@@ -135,42 +136,47 @@ public class FetchTablesQuery {
 
    public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {
       TableDescriptor mainTable = fetchTables.get(0).table;
-      Connection conn = transaction.getConnection(mainTable.getDataSourceName());
       StringBuilder qsb = buildTableFetchQuery(fetchTables);
       ResultSet rs = null;
       List<IdPropertyDescriptor> idColumns = mainTable.getIdColumns();
       try {
          String queryStr = qsb.toString();
-         PreparedStatement st = conn.prepareStatement(queryStr);
-         String logStr = DBUtil.verbose ? queryStr : null;
-         Object inst = dbObj.getInst();
-         for (int i = 0; i < idColumns.size(); i++) {
-            DBPropertyDescriptor propDesc = idColumns.get(i);
-            IBeanMapper propMapper = propDesc.getPropertyMapper();
-            Object colVal = propMapper.getPropertyValue(inst, false, false);
-            DBColumnType colType = propDesc.getDBColumnType();
-            DBUtil.setStatementValue(st, i+1, colType, colVal);
-            if (logStr != null)
-               logStr = DBUtil.replaceNextParam(logStr, colVal, colType);
-         }
-
-         rs = st.executeQuery();
-
-         StringBuilder logSB = logStr != null ? new StringBuilder(logStr) : null;
-
-         if (logSB != null)
-            logSB.append(" -> ");
-
-         transaction.applyingDBChanges = true;
-
          boolean res;
-         if (!multiRow) // populate properties of dbObj from the tables in this query
-            res = processOneRowQueryResults(dbObj, inst, rs, logSB);
-         else // fetch a multi-valued property
-            res = processMultiResults(null, dbObj, inst, rs, logSB);
-         if (logSB != null) {
-            DBUtil.info(logSB.toString());
+         if (!mainTable.dbTypeDesc.dbDisabled) {
+            Connection conn = transaction.getConnection(mainTable.getDataSourceName());
+            PreparedStatement st = conn.prepareStatement(queryStr);
+            String logStr = DBUtil.verbose ? queryStr : null;
+            Object inst = dbObj.getInst();
+            for (int i = 0; i < idColumns.size(); i++) {
+               DBPropertyDescriptor propDesc = idColumns.get(i);
+               IBeanMapper propMapper = propDesc.getPropertyMapper();
+               Object colVal = propMapper.getPropertyValue(inst, false, false);
+               DBColumnType colType = propDesc.getDBColumnType();
+               DBUtil.setStatementValue(st, i+1, colType, colVal);
+               if (logStr != null)
+                  logStr = DBUtil.replaceNextParam(logStr, colVal, colType);
+            }
+
+            rs = st.executeQuery();
+
+            StringBuilder logSB = logStr != null ? new StringBuilder(logStr) : null;
+
+            if (logSB != null)
+               logSB.append(" -> ");
+
+            transaction.applyingDBChanges = true;
+
+            if (!multiRow) // populate properties of dbObj from the tables in this query
+               res = processOneRowQueryResults(dbObj, inst, rs, logSB);
+            else // fetch a multi-valued property
+               res = processMultiResults(null, dbObj, inst, rs, logSB);
+
+            if (logSB != null) {
+               DBUtil.info(logSB.toString());
+            }
          }
+         else
+            res = true;
          return res;
       }
       catch (SQLException exc) {
@@ -185,7 +191,6 @@ public class FetchTablesQuery {
 
    public List<IDBObject> query(DBTransaction transaction, DBObject proto) {
       TableDescriptor mainTable = fetchTables.get(0).table;
-      Connection conn = transaction.getConnection(mainTable.getDataSourceName());
       StringBuilder qsb = buildTableQueryBase(mainTable, fetchTables);
       ResultSet rs = null;
       StringBuilder logSB = DBUtil.verbose ? new StringBuilder(qsb) : null;
@@ -196,36 +201,63 @@ public class FetchTablesQuery {
 
       try {
          String queryStr = qsb.toString();
-         PreparedStatement st = conn.prepareStatement(queryStr);
-         Object inst = proto.getInst();
-         for (int i = 0; i < paramValues.size(); i++) {
-            Object paramValue = paramValues.get(i);
-            DBColumnType propType = paramTypes.get(i);
-            DBUtil.setStatementValue(st, i+1, propType, paramValue);
-         }
-
-         rs = st.executeQuery();
-
-         if (logSB != null)
-            logSB.append(" -> ");
-
-         transaction.applyingDBChanges = true;
-
          ArrayList<IDBObject> res = new ArrayList<IDBObject>();
-         if (!multiRow) {
-            if (!processOneRowQueryResults(proto, inst, rs, logSB))
-               return null;
-            res.add(proto);
-            return res;
+         DBTypeDescriptor dbTypeDesc = mainTable.dbTypeDesc;
+
+         if (!dbTypeDesc.dbDisabled) {
+            Connection conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
+            PreparedStatement st = conn.prepareStatement(queryStr);
+            Object inst = proto.getInst();
+            for (int i = 0; i < paramValues.size(); i++) {
+               Object paramValue = paramValues.get(i);
+               DBColumnType propType = paramTypes.get(i);
+               DBUtil.setStatementValue(st, i+1, propType, paramValue);
+            }
+
+            rs = st.executeQuery();
+
+            if (logSB != null)
+               logSB.append(" -> ");
+
+            transaction.applyingDBChanges = true;
+
+            if (!multiRow) {
+               if (!processOneRowQueryResults(proto, inst, rs, logSB))
+                  return null;
+               res.add(proto);
+               return res;
+            }
+            else {
+               res = new ArrayList<IDBObject>();
+               processMultiResults(res, null, inst, rs, logSB);
+            }
          }
-         else {
-            res = new ArrayList<IDBObject>();
-            processMultiResults(res, null, inst, rs, logSB);
+         // Just logging the SQL we could do for diagnostic purposes - results for memory queries are merged in later
+         else if (logSB != null) {
+            logSB.append(" (dbDisabled) ");
+         }
+         List<IDBObject> cacheRes = null;
+         if (dbTypeDesc.dbReadOnly) {
+            cacheRes = dbTypeDesc.queryCache(proto, propNames);
+            if (cacheRes != null && logSB != null) {
+               logSB.append("   cached results: [");
+               for (int ci = 0; ci < cacheRes.size(); ci++) {
+                  IDBObject cacheObj = cacheRes.get(ci);
+                  if (ci != 0)
+                     logSB.append(", ");
+                  DBUtil.appendVal(logSB, cacheObj);
+               }
+               logSB.append("]\n");
+            }
          }
          if (logSB != null) {
             DBUtil.info(logSB.toString());
          }
-         return res;
+         if (cacheRes == null)
+            return res;
+         if (res.size() == 0)
+            return cacheRes;
+         return dbTypeDesc.mergeResultLists(cacheRes, res);
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
@@ -655,6 +687,7 @@ public class FetchTablesQuery {
    public FetchTablesQuery clone() {
       FetchTablesQuery res = new FetchTablesQuery(dataSourceName, multiRow);
       res.includesPrimary = includesPrimary;
+      res.propNames = propNames;
       for (FetchTableDesc ftd:fetchTables) {
          FetchTableDesc nftd = ftd.clone();
          res.fetchTables.add(nftd);

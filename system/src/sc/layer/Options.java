@@ -55,6 +55,8 @@ public class Options {
    @Constant public boolean info = true;
    /** Controls whether java files compiled by this system debuggable */
    @Constant public boolean debug = true;
+   /** Disable the default database for testing - store objects in memory only */
+   @Constant public boolean dbDisabled = false;
    /** Should compiled classes be parsed using CFClass instead of the default which is to use the class loader */
    @Constant public boolean crossCompile = false;
    /** Change to the buildDir before running the command */
@@ -274,6 +276,7 @@ public class Options {
                          "   [ -P<propFileName.propName=value> ]: Override layer property, bound at top-level of layer directory in propFileName with propName=value\n" +
                          "   [ -n ]: Start 'create layer' wizard on startup.\n" +
                          "   [ -ni ]: Disable command interpreter\n" +
+                         "   [ -ndb ]: Disable the database for reads and writes - only store them in memory.\n" +
                          "   [ -ndbg ]: Do not compile Java files with debug enabled\n" +
                          "   [ -dt ]: Enable the liveDynamicTypes option - so that you can modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
                          "   [ -nd ]: Disable the liveDynamicTypes option - so that you cannot modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
@@ -434,6 +437,9 @@ public class Options {
                      startInterpreter = false;
                   else if (opt.equals("ndbg")) {
                      debug = false;
+                  }
+                  else if (opt.equals("ndb")) {
+                     dbDisabled = true;
                   }
                   else
                      Options.usage("Unrecognized option: " + opt, args);

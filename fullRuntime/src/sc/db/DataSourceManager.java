@@ -5,22 +5,26 @@ import javax.naming.InitialContext;
 
 import java.util.HashMap;
 
+/**
+ * Manages access to the runtime, active data sources - i.e the connections to the databases.
+ * The DBDataSource object holds the connection configuration
+ * information and typically a references to a javax.sql.DataSource
+ */
 public class DataSourceManager {
-   public static HashMap<String,DataSource> dataSources = new HashMap<String,DataSource>();
+   public static HashMap<String,DBDataSource> dataSources = new HashMap<String,DBDataSource>();
 
-   public static DataSource getDataSource(String dsName) {
-      DataSource ds = dataSources.get(dsName);
-      if (ds == null) {
-         try {
-            InitialContext ctx = new InitialContext();
-            ds = (DataSource) ctx.lookup("java:comp/env/" + dsName);
-         }
-         catch (javax.naming.NamingException exc) {}
-      }
-      return ds;
+   public static boolean dbDisabled = false;
+
+   public static DBDataSource getDBDataSource(String dsName) {
+      return dataSources.get(dsName);
    }
 
-   public static void addDataSource(String jndiName, DataSource ds) { 
+   public static void addDBDataSource(String jndiName, DBDataSource ds) {
+      if (dbDisabled && ds != null) {
+         ds.dbDisabled = true;
+         ds.readOnly = true;
+         DBUtil.verbose("Disabling dataSource: " + jndiName + " due to configured dbDisabled flag (-ndb) option");
+      }
       dataSources.put(jndiName, ds);
    }
 }

@@ -43,8 +43,6 @@ import java.util.*;
 
 import sc.lang.java.Statement.RuntimeStatus;
 
-import javax.management.loading.MLet;
-
 /**
  * This interface contains a wide range of operations on Java objects defined in either java.lang.Class, or ITypeDeclaration as the
  * primary types.  For ITypeDeclaration there are two primary implementations: CFClass - the .class file parser, or sc.lang.java.TypeDeclaration,
@@ -9670,7 +9668,7 @@ public class ModelUtil {
 
          if (persist) {
             if (dataSourceName == null) {
-               DataSourceDef def = sys.defaultDataSource;
+               DBDataSource def = sys.defaultDataSource;
                dataSourceName = def == null ? null : def.jndiName;
                if (dataSourceName == null)
                   return null;
@@ -10183,7 +10181,7 @@ public class ModelUtil {
       DBTypeDescriptor typeDesc = ModelUtil.getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj, false);
       if (typeDesc != null) {
          String dataSourceName = typeDesc.dataSourceName;
-         DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
+         DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
          if (dataSource != null) {
             return sys.getDBProvider(dataSource.provider, refLayer);
          }
@@ -10193,7 +10191,7 @@ public class ModelUtil {
 
    public static DBProvider getDBProviderForPropertyDesc(LayeredSystem sys, Layer refLayer, DBPropertyDescriptor propDesc) {
       String dataSourceName = propDesc.getDataSourceForProp();
-      DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
+      DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
       if (dataSource != null) {
          return sys.getDBProvider(dataSource.provider, refLayer);
       }
@@ -10208,7 +10206,7 @@ public class ModelUtil {
          DBPropertyDescriptor propDesc = typeDesc.getPropertyDescriptor(propName);
          if (propDesc != null) {
             String dataSourceName = propDesc.getDataSourceForProp();
-            DataSourceDef dataSource = sys.getDataSourceDef(dataSourceName, refLayer.activated);
+            DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
             if (dataSource != null) {
                return sys.getDBProvider(dataSource.provider, refLayer);
             }

@@ -4,25 +4,23 @@ import sc.dyn.DynUtil;
 import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
 
-import javax.naming.InitialContext;
 import javax.sql.DataSource;
-import java.math.BigDecimal;
 import java.sql.*;
 
-import sc.db.DataSourceManager;
 import sc.util.IMessageHandler;
 import sc.util.JSON;
 import sc.util.MessageHandler;
 
 public class DBUtil {
-   public static boolean verbose = true;
+   public static boolean verbose = false;
 
    public static IMessageHandler msgHandler;
 
    public static Connection createConnection(String dataSourceName) {
       try {
-         DataSource ds = DataSourceManager.getDataSource(dataSourceName);
-         return ds.getConnection();
+         DBDataSource dbDS = DataSourceManager.getDBDataSource(dataSourceName);
+         DataSource javaDS = dbDS.getDataSource();
+         return javaDS.getConnection();
       }
       catch (SQLException exc) {
          System.err.println("*** SQL error getting DB connection: " + exc);

@@ -6,11 +6,13 @@ import java.util.List;
 public class DBFetchGroupQuery extends DBQuery {
    DBTypeDescriptor dbTypeDesc;
    List<FetchTablesQuery> queries = new ArrayList<FetchTablesQuery>();
+   List<String> propNames;
 
    FetchTablesQuery curQuery;
 
-   public DBFetchGroupQuery(DBTypeDescriptor dbTypeDesc) {
+   public DBFetchGroupQuery(DBTypeDescriptor dbTypeDesc, List<String> propNames) {
       this.dbTypeDesc = dbTypeDesc;
+      this.propNames = propNames;
    }
 
    public void addFetchGroup(String fetchGroup, boolean multiRow) {
@@ -20,6 +22,7 @@ public class DBFetchGroupQuery extends DBQuery {
       for (FetchTablesQuery ftq:fgQuery.queries) {
          FetchTablesQuery newFtq = ftq.clone();
          newFtq.multiRow = multiRow;
+         newFtq.propNames = propNames;
          queries.add(newFtq);
       }
    }
@@ -38,6 +41,7 @@ public class DBFetchGroupQuery extends DBQuery {
          if (query.dataSourceName.equals(dataSourceName) && query.multiRow == multiRow)
             return query;
       FetchTablesQuery ftq = new FetchTablesQuery(dataSourceName, multiRow);
+      ftq.propNames = propNames;
       queries.add(ftq);
       return ftq;
    }
@@ -61,7 +65,7 @@ public class DBFetchGroupQuery extends DBQuery {
    }
 
    public DBFetchGroupQuery clone() {
-      DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc);
+      DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc, propNames);
       res.queryNumber = queryNumber;
       res.queryName = queryName;
       for (FetchTablesQuery ftq:queries)

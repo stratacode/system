@@ -123,49 +123,78 @@ public abstract class TxOperation {
       if (logSB != null)
          logSB.append(rest);
 
+      DBDataSource ds = dbTypeDesc.getDataSource();
+      boolean addToDB = !dbTypeDesc.dbReadOnly;
+
       try {
-         Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         String statementStr = sb.toString();
-         PreparedStatement st = conn.prepareStatement(statementStr);
+         if (addToDB) { // If the db is read-only will store the objects in memory for easier testing, prototyping
+            Connection conn = transaction.getConnection(ds.jndiName);
+            String statementStr = sb.toString();
+            PreparedStatement st = conn.prepareStatement(statementStr);
 
-         for (int i = 0; i < numCols; i++) {
-            DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
-         }
-
-         if (dbIdCols != null) {
-            ResultSet rs = st.executeQuery();
-            if (!rs.next())
-               throw new IllegalArgumentException("Missing returned id result for insert with definedByDB ids: " + dbIdCols);
-            if (logSB != null)
-               logSB.append(" -> ");
-            for (int i = 0; i < dbIdCols.size(); i++) {
-               IdPropertyDescriptor dbIdCol = dbIdCols.get(i);
-               IBeanMapper mapper = dbIdCol.getPropertyMapper();
-               Object id = DBUtil.getResultSetByIndex(rs, i+1, dbIdCol);
-               mapper.setPropertyValue(inst, id);
-
-               if (logSB != null) {
-                  if (i != 0)
-                     logSB.append(", ");
-                  logSB.append(id);
-               }
+            for (int i = 0; i < numCols; i++) {
+               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
             }
 
-            if (logSB != null) {
-               DBUtil.info(logSB);
+            if (dbIdCols != null) {
+               ResultSet rs = st.executeQuery();
+               if (!rs.next())
+                  throw new IllegalArgumentException("Missing returned id result for insert with definedByDB ids: " + dbIdCols);
+               if (logSB != null)
+                  logSB.append(" = ");
+               for (int i = 0; i < dbIdCols.size(); i++) {
+                  IdPropertyDescriptor dbIdCol = dbIdCols.get(i);
+                  IBeanMapper mapper = dbIdCol.getPropertyMapper();
+                  Object id = DBUtil.getResultSetByIndex(rs, i+1, dbIdCol);
+                  mapper.setPropertyValue(inst, id);
+
+                  if (logSB != null) {
+                     if (i != 0)
+                        logSB.append(", ");
+                     logSB.append(id);
+                  }
+               }
+
+               if (logSB != null) {
+                  DBUtil.info(logSB);
+               }
+            }
+            else {
+               int numInserted = st.executeUpdate();
+               if (numInserted != 1)
+                 DBUtil.error("Insert of one row returns: " + numInserted + " rows inserted");
+
+               if (logSB != null) {
+                  if (numInserted == 1)
+                     logSB.append(" -> inserted one row");
+                  else
+                     logSB.append(" -> updated " + numInserted + " rows") ;
+
+                  DBUtil.info(logSB);
+               }
             }
          }
          else {
-            int numInserted = st.executeUpdate();
-            if (numInserted != 1)
-              DBUtil.error("Insert of one row returns: " + numInserted + " rows inserted");
+            if (dbIdCols != null) {
+               if (logSB != null)
+               logSB.append(" (dbDisabled) -> ");
+               for (int i = 0; i < dbIdCols.size(); i++) {
+                  IdPropertyDescriptor dbIdCol = dbIdCols.get(i);
+                  IBeanMapper mapper = dbIdCol.getPropertyMapper();
+                  Object id = dbIdCol.allocMemoryId();
+                  mapper.setPropertyValue(inst, id);
+
+                  if (logSB != null) {
+                     if (i != 0)
+                        logSB.append(", ");
+                     logSB.append(id);
+                  }
+               }
+            }
+            else if (logSB != null)
+               logSB.append(" (dbDisabled)");
 
             if (logSB != null) {
-               if (numInserted == 1)
-                  logSB.append(" -> inserted one row");
-               else
-                  logSB.append(" -> updated " + numInserted + " rows") ;
-
                DBUtil.info(logSB);
             }
          }
@@ -336,54 +365,84 @@ public abstract class TxOperation {
       if (toInsert == 0)
          return 0;
 
+      boolean addToDB = !dbTypeDesc.dbReadOnly;
       ResultSet rs = null;
       try {
-         Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         String insertStr = sb.toString();
-         PreparedStatement st = conn.prepareStatement(insertStr);
+         if (addToDB) {
+            Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
+            String insertStr = sb.toString();
+            PreparedStatement st = conn.prepareStatement(insertStr);
 
-         for (int ci = 0; ci < columnValues.size(); ci++) {
-            DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci));
-         }
-         int numInserted;
-
-         if (dbIdCols != null) {
-            rs = st.executeQuery();
-            numInserted = 0;
-            // For each instance read back the returned 'definedByDB' id properties and set them
-            if (logSB != null) {
-               logSB.append(" -> ");
+            for (int ci = 0; ci < columnValues.size(); ci++) {
+               DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci));
             }
-            for (int ix = 0; ix < numInsts; ix++) {
-               if (!rs.next())
-                  throw new IllegalArgumentException("Unexpected end of query results: " + sb + " expected to return: " + numInsts + " and did not return: " + ix);
-               if (logSB != null && ix != 0)
-                  logSB.append(", ");
-               IDBObject arrInst = propList.get(ix);
-               for (int idx = 0; idx < dbIdCols.size(); idx++) {
-                  IdPropertyDescriptor dbIdCol = dbIdCols.get(idx);
-                  IBeanMapper mapper = dbIdCol.getPropertyMapper();
-                  Object id = DBUtil.getResultSetByIndex(rs, idx+1, dbIdCol);
-                  mapper.setPropertyValue(arrInst, id);
+            int numInserted;
 
-                  if (logSB != null) {
-                     if (idx != 0)
-                        logSB.append(", ");
-                     logSB.append(id);
-                  }
+            if (dbIdCols != null) {
+               rs = st.executeQuery();
+               numInserted = 0;
+               // For each instance read back the returned 'definedByDB' id properties and set them
+               if (logSB != null) {
+                  logSB.append(" = ");
                }
-               numInserted++;
+               for (int ix = 0; ix < numInsts; ix++) {
+                  if (!rs.next())
+                     throw new IllegalArgumentException("Unexpected end of query results: " + sb + " expected to return: " + numInsts + " and did not return: " + ix);
+                  if (logSB != null && ix != 0)
+                     logSB.append(", ");
+                  IDBObject arrInst = propList.get(ix);
+                  for (int idx = 0; idx < dbIdCols.size(); idx++) {
+                     IdPropertyDescriptor dbIdCol = dbIdCols.get(idx);
+                     IBeanMapper mapper = dbIdCol.getPropertyMapper();
+                     Object id = DBUtil.getResultSetByIndex(rs, idx+1, dbIdCol);
+                     mapper.setPropertyValue(arrInst, id);
+
+                     if (logSB != null) {
+                        if (idx != 0)
+                           logSB.append(", ");
+                        logSB.append(id);
+                     }
+                  }
+                  numInserted++;
+               }
             }
+            else {
+               numInserted = st.executeUpdate();
+               if (logSB != null) {
+                  logSB.append(" -> inserted ");
+                  logSB.append(numInserted);
+               }
+            }
+            if (numInserted != toInsert)
+               DBUtil.error("Insert of: " + toInsert + " rows inserted: " + numInserted + " instead for: " + dbTypeDesc);
          }
          else {
-            numInserted = st.executeUpdate();
-            if (logSB != null) {
-               logSB.append(" -> inserted ");
-               logSB.append(numInserted);
+            if (logSB != null)
+               logSB.append(" (dbDisabled) ");
+            if (dbIdCols != null) {
+               // For each instance read back the returned 'definedByDB' id properties and set them
+               if (logSB != null) {
+                  logSB.append(" = ");
+               }
+               for (int ix = 0; ix < numInsts; ix++) {
+                  if (logSB != null && ix != 0)
+                     logSB.append(", ");
+                  IDBObject arrInst = propList.get(ix);
+                  for (int idx = 0; idx < dbIdCols.size(); idx++) {
+                     IdPropertyDescriptor dbIdCol = dbIdCols.get(idx);
+                     IBeanMapper mapper = dbIdCol.getPropertyMapper();
+                     Object id = dbIdCol.allocMemoryId();
+                     mapper.setPropertyValue(arrInst, id);
+
+                     if (logSB != null) {
+                        if (idx != 0)
+                           logSB.append(", ");
+                        logSB.append(id);
+                     }
+                  }
+               }
             }
          }
-         if (numInserted != toInsert)
-            DBUtil.error("Insert of: " + toInsert + " rows inserted: " + numInserted + " instead for: " + dbTypeDesc);
 
          if (logSB != null) {
             DBUtil.info(logSB);
@@ -611,44 +670,52 @@ public abstract class TxOperation {
       }
 
       try {
-         Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
-         String statementStr = sb.toString();
-         PreparedStatement st = conn.prepareStatement(statementStr);
+         if (!dbTypeDesc.dbReadOnly) {
+            Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
+            String statementStr = sb.toString();
+            PreparedStatement st = conn.prepareStatement(statementStr);
 
-         for (int i = 0; i < numCols; i++) {
-            DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
-         }
-         if (versProp != null)
-            DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
+            for (int i = 0; i < numCols; i++) {
+               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
+            }
+            if (versProp != null)
+               DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
 
-         int numDeleted = st.executeUpdate();
+            int numDeleted = st.executeUpdate();
 
-         if (deleteTable.primary) {
-            if (numDeleted != 1) {
-               if (numDeleted == 0) {
-                  if (versProp == null)
-                     DBUtil.error("Delete from primary table failed to remove row for: " + dbObject);
+            if (deleteTable.primary) {
+               if (numDeleted != 1) {
+                  if (numDeleted == 0) {
+                     if (versProp == null)
+                        DBUtil.error("Delete from primary table failed to remove row for: " + dbObject);
+                     else
+                        DBUtil.info("Delete - StaleDataException for versioned object: " + dbObject);
+                     throw new StaleDataException(dbObject, version);
+                  }
                   else
-                     DBUtil.info("Delete - StaleDataException for versioned object: " + dbObject);
-                  throw new StaleDataException(dbObject, version);
+                     DBUtil.error("Delete from primary table expected to remove one row actually removed: " + numDeleted + " for: " + dbObject);
                }
+            }
+
+            if (logSB != null) {
+               if (numDeleted == 1)
+                  logSB.append(" -> removed one row");
+               else if (!deleteTable.multiRow)
+                  logSB.append(" -> ***error - delete removed " + numDeleted + " rows") ;
                else
-                  DBUtil.error("Delete from primary table expected to remove one row actually removed: " + numDeleted + " for: " + dbObject);
+                  logSB.append(" -> multi table removed: " + numDeleted);
+               if (versProp != null)
+                  logSB.append("  - version: " + version);
+            }
+         }
+         else {
+            if (logSB != null) {
+               logSB.append(" (dbDisabled)");
             }
          }
 
-         if (logSB != null) {
-            if (numDeleted == 1)
-               logSB.append(" -> removed one row");
-            else if (!deleteTable.multiRow)
-               logSB.append(" -> ***error - delete removed " + numDeleted + " rows") ;
-            else
-               logSB.append(" -> multi table removed: " + numDeleted);
-            if (versProp != null)
-               logSB.append("  - version: " + version);
-
+         if (logSB != null)
             DBUtil.info(logSB);
-         }
 
          if (deleteTable.primary) {
             dbTypeDesc.removeInstance(dbObject, true);

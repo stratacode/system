@@ -32,6 +32,7 @@ public class DBTypeDescriptor {
 
    public static void add(DBTypeDescriptor typeDescriptor) {
       Object typeDecl = typeDescriptor.typeDecl;
+      typeDescriptor.runtimeMode = true;
       DBTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, typeDescriptor);
       String typeName = DynUtil.getTypeName(typeDecl, false);
       DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, typeDescriptor);
@@ -70,11 +71,21 @@ public class DBTypeDescriptor {
 
    public DBTypeDescriptor baseType;
 
-   // Name for the primary data source
+   // Configured name for the primary data source
    public String dataSourceName;
+
+   /** Reference, populated on the first request to the database connection or configuration */
+   public DBDataSource dataSource;
 
    public boolean queueInserts = false;
    public boolean queueDeletes = false;
+
+   /** Turn off writes to the database - instead, these will be stored in memory and merged into query results for testing purposes */
+   public boolean dbReadOnly = false;
+   /** Turn off database entirely - store objects and run queries only in memory for testing */
+   public boolean dbDisabled = false;
+
+   public boolean memStoreEnabled = false;
 
    /** Set to true for types where the source has no 'id' property */
    public boolean needsAutoId = false;
@@ -88,6 +99,9 @@ public class DBTypeDescriptor {
    public boolean tablesInitialized = false;
 
    public List<FindByDescriptor> findByQueries = null;
+
+   /** False during the code-generation phase, true when connected to a database */
+   public boolean runtimeMode = false;
 
    /**
     * Defines the type with the id properties of the primary table in tact so it can be used to create references from other types.
@@ -223,7 +237,7 @@ public class DBTypeDescriptor {
          return false;
       DBFetchGroupQuery query = fetchGroups.get(fetchGroup);
       if (query == null) {
-         query = new DBFetchGroupQuery(this);
+         query = new DBFetchGroupQuery(this, null);
          fetchGroups.put(fetchGroup, query);
          addQuery(query);
       }
@@ -371,7 +385,7 @@ public class DBTypeDescriptor {
       else
          id = new MultiColIdentity(idArgs);
 
-      return lookupInstById(id, true, true);
+      return lookupInstById(id, false, true);
    }
 
    private void initTypeInstances() {
@@ -397,9 +411,12 @@ public class DBTypeDescriptor {
       // TODO: do we need to do dbRefresh() on the returned instance - check the status and return null if the item no longer exists?
       // check cache mode here to determine what to fetch?
       IDBObject inst = typeInstances.get(id);
-      if (inst != null || !createProto) {
+      if (inst != null) {
          return inst;
       }
+      if (!createProto && dbDisabled)
+         return null;
+
       DBObject dbObj;
       synchronized (this) {
          inst = createPrototype();
@@ -515,6 +532,20 @@ public class DBTypeDescriptor {
       if (started)
          return;
       started = true;
+      if (dataSource == null) {
+         dataSource = DataSourceManager.getDBDataSource(dataSourceName);
+         if (dataSource == null) {
+            if (runtimeMode)
+               throw new IllegalArgumentException("No data source: " + dataSourceName);
+         }
+         else {
+            if (dataSource.readOnly)
+               dbReadOnly = true;
+            if (dataSource.dbDisabled)
+               dbDisabled = true;
+         }
+      }
+
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.start();
       }
@@ -543,7 +574,7 @@ public class DBTypeDescriptor {
    }
 
    private DBFetchGroupQuery initQuery(DBObject proto, String fetchGroup, List<String> props, boolean multiRow) {
-      DBFetchGroupQuery groupQuery =  new DBFetchGroupQuery(this);
+      DBFetchGroupQuery groupQuery =  new DBFetchGroupQuery(this, props);
       if (fetchGroup == null)
          fetchGroup = defaultFetchGroup;
       // Add the tables to fetch all of the properties requested in this query - the 'fetchGroup' but turn it into a 'multiRow' query
@@ -595,6 +626,75 @@ public class DBTypeDescriptor {
 
       DBTransaction curTx = DBTransaction.getOrCreate();
       return groupQuery.queryOne(curTx, proto.getDBObject());
+   }
+
+   public List<IDBObject> mergeResultLists(List<IDBObject> primary, List<IDBObject> other) {
+      int osz;
+      if (other == null || (osz = other.size()) == 0)
+         return primary;
+      int psz;
+      if (primary == null || (psz = primary.size()) == 0)
+         return other;
+
+      List<IDBObject> res;
+      List<IDBObject> toApply;
+      boolean resIsPrimary;
+      if (osz > psz) {
+         res = other;
+         toApply = primary;
+         resIsPrimary = false;
+      }
+      else {
+         res = primary;
+         toApply = other;
+         resIsPrimary = true;
+      }
+      Map<Object,IDBObject> applyIndex = new HashMap<Object,IDBObject>();
+      for (IDBObject applyEnt:toApply)
+         applyIndex.put(applyEnt.getDBId(), applyEnt);
+      for (int i = 0; i < res.size(); i++) {
+         IDBObject resEnt = res.get(i);
+         Object resId = resEnt.getDBId();
+         IDBObject toMerge = applyIndex.remove(resId);
+         if (toMerge != null) {
+            if (!resIsPrimary) {
+               res.set(i, toMerge);
+            }
+         }
+      }
+      for (IDBObject applyEnt:toApply) {
+         if (applyIndex.get(applyEnt.getDBId()) != null) {
+            // TODO: if sorting, insert this into the right location in the resulting list
+            res.add(applyEnt);
+         }
+      }
+      return res;
+   }
+
+   public List<IDBObject> queryCache(DBObject proto, List<String> props) {
+      if (typeInstances == null)
+         return null;
+      ArrayList<IDBObject> res = new ArrayList<IDBObject>();
+      List<Object> protoVals = new ArrayList<Object>();
+      int numProps = props.size();
+      for (int i = 0; i < numProps; i++) {
+         Object protoVal = proto.getPropertyInPath(props.get(i));
+         protoVals.add(protoVal);
+      }
+      for (IDBObject inst: typeInstances.values()) {
+         DBObject dbObj = inst.getDBObject();
+         boolean matched = true;
+         for (int i = 0; i < numProps; i++) {
+            Object propVal = dbObj.getPropertyInPath(props.get(i));
+            if (!DynUtil.equalObjects(propVal, protoVals.get(i))) {
+               matched = false;
+               break;
+            }
+         }
+         if (matched)
+            res.add(inst);
+      }
+      return res;
    }
 
    private void appendDBPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
@@ -1155,5 +1255,11 @@ public class DBTypeDescriptor {
          pathRes.append(pathName[j]);
       }
       return pathRes;
+   }
+
+   public DBDataSource getDataSource() {
+      if (dataSource == null || !started)
+         throw new IllegalArgumentException("DBTypeDescriptor being used before being started");
+      return dataSource;
    }
 }
