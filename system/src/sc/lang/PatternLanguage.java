@@ -36,15 +36,25 @@ import sc.parser.*;
  */
 public class PatternLanguage extends BaseLanguage {
 
-   Parselet escapedString = new OrderedChoice("('','')", REPEAT, new SymbolChoice("\\{", "\\}", "\\[", "\\]"), new SymbolChoice(NOT, "\\", "{", "}", "[", "]", EOF));
+   Parselet escapedString = new OrderedChoice("('','')", REPEAT,
+                        new SymbolChoice("\\{", "\\}", "\\[", "\\]", "\\(", "\\)", "\\!", "\\*"),
+                        new SymbolChoice(NOT, "\\", "{", "}", "[", "]", "(", ")", "!", "*", EOF));
 
    // A variable is a variableDef surrounded by braces
    Sequence variable = new Sequence("(,.,)", new Symbol("{"), new Sequence("PatternVariable(name,*)", identifier, new Sequence("(,equalsName)", OPTIONAL, new Symbol("="), identifier)), new Symbol("}"));
 
-   Sequence optionalPattern = new Sequence("OptionalPattern(,elements,)", new Symbol("["), new OrderedChoice("([], [])", OPTIONAL | REPEAT, escapedString, variable), new Symbol("]"));
+   SymbolChoice optionSymbols = new SymbolChoice( OPTIONAL | REPEAT, "!", "*");
+
+   Sequence optionalPattern = new Sequence("OptionalPattern(optionSymbols,,elements,)");
+
+   Sequence nestedPattern = new Sequence("Pattern(optionSymbols,,elements,)");
 
    // A pattern element is an Object - either a String or a Variable.
-   Parselet patternElements = new OrderedChoice("([], [], [])", OPTIONAL | REPEAT, escapedString, variable, optionalPattern);
+   Parselet patternElements = new OrderedChoice("([], [], [], [])", OPTIONAL | REPEAT, escapedString, variable, optionalPattern, nestedPattern);
+   {
+      optionalPattern.set(optionSymbols, new Symbol("["), patternElements, new Symbol("]"));
+      nestedPattern.set(optionSymbols, new Symbol("("), patternElements, new Symbol(")"));
+   }
 
    // A pattern is a list of elements
    public Parselet pattern = new Sequence("Pattern(elements,)", patternElements, new Symbol(EOF));

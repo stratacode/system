@@ -25,4 +25,16 @@ public class PatternVariable extends SemanticNode {
          parseletName = name;
       }
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("{");
+      sb.append(name);
+      if (equalsName != null) {
+         sb.append("=");
+         sb.append(equalsName);
+      }
+      sb.append("}");
+      return sb.toString();
+   }
 }

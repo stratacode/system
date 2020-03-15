@@ -5,8 +5,6 @@
 package sc.lang.java;
 
 import sc.db.DBPropertyDescriptor;
-import sc.db.DBTypeDescriptor;
-import sc.db.DataSourceDef;
 import sc.db.IdPropertyDescriptor;
 import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
