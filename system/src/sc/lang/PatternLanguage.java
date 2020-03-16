@@ -12,9 +12,12 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * A language which lets you define a simple pattern that will get matched to a string, and optionally to populate properties of an
- * instance of a particular type.  First a Pattern instance is parsed from the string.  You then initialize it with
- * a class - which defines the type produced when parsing the instance.  This class must define the properties referenced in the pattern.  This produces
+ * A language which lets you define a simple pattern that will get matched to a string, or populate properties of an
+ * instance, or apply a log filter to replace varying data with a consistent token for easier verification of program output.
+ *
+ * A Pattern instance is created by parsing a string in the PatternLanguage.  It's initialized and has the 'match', 'matchString',
+ * 'eval
+ * defines the type produced when parsing the instance.  This class must define the properties referenced in the pattern.  This produces
  * a generated Parselet which can parse that pattern and if needed, set properties in an instance.
  * Use Language.parseIntoInstance with that parselet to parse a given string and set properties on the instance.
  * <p>

@@ -54,6 +54,15 @@ public class URLParamProperty extends BaseURLParamProperty {
                OptionalPattern optPat = (OptionalPattern) elem;
                sb.append("new sc.lang.html.OptionalURLParam(" + toValueString(type, optPat.elements) + ")");
             }
+            // TODO: Is there a use case to support more complex patterns in URLs?
+            else if (elem instanceof Pattern) {
+               Pattern optPat = (Pattern) elem;
+               if (optPat.negated)
+                  throw new IllegalArgumentException("Missing support for ! patterns in URL strings");
+               if (optPat.repeat)
+                  throw new IllegalArgumentException("Missing support for * patterns in URL strings");
+               throw new IllegalArgumentException("Missing support for nested patterns in URL strings");
+            }
          }
          sb.append("})");
          return sb.toString();

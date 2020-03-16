@@ -16,6 +16,16 @@ import sc.util.URLUtil;
 import java.util.ArrayList;
 import java.util.Map;
 
+/**
+ * A basic pattern matching algorithm that also supports populating named variables in an instance and
+ * replacing a matched variable with a basic name for making it possible to filter log files, removing variables for
+ * 'diff' comparison of test logs.
+ * Use {parseletName} to parse/match a token of a specific type. Use {propName=parseletName} to define a variable that
+ * can either be parsed and used to set propName on the provided instance. Or use the 'replace' mode to replace the parsed
+ * value with {id=parseletName} (to say replace an id that changes from run to run with the word 'id')
+ * See the PatternLanguage for details on the syntax used to generate a Pattern.
+ * Use the method 'match', 'matchString', 'evalPatternWithInst' and 'replaceString' to use the pattern in different ways.
+ */
 public class Pattern extends SemanticNode {
    // String, PatternVariable, or OptionalPattern
    public SemanticNodeList<Object> elements;
