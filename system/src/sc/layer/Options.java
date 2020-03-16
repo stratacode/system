@@ -10,6 +10,7 @@ import sc.lang.AbstractInterpreter;
 import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
+import sc.lang.pattern.Pattern;
 import sc.obj.Constant;
 import sc.obj.ScopeDefinition;
 import sc.sync.SyncManager;
@@ -742,6 +743,7 @@ public class Options {
       // When testing we don't want the normal run - open page to open - it's up to the test script to decide what to open to test
       if (testMode) {
          PTypeUtil.testMode = true;
+         Pattern.testMode = true;
          openPageAtStartup = false;
          // By default test modes should not display unless you use -tw
          if (!headlessSet)

@@ -8,7 +8,6 @@ import sc.dyn.DynUtil;
 import sc.lang.PatternLanguage;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
-import sc.lang.html.Option;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.ModelUtil;
 import sc.parser.*;
@@ -28,11 +27,21 @@ public class Pattern extends SemanticNode {
    private transient Parselet parselet = null;
    private transient Language language = null;
 
+   /** Flag to enable comparison of the two ways of matching a pattern - with and without parselets */
+   public static boolean testMode = false;
+
    public void init() {
       super.init();
       if (optionSymbols != null) {
          repeat = optionSymbols.contains("*");
          negated = optionSymbols.contains("!");
+      }
+      if (elements != null) {
+         for (int i = 0; i < elements.size(); i++) {
+            Object elem = elements.get(i);
+            if (PString.isString(elem))
+               elements.set(i, PatternLanguage.unescapePatternToken(elem.toString()));
+         }
       }
    }
 
@@ -109,6 +118,7 @@ public class Pattern extends SemanticNode {
                descriptor.append(",");
             first = false;
             if (PString.isString(elem)) {
+               /*
                String elemStr = elem.toString();
                int elemStrLen = elemStr.length();
                for (int i = 0; i < elemStrLen; i++) {
@@ -120,7 +130,8 @@ public class Pattern extends SemanticNode {
                      }
                   }
                }
-               Symbol sym = new Symbol(negated ? IParserConstants.NOT : 0, elemStr);
+               */
+               Symbol sym = new Symbol(negated ? IParserConstants.NOT : 0, PatternLanguage.unescapePatternToken(elem.toString()));
                parselets.add(sym);
             }
             else if (elem instanceof PatternVariable) {
@@ -166,192 +177,12 @@ public class Pattern extends SemanticNode {
       return parselet;
    }
 
-   /**
-    * The internal routine that implements the match for a given pattern.
-    * Returns null for no match - empty string for an optional match that did not match.
-    * We could implement this using the getParselet for the
-    * server but want to have one set of logic we share between client and server and don't want to require Parselets just for URL pattern matching.
-    */
-   String match(String fromStr, Object inst) {
-      int len = 0;
-      String matchStr = fromStr;
-      boolean repeatMatch;
-      do {
-         // We repeat the loop either if this is marked as a 'repeat' element or if it's a !<string> pattern
-         repeatMatch = repeat;
-         for (Object elem:elements) {
-            if (PString.isString(elem)) {
-               String elemStr = elem.toString();
-               if (matchStr.startsWith(elemStr)) {
-                  if (negated) {
-                     if (len == 0)
-                        return null;
-                     return fromStr.substring(0, len);
-                  }
-                  int strLen = elemStr.length();
-                  matchStr = matchStr.substring(strLen);
-                  len += strLen;
-               }
-               else {
-                  if (negated) {
-                     matchStr = matchStr.substring(1);
-                     len += 1;
-                     repeatMatch = true;
-                  }
-                  else
-                     return null;
-               }
-            }
-            else if (elem instanceof Pattern) {
-               Pattern pattern = (Pattern) elem;
-               String subMatch = pattern.match(matchStr, inst);
-               if (subMatch == null) {
-                  if (negated) {
-                     int strLen = 1;
-                     matchStr = matchStr.substring(strLen);
-                     len += strLen;
-                     repeatMatch = true;
-                  }
-                  else
-                     return null;
-               }
-               else {
-                  if (negated) {
-                     return null;
-                  }
-                  else {
-                     int subLen = subMatch.length();
-                     if (subLen != 0) {
-                        matchStr = matchStr.substring(subLen);
-                        len += subLen;
-                     }
-                  }
-               }
-            }
-            else if (elem instanceof PatternVariable) {
-               PatternVariable patVar = (PatternVariable) elem;
-               String typeName = patVar.parseletName;
-               String propName = patVar.propertyName;
-               Object propVal = null;
-               int matchLen = matchStr.length();
-               try {
-                  if (typeName.equals("integer") || typeName.equals("integerLiteral") || typeName.equals("digits")) {
-                     int intLen;
-                     for (intLen = 0; intLen < matchLen && Character.isDigit(matchStr.charAt(intLen)); intLen++) {
-                     }
-                     if (intLen == 0) {
-                        if (negated) {
-                           int strLen = 1;
-                           matchStr = matchStr.substring(strLen);
-                           len += strLen;
-                        }
-                        else
-                           return null;
-                     }
-                     String intStr = matchStr.substring(0, intLen);
-                     try {
-                        int intVal = Integer.parseInt(intStr);
-                        propVal = intVal;
-                        if (inst != null) {
-                           if (propName != null) {
-                              DynUtil.setProperty(inst, propName, intVal);
-                           }
-                        }
-                     }
-                     catch (NumberFormatException exc) {
-                        return null;
-                     }
-                     matchStr = matchStr.substring(intLen);
-                  }
-                  else if (typeName.equals("urlString") || typeName.equals("identifier") || typeName.equals("alphaNumString")) {
-                     int strLen = 0;
-                     while (strLen < matchLen) {
-                        char c = matchStr.charAt(strLen);
-                        boolean isFirst = strLen == 0;
-
-                        if (typeName.equals("urlString")) {
-                           if (!URLUtil.isURLCharacter(c))
-                              break;
-                        }
-                        else if (typeName.equals("identifier")) {
-                           if (isFirst) {
-                              if (!Character.isJavaIdentifierStart(c))
-                                 break;
-                           }
-                           else if (!Character.isJavaIdentifierPart(c))
-                              break;
-                        }
-                        else if (typeName.equals("alphaNumString")) {
-                           if (!Character.isAlphabetic(c) && !Character.isDigit(c))
-                              break;
-                        }
-                        strLen++;
-                     }
-                     if (strLen == 0) {
-                        if (negated) {
-                           int addLen = 1;
-                           matchStr = matchStr.substring(addLen);
-                           len += addLen;
-                        }
-                        else {
-                           return null;
-                        }
-                     }
-                     String strVal = matchStr.substring(0, strLen);
-                     propVal = strVal;
-                     if (inst != null) {
-                        DynUtil.setProperty(inst, propName, strVal);
-                     }
-                     matchStr = matchStr.substring(strLen);
-                  }
-                  else if (typeName.equals("whiteSpace")) {
-                     int strLen = 0;
-                     while (strLen < matchLen) {
-                        char c = matchStr.charAt(strLen);
-                        if (!Character.isWhitespace(c))
-                           break;
-                        strLen++;
-                     }
-                     if (strLen > 0) {
-                        if (negated)
-                           return null;
-                        matchStr = matchStr.substring(strLen);
-                     }
-                     else {
-                        if (negated) {
-                           matchStr = matchStr.substring(1);
-                           len++;
-                        }
-                     }
-                  }
-                  else if (typeName.equals("quoteChar")) {
-                     if (matchStr.startsWith("'") || matchStr.startsWith("\"")) {
-                        if (negated)
-                           return null;
-                        matchStr = matchStr.substring(1);
-                     }
-                  }
-                  else {
-                     System.err.println("*** Unrecognized pattern name for Pattern match method - missing emulation of Parselet: " + typeName);
-                  }
-               }
-               catch (IllegalArgumentException exc) {
-                  System.err.println("*** Failed to set pattern property: " + inst + "." + propName + " = " + propVal);
-                  return null;
-               }
-            }
-         }
-      } while (repeatMatch);
-      if (len == fromStr.length())
-         return fromStr;
-      else
-         return fromStr.substring(0, len);
-   }
-
    public boolean matchString(String fromStr) {
-      String matchStr = match(fromStr, null);
+      ReplaceResult res = doMatch(fromStr, false, null);
+      if (res == null)
+         return false;
       // Should be a match with nothing left over
-      return matchStr != null && matchStr.length() == fromStr.length();
+      return res.matchedLen == fromStr.length();
    }
 
    // TODO: this does the match via the parselet which can use any parselet defined in the language. For the URLs we moved to
@@ -359,13 +190,23 @@ public class Pattern extends SemanticNode {
    public boolean matchSimpleString(String fromStr) {
       if (language == null)
          language = parselet.getLanguage();
-      return language.matchString(fromStr, parselet);
+      boolean res = language.matchString(fromStr, parselet);
+      if (testMode) {
+         boolean matchRes = matchString(fromStr);
+         if (res != matchRes)
+            System.err.println("*** Pattern.testMode error - matchString method and parselet pattern match are not the same for: " + this);
+      }
+      return res;
    }
 
    public boolean updateInstance(String fromStr, Object inst) {
       if (matchString(fromStr)) {
-         Object res = match(fromStr, inst);
-         return res != null;
+         ReplaceResult matchRes = doMatch(fromStr, false, inst);
+         // This should return true because we did the simple match first - unless we fail to set the instance for some reason
+         boolean res = matchRes != null && matchRes.matchedLen == fromStr.length();
+         if (!res)
+            System.err.println("*** Pattern.updateInstance returns false for a matching string");
+         return res;
       }
       return false;
    }
@@ -382,6 +223,8 @@ public class Pattern extends SemanticNode {
     *
     * If a required PatternVariable does not have a value, null is returned - which means
     * this URL is not valid in this context.
+    *
+    * TODO: needs to be updated to handle repeat and negated patterns
     */
    public String evalPatternWithInst(Map<String,Object> otherProps, Object inst) {
       StringBuilder sb = new StringBuilder();
@@ -422,7 +265,7 @@ public class Pattern extends SemanticNode {
    }
 
    public String replaceString(String fromStr) {
-      ReplaceResult res = doReplaceString(fromStr);
+      ReplaceResult res = doMatch(fromStr, true, null);
       if (res == null)
          return null;
       int fromLen = fromStr.length();
@@ -442,7 +285,7 @@ public class Pattern extends SemanticNode {
     * log file and replace matched values with the data type name matched - when those values are not consistent
     * from one run to the other.
     */
-   public ReplaceResult doReplaceString(String fromStr) {
+   public ReplaceResult doMatch(String fromStr, boolean doReplace, Object inst) {
       int len = 0;
       String matchStr = fromStr;
       StringBuilder res = new StringBuilder();
@@ -499,7 +342,7 @@ public class Pattern extends SemanticNode {
             }
             else if (elem instanceof Pattern) {
                Pattern pattern = (Pattern) elem;
-               ReplaceResult subMatch = pattern.doReplaceString(matchStr);
+               ReplaceResult subMatch = pattern.doMatch(matchStr, doReplace, inst);
                if (subMatch == null) {
                   if (negated) {
                      nextRes.append(pendingNeg);
@@ -568,6 +411,9 @@ public class Pattern extends SemanticNode {
                         try {
                            int intVal = Integer.parseInt(intStr); // validate that this string is an integer
                            // TODO: should we add an option to return the values?
+                           if (propName != null && inst != null) {
+                              DynUtil.setProperty(inst, propName, intVal);
+                           }
                         }
                         catch (NumberFormatException exc) {
                            if (negated) {
@@ -579,13 +425,15 @@ public class Pattern extends SemanticNode {
                            else
                               return null;
                         }
+                        // TODO: catch IllegalArgumentException here and log an error?
                         if (intMatched) {
                            if (negated) {
                               if (propName == null) {
                                  pendingNeg.append(intStr);
                               }
                               else {
-                                 appendSubstitute(pendingNeg, propName);
+                                 if (doReplace)
+                                    appendSubstitute(pendingNeg, propName);
                               }
                               pendingNegLen += intLen;
                            }
@@ -594,7 +442,8 @@ public class Pattern extends SemanticNode {
                                  nextRes.append(intStr);
                               }
                               else {
-                                 appendSubstitute(nextRes, propName);
+                                 if (doReplace)
+                                    appendSubstitute(nextRes, propName);
                               }
                               nextLen += intLen;
                            }
@@ -602,7 +451,7 @@ public class Pattern extends SemanticNode {
                         }
                      }
                   }
-                  else if (typeName.equals("urlString") || typeName.equals("identifier") || typeName.equals("alphaNumString")) {
+                  else if (typeName.equals("urlString") || typeName.equals("identifier") || typeName.equals("alphaNumString") || typeName.equals("escapedString")) {
                      int strLen = 0;
                      while (strLen < matchLen) {
                         char c = matchStr.charAt(strLen);
@@ -622,6 +471,10 @@ public class Pattern extends SemanticNode {
                         }
                         else if (typeName.equals("alphaNumString")) {
                            if (!Character.isAlphabetic(c) && !Character.isDigit(c))
+                              break;
+                        }
+                        else if (typeName.equals("escapedString")) {
+                           if (c == '"' || c == 0 || c == '\n')
                               break;
                         }
                         strLen++;
@@ -658,7 +511,13 @@ public class Pattern extends SemanticNode {
                            if (propName == null)
                               nextRes.append(strVal);
                            else {
-                              appendSubstitute(nextRes, propName);
+                              if (doReplace)
+                                 appendSubstitute(nextRes, propName);
+                              else {
+                                 if (inst != null) {
+                                    DynUtil.setProperty(inst, propName, strVal);
+                                 }
+                              }
                            }
                            nextLen += strLen;
                         }

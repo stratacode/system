@@ -7,6 +7,10 @@ package sc.lang;
 import sc.layer.Layer;
 import sc.parser.*;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * A language which lets you define a simple pattern that will get matched to a string, and optionally to populate properties of an
  * instance of a particular type.  First a Pattern instance is parsed from the string.  You then initialize it with
@@ -35,9 +39,34 @@ import sc.parser.*;
  * </p>
  */
 public class PatternLanguage extends BaseLanguage {
+   static List<String> escapeChars = Arrays.asList("{", "}", "[", "]", "(", ")", "!", "*");
+   static List<String> escapedChars = new ArrayList<String>(escapeChars.size());
+   static {
+      for (int i = 0; i < escapeChars.size(); i++) {
+         escapedChars.add("\\" + escapeChars.get(i));
+      }
+   }
+
+   public static String unescapePatternToken(String token) {
+      int sz = token.length();
+      StringBuilder res = null;
+      for (int i = 0; i < sz; i++) {
+         char c = token.charAt(i);
+         if (c == '\\') {
+            if (i < sz-1 && escapeChars.contains(String.valueOf(token.charAt(i+1)))) {
+               if (res == null)
+                  res = new StringBuilder(token.substring(0, i));
+               continue;
+            }
+         }
+         if (res != null)
+            res.append(c);
+      }
+      return res == null ? token : res.toString();
+   }
 
    Parselet escapedString = new OrderedChoice("('','')", REPEAT,
-                        new SymbolChoice("\\{", "\\}", "\\[", "\\]", "\\(", "\\)", "\\!", "\\*"),
+           new SymbolChoice(escapedChars.toArray(new String[escapedChars.size()])),
                         new SymbolChoice(NOT, "\\", "{", "}", "[", "]", "(", ")", "!", "*", EOF));
 
    // A variable is a variableDef surrounded by braces
