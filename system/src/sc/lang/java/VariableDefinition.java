@@ -162,7 +162,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          LayeredSystem sys = getLayeredSystem();
          Layer refLayer = getLayer();
          DBPropertyDescriptor dbPropDesc = ModelUtil.getDBPropertyDescriptor(sys, refLayer, this);
-         if (dbPropDesc != null) {
+         // The private check prevents a double conversion... TODO: some better way to note that db properties as already transformed?
+         if (dbPropDesc != null && !getDefinition().hasModifier("private")) {
             DBProvider dbProvider = ModelUtil.getDBProviderForPropertyDesc(sys, refLayer, dbPropDesc);
             if (dbProvider != null && dbProvider.getNeedsGetSet()) {
                convertGetSet = true;
