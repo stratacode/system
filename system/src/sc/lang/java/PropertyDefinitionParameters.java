@@ -51,6 +51,10 @@ public class PropertyDefinitionParameters {
    public String dynUtilClass = "sc.dyn.DynUtil";
    public String beanMapperClass = "sc.type.IBeanMapper";
 
+   public boolean getNeedsPropertyMapper() {
+      return bindable || getNeedsIndexedSetter();
+   }
+
    public static PropertyDefinitionParameters create(String propName) {
       PropertyDefinitionParameters pdp = new PropertyDefinitionParameters();
 
