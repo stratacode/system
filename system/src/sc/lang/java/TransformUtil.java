@@ -778,12 +778,12 @@ public class TransformUtil {
            "<% } %>";
 
    private final static String PROPERTY_DEFINITION_STATIC =
-           "<% if (bindable) { %>\n" +
+           "<% if (needsPropertyMapper) { %>\n" +
            "   public final static <%=beanMapperClass%> <%=propertyMappingName%> = <%=dynUtilClass%>.resolvePropertyMapping(<%=enclosingTypeName%>.class, \"<%=lowerPropertyName%>\");\n" +
            "<% } %>\n";
 
    private final static String DYN_TYPE_PROP_DEF_STATIC_TEMPLATE =
-           "<% if (bindable) { %>\n" +
+           "<% if (needsPropertyMapper) { %>\n" +
            "   public final static <%=beanMapperClass%> <%=propertyMappingName%> = <%=enclosingOuterTypeName%>.resolvePropertyMapping<%= innerName %>(\"<%=lowerPropertyName%>\");\n" +
            "<% } %>\n";
 
@@ -1051,7 +1051,6 @@ public class TransformUtil {
       TypeDeclaration enclosingType = propType.getRootType();
       if (enclosingType == null)
          enclosingType = propType;
-
       LayeredSystem sys = propType.getLayeredSystem();
       ExecutionContext ctx = new ExecutionContext();
       ctx.pushCurrentObject(params);
