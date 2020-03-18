@@ -1231,4 +1231,19 @@ public class LayerUtil implements LayerConstants {
       return sb;
    }
 
+   public static String cleanBuildVersion(LayeredSystem sys, String path) {
+      if (!sys.options.testMode)
+         return path;
+      int ix = path.indexOf("/dev/");
+      if (ix != -1) {
+         int startRem = ix + "/dev/".length();
+         int endRemIx = path.indexOf("/", startRem+1);
+         if (endRemIx != -1) {
+            endRemIx = path.indexOf("/", endRemIx+1);
+         }
+         return path.substring(0, startRem) + "{buildVersion}" + path.substring(endRemIx);
+      }
+      return path;
+   }
+
 }

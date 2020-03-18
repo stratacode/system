@@ -4791,7 +4791,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          sys.flushClassCache(FileUtil.removeExtension(stubRelName).replace("/", "."));
          String cp = sys.getClassPathForLayer(lyr, true, bd, true);
          if (sys.options.verbose)
-            System.out.println("Compiling: " + toCompileEnts + " into build dir: " + bd + " with classpath: " + cp);
+            System.out.println("Compiling: " + toCompileEnts + " into build dir: " + LayerUtil.cleanBuildVersion(sys, bd) + " with classpath: " + LayerUtil.cleanBuildVersion(sys, cp));
          else if (sys.options.info && !sys.options.testVerifyMode)
             System.out.println("Compiling: " + toCompileEnts.size() + " stub files");
          HashSet<String> errorFiles = new HashSet<String>();
@@ -4799,7 +4799,6 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             displayError("Failed compile step for dynamic type: " + getFullTypeName() + " for ");
          }
       }
-
    }
 
    String getSrcIndexName() {
