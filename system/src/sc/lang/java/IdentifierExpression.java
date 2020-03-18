@@ -5991,4 +5991,8 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
       return super.getNodeErrorRange();
    }
+
+   public boolean isSettableExpr() {
+      return true;
+   }
 }

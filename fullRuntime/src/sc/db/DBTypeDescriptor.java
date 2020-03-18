@@ -700,7 +700,7 @@ public class DBTypeDescriptor {
    private void appendDBPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
       if (logSB != null) {
          if (compareVal) {
-            DBUtil.appendVal(logSB, propValue);
+            DBUtil.appendVal(logSB, propValue, null);
             logSB.append(" = ");
          }
          curQuery.appendLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName);
@@ -714,7 +714,7 @@ public class DBTypeDescriptor {
    private void appendJSONPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue, String propPath) {
       if (logSB != null) {
          if (compareVal) {
-            DBUtil.appendVal(logSB, propValue);
+            DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType());
             logSB.append(" = ");
          }
          curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName, propPath);
@@ -776,10 +776,12 @@ public class DBTypeDescriptor {
                }
                else {
                   curQuery.paramValues.add(propVal);
-                  curQuery.paramTypes.add(DBColumnType.fromJavaType(propType));
+
+                  DBColumnType propColType = DBColumnType.fromJavaType(propType);
+                  curQuery.paramTypes.add(propColType);
 
                   if (logSB != null) {
-                     DBUtil.appendVal(logSB, propVal);
+                     DBUtil.appendVal(logSB, propVal, propColType);
                      logSB.append(" = ");
                   }
                }
@@ -889,8 +891,23 @@ public class DBTypeDescriptor {
                logSB.append(cval.toString());
          }
       }
+      else if (binding instanceof ArithmeticBinding) {
+         FetchTablesQuery curQuery = groupQuery.curQuery;
+         ArithmeticBinding abind = (ArithmeticBinding) binding;
+         StringBuilder logSB = curQuery.logSB;
+         if (abind.operator.equals("&")) {
+            IBinding[] boundParams = abind.getBoundParams();
+            appendParamValues(groupQuery, curTypeDesc, curObj, boundParams[0]);
+            if (logSB != null) {
+               logSB.append(" & ");
+            }
+            appendParamValues(groupQuery, curTypeDesc, curObj, boundParams[1]);
+         }
+         else
+            throw new IllegalArgumentException("Unsupported arithmetic binding for appendParams");
+      }
       else
-         throw new IllegalArgumentException("Unsupport binding type for query");
+         throw new IllegalArgumentException("Unsupported binding type for appendParams");
    }
 
    private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath) {
@@ -1143,8 +1160,20 @@ public class DBTypeDescriptor {
          else
             curQuery.whereAppend(cval.toString());
       }
+      else if (binding instanceof ArithmeticBinding) {
+         FetchTablesQuery curQuery = groupQuery.curQuery;
+         ArithmeticBinding abind = (ArithmeticBinding) binding;
+         if (abind.operator.equals("&")) {
+            IBinding[] boundParams = abind.getBoundParams();
+            appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, boundParams[0]);
+            curQuery.whereAppend(" & ");
+            appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, boundParams[1]);
+         }
+         else
+            throw new IllegalArgumentException("Unsupported arithmetic binding for query");
+      }
       else
-         throw new IllegalArgumentException("Unsupport binding type for query");
+         throw new IllegalArgumentException("Unsupported binding type for query");
    }
 
    private StringBuilder getVarBindPropPath(VariableBinding varBind, int startIx) {

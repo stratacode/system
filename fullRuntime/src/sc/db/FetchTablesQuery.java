@@ -245,7 +245,7 @@ public class FetchTablesQuery {
                   IDBObject cacheObj = cacheRes.get(ci);
                   if (ci != 0)
                      logSB.append(", ");
-                  DBUtil.appendVal(logSB, cacheObj);
+                  DBUtil.appendVal(logSB, cacheObj, null);
                }
                logSB.append("]\n");
             }
@@ -322,7 +322,7 @@ public class FetchTablesQuery {
             propMapper.setPropertyValue(fetchInst, val);
 
             if (logSB != null) {
-               DBUtil.appendVal(logSB, val);
+               DBUtil.appendVal(logSB, val, null);
             }
          }
          if (ftd.revColumns != null) {
@@ -348,7 +348,7 @@ public class FetchTablesQuery {
                   System.err.println("*** Error - value for reverse reference property where there's no reverse instance");
 
                if (logSB != null) {
-                  DBUtil.appendVal(logSB, val);
+                  DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
                }
             }
          }
@@ -459,7 +459,7 @@ public class FetchTablesQuery {
                      logSB.append(", ");
                      logSB.append(propMapper.getPropertyName());
                      logSB.append("=");
-                     DBUtil.appendVal(logSB, val);
+                     DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
                   }
                }
             }
@@ -546,7 +546,7 @@ public class FetchTablesQuery {
                            logSB.append(", ");
                         logSB.append(propMapper.getPropertyName());
                         logSB.append("=");
-                        DBUtil.appendVal(logSB, val);
+                        DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
                      }
                   }
                }

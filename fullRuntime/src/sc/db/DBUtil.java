@@ -316,13 +316,16 @@ public class DBUtil {
          return inst.toString();
    }
 
-   public static void appendVal(StringBuilder logSB, Object val) {
+   public static void appendVal(StringBuilder logSB, Object val, DBColumnType colType) {
      if (val instanceof IDBObject)
         logSB.append(((IDBObject) val).getDBObject());
      else if (val instanceof CharSequence) {
         logSB.append("'");
         logSB.append(val);
         logSB.append("'");
+     }
+     else if (colType != null) {
+        logSB.append(formatValue(val, colType));
      }
      else
         logSB.append(val);

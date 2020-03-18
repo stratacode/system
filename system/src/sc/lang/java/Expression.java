@@ -1174,4 +1174,12 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       return bind;
    }
 
+   public boolean isSettableExpr() {
+      return false;
+   }
+
+   public Expression getUnwrappedExpr() {
+      return this;
+   }
+
 }

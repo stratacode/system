@@ -1131,4 +1131,8 @@ public class SelectorExpression extends ChainedExpression {
    public Object getBoundType(int ix) {
       return boundTypes == null || boundTypes.length <= ix ? null : boundTypes[ix];
    }
+
+   public boolean isSettableExpr() {
+      return true;
+   }
 }

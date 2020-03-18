@@ -4,6 +4,7 @@ import sc.dyn.DynUtil;
 import sc.sync.JSONParser;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
+import sc.type.PTypeUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,8 +21,11 @@ public class JSON {
          List listVal = (List) value;
          if (propertyType instanceof Class) {
             Class propCl = (Class) propertyType;
-            if (propCl.isArray())
-               return listVal.toArray();
+            if (propCl.isArray()) {
+               // Do this to ensure the array returned is String[] instead of just Object[]
+               Object[] arr = (Object[]) PTypeUtil.newArray(propCl.getComponentType(), listVal.size());
+               return listVal.toArray(arr);
+            }
             else if (propCl == List.class)
                return listVal;
             else if (propCl == ArrayList.class)
@@ -53,7 +57,7 @@ public class JSON {
    public static StringBuilder toJSON(Object o) {
       StringBuilder sb = new StringBuilder();
       JSONContext ctx = new JSONContext();
-      appendObject(ctx, sb, o);
+      appendValue(ctx, sb, o);
       return sb;
    }
 

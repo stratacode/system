@@ -14,7 +14,7 @@ import sc.type.InverseOp;
   * there's only one non-constant parameter.
   */
 public class ArithmeticBinding extends AbstractMethodBinding {
-   String operator;
+   public String operator;
    public ArithmeticBinding(String op, IBinding[] parameterBindings) {
       super(parameterBindings);
       operator = op;

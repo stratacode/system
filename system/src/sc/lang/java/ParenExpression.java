@@ -116,4 +116,10 @@ public class ParenExpression extends ChainedExpression {
    public boolean isIncompleteStatement() {
       return false;
    }
+
+   public Expression getUnwrappedExpr() {
+      if (expression == null)
+         return this;
+      return expression.getUnwrappedExpr();
+   }
 }

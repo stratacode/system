@@ -538,8 +538,25 @@ public class BinaryExpression extends Expression {
          if (rhs instanceof Expression) {
             getRhsExpr().setBindingInfo(bindingDirection, bindingStatement, true);
             if (dir.doReverse()) {
-               if (InverseOp.get(operator) == null)
-                  getErrorRoot().displayError("Invalid reverse binding (=:) expression.  Operator: ", operator, " is not invertible in: ");
+               if (InverseOp.get(operator) == null) {
+                  Expression rhsExpr = getRhsExpr().getUnwrappedExpr();
+                  Expression lhsExpr = lhs.getUnwrappedExpr();
+                  if (operator.equals("==") || operator.equals("!=")) {
+                     boolean supported = false;
+                     if (lhsExpr.isConstant()) {
+                        if (rhsExpr instanceof BinaryExpression && ((BinaryExpression) rhsExpr).isReversibleBoolean())
+                           supported = true;
+                     }
+                     else  if (rhsExpr.isConstant()) {
+                        if (lhsExpr instanceof BinaryExpression && ((BinaryExpression) lhsExpr).isReversibleBoolean())
+                           supported = true;
+                     }
+                     if (!supported)
+                        getErrorRoot().displayError("Invalid conditional reverse binding (=:) expression. Operands not invertible in: ");
+                  }
+                  else if (!isReversibleBoolean())
+                     getErrorRoot().displayError("Invalid reverse binding (=:) expression.  Operator: ", operator, " is not invertible in: ");
+               }
             }
          }
          else if (!operator.equals("instanceof"))
@@ -547,6 +564,18 @@ public class BinaryExpression extends Expression {
       }
       else
          System.out.println("*** no lhs or rhs for bound expression");
+   }
+
+   private boolean isReversibleBoolean() {
+      if (rhs instanceof Expression && lhs != null && operator.equals("&")) {
+         Expression rhsExpr = getRhsExpr();
+         if (rhsExpr.isConstant()) {
+            return lhs.isSettableExpr();
+         }
+         else if (lhs.isConstant())
+            return rhsExpr.isSettableExpr();
+      }
+      return false;
    }
 
    /**

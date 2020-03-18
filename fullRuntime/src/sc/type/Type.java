@@ -215,7 +215,7 @@ public enum Type {
          char c = operator.charAt(0);
          int result;
          if (lhsObj == null || rhsObj == null)
-            throw new NullPointerException("Null encountered in dynamic arithemtic exprs");
+            throw new NullPointerException("Null encountered in dynamic arithmetic expression: " + lhsObj + " = " + rhsObj);
          int lhs = ((Number) lhsObj).intValue();
          int rhs = ((Number) rhsObj).intValue();
          switch (c) {
