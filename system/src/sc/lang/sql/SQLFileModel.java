@@ -4,11 +4,14 @@ import sc.db.DBPropertyDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.db.DBUtil;
 import sc.db.TableDescriptor;
+import sc.lang.SQLLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.*;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.SCModel;
 import sc.layer.Layer;
+import sc.parser.ParseError;
+import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.util.StringUtil;
 
@@ -173,29 +176,46 @@ public class SQLFileModel extends SCModel {
                }
             }
          }
+         List<SQLConstraint> constraints = colDef.columnConstraints;
+         boolean setProp = false;
          if (propDesc.required) {
-            List<SQLConstraint> constraints = colDef.columnConstraints;
-            boolean setProp = false;
             if (constraints == null) {
                constraints = new SemanticNodeList<SQLConstraint>();
                setProp = true;
             }
             constraints.add(new NotNullConstraint());
-            if (setProp)
-               colDef.setProperty("columnConstraints", constraints);
          }
          if (propDesc.unique && !isId) {
-            List<SQLConstraint> constraints = colDef.columnConstraints;
-            boolean setProp = false;
             if (constraints == null) {
                constraints = new SemanticNodeList<SQLConstraint>();
                setProp = true;
             }
             constraints.add(new UniqueConstraint());
-            if (setProp)
-               colDef.setProperty("columnConstraints", constraints);
          }
+         if (propDesc.dbDefault != null && propDesc.dbDefault.length() > 0) {
+            if (constraints == null) {
+               constraints = new SemanticNodeList<SQLConstraint>();
+               setProp = true;
+            }
+            DefaultConstraint defConstr = new DefaultConstraint();
+            defConstr.setProperty("expression", parseSQLExpression(propDesc.dbDefault));
+            constraints.add(defConstr);
+         }
+         if (setProp)
+            colDef.setProperty("columnConstraints", constraints);
          tableDefs.add(colDef);
+      }
+   }
+
+   public SQLExpression parseSQLExpression(String exprStr) {
+      SQLLanguage lang = SQLLanguage.getSQLLanguage();
+      Object res = lang.parseString(exprStr, lang.sqlExpression);
+      if (res instanceof ParseError) {
+         displayError("Invalid dbDefault: " + exprStr + " not a valid sqlExpression");
+         return null;
+      }
+      else {
+         return (SQLExpression) ParseUtil.nodeToSemanticValue(res);
       }
    }
 

@@ -4,7 +4,9 @@ import java.lang.annotation.Repeatable;
 
 
 /** 
-  * A repeatable annotation, set on either a property or a class.
+  * A repeatable annotation, set on either a property or a class. When set on a class a name must be provided but
+  * when set on a property, the default name is the propertyName.
+  *
   * Each FindBy annotation generates a findByName(..) method that
   * executes a query and returns one or more DBObjects 
   */
@@ -39,4 +41,7 @@ public @interface FindBy {
 
    /** Specifies the name of the group of properties to fetch when running the query */
    String fetchGroup() default "";
+
+   /** Specifies a comma separated list of properties to use to sort the results of this query */
+   String orderBy() default "";
 }

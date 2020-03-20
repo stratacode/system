@@ -68,14 +68,14 @@ public class ConditionalBinding extends AbstractMethodBinding {
       // A special case that's useful for turning booleans into bitMasks and back again.
       if (boundParams.length == 2) {
          ArithmeticBinding arithBind;
-         ConstantBinding topConstBind;
-         if (boundParams[0] instanceof ConstantBinding && boundParams[1] instanceof ArithmeticBinding) {
-            topConstBind = (ConstantBinding) boundParams[0];
+         IBinding topConstBind;
+         if (boundParams[0].isConstant() && boundParams[1] instanceof ArithmeticBinding) {
+            topConstBind = boundParams[0];
             arithBind = (ArithmeticBinding) boundParams[1];
          }
-         else if (boundParams[0] instanceof ArithmeticBinding && boundParams[1] instanceof ConstantBinding) {
+         else if (boundParams[0] instanceof ArithmeticBinding && boundParams[1].isConstant()) {
             arithBind = (ArithmeticBinding) boundParams[0];
-            topConstBind = (ConstantBinding) boundParams[1];
+            topConstBind = boundParams[1];
          }
          else
             throw new UnsupportedOperationException("Reverse binding not supported on this conditional expression");
@@ -86,21 +86,24 @@ public class ConditionalBinding extends AbstractMethodBinding {
          if (!(value instanceof Boolean))
             throw new UnsupportedOperationException("Reverse binding on conditional expression supports only boolean types");
 
-         if (arithBind.operator.equals("&") && arithBind.boundParams.length == 2 && topConstBind.value instanceof Number) {
-            Number constVal = (Number) topConstBind.value;
-            ConstantBinding innerConst;
+         Object topConstVal = topConstBind.getPropertyValue(obj, false, false);
+         if (arithBind.operator.equals("&") && arithBind.boundParams.length == 2 && topConstVal instanceof Number) {
+            Number constVal = (Number) topConstVal;
+            IBinding innerConst;
             VariableBinding innerVar;
-            if (arithBind.boundParams[0] instanceof ConstantBinding && arithBind.boundParams[1] instanceof VariableBinding) {
-               innerConst = (ConstantBinding) arithBind.boundParams[0];
+            boolean p0Const = arithBind.boundParams[0].isConstant();
+            boolean p1Const = arithBind.boundParams[1].isConstant();
+            if (p0Const && !p1Const && arithBind.boundParams[1] instanceof VariableBinding) {
+               innerConst = arithBind.boundParams[0];
                innerVar = (VariableBinding) arithBind.boundParams[1];
             }
-            else if (arithBind.boundParams[1] instanceof ConstantBinding && arithBind.boundParams[0] instanceof VariableBinding) {
+            else if (p1Const && !p0Const && arithBind.boundParams[0] instanceof VariableBinding) {
                innerVar = (VariableBinding) arithBind.boundParams[0];
-               innerConst = (ConstantBinding) arithBind.boundParams[1];
+               innerConst = arithBind.boundParams[1];
             }
             else
                throw new UnsupportedOperationException("Unsupported conditional reverse binding pattern");
-            Object innerConstVal = innerConst.value;
+            Object innerConstVal = innerConst.getPropertyValue(obj, false, false);
             if (!(innerConstVal instanceof Number)) {
                throw new UnsupportedOperationException("Unsupported conditional reverse binding data type");
             }

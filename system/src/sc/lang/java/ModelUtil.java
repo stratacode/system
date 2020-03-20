@@ -9996,6 +9996,7 @@ public class ModelUtil {
                String propDataSourceName = null;
                String propFetchGroup = null;
                String propReverseProperty = null;
+               String propDBDefault = null;
                if (propSettings != null) {
                   Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
                   if (tmpPersist != null && !tmpPersist) {
@@ -10044,6 +10045,10 @@ public class ModelUtil {
                   String tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSettings, "reverseProperty");
                   if (tmpReverseProperty != null) {
                      propReverseProperty = tmpReverseProperty;
+                  }
+                  String tmpDBDefault = (String) ModelUtil.getAnnotationValue(propSettings, "dbDefault");
+                  if (tmpDBDefault != null) {
+                     propDBDefault = tmpDBDefault;
                   }
                }
                else {
@@ -10117,14 +10122,14 @@ public class ModelUtil {
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                          multiRow, propReverseProperty);
+                          multiRow, propReverseProperty, propDBDefault);
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                          multiRow, propReverseProperty);
+                          multiRow, propReverseProperty, propDBDefault);
                }
 
                propDesc.refDBTypeDesc = refDBTypeDesc;

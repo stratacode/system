@@ -264,6 +264,28 @@ public class BinaryExpression extends Expression {
       if (!isNestedExpr && !nestedBinding && bindingDirection != null && bindingDirection.doReverse() && rhs instanceof Expression && lhs.isConstant() == getRhsExpr().isConstant()) {
          getErrorRoot().displayError("Invalid expression with operator: " + operator + " for reverse binding expression (the '=:' operator) - one value in the equation must be constant, the other variable ");
       }
+
+      if (bindingDirection != null && bindingDirection.doReverse()) {
+         if (InverseOp.get(operator) == null) {
+            Expression rhsExpr = getRhsExpr().getUnwrappedExpr();
+            Expression lhsExpr = lhs.getUnwrappedExpr();
+            if (operator.equals("==") || operator.equals("!=")) {
+               boolean supported = false;
+               if (lhsExpr.isConstant()) {
+                  if (rhsExpr instanceof BinaryExpression && ((BinaryExpression) rhsExpr).isReversibleBoolean())
+                     supported = true;
+               }
+               else  if (rhsExpr.isConstant()) {
+                  if (lhsExpr instanceof BinaryExpression && ((BinaryExpression) lhsExpr).isReversibleBoolean())
+                     supported = true;
+               }
+               if (!supported)
+                  getErrorRoot().displayError("Invalid conditional reverse binding (=:) expression. Operands not invertible in: ");
+            }
+            else if (!isReversibleBoolean())
+               getErrorRoot().displayError("Invalid reverse binding (=:) expression.  Operator: ", operator, " is not invertible in: ");
+         }
+      }
    }
 
    /* TODO: weird that these exprs get validated and processed but not started
@@ -537,27 +559,6 @@ public class BinaryExpression extends Expression {
          lhs.setBindingInfo(bindingDirection, bindingStatement, true);
          if (rhs instanceof Expression) {
             getRhsExpr().setBindingInfo(bindingDirection, bindingStatement, true);
-            if (dir.doReverse()) {
-               if (InverseOp.get(operator) == null) {
-                  Expression rhsExpr = getRhsExpr().getUnwrappedExpr();
-                  Expression lhsExpr = lhs.getUnwrappedExpr();
-                  if (operator.equals("==") || operator.equals("!=")) {
-                     boolean supported = false;
-                     if (lhsExpr.isConstant()) {
-                        if (rhsExpr instanceof BinaryExpression && ((BinaryExpression) rhsExpr).isReversibleBoolean())
-                           supported = true;
-                     }
-                     else  if (rhsExpr.isConstant()) {
-                        if (lhsExpr instanceof BinaryExpression && ((BinaryExpression) lhsExpr).isReversibleBoolean())
-                           supported = true;
-                     }
-                     if (!supported)
-                        getErrorRoot().displayError("Invalid conditional reverse binding (=:) expression. Operands not invertible in: ");
-                  }
-                  else if (!isReversibleBoolean())
-                     getErrorRoot().displayError("Invalid reverse binding (=:) expression.  Operator: ", operator, " is not invertible in: ");
-               }
-            }
          }
          else if (!operator.equals("instanceof"))
             System.err.println("Unknown rhs");

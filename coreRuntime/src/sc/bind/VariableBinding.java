@@ -35,7 +35,9 @@ import static sc.bind.Bind.trace;
  * are evaluated each time the binding fires.
  */
 public class VariableBinding extends DestinationListener {
+   /** array of String or IBinding - each corresponding to an element in the path a.b */
    Object [] boundProps;
+   /** the current value of the binding at each location in the path name */
    Object [] boundValues;
 
    Object srcObj;
@@ -775,6 +777,18 @@ public class VariableBinding extends DestinationListener {
 
 
    public boolean isConstant() {
+      if (boundProps != null) {
+         for (int i = 0; i < boundProps.length; i++) {
+            Object boundProp = boundProps[i];
+            if (boundProp instanceof IBinding) {
+               if (!((IBinding) boundProp).isConstant())
+                  return false;
+            }
+            else // TODO: we could check for a final modifier on the property here?
+               return false;
+         }
+         return true;
+      }
       return false;
    }
 

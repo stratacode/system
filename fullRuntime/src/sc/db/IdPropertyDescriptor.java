@@ -5,7 +5,7 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
    public boolean definedByDB;
 
    public IdPropertyDescriptor(String propertyName, String columnName, String columnType, boolean definedByDB) {
-      super(propertyName, columnName, columnType, null, false, true, false, null, null, null, false, null);
+      super(propertyName, columnName, columnType, null, false, true, false, null, null, null, false, null, null);
       this.definedByDB = definedByDB;
    }
 
@@ -31,6 +31,10 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
    }
 
    private int currentMemoryId = 0;
+
+   public Object getDBDefaultValue() {
+      return allocMemoryId();
+   }
 
    public synchronized int allocMemoryId() {
       currentMemoryId++;

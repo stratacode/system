@@ -10,4 +10,5 @@ public @interface DBPropertySettings {
    String tableName() default "";
    String dataSourceName() default "";
    String reverseProperty() default "";
+   String dbDefault() default "";
 }

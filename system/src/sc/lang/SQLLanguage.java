@@ -155,7 +155,7 @@ public class SQLLanguage extends BaseLanguage {
 
    Sequence prefixUnaryExpression = new Sequence("SQLPrefixUnaryExpression(operator,expression)", unaryPrefix, sqlPrimary);
    Sequence binaryOperands = new Sequence("SQLBinaryOperand(operator,rhs)", OPTIONAL | REPEAT, binaryOperators, sqlPrimary);
-   Sequence sqlExpression = new ChainedResultSequence("SQLBinaryExpression(firstExpr,operands)", sqlPrimary, binaryOperands);
+   public Sequence sqlExpression = new ChainedResultSequence("SQLBinaryExpression(firstExpr,operands)", sqlPrimary, binaryOperands);
    Sequence parenExpression = new Sequence("SQLParenExpression(,expression,)" , openParen, sqlExpression, closeParenSkipOnError);
    Sequence expressionList = new Sequence("([],[])", OPTIONAL, sqlExpression, new Sequence("(,[])", OPTIONAL | REPEAT, comma, sqlExpression));
    Sequence functionCall = new Sequence("FunctionCall(functionName,,expressionList,)", sqlQualifiedIdentifier, openParen, expressionList, closeParenSkipOnError);

@@ -3,7 +3,7 @@ package sc.db;
 import java.sql.Types;
 
 public enum DBColumnType {
-   Int, Long, String, Float, Double, Boolean, Json, Reference;
+   Int, Long, String, Float, Double, Boolean, Json, Reference, Date;
 
    public static DBColumnType fromJavaType(Object propertyType) {
       if (propertyType == Integer.class || propertyType == Integer.TYPE) {
@@ -22,6 +22,8 @@ public enum DBColumnType {
          return DBColumnType.Float;
       else if (propertyType == Double.class)
          return DBColumnType.Double;
+      else if (propertyType == java.util.Date.class)
+         return DBColumnType.Date;
       else
          return null;
    }
@@ -43,6 +45,8 @@ public enum DBColumnType {
          case Json:
          case Reference:
             return Types.OTHER;
+         case Date:
+            return Types.TIMESTAMP;
       }
       throw new UnsupportedOperationException("Missing value in getSQLType");
    }

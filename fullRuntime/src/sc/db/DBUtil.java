@@ -5,7 +5,12 @@ import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
 
 import javax.sql.DataSource;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.sql.Types;
 
 import sc.util.IMessageHandler;
 import sc.util.JSON;
@@ -158,6 +163,11 @@ public class DBUtil {
          case Double:
             st.setDouble(index, (Double) val);
             break;
+         case Date:
+            java.util.Date update = (java.util.Date) val;
+            java.sql.Date sqlDate = update instanceof java.sql.Date ? (java.sql.Date) update : new java.sql.Date(update.getTime());
+            st.setDate(index, sqlDate);
+            break;
          case Reference:
             throw new IllegalArgumentException("type should be the id column type");
          case Json:
@@ -219,6 +229,11 @@ public class DBUtil {
             if (rs.wasNull())
                return null;
             return dres;
+         case Date:
+            java.sql.Timestamp sqlDate = rs.getTimestamp(index);
+            if (rs.wasNull())
+               return null;
+            return sqlDate;
          case Json:
             Object ores = rs.getObject(index);
             if (ores == null)
@@ -251,6 +266,8 @@ public class DBUtil {
          return "real";
       else if (propertyType == Double.class || propertyType == Double.TYPE)
          return "double";
+      else if (propertyType == java.util.Date.class || propertyType == java.sql.Date.class)
+         return "timestamp";
       else // TODO: BigDecimal, byte array, char, Character - size limit for strings through an annotation
          return null;
    }
@@ -260,14 +277,16 @@ public class DBUtil {
          return "int";
       else if (type.equalsIgnoreCase("bigserial") || type.equalsIgnoreCase("bigint"))
          return "long";
-      else if (type.startsWith("varchar") || type.equals("text"))
+      else if (type.toLowerCase().startsWith("varchar") || type.equalsIgnoreCase("text"))
          return "String";
-      else if (type.equals("boolean"))
+      else if (type.equalsIgnoreCase("boolean"))
          return "boolean";
-      else if (type.equals("real"))
+      else if (type.equalsIgnoreCase("real"))
          return "float";
-      else if (type.equals("double"))
+      else if (type.equalsIgnoreCase("double"))
          return "double";
+      else if (type.equalsIgnoreCase("timestamp"))
+         return "java.util.Date";
       throw new UnsupportedOperationException();
    }
 

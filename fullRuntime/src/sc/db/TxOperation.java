@@ -45,7 +45,7 @@ public abstract class TxOperation {
       ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
       ArrayList<Object> columnValues = new ArrayList<Object>();
 
-      ArrayList<IdPropertyDescriptor> dbIdCols = null;
+      ArrayList<DBPropertyDescriptor> dbIdCols = null;
 
       List<String> nullProps = null;
       IDBObject inst = dbObject.getInst();
@@ -53,7 +53,7 @@ public abstract class TxOperation {
          IdPropertyDescriptor idCol = idCols.get(i);
          if (isPrimary && idCol.definedByDB) {
             if (dbIdCols == null)
-               dbIdCols = new ArrayList<IdPropertyDescriptor>();
+               dbIdCols = new ArrayList<DBPropertyDescriptor>();
             dbIdCols.add(idCol);
          }
          else {
@@ -75,7 +75,7 @@ public abstract class TxOperation {
          throw new IllegalArgumentException("Null id properties for DBObject in insert: " + nullProps);
 
       int idSize = columnNames.size();
-      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues);
+      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols);
 
       int numCols = columnNames.size();
 
@@ -143,7 +143,7 @@ public abstract class TxOperation {
                if (logSB != null)
                   logSB.append(" = ");
                for (int i = 0; i < dbIdCols.size(); i++) {
-                  IdPropertyDescriptor dbIdCol = dbIdCols.get(i);
+                  DBPropertyDescriptor dbIdCol = dbIdCols.get(i);
                   IBeanMapper mapper = dbIdCol.getPropertyMapper();
                   Object id = DBUtil.getResultSetByIndex(rs, i+1, dbIdCol);
                   mapper.setPropertyValue(inst, id);
@@ -179,9 +179,9 @@ public abstract class TxOperation {
                if (logSB != null)
                logSB.append(" (dbDisabled) -> ");
                for (int i = 0; i < dbIdCols.size(); i++) {
-                  IdPropertyDescriptor dbIdCol = dbIdCols.get(i);
+                  DBPropertyDescriptor dbIdCol = dbIdCols.get(i);
                   IBeanMapper mapper = dbIdCol.getPropertyMapper();
-                  Object id = dbIdCol.allocMemoryId();
+                  Object id = dbIdCol.getDBDefaultValue();
                   mapper.setPropertyValue(inst, id);
 
                   if (logSB != null) {
@@ -463,7 +463,8 @@ public abstract class TxOperation {
    }
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
-                                    ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues) {
+                                    ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
+                                    List<DBPropertyDescriptor> dbReturnCols) {
       Object inst = dbObject.getInst();
       for (DBPropertyDescriptor col:cols) {
          int numCols = col.getNumColumns();
@@ -481,6 +482,10 @@ public abstract class TxOperation {
                columnNames.add(col.columnName);
                columnTypes.add(colType);
                columnValues.add(val);
+            }
+
+            if (col.dbDefault != null && col.dbDefault.length() > 0) {
+               dbReturnCols.add(col);
             }
          }
          else {
@@ -726,5 +731,6 @@ public abstract class TxOperation {
       }
       return 1;
    }
+
 }
 

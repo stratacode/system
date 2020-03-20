@@ -790,6 +790,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(", ");
          sb.append(propDesc.multiRow);
          appendString(sb, propDesc.reverseProperty, true);
+         appendString(sb, propDesc.dbDefault, true);
       }
       else {
          sb.append(", ");

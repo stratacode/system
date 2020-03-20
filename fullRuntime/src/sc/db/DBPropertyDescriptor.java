@@ -49,6 +49,9 @@ public class DBPropertyDescriptor {
     */
    public String reverseProperty;
 
+   /** If set, the value to use for the 'default' statement in the DDL */
+   public String dbDefault;
+
    /** True for properties that are read from the database, but not updated. This is set in particular for reverse properties in a relationship - only one side needs to update based on the change. */
    public boolean readOnly;
 
@@ -73,7 +76,7 @@ public class DBPropertyDescriptor {
 
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
                                boolean required, boolean unique, boolean onDemand, String dataSourceName, String fetchGroup,
-                               String refTypeName, boolean multiRow, String reverseProperty) {
+                               String refTypeName, boolean multiRow, String reverseProperty, String dbDefault) {
       this.propertyName = propertyName;
       this.columnName = columnName;
       this.columnType = columnType;
@@ -86,6 +89,7 @@ public class DBPropertyDescriptor {
       this.refTypeName = refTypeName;
       this.multiRow = multiRow;
       this.reverseProperty = reverseProperty;
+      this.dbDefault = dbDefault;
    }
 
    void init(DBTypeDescriptor typeDesc, TableDescriptor tableDesc) {
@@ -354,5 +358,13 @@ public class DBPropertyDescriptor {
          return DBColumnType.fromJavaType(propertyType);
       }
       throw new UnsupportedOperationException("Unhandled case");
+   }
+
+   public Object getDBDefaultValue() {
+      if (dbDefault == null || dbDefault.length() == 0)
+         return null;
+      if (dbDefault.equalsIgnoreCase("now()"))
+         return new java.util.Date();
+      throw new UnsupportedOperationException("Unrecognized dbDefault value for memory database");
    }
 }
