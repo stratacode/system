@@ -172,7 +172,12 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       else if (customResolver != null)
          customSetter = TransformUtil.evalTemplate(this, customSetter, true, false, null);
 
-      dbTypeDescriptor = ModelUtil.getDBTypeDescriptor(objType.getLayeredSystem(), objType.getLayer(), objType, false);
+      BodyTypeDeclaration dbType;
+      if (objType.isStarted())
+         dbType = objType.resolve(true);
+      else
+         dbType = objType;
+      dbTypeDescriptor = ModelUtil.getDBTypeDescriptor(dbType.getLayeredSystem(), dbType.getLayer(), dbType, false);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -480,6 +485,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("(");
          int numProps = fbDesc.propNames.size();
          int numOpts = fbDesc.optionNames == null ? 0 : fbDesc.optionNames.size();
+         int argCt = 0;
          ArrayList<String> propVarNames = new ArrayList<String>(numProps);
          for (int j = 0; j < numProps; j++) {
             if (j != 0)
@@ -492,17 +498,16 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             sb.append(getTypeName(propType));
             sb.append(" ");
             sb.append(propVarName);
-
+            argCt++;
          }
          ArrayList<String> optVarNames = new ArrayList<String>(numOpts);
          if (numOpts > 0) {
             for (int j = 0; j < numOpts; j++) {
-               if (j != 0)
+               if (argCt != 0)
                   sb.append(", ");
                String optName = fbDesc.optionNames.get(j);
                String optVarName = optName.replace(".","_");
                optVarNames.add(optVarName);
-               String capVarName = CTypeUtil.capitalizePropertyName(optVarName);
                Object propType = fbDesc.optionTypes.get(j);
                sb.append("boolean _opt");
                sb.append(j);
@@ -512,6 +517,20 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                sb.append(getTypeName(propType));
                sb.append(" ");
                sb.append(optVarName);
+               argCt++;
+            }
+         }
+         if (fbDesc.multiRow) {
+            if (fbDesc.orderByOption) {
+               if (argCt > 0)
+                  sb.append(", ");
+               sb.append("java.util.List<String> orderBy");
+               argCt++;
+            }
+            if (fbDesc.paged) {
+               if (argCt > 0)
+                  sb.append(", ");
+               sb.append("int startIndex, int maxResults");
             }
          }
          sb.append(") {\n");
@@ -574,6 +593,12 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             appendString(sb, propName, false);
             sb.append(");\n      }\n");
          }
+         if (fbDesc.orderByProps != null) {
+            sb.append("      java.util.List<String> orderBy = new java.util.ArrayList<String>(");
+            if (fbDesc.orderByProps.size() > 0)
+               appendStringList(sb, fbDesc.orderByProps);
+            sb.append(");\n");
+         }
          sb.append("      return (");
          if (fbDesc.multiRow) {
             sb.append("java.util.List<");
@@ -590,7 +615,18 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             sb.append("queryOne(");
          sb.append("proto.getDBObject(),");
          appendString(sb, fbDesc.fetchGroup, false);
-         sb.append(", propList);\n");
+         sb.append(", propList");
+         if (fbDesc.multiRow) {
+            if (fbDesc.orderByOption || fbDesc.orderByProps != null)
+               sb.append(", orderBy");
+            else
+               sb.append(", null");
+            if (fbDesc.paged)
+               sb.append(", startIndex, maxResults");
+            else
+               sb.append(", 0, 0");
+         }
+         sb.append(");\n");
          sb.append("   }\n\n");
       }
       return sb.toString();
@@ -679,8 +715,14 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(", ");
          appendStringList(sb, fbDesc.optionNames);
          sb.append(", ");
+         appendStringList(sb, fbDesc.orderByProps);
+         sb.append(", ");
+         sb.append(fbDesc.orderByOption);
+         sb.append(", ");
          sb.append(fbDesc.multiRow);
          appendString(sb, fbDesc.fetchGroup, true);
+         sb.append(", ");
+         sb.append(fbDesc.paged);
          sb.append(")");
       }
       sb.append(")");

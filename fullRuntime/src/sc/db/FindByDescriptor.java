@@ -17,8 +17,11 @@ public class FindByDescriptor {
    public String name;
    public List<String> propNames;
    public List<String> optionNames;
+   public List<String> orderByProps;
+   public boolean orderByOption;
    public boolean multiRow;
    public String fetchGroup;
+   public boolean paged;
 
    public List<Object> propTypes;
    public List<Object> optionTypes;
@@ -29,12 +32,15 @@ public class FindByDescriptor {
      */
    public List<String> protoProps;
 
-   public FindByDescriptor(String name, List<String> properties, List<String> options, boolean multiRow, String fetchGroup) {
+   public FindByDescriptor(String name, List<String> properties, List<String> options, List<String> orderByProps, boolean orderByOption, boolean multiRow, String fetchGroup, boolean paged) {
       this.name = name;
       this.propNames = properties;
       this.optionNames = options;
       this.multiRow = multiRow;
       this.fetchGroup = fetchGroup;
+      this.orderByProps = orderByProps;
+      this.orderByOption = orderByOption;
+      this.paged = paged;
    }
 
    public void initTypes(Object typeDecl) {
@@ -83,5 +89,7 @@ public class FindByDescriptor {
       }
    }
 
-
+   public String toString() {
+      return name;
+   }
 }

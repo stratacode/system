@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.layer.LayeredSystem;
 import sc.type.Type;
+import sc.util.StringUtil;
 
 public class PrimitiveType extends JavaType {
    public String typeName;
@@ -174,5 +175,9 @@ public class PrimitiveType extends JavaType {
 
    public Object definesTypeParameter(Object typeParamName, ITypeParamContext ctx) {
       return null;
+   }
+
+   public boolean equalTypes(JavaType other) {
+      return (other instanceof PrimitiveType) && StringUtil.equalStrings(((PrimitiveType) other).typeName, typeName);
    }
 }

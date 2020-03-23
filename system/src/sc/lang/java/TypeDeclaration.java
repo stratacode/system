@@ -716,6 +716,11 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          }
       }
       else {
+         for (int i = 0; i < implementsTypes.size(); i++) {
+            JavaType oldImpl = implementsTypes.get(i);
+            if (oldImpl.equalTypes(impl))
+               return;
+         }
          implementsTypes.add(impl);
          if (typeInfoInitialized) {
             int sz;

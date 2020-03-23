@@ -116,6 +116,8 @@ public class ModelInStream extends BinfInStream {
                         System.out.println("*** No semantic value class for deserializing semantic node");
                      }
                      ISemanticNode resNode = (ISemanticNode) RTypeUtil.createInstance(cl);
+                     if (resNode == null)
+                        throw new IllegalArgumentException("Invalid class for restore");
                      resNode.setParseletId(parseletId);
                      DynType type = TypeUtil.getPropertyCache(cl);
                      IBeanMapper[] semanticProps = type.getSemanticPropertyList();

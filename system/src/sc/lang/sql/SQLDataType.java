@@ -46,8 +46,10 @@ public class SQLDataType extends JavaSemanticNode {
    public String getJavaTypeName() {
       if (typeName.equalsIgnoreCase("varchar") || typeName.equals("text") || typeName.equals("nvarchar") || typeName.equals("ntext"))
          return "String";
-      else if (typeName.equalsIgnoreCase("int") || typeName.equalsIgnoreCase("integer"))
+      else if (typeName.equalsIgnoreCase("integer") || typeName.equals("serial"))
          return "int";
+      else if (typeName.equalsIgnoreCase("bigint") || typeName.equals("bigserial"))
+         return "long";
       else if (typeName.equalsIgnoreCase("tinyint"))
          return "byte";
       else if (typeName.equalsIgnoreCase("smallint"))

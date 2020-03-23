@@ -9,4 +9,11 @@ public class QuotedIdentifier extends SQLIdentifier {
    public String toString() {
       return value;
    }
+
+   public String toSafeLanguageString() {
+      if (parseNode == null || parseNodeInvalid) {
+         return '"' + value + '"';
+      }
+      return super.toSafeLanguageString();
+   }
 }

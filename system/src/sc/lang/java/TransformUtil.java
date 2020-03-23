@@ -435,7 +435,10 @@ public class TransformUtil {
                ModelUtil.updateFromStatementRefs(list, fromStatements, globalFromStatement);
 
             // Need to init/start these after they have been added to the hierarchy so they can resolve etc.
-            ParseUtil.initAndStartComponent(list);
+            if (accessClass.isStarted())
+               ParseUtil.initAndStartComponent(list);
+            else
+               ParseUtil.initComponent(list);
 
             return list.size();
          }

@@ -8567,7 +8567,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
 
          DBTypeDescriptor typeDesc = getDBTypeDescriptor();
-         if (typeDesc != null) {
+         // Only generate the schema for the most specific type
+         if (typeDesc != null && !isModifiedBySameType()) {
             DBProvider dbProvider = ModelUtil.getDBProviderForType(getLayeredSystem(), getLayer(), this);
             if (dbProvider != null) {
                dbProvider.processGeneratedFiles(this, typeDesc);
@@ -9076,7 +9077,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
   public void initDBTypeDescriptor() {
-      dbTypeDescriptor = ModelUtil.initDBTypeDescriptor(getLayeredSystem(), getLayer(), this);
+      if (!isLayerType && !isLayerComponent())
+         dbTypeDescriptor = ModelUtil.initDBTypeDescriptor(getLayeredSystem(), getLayer(), this);
       dbTypeDescriptorInited = true;
   }
 
@@ -9909,6 +9911,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          // been transformed or even cloned.
          if (componentMethods != null)
             res.componentMethods = componentMethods;
+
+         if (dbTypeDescriptorInited) {
+            res.dbTypeDescriptor = dbTypeDescriptor;
+            res.dbTypeDescriptorInited = true;
+         }
       }
 
       return res;

@@ -200,4 +200,15 @@ public class BoundType extends JavaType {
       return baseType.definesTypeParameter(typeParam, ctx);
    }
 
+   public boolean equalTypes(JavaType other) {
+      if (!(other instanceof BoundType))
+         return false;
+      BoundType otherB = (BoundType) other;
+      if (otherB.baseType == baseType)
+         return true;
+      if (baseType == null || otherB.baseType == null)
+         return false;
+      return baseType.equalTypes(otherB.baseType);
+   }
+
 }

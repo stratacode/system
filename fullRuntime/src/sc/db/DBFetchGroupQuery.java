@@ -7,6 +7,8 @@ public class DBFetchGroupQuery extends DBQuery {
    DBTypeDescriptor dbTypeDesc;
    List<FetchTablesQuery> queries = new ArrayList<FetchTablesQuery>();
    List<String> propNames;
+   List<String> orderByProps;
+   int startIx, maxResults;
 
    FetchTablesQuery curQuery;
 
@@ -91,5 +93,44 @@ public class DBFetchGroupQuery extends DBQuery {
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");
       return curQuery.queryOne(transaction, proto);
+   }
+
+   public void setOrderBy(List<String> orderByProps) {
+      this.orderByProps = orderByProps;
+      for (int i = 0; i < orderByProps.size(); i++) {
+         String orderByProp = orderByProps.get(i);
+         boolean desc = orderByProp.startsWith("-");
+         if (desc)
+            orderByProp = orderByProp.substring(1);
+         DBPropertyDescriptor propDesc = dbTypeDesc.getPropertyDescriptor(orderByProp);
+         if (propDesc == null)
+            throw new IllegalArgumentException("Missing orderBy property: " + orderByProp + " in: " + dbTypeDesc);
+         if (propDesc.multiRow)
+            throw new IllegalArgumentException("Multi valued property: " + orderByProp + " used in orderBy: " + dbTypeDesc);
+         String dataSourceName = propDesc.getDataSourceForProp();
+         FetchTablesQuery query = getFetchTablesQuery(dataSourceName, false);
+         if (query.orderByProps == null) {
+            query.orderByProps = new ArrayList<DBPropertyDescriptor>(orderByProps.size());
+            query.orderByDirs = new ArrayList<Boolean>(orderByProps.size());
+         }
+         query.orderByProps.add(propDesc);
+         query.orderByDirs.add(desc);
+      }
+   }
+
+   public void setStartIndex(int ix) {
+      this.startIx = ix;
+      if (queries != null) {
+         for (FetchTablesQuery query:queries)
+            query.startIndex = ix;
+      }
+   }
+
+   public void setMaxResults(int max) {
+      this.maxResults = max;
+      if (queries != null) {
+         for (FetchTablesQuery query:queries)
+            query.maxResults = max;
+      }
    }
 }

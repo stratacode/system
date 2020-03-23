@@ -123,8 +123,8 @@ public class DBPropertyDescriptor {
                // one-to-many or many-to-many relationship
                if (reversePropDesc == this)
                   System.err.println("*** DBPropertyDescriptor: " + this + " has reverseProperty pointing to itself");
-               else if (reversePropDesc.reversePropDesc != null || reversePropDesc.reverseProperty != null) {
-                  System.err.println("*** reverseProperty conflict on  between: " + reverseProperty + " defined on: " + dbTypeDesc + " and " + reversePropDesc + " defined: " + reversePropDesc.reverseProperty);
+               else if (reversePropDesc.reverseProperty != null) {
+                  System.err.println("*** reverseProperty conflict between: " + reverseProperty + " defined on: " + dbTypeDesc + " and " + reversePropDesc + " defined: " + reversePropDesc.reverseProperty);
                }
                else {
                   if (multiRow && !reversePropDesc.multiRow)

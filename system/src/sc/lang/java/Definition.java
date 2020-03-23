@@ -615,7 +615,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
             for (Object modifier:overrideDef.modifiers) {
                if (modifier instanceof Annotation) {
                   Annotation overriddenAnnotation = (Annotation) modifier;
-                  Object thisAnnotation = getAnnotation(overriddenAnnotation.typeName);
+                  Object thisAnnotation = getAnnotation(overriddenAnnotation.getFullTypeName());
                   if (thisAnnotation == null) {
                      any = true;
                      if (modifiers == null) {

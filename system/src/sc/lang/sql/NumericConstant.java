@@ -4,4 +4,11 @@ public class NumericConstant extends SQLExpression {
    public String numberPart;
    public String fractionPart;
    public String exponent;
+
+   public String toSafeLanguageString() {
+      if (parseNode == null || parseNodeInvalid) {
+         return numberPart + (fractionPart != null ? fractionPart : "") + (exponent != null ? exponent : "");
+      }
+      return super.toSafeLanguageString();
+   }
 }

@@ -7,4 +7,12 @@ import java.util.Set;
 public class SQLBinaryOperand extends SemanticNode {
    public String operator;
    public SQLExpression rhs;
+
+
+   public String toSafeLanguageString() {
+      if (parseNode == null || parseNodeInvalid) {
+         return operator + " " + (rhs == null ? "null" : rhs.toSafeLanguageString());
+      }
+      return super.toSafeLanguageString();
+   }
 }

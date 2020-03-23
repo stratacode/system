@@ -32,4 +32,40 @@ public class ColumnDef extends TableDef {
             c.addTableReferences(refTableNames);
       }
    }
+
+   public ReferencesConstraint getReferencesConstraint() {
+      if (columnConstraints != null) {
+         for (SQLConstraint constraint:columnConstraints)
+            if (constraint instanceof ReferencesConstraint)
+               return (ReferencesConstraint) constraint;
+      }
+      return null;
+   }
+
+   public boolean hasNotNullConstraint() {
+      if (columnConstraints != null) {
+         for (SQLConstraint constraint:columnConstraints)
+            if (constraint instanceof NotNullConstraint)
+               return true;
+      }
+      return false;
+   }
+
+   public boolean hasUniqueConstraint() {
+      if (columnConstraints != null) {
+         for (SQLConstraint constraint:columnConstraints)
+            if (constraint instanceof UniqueConstraint)
+               return true;
+      }
+      return false;
+   }
+
+   public String getDefaultExpression() {
+      if (columnConstraints != null) {
+         for (SQLConstraint constraint:columnConstraints)
+            if (constraint instanceof DefaultConstraint)
+               return ((DefaultConstraint) constraint).expression.toSafeLanguageString();
+      }
+      return null;
+   }
 }

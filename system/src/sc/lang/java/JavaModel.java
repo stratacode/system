@@ -1987,6 +1987,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          if (!needsTransform()) {
             return FileUtil.getFileAsString(getSrcFile().absFileName);
          }
+         // TODO: this code won't work for subclasses since the generate method requires an exact match for the semantic value
+         // class
          Parselet compUnit = JavaLanguage.INSTANCE.compilationUnit;
          PerfMon.start("newModelGenerate");
          Object res = compUnit.generate(JavaLanguage.INSTANCE.newGenerateContext(compUnit, this), this);

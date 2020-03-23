@@ -1,18 +1,19 @@
 package sc.lang.sql;
 
+import com.sun.istack.internal.NotNull;
 import sc.db.DBPropertyDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.db.DBUtil;
 import sc.db.TableDescriptor;
-import sc.lang.SQLLanguage;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.SCModel;
 import sc.layer.Layer;
-import sc.parser.ParseError;
-import sc.parser.ParseUtil;
+import sc.parser.*;
 import sc.type.CTypeUtil;
+import sc.type.Modifier;
+import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.util.ArrayList;
@@ -72,7 +73,8 @@ public class SQLFileModel extends SCModel {
       mods.add(Annotation.create("sc.db.DBTypeSettings"));
 
       if (prevType == null) {
-         newType = ClassDeclaration.create("class", typeName, ClassType.create("sc.db.DBObject"));
+         newType = ClassDeclaration.create("class", typeName, null);
+         newType.addImplements(ClassType.create("sc.db.IDBObject"));
          if (typeLayer != null && typeLayer.defaultModifier != null) {
             mods.add(typeLayer.defaultModifier);
          }
@@ -88,14 +90,18 @@ public class SQLFileModel extends SCModel {
       addTypeDeclaration(newType);
 
       if (primaryTable != null)
-         addTableProperties(newType, primaryTable, true);
+         addTableProperties(newType, primaryTable, prevType, true);
+      else
+         displayError("No primary table: " + sqlName + " defined in: ");
 
       for (CreateTable auxTable:auxTables)
-         addTableProperties(newType, auxTable, false);
+         addTableProperties(newType, auxTable, prevType, false);
+
+      super.init();
    }
 
    // Fills in any missing properties in the type from the information we have in the SQL definition.
-   private void addTableProperties(TypeDeclaration type, CreateTable table, boolean primary) {
+   private void addTableProperties(TypeDeclaration type, CreateTable table, TypeDeclaration prevType, boolean primary) {
       if (table.tableDefs == null) {
          return; // TODO: should we display an error here?
       }
@@ -107,18 +113,46 @@ public class SQLFileModel extends SCModel {
             if (colIdent != null) {
                colName = colIdent.toString();
                String propName = DBUtil.getJavaName(colName);
-               SQLDataType colType = colDef.columnType;
-               String javaTypeName = colType.getJavaTypeName();
+               propName = CTypeUtil.decapitalizePropertyName(propName);
+               ReferencesConstraint refConstr = colDef.getReferencesConstraint();
+               String javaTypeName;
+               if (refConstr != null) {
+                  javaTypeName = DBUtil.getJavaName(refConstr.refTable.toString());
+                  // TODO: if this is a multi table, we should make this List<typeName>
+               }
+               else {
+                  SQLDataType colType = colDef.columnType;
+                  javaTypeName = colType.getJavaTypeName();
+               }
                if (javaTypeName == null)
                   continue;
                JavaType javaType = JavaType.createJavaTypeFromName(javaTypeName);
-               Object member = type.definesMember(propName, MemberType.PropertyAnySet, type, null);
+               Object member = prevType == null ? null : prevType.definesMember(propName, MemberType.PropertyAnySet, type, null);
+               boolean required = colDef.hasNotNullConstraint();
+               boolean unique = colDef.hasUniqueConstraint();
+               String dbDefault = colDef.getDefaultExpression();
                if (member == null) {
-                  FieldDefinition field = FieldDefinition.create(getLayeredSystem(), javaType, propName);
-                  if (colDef.isPrimaryKey())
-                     field.addModifier("@sc.obj.Constant");
+                  FieldDefinition field = FieldDefinition.createFromJavaType(javaType, propName);
+                  if (colDef.isPrimaryKey()) {
+                     field.addModifier(Annotation.create("sc.obj.Constant"));
+                     Annotation annot = Annotation.create("sc.db.IdSettings");
+                     if (DBUtil.isDefinedInDBColumnType(colDef.columnType.toString())) {
+                        annot.addAnnotationValues(AnnotationValue.create("definedByDB", true));
+                     }
+                     field.addModifier(annot);
+                  }
+                  else if (required || unique || dbDefault != null)
+                     addDBPropertySettings(field, required, unique, dbDefault);
                   field.addModifier("public");
                   type.addBodyStatementIndent(field);
+               }
+               else {
+                  if (required || unique || dbDefault != null) {
+                     if (member instanceof Definition)
+                        addDBPropertySettings((Definition) member, required, unique, dbDefault);
+                     else
+                        displayError("Unhandled case - no way to set unique/required on property: " + member);
+                  }
                }
             }
             else
@@ -127,6 +161,22 @@ public class SQLFileModel extends SCModel {
       }
    }
 
+   void addDBPropertySettings(Definition def, boolean required, boolean unique, String dbDefault) {
+      Annotation annot = Annotation.create("sc.db.DBPropertySettings");
+      if (required) {
+         AnnotationValue reqVal = AnnotationValue.create("required", Boolean.TRUE);
+         annot.addAnnotationValues(reqVal);
+      }
+      if (unique) {
+         AnnotationValue reqVal = AnnotationValue.create("unique", Boolean.TRUE);
+         annot.addAnnotationValues(reqVal);
+      }
+      if (dbDefault != null) {
+         AnnotationValue reqVal = AnnotationValue.create("dbDefault", dbDefault);
+         annot.addAnnotationValues(reqVal);
+      }
+      def.addModifier(annot);
+   }
 
    public void addCreateTable(TableDescriptor tableDesc) {
       // TODO: TableDescriptor is a big subset of 'CreateTable' - need to either fill it out or preserve it by modifying the source when augmenting DDL
@@ -230,5 +280,44 @@ public class SQLFileModel extends SCModel {
          }
       }
       return false;
+   }
+
+   // TODO: this clearParseTree stuff was taken from Template - should we share it in a common base class or put it in JavaModel?
+   private boolean parseTreeCleared = false;
+
+   private void clearParseTree() {
+      if (parseTreeCleared)
+         return;
+      // Need to clear out the old parse tree.  During transform, we switch from the scsql file format to
+      // a .java file format.
+      IParseNode node = getParseNode();
+      if (node != null)
+         node.setSemanticValue(null, true, false);
+      parseTreeCleared = true;
+   }
+
+   public boolean transform(ILanguageModel.RuntimeType runtime) {
+      clearParseTree();
+
+      return super.transform(runtime);
+   }
+
+   // TODO: also copied from TemplateLanguage
+   public String getTransformedResult() {
+      if (transformedModel != null)
+         return transformedModel.getTransformedResult();
+      clearParseTree();
+      Object generateResult = SQLLanguage.INSTANCE.compilationUnit.generate(new GenerateContext(false), this);
+      if (generateResult instanceof GenerateError) {
+         displayError("*** Unable to generate template model for: " );
+         return null;
+      }
+      else if (generateResult instanceof IParseNode) {
+         // Need to format it and remove spacing and newline parse-nodes so we can accurately compute line numbers and offsets for registering gen source
+         return ((IParseNode) generateResult).formatString(null, null, -1, true).toString();
+      }
+      else {
+         return generateResult.toString();
+      }
    }
 }

@@ -612,9 +612,21 @@ public class DBTypeDescriptor {
       }
    }
 
-   public List<? extends IDBObject> query(DBObject proto, String fetchGroup, List<String> props) {
-      DBFetchGroupQuery groupQuery = initQuery(proto, fetchGroup, props, true);
-      addParamValues(groupQuery, proto, props);
+   /**
+    * The core "declarative query" method to return objects for this type descriptor. The proto object holds the values of the properties
+    * listed in protoProps. Those form a 'where clause' using 'and' for all properties in the list. The orderByProps list
+    * contains the ordered list of sort properties. Use "-propName" for a descending order sort on that property.
+    */
+   public List<? extends IDBObject> query(DBObject proto, String fetchGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
+      DBFetchGroupQuery groupQuery = initQuery(proto, fetchGroup, protoProps, true);
+      addParamValues(groupQuery, proto, protoProps);
+      if (orderByProps != null) {
+         groupQuery.setOrderBy(orderByProps);
+      }
+      if (startIx != 0)
+         groupQuery.setStartIndex(startIx);
+      if (maxResults > 0)
+         groupQuery.setMaxResults(maxResults);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
       return groupQuery.query(curTx, proto.getDBObject());

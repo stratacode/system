@@ -9678,9 +9678,13 @@ public class ModelUtil {
 
             String fullTypeName = ModelUtil.getTypeName(typeDecl);
 
-            DBTypeDescriptor dbTypeDesc = sys.getDBTypeDescriptor(fullTypeName);
-            if (dbTypeDesc != null)
-               return dbTypeDesc;
+            // For ModifyDeclaration don't use the cached type descriptor since it might need to be refined
+            DBTypeDescriptor dbTypeDesc = null;
+            if (!(typeDecl instanceof BodyTypeDeclaration)) {
+               dbTypeDesc = sys.getDBTypeDescriptor(fullTypeName);
+               if (dbTypeDesc != null)
+                  return dbTypeDesc;
+            }
 
             String typeName = CTypeUtil.getClassName(fullTypeName);
             if (primaryTableName == null)
@@ -9689,7 +9693,7 @@ public class ModelUtil {
 
             List<FindByDescriptor> findByQueries = null;
 
-            Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
+            Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, true, true, false);
             if (properties != null) {
                for (Object property:properties) {
                   String propName = ModelUtil.getPropertyName(property);
@@ -9708,6 +9712,19 @@ public class ModelUtil {
                      boolean multiRowQuery = initFindByPropertyList(sys, typeDecl, fbProps, "with", findByProp, propName, properties, typeName);
 
                      String fetchGroup = (String) ModelUtil.getAnnotationValue(findByProp, "fetchGroup");
+                     Boolean paged = (Boolean) ModelUtil.getAnnotationValue(findByProp, "paged");
+
+                     String orderByStr = (String) ModelUtil.getAnnotationValue(findByProp, "orderBy");
+
+                     List<String> orderByProps = null;
+                     boolean orderByOption = false;
+                     if (orderByStr != null && orderByStr.length() > 0) {
+                        if (orderByStr.equals("?"))
+                           orderByOption = true;
+                        else {
+                           orderByProps = Arrays.asList(StringUtil.split(orderByStr, ","));
+                        }
+                     }
 
                      ArrayList<String> fbOptions = new ArrayList<String>();
                      // Even if an options property is unique, we don't consider that a single value query because that
@@ -9730,7 +9747,7 @@ public class ModelUtil {
                         }
                      }
 
-                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, multiRowQuery, fetchGroup);
+                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, fetchGroup, paged != null && paged);
                      if (findByQueries == null)
                         findByQueries = new ArrayList<FindByDescriptor>();
                      findByQueries.add(fbDesc);
@@ -9762,7 +9779,7 @@ public class ModelUtil {
                      if (idColumnName == null)
                         idColumnName = SQLUtil.getSQLName(propName);
                      if (idColumnType == null) {
-                        idColumnType = DBUtil.getDefaultSQLType(propType);
+                        idColumnType = DBUtil.getDefaultSQLType(propType, definedByDB);
                         if (idColumnType == null)
                            throw new IllegalArgumentException("Invalid property type: " + propType + " for id: " + idColumnName);
                      }
@@ -9793,8 +9810,20 @@ public class ModelUtil {
                      fbOptions = null;
 
                   String fetchGroup = (String) ModelUtil.getAnnotationValue(findByCl, "fetchGroup");
+                  Boolean paged = (Boolean) ModelUtil.getAnnotationValue(findByCl, "paged");
+                  String orderByStr = (String) ModelUtil.getAnnotationValue(findByCl, "orderBy");
 
-                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, multiRowQuery, fetchGroup);
+                  List<String> orderByProps = null;
+                  boolean orderByOption = false;
+                  if (orderByStr != null && orderByStr.length() > 0) {
+                     if (orderByStr.equals("?"))
+                        orderByOption = true;
+                     else {
+                        orderByProps = Arrays.asList(StringUtil.split(orderByStr, ","));
+                     }
+                  }
+
+                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, fetchGroup, paged != null && paged);
                   if (findByQueries == null)
                      findByQueries = new ArrayList<FindByDescriptor>();
                   findByQueries.add(fbDesc);
@@ -10078,7 +10107,7 @@ public class ModelUtil {
                }
 
                if (propColumnType == null) {
-                  propColumnType = DBUtil.getDefaultSQLType(propType);
+                  propColumnType = DBUtil.getDefaultSQLType(propType, false);
                   if (propColumnType == null) {
                      refDBTypeDesc = getDBTypeDescriptor(sys, refLayer, propType, true);
                      if (refDBTypeDesc == null) {

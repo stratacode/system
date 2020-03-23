@@ -15,7 +15,7 @@ import java.util.Set;
  *
  * TODO: this is a starting point for a general purpose SQL language parse. Initially based on a useful subset of postgres sql to keep ddl in-sync with code.
  */
-public class SQLLanguage extends BaseLanguage {
+public class SQLLanguage extends SCLanguage {
    protected static final String[] ALL_SQL_KEYWORDS_ARR = {
            "all", "and", "any", "array", "as", "asc", "asymmetric", "both",
            "case", "cast", "check", "collate", "column", "constraint", "create", "current_date", "current_role", "current_time", "current_timestamp", "current_user",
@@ -153,15 +153,15 @@ public class SQLLanguage extends BaseLanguage {
 
    IndexedChoice sqlPrimary = new IndexedChoice();
 
-   Sequence prefixUnaryExpression = new Sequence("SQLPrefixUnaryExpression(operator,expression)", unaryPrefix, sqlPrimary);
-   Sequence binaryOperands = new Sequence("SQLBinaryOperand(operator,rhs)", OPTIONAL | REPEAT, binaryOperators, sqlPrimary);
-   public Sequence sqlExpression = new ChainedResultSequence("SQLBinaryExpression(firstExpr,operands)", sqlPrimary, binaryOperands);
-   Sequence parenExpression = new Sequence("SQLParenExpression(,expression,)" , openParen, sqlExpression, closeParenSkipOnError);
-   Sequence expressionList = new Sequence("([],[])", OPTIONAL, sqlExpression, new Sequence("(,[])", OPTIONAL | REPEAT, comma, sqlExpression));
-   Sequence functionCall = new Sequence("FunctionCall(functionName,,expressionList,)", sqlQualifiedIdentifier, openParen, expressionList, closeParenSkipOnError);
-   Sequence trueLiteral = new Sequence("TrueLiteral(value)", trueKeyword);
-   Sequence falseLiteral = new Sequence("FalseLiteral(value)", falseKeyword);
-   Sequence nullLiteral = new Sequence("NullLiteral(value)", nullKeyword);
+   Sequence sqlPrefixUnaryExpression = new Sequence("SQLPrefixUnaryExpression(operator,expression)", unaryPrefix, sqlPrimary);
+   Sequence sqlBinaryOperands = new Sequence("SQLBinaryOperand(operator,rhs)", OPTIONAL | REPEAT, binaryOperators, sqlPrimary);
+   public Sequence sqlExpression = new ChainedResultSequence("SQLBinaryExpression(firstExpr,operands)", sqlPrimary, sqlBinaryOperands);
+   Sequence sqlParenExpression = new Sequence("SQLParenExpression(,expression,)" , openParen, sqlExpression, closeParenSkipOnError);
+   Sequence sqlExpressionList = new Sequence("([],[])", OPTIONAL, sqlExpression, new Sequence("(,[])", OPTIONAL | REPEAT, comma, sqlExpression));
+   Sequence functionCall = new Sequence("FunctionCall(functionName,,expressionList,)", sqlQualifiedIdentifier, openParen, sqlExpressionList, closeParenSkipOnError);
+   Sequence trueLiteral = new Sequence("SQLTrueLiteral(value)", trueKeyword);
+   Sequence falseLiteral = new Sequence("SQLFalseLiteral(value)", falseKeyword);
+   Sequence sqlNullLiteral = new Sequence("SQLNullLiteral(value)", nullKeyword);
    // Because current_date etc are keywords, they are not matched as sqlIdentifiers so need a new rule here
    Sequence keywordLiteral = new Sequence("KeywordLiteral(value)", new ICSymbolChoiceSpace("current_timestamp", "current_time", "current_date", "current_user", "session_user", "current_role"));
 
@@ -170,15 +170,15 @@ public class SQLLanguage extends BaseLanguage {
    // TODO :: casting
 
    {
-      sqlPrimary.put("(", parenExpression);
+      sqlPrimary.put("(", sqlParenExpression);
       sqlPrimary.put("'", sqlQuotedStringLiteral);
       sqlPrimary.put("$", dollarStringLiteral);
       sqlPrimary.put("B", bitStringLiteral);
       sqlPrimary.put("b", bitStringLiteral);
       sqlPrimary.put("x", hexStringLiteral);
       sqlPrimary.put("X", hexStringLiteral);
-      sqlPrimary.put("n", nullLiteral);
-      sqlPrimary.put("N", nullLiteral);
+      sqlPrimary.put("n", sqlNullLiteral);
+      sqlPrimary.put("N", sqlNullLiteral);
       sqlPrimary.put("t", trueLiteral);
       sqlPrimary.put("T", trueLiteral);
       sqlPrimary.put("f", falseLiteral);
@@ -191,7 +191,7 @@ public class SQLLanguage extends BaseLanguage {
       for (int i = 0; i < 10; i++)
          sqlPrimary.put(String.valueOf(i), numericConstant);
       sqlPrimary.put(".", numericConstant);
-      sqlPrimary.addDefault(functionCall, sqlIdentifierExpression, prefixUnaryExpression, keywordLiteral);
+      sqlPrimary.addDefault(functionCall, sqlIdentifierExpression, sqlPrefixUnaryExpression, keywordLiteral);
    }
 
    Sequence namedConstraint = new Sequence("NamedConstraint(,constraintName)", new ICSymbolSpace("constraint"), sqlIdentifier);
@@ -288,7 +288,7 @@ public class SQLLanguage extends BaseLanguage {
 
    Sequence tablePartition = new Sequence("TablePartition(,,partitionBy,,expressionList,)", OPTIONAL,
            new ICSymbolSpace("partition"), new ICSymbolSpace("by"), new ICSymbolChoiceSpace("range", "list"),
-           openParen, expressionList, closeParen);
+           openParen, sqlExpressionList, closeParen);
 
    Sequence createTable = new Sequence("CreateTable(tableOptions,,ifNotExists,tableName,ofType,,tableDefs,,tableInherits,tablePartition,storageParams,tableSpace)",
                    new ICSymbolChoiceSpace(REPEAT | OPTIONAL, "global", "local", "temporary", "temp", "unlogged"),
@@ -308,6 +308,12 @@ public class SQLLanguage extends BaseLanguage {
    public OrderedChoice sqlCommands = new OrderedChoice( "([])", REPEAT | OPTIONAL, createCommand);
 
    public Sequence sqlFileModel = new Sequence("SQLFileModel(,sqlCommands,)", spacing, sqlCommands, new Symbol(EOF));
+
+   {
+      // For when we convert scsql to java, need to update the result class name so it matches. This corresponds to the
+      // code in SQLFileModel.getTransformedResult
+      compilationUnit.setResultClassName("SQLFileModel");
+   }
 
    class DollarTag extends Sequence {
       DollarTagType tagType;

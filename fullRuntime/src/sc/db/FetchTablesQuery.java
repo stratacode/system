@@ -19,16 +19,24 @@ public class FetchTablesQuery {
    List<FetchTableDesc> fetchTables = new ArrayList<FetchTableDesc>();
    Map<String, FetchTableDesc> fetchTablesIndex = new TreeMap<String, FetchTableDesc>();
 
+   List<DBPropertyDescriptor> orderByProps = null;
+   List<Boolean> orderByDirs = null;
+
    /**
     * For queries that have a custom where clause, these properties provide the extra info required to make the query
     */
    public StringBuilder whereSB;
    public StringBuilder logSB;
 
+   public StringBuilder orderBySB;
+
    public List<String> propNames;
    public int numWhereColumns = 0;
    public List<Object> paramValues;
    public List<DBColumnType> paramTypes;
+
+   public int startIndex = 0;
+   public int maxResults = 0; // unlimited
 
    public FetchTablesQuery(String dataSourceName, boolean multiRow) {
       this.dataSourceName = dataSourceName;
@@ -198,6 +206,19 @@ public class FetchTablesQuery {
       qsb.append(whereSB);
       if (logSB != null)
          logSB.append(this.logSB);
+      if (orderBySB != null) {
+         qsb.append(orderBySB);
+         if (logSB != null)
+            logSB.append(this.orderBySB);
+      }
+      if (maxResults > 0) {
+         qsb.append(" LIMIT ");
+         qsb.append(maxResults);
+      }
+      if (startIndex > 0) {
+         qsb.append(" OFFSET ");
+         qsb.append(startIndex);
+      }
 
       try {
          String queryStr = qsb.toString();
@@ -661,7 +682,7 @@ public class FetchTablesQuery {
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append("select ");
+      sb.append("select-query: ");
       if (fetchTables != null) {
          for (int i = 0; i < fetchTables.size(); i++) {
             FetchTableDesc fetchTable = fetchTables.get(i);
@@ -673,6 +694,9 @@ public class FetchTablesQuery {
       if (whereSB != null) {
          sb.append(" WHERE ");
          sb.append(whereSB);
+      }
+      if (orderBySB != null) {
+         sb.append(orderBySB);
       }
       if (paramValues != null) {
          sb.append(" (");
@@ -761,6 +785,20 @@ public class FetchTablesQuery {
    public void whereAppendIdent(String ident) {
       initWhereQuery();
       DBUtil.appendIdent(whereSB, null, ident);
+   }
+
+   public void setOrderByProps(List<DBPropertyDescriptor> props, List<Boolean> orderByDirs) {
+      orderBySB = new StringBuilder();
+      orderBySB.append(" ORDER BY ");
+      for (int i = 0; i < props.size(); i++) {
+         if (i != 0)
+            orderBySB.append(", ");
+         DBPropertyDescriptor prop = props.get(i);
+         Boolean dir = orderByDirs.get(i);
+         orderBySB.append(prop.getColTypeDesc());
+         if (!dir)
+            orderBySB.append(" DESC");
+      }
    }
 
    public void insertIdProperty() {

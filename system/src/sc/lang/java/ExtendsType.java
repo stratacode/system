@@ -434,4 +434,17 @@ public class ExtendsType extends JavaType {
       // TODO: anything else to do here?
       return typeArgument.definesTypeParameter(typeParam, ctx);
    }
+
+   public boolean equalTypes(JavaType other) {
+      if (!(other instanceof ExtendsType))
+         return false;
+      ExtendsType otherE = (ExtendsType) other;
+      if (questionMark != otherE.questionMark)
+         return false;
+      if (typeArgument == otherE.typeArgument)
+         return true;
+      if (typeArgument == null || otherE.typeArgument == null)
+         return false;
+      return typeArgument.equals(otherE.typeArgument);
+   }
 }

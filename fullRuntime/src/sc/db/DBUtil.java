@@ -40,11 +40,9 @@ public class DBUtil {
       for (int i = 0; i < javaName.length(); i++) {
          char c = javaName.charAt(i);
          if (Character.isUpperCase(c)) {
-            if (!upper) {
-               if (i > 0)
-                  sb.append("_");
-               upper = true;
-            }
+            if (i > 0)
+               sb.append("_");
+            upper = true;
             sb.append(Character.toLowerCase(c));
          }
          else {
@@ -253,13 +251,13 @@ public class DBUtil {
       }
    }
 
-   public static String getDefaultSQLType(Object propertyType) {
+   public static String getDefaultSQLType(Object propertyType, boolean dbDefinedId) {
       if (propertyType == Integer.class || propertyType == Integer.TYPE)
-         return "integer";
+         return dbDefinedId ? "serial" : "integer";
       else if (propertyType == String.class)
          return "text";
       else if (propertyType == Long.class || propertyType == Long.TYPE)
-         return "bigint";
+         return dbDefinedId ? "bigserial" : "bigint";
       else if (propertyType == Boolean.class || propertyType == Boolean.TYPE)
          return "boolean";
       else if (propertyType == Float.class || propertyType == Float.TYPE)
@@ -288,6 +286,10 @@ public class DBUtil {
       else if (type.equalsIgnoreCase("timestamp"))
          return "java.util.Date";
       throw new UnsupportedOperationException();
+   }
+
+   public static boolean isDefinedInDBColumnType(String colType) {
+      return colType.equals("bigserial") || colType.equals("serial");
    }
 
    public static String getKeyIdColumnType(String type) {

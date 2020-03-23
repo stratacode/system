@@ -436,4 +436,5 @@ public abstract class JavaType extends JavaSemanticNode implements ITypedObject 
       return newType;
    }
 
+   public abstract boolean equalTypes(JavaType other);
 }

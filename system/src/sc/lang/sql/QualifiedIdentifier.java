@@ -12,4 +12,11 @@ public class QualifiedIdentifier extends SQLIdentifier {
    public String toString() {
       return StringUtil.arrayToType(identifiers.toArray());
    }
+
+   public String toSafeLanguageString() {
+      if (parseNode == null || parseNodeInvalid) {
+         return toString();
+      }
+      return super.toSafeLanguageString();
+   }
 }
