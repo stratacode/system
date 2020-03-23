@@ -6260,6 +6260,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (res != null && (!skipExcluded || !res.excluded)) {
          if (!res.initCompleted)
             System.err.println("*** Layer: " + res + " did not fully initialize!");
+         if (res.layeredSystem == null)
+            System.err.println("*** Layer: " + res + " has no layeredSystem in lookupInactiveLayer!");
          return res;
       }
       if (checkPeers && peerSystems != null) {
@@ -6269,6 +6271,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (peerRes != null) {
                if (!peerRes.initCompleted)
                   System.err.println("*** Layer: " + peerRes + " did not fully initialize!");
+               if (peerRes.layeredSystem == null)
+                  System.err.println("*** Layer - peer: " + peerRes + " has no layeredSystem in lookupInactiveLayer!");
                return peerRes;
             }
          }
@@ -15730,6 +15734,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    public Layer getSameLayerFromRemote(Layer layer) {
+      if (layer.layeredSystem == null) {
+         System.err.println("*** Null layeredSystem in getSameLayerFromRemote");
+         return null;
+      }
       if (layer.layeredSystem == this)
          System.err.println("*** Not from a remote system");
       return layer.activated ? getLayerByName(layer.getLayerUniqueName()) : lookupInactiveLayer(layer.getLayerName(), false, true);
