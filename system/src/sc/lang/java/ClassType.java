@@ -1249,6 +1249,6 @@ public class ClassType extends JavaType {
 */
 
    public boolean equalTypes(JavaType other) {
-      return (other instanceof ClassType) && StringUtil.equalStrings(((ClassType) other).typeName, typeName);
+      return (other instanceof ClassType) && StringUtil.equalStrings(((ClassType) other).getFullTypeName(), getFullTypeName());
    }
 }
