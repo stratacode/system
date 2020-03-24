@@ -2904,7 +2904,7 @@ public class ModelUtil {
          else
             throw new UnsupportedOperationException();
 
-         return Arrays.asList(jlannot);
+         return Arrays.asList((Object) jlannot);
       }
    }
 

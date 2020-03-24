@@ -1,6 +1,5 @@
 package sc.lang.sql;
 
-import com.sun.istack.internal.NotNull;
 import sc.db.DBPropertyDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.db.DBUtil;
@@ -12,8 +11,6 @@ import sc.lang.sc.SCModel;
 import sc.layer.Layer;
 import sc.parser.*;
 import sc.type.CTypeUtil;
-import sc.type.Modifier;
-import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.util.ArrayList;
