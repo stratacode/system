@@ -14,4 +14,9 @@ public abstract class SQLIdentifier extends SemanticNode {
       return qual;
    }
 
+   public abstract String getIdentifier();
+
+   public String toString() {
+      return getIdentifier();
+   }
 }

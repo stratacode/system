@@ -332,7 +332,7 @@ public class TestUtil {
          Language.registerLanguage(CSSLanguage.INSTANCE, "sccss");
          Language.registerLanguage(CSSLanguage.INSTANCE, "css");
          Language.registerLanguage(CommandSCLanguage.INSTANCE, "scr");
-         Language.registerLanguage(SQLLanguage.INSTANCE, "scsql");
+         Language.registerLanguage(SQLLanguage.getSQLLanguage(), "scsql");
       }
       else {
          if (opts.srcPath == null && buildList != null) {

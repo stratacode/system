@@ -9,6 +9,7 @@ import sc.lang.java.*;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.SCModel;
 import sc.layer.Layer;
+import sc.layer.LayeredSystem;
 import sc.parser.*;
 import sc.type.CTypeUtil;
 import sc.util.StringUtil;
@@ -26,11 +27,23 @@ public class SQLFileModel extends SCModel {
       if (initialized) return;
 
       String fullTypeName = getModelTypeName();
+      if (fullTypeName == null) {
+         System.err.println("*** No model type for scsql");
+         return;
+      }
       String typeName = CTypeUtil.getClassName(fullTypeName);
 
       if (sqlCommands == null) {
          displayError("No sql commands in file to define type: " + typeName + ": for: ");
          return;
+      }
+
+      LayeredSystem sys = getLayeredSystem();
+      SQLFileModel old = sys.schemaManager.schemasByType.put(fullTypeName, this);
+      if (old != null) {
+         // TODO: should we do a smart merge here - i.e. allow the next create table to override a previous one
+         // maybe support way to add to a table - for now, we're just going to let the new one replace the old one
+         displayWarning("Replacing old schema for type: " + fullTypeName);
       }
 
       String sqlName = SQLUtil.getSQLName(typeName);
@@ -175,24 +188,59 @@ public class SQLFileModel extends SCModel {
       def.addModifier(annot);
    }
 
-   public void addCreateTable(TableDescriptor tableDesc) {
-      // TODO: TableDescriptor is a big subset of 'CreateTable' - need to either fill it out or preserve it by modifying the source when augmenting DDL
-      CreateTable ct = new CreateTable();
-      ct.setProperty("tableName", SQLIdentifier.create(tableDesc.tableName));
-      SemanticNodeList<TableDef> tableDefs = new SemanticNodeList<TableDef>();
-      appendColumnDefs(tableDefs, tableDesc.getIdColumns(), true, tableDesc.multiRow);
-      appendColumnDefs(tableDefs, tableDesc.columns, false, tableDesc.multiRow);
-      ct.setProperty("tableDefs", tableDefs);
-
-      if (sqlCommands == null) {
-         setProperty("sqlCommands", new SemanticNodeList<SQLCommand>());
+   private CreateTable findCreateTable(String tableName) {
+      if (sqlCommands == null)
+         return null;
+      for (SQLCommand cmd:sqlCommands) {
+         if (cmd instanceof CreateTable) {
+            CreateTable ct = (CreateTable) cmd;
+            if (ct.tableName.getIdentifier().equals(tableName))
+               return ct;
+         }
       }
-      sqlCommands.add(ct);
+      return null;
    }
 
-   private void appendColumnDefs(List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList, boolean isId, boolean multiRow) {
+   public void addCreateTable(TableDescriptor tableDesc) {
+      String tableName = tableDesc.tableName;
+      CreateTable createTable = findCreateTable(tableName);
+      boolean newTable = false;
+      if (createTable == null) {
+         createTable = new CreateTable();
+         createTable.setProperty("tableName", SQLIdentifier.create(tableDesc.tableName));
+         newTable = true;
+      }
+      SemanticNodeList<TableDef> tableDefs = new SemanticNodeList<TableDef>();
+      appendColumnDefs(createTable, tableDefs, tableDesc.getIdColumns(), true, tableDesc.multiRow);
+      appendColumnDefs(createTable, tableDefs, tableDesc.columns, false, tableDesc.multiRow);
+      if (createTable.tableDefs == null)
+         createTable.setProperty("tableDefs", tableDefs);
+      else {
+         createTable.tableDefs.addAll(tableDefs);
+      }
+
+      if (newTable) {
+         if (sqlCommands == null) {
+            setProperty("sqlCommands", new SemanticNodeList<SQLCommand>());
+         }
+         sqlCommands.add(createTable);
+      }
+   }
+
+   private void appendColumnDefs(CreateTable createTable, List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList, boolean isId, boolean multiRow) {
       for (DBPropertyDescriptor propDesc:propDescList) {
-         ColumnDef colDef = new ColumnDef();
+         String colName = propDesc.columnName;
+         String colType = propDesc.columnType;
+         ColumnDef colDef = createTable == null ? null : createTable.findColumn(colName);
+
+         if (colDef != null) {
+            SQLDataType oldColType = colDef.columnType;
+            if (oldColType.typeName == null || !oldColType.typeName.equalsIgnoreCase(colType))
+               System.err.println("*** column type conflict for: " + colName);
+            continue;
+         }
+
+         colDef = new ColumnDef();
          colDef.setProperty("columnName", SQLIdentifier.create(propDesc.columnName));
          colDef.setProperty("columnType", SQLDataType.create(propDesc.columnType));
          // If it's a single column primary key, add it here - otherwise, it's a new constraint at the table level

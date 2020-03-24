@@ -3,9 +3,11 @@ package sc.lang.sql;
 import sc.db.DBTypeDescriptor;
 import sc.db.DBUtil;
 import sc.db.TableDescriptor;
+import sc.lang.ISemanticNode;
 import sc.lang.SQLLanguage;
 import sc.lang.java.JavaModel;
 import sc.lang.java.ModelUtil;
+import sc.layer.LayeredSystem;
 import sc.parser.PString;
 
 public class SQLUtil {
@@ -13,12 +15,17 @@ public class SQLUtil {
    // capture in the DBTypeDescriptor. Or we could add those features to the DBTypeDescriptor and pass them through here
    // so that we could modify those features as well.
    public static SQLFileModel convertTypeToSQLFileModel(JavaModel fromModel, DBTypeDescriptor dbTypeDesc) {
-      SQLFileModel res = new SQLFileModel();
+      String typeName = ModelUtil.getTypeName(dbTypeDesc.typeDecl);
+      LayeredSystem sys = fromModel.layeredSystem;
+
+      SQLFileModel old = sys.schemaManager.schemasByType.get(typeName);
+
+      SQLFileModel res = old == null ? new SQLFileModel() : (SQLFileModel) old.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null);
       if (!dbTypeDesc.tablesInitialized)
-         ModelUtil.completeDBTypeDescriptor(dbTypeDesc, fromModel.layeredSystem, fromModel.layer, dbTypeDesc);
+         ModelUtil.completeDBTypeDescriptor(dbTypeDesc, sys, fromModel.layer, dbTypeDesc);
       dbTypeDesc.init();
       dbTypeDesc.start();
-      res.layeredSystem = fromModel.layeredSystem;
+      res.layeredSystem = sys;
       res.layer = fromModel.layer;
       res.addCreateTable(dbTypeDesc.primaryTable);
       if (dbTypeDesc.auxTables != null) {
@@ -33,6 +40,7 @@ public class SQLUtil {
                res.addCreateTable(multiTable);
          }
       }
+      sys.schemaManager.schemasByType.put(typeName, res);
       return res;
    }
 

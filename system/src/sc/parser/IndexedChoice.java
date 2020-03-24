@@ -118,6 +118,9 @@ public class IndexedChoice extends OrderedChoice {
       }
    }
 
+   public List<Parselet> remove(String key) {
+       return indexedParselets.remove(key);
+   }
 
    /**
     * When inheriting a grammar from a base language, you may need to replace one parselet for another one.

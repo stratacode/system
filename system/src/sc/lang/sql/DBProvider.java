@@ -8,6 +8,7 @@ import sc.lang.java.PropertyDefinitionParameters;
 import sc.lang.java.TransformUtil;
 import sc.lang.template.Template;
 import sc.layer.Layer;
+import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.layer.SrcIndexEntry;
 import sc.parser.IParseNode;
@@ -67,13 +68,16 @@ public class DBProvider {
    public void processGeneratedFiles(BodyTypeDeclaration type, DBTypeDescriptor typeDesc) {
       JavaModel model = type.getJavaModel();
 
-      SQLFileModel fileModel = SQLUtil.convertTypeToSQLFileModel(model, typeDesc);
+      SQLFileModel sqlModel = SQLUtil.convertTypeToSQLFileModel(model, typeDesc);
 
-      addDBSchema(typeDesc.dataSourceName, fileModel);
+      LayeredSystem sys = model.layeredSystem;
+      sys.schemaManager.schemasByType.put(type.getFullTypeName(), sqlModel);
 
-      fileModel.srcType = type;
+      addDBSchema(typeDesc.dataSourceName, sqlModel);
 
-      Object parseNode = ParseUtil.getParseNode(SQLLanguage.getSQLLanguage().sqlFileModel, fileModel);
+      sqlModel.srcType = type;
+
+      Object parseNode = ParseUtil.getParseNode(SQLLanguage.getSQLLanguage().sqlFileModel, sqlModel);
       if (parseNode instanceof IParseNode) {
          String sqlFileBody = parseNode.toString();
          model.addExtraFile(type.typeName + ".sql", sqlFileBody);
@@ -117,9 +121,9 @@ public class DBProvider {
 
             boolean any = false;
             StringBuilder schemaSB = new StringBuilder();
-            schemaSB.append("/* Database schema for datasource: " + dataSource + "*/\n");
+            schemaSB.append("/* Database schema for datasource: " + dataSource + " */\n");
             for (SQLFileModel sqlFileModel:sqlFileModels) {
-               schemaSB.append("\n\n/* schema for type: " + sqlFileModel.srcType.getFullTypeName() + "*/\n\n");
+               schemaSB.append("\n\n/* schema for type: " + sqlFileModel.srcType.getFullTypeName() + " */\n\n");
                schemaSB.append(sqlFileModel.toLanguageString());
                schemaSB.append("\n");
                any = true;

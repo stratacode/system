@@ -6,7 +6,7 @@ import sc.util.StringUtil;
 public class QuotedIdentifier extends SQLIdentifier {
    public String value;
 
-   public String toString() {
+   public String getIdentifier() {
       return value;
    }
 

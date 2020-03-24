@@ -9,7 +9,7 @@ import java.util.List;
 public class QualifiedIdentifier extends SQLIdentifier {
    public List<IString> identifiers;
 
-   public String toString() {
+   public String getIdentifier() {
       return StringUtil.arrayToType(identifiers.toArray());
    }
 

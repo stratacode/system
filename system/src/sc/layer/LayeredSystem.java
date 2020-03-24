@@ -18,6 +18,7 @@ import sc.lang.sc.*;
 import sc.dyn.*;
 import sc.lang.sql.DBAnnotationProcessor;
 import sc.lang.sql.DBProvider;
+import sc.lang.sql.SchemaManager;
 import sc.lang.template.Template;
 import sc.layer.deps.*;
 import sc.lifecycle.ILifecycle;
@@ -407,6 +408,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** When building, stores the current mapping of type-name to DBTypeDescriptor, so that we can assemble the reference graph as it's being built for source and compiled classes */
    public Map<String, DBTypeDescriptor> dbTypeDescriptors = null;
+
+   public SchemaManager schemaManager = new SchemaManager(this);
 
    public void addDBTypeDescriptor(String typeName, DBTypeDescriptor dtd) {
       if (dbTypeDescriptors == null)

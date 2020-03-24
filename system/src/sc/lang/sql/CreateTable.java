@@ -23,4 +23,13 @@ public class CreateTable extends SQLCommand {
             def.addTableReferences(refTableNames);
       }
    }
+
+   public ColumnDef findColumn(String colName) {
+      if (tableDefs != null) {
+         for (TableDef td:tableDefs)
+            if (td instanceof ColumnDef && ((ColumnDef) td).columnName.getIdentifier().equals(colName))
+               return (ColumnDef) td;
+      }
+      return null;
+   }
 }

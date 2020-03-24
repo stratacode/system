@@ -26,7 +26,7 @@ public class SQLLanguage extends SCLanguage {
 
    protected static Set<IString> ALL_SQL_KEYWORDS = new HashSet<IString>(Arrays.asList(PString.toPString(ALL_SQL_KEYWORDS_ARR)));
 
-   public final static SQLLanguage INSTANCE = new SQLLanguage();
+   public static SQLLanguage INSTANCE;
 
    public SQLLanguage() {
       this(null);
@@ -39,9 +39,13 @@ public class SQLLanguage extends SCLanguage {
       addToSemanticValueClassPath("sc.lang.sql");
       languageName = "SC SQL";
       defaultExtension = "scsql";
+      if (INSTANCE == null)
+         INSTANCE = this;
    }
 
    public static SQLLanguage getSQLLanguage() {
+      if (INSTANCE == null)
+         INSTANCE = new SQLLanguage();
       return INSTANCE;
    }
 
@@ -111,6 +115,8 @@ public class SQLLanguage extends SCLanguage {
 
       // Use the Java-like EOLComment inherited from BaseLanguage - replace the first parselet. This changes the default 'spacing' parselet
       EOLComment.set(0, new Symbol("--"));
+      spacing.remove("//");
+      spacing.put("--", EOLComment);
    }
 
    public ICSymbolChoiceSpace binaryOperators = new ICSymbolChoiceSpace("and", "or", "<>", "=", "!=", "<", ">", "<=", ">=",
