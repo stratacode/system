@@ -561,7 +561,9 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       StringBuilder sb = new StringBuilder();
       if (parameters != null && parameters.getNumParameters() > 0) {
          //sb.append("("); part of language string
-         sb.append(parameters.toLanguageString(SCLanguage.getSCLanguage().parameters));
+         String paramStr = parameters.toLanguageString(SCLanguage.getSCLanguage().parameters);
+         paramStr = paramStr.trim();
+         sb.append(paramStr);
          //sb.append(")"); part of language string?
       }
       else
