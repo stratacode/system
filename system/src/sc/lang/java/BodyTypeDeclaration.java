@@ -8569,7 +8569,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          DBTypeDescriptor typeDesc = getDBTypeDescriptor();
          // Only generate the schema for the most specific type
          if (typeDesc != null && !isModifiedBySameType()) {
-            DBProvider dbProvider = ModelUtil.getDBProviderForType(getLayeredSystem(), getLayer(), this);
+            DBProvider dbProvider = DBProvider.getDBProviderForType(getLayeredSystem(), getLayer(), this);
             if (dbProvider != null) {
                dbProvider.processGeneratedFiles(this, typeDesc);
             }
@@ -9078,7 +9078,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
   public void initDBTypeDescriptor() {
       if (!isLayerType && !isLayerComponent())
-         dbTypeDescriptor = ModelUtil.initDBTypeDescriptor(getLayeredSystem(), getLayer(), this);
+         dbTypeDescriptor = DBProvider.initDBTypeDescriptor(getLayeredSystem(), getLayer(), this);
       dbTypeDescriptorInited = true;
   }
 

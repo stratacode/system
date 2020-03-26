@@ -5,9 +5,8 @@
 package sc.classfile;
 
 import sc.db.DBTypeDescriptor;
+import sc.lang.sql.DBProvider;
 import sc.util.*;
-import sc.lang.SemanticNode;
-import sc.lang.sc.ModifyDeclaration;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.lifecycle.ILifecycle;
@@ -979,6 +978,6 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
    }
 
    public DBTypeDescriptor getDBTypeDescriptor() {
-      return ModelUtil.initDBTypeDescriptor(system, layer, this);
+      return DBProvider.initDBTypeDescriptor(system, layer, this);
    }
 }

@@ -101,12 +101,12 @@ public class PropertyDefinitionParameters {
    public void initForVarDef(LayeredSystem sys, Object varDef) {
       Object enclType = ModelUtil.getEnclosingType(varDef);
       Layer propLayer = ModelUtil.getLayerForMember(sys, varDef);
-      DBProvider dbProvider = ModelUtil.getDBProviderForProperty(sys, propLayer, varDef);
+      DBProvider dbProvider = DBProvider.getDBProviderForProperty(sys, propLayer, varDef);
       if (dbProvider != null && dbProvider.getNeedsGetSet()) {
          persist = true;
          dbObjVarName = "_dbObject";
          dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
-         dbPropDesc = ModelUtil.getDBPropertyDescriptor(sys, propLayer, varDef);
+         dbPropDesc = DBProvider.getDBPropertyDescriptor(sys, propLayer, varDef);
          dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
 
          dbGetProperty = dbProvider.evalGetPropertyTemplate(this);

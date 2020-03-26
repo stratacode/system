@@ -18,11 +18,21 @@ public class SQLUtil {
       String typeName = ModelUtil.getTypeName(dbTypeDesc.typeDecl);
       LayeredSystem sys = fromModel.layeredSystem;
 
-      SQLFileModel old = sys.schemaManager.schemasByType.get(typeName);
+      String dataSourceName = dbTypeDesc.dataSourceName;
+      if (dataSourceName == null)
+         dataSourceName = sys.defaultDataSource == null ? null : sys.defaultDataSource.jndiName;
+
+      SQLFileModel old = null;
+      DBProvider provider = null;
+      if (dataSourceName != null) {
+         provider = DBProvider.getDBProviderForType(sys, fromModel.getLayer(), dbTypeDesc.typeDecl);
+         if (provider != null)
+            old = provider.getSchemaForType(dataSourceName, typeName);
+      }
 
       SQLFileModel res = old == null ? new SQLFileModel() : (SQLFileModel) old.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null);
       if (!dbTypeDesc.tablesInitialized)
-         ModelUtil.completeDBTypeDescriptor(dbTypeDesc, sys, fromModel.layer, dbTypeDesc);
+         DBProvider.completeDBTypeDescriptor(dbTypeDesc, sys, fromModel.layer, dbTypeDesc);
       dbTypeDesc.init();
       dbTypeDesc.start();
       res.layeredSystem = sys;
@@ -40,7 +50,8 @@ public class SQLUtil {
                res.addCreateTable(multiTable);
          }
       }
-      sys.schemaManager.schemasByType.put(typeName, res);
+      if (provider != null)
+         provider.addSchema(dataSourceName, typeName, res);
       return res;
    }
 

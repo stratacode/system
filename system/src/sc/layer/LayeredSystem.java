@@ -409,8 +409,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** When building, stores the current mapping of type-name to DBTypeDescriptor, so that we can assemble the reference graph as it's being built for source and compiled classes */
    public Map<String, DBTypeDescriptor> dbTypeDescriptors = null;
 
-   public SchemaManager schemaManager = new SchemaManager(this);
-
    public void addDBTypeDescriptor(String typeName, DBTypeDescriptor dtd) {
       if (dbTypeDescriptors == null)
          dbTypeDescriptors = new HashMap<String,DBTypeDescriptor>();

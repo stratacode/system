@@ -6,14 +6,13 @@ package sc.lang.java;
 
 import sc.db.*;
 import sc.lang.sc.IScopeProcessor;
+import sc.lang.sql.DBProvider;
 import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
-import sc.layer.SrcEntry;
 import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
-import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.util.*;
@@ -177,7 +176,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          dbType = objType.resolve(true);
       else
          dbType = objType;
-      dbTypeDescriptor = ModelUtil.getDBTypeDescriptor(dbType.getLayeredSystem(), dbType.getLayer(), dbType, false);
+      dbTypeDescriptor = DBProvider.getDBTypeDescriptor(dbType.getLayeredSystem(), dbType.getLayer(), dbType, false);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -645,7 +644,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
       if (!dbTypeDescriptor.tablesInitialized) {
          Layer layer = getLayer();
-         ModelUtil.completeDBTypeDescriptor(dbTypeDescriptor, layer.getLayeredSystem(), layer, objType);
+         DBProvider.completeDBTypeDescriptor(dbTypeDescriptor, layer.getLayeredSystem(), layer, objType);
       }
 
       dbTypeDescriptor.init();

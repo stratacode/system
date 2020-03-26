@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.db.DBTypeDescriptor;
+import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
 import sc.type.*;
 import sc.layer.LayeredSystem;
@@ -659,7 +660,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
    }
 
    public DBTypeDescriptor getDBTypeDescriptor() {
-      return ModelUtil.getDBTypeDescriptor(system, getRefLayer(), baseType, false);
+      return DBProvider.getDBTypeDescriptor(system, getRefLayer(), baseType, false);
    }
 
    public String toString() {

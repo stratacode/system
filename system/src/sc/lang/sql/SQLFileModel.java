@@ -1,9 +1,6 @@
 package sc.lang.sql;
 
-import sc.db.DBPropertyDescriptor;
-import sc.db.DBTypeDescriptor;
-import sc.db.DBUtil;
-import sc.db.TableDescriptor;
+import sc.db.*;
 import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.sc.ModifyDeclaration;
@@ -39,7 +36,20 @@ public class SQLFileModel extends SCModel {
       }
 
       LayeredSystem sys = getLayeredSystem();
-      SQLFileModel old = sys.schemaManager.schemasByType.put(fullTypeName, this);
+
+      DBDataSource dataSource = sys.defaultDataSource;
+      if (dataSource == null) {
+         displayWarning("No default data source: skipping scsql file: ");
+         return;
+      }
+      String dataSourceName = dataSource.jndiName;
+      DBProvider provider = DBProvider.getDBProviderForDataSource(sys, getLayer(), dataSourceName);
+      if (provider == null) {
+         displayWarning("No provider for data source: " + dataSourceName + " skipping scsql file: ");
+         return;
+      }
+
+      SQLFileModel old = provider.addSchema(dataSourceName, fullTypeName, this);
       if (old != null) {
          // TODO: should we do a smart merge here - i.e. allow the next create table to override a previous one
          // maybe support way to add to a table - for now, we're just going to let the new one replace the old one
@@ -98,6 +108,8 @@ public class SQLFileModel extends SCModel {
       // TODO: set this on the primary table once it's an ISrcStatement
       //newType.fromStatement = this;
       addTypeDeclaration(newType);
+
+      srcType = newType;
 
       if (primaryTable != null)
          addTableProperties(newType, primaryTable, prevType, true);
@@ -260,7 +272,7 @@ public class SQLFileModel extends SCModel {
                System.err.println("*** Failed to find refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
             }
             else {
-               DBTypeDescriptor refTypeDesc = ModelUtil.getDBTypeDescriptor(layeredSystem, getLayer(), refType, true);
+               DBTypeDescriptor refTypeDesc = DBProvider.getDBTypeDescriptor(layeredSystem, getLayer(), refType, true);
                if (refTypeDesc == null) {
                   System.err.println("*** Failed to find DBTypeDescriptor for refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
                }
@@ -364,5 +376,45 @@ public class SQLFileModel extends SCModel {
       else {
          return generateResult.toString();
       }
+   }
+
+   /** We have an old SQL model that needs to be altered to define the new toModel */
+   public SQLFileModel alterTo(SQLFileModel newModel) {
+      if (sqlCommands == null || sqlCommands.size() == 0)
+         return newModel;
+
+      SQLFileModel resModel = new SQLFileModel();
+
+      for (SQLCommand newCmd:newModel.sqlCommands) {
+         if (newCmd instanceof CreateTable) {
+            CreateTable newTable = (CreateTable) newCmd;
+            CreateTable oldTable = findCreateTable(newTable.tableName.getIdentifier());
+            if (oldTable == null) {
+               resModel.addCommand((SQLCommand) newTable.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null));
+            }
+            else {
+               oldTable.alterTo(resModel, newTable);
+            }
+         }
+         // TODO: handle create sequence, index, view, function, procedure, and more!
+         else {
+            System.err.println("*** Unhandled case for alterTo in generating schema diffs: ");
+         }
+      }
+      return resModel;
+   }
+
+   public void addCommand(SQLCommand cmd) {
+      List<SQLCommand> newCmds;
+      boolean set = false;
+      if (sqlCommands == null) {
+         newCmds = new SemanticNodeList<SQLCommand>();
+         set = true;
+      }
+      else
+         newCmds = sqlCommands;
+      newCmds.add(cmd);
+      if (set)
+         setProperty("sqlCommands", newCmds);
    }
 }

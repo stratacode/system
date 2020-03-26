@@ -15,7 +15,7 @@ import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.sc.SCModel;
 import sc.lang.sc.ModifyDeclaration;
 import sc.lang.sc.PropertyAssignment;
-import sc.layer.IFileProcessorResult;
+import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
@@ -445,7 +445,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
 
    public DBTypeDescriptor getDBTypeDescriptor() {
       if (rootType != null)
-         return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), rootType, false);
+         return DBProvider.getDBTypeDescriptor(getLayeredSystem(), getLayer(), rootType, false);
       return null;
    }
 

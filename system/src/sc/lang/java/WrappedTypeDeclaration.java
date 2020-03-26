@@ -5,6 +5,7 @@
 package sc.lang.java;
 
 import sc.db.DBTypeDescriptor;
+import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
 import sc.type.CTypeUtil;
 import sc.type.DynType;
@@ -377,7 +378,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    public DBTypeDescriptor getDBTypeDescriptor() {
-      return ModelUtil.getDBTypeDescriptor(getLayeredSystem(), getLayer(), baseType, false);
+      return DBProvider.getDBTypeDescriptor(getLayeredSystem(), getLayer(), baseType, false);
    }
 
    public boolean isLayerType() {
