@@ -12,4 +12,8 @@ public class CreateType extends SQLCommand {
 
    void addTableReferences(Set<String> refTableNames) {
    }
+
+   public String toDeclarationString() {
+      return "type " + typeName;
+   }
 }

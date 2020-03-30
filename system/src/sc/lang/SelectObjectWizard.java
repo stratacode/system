@@ -31,7 +31,7 @@ public class SelectObjectWizard extends CommandWizard {
       wizard.statement = st;
       wizard.type = cmd.currentTypes.get(cmd.currentTypes.size()-1);
       wizard.instances = instances;
-      cmd.currentWizard = wizard;
+      cmd.addCommandWizard(wizard);
    }
 
    public String prompt() {
@@ -97,13 +97,13 @@ public class SelectObjectWizard extends CommandWizard {
                }
                else if (statement != null)
                   commandInterpreter.processStatement(statement, true);
-               commandInterpreter.currentWizard = null;
+               commandInterpreter.completeCommandWizard(this);
                break;
          }
       }
       catch (IllegalArgumentException exc) {
          System.err.println(exc.getMessage());
-         commandInterpreter.currentWizard = null;
+         commandInterpreter.completeCommandWizard(this);
       }
       commandInterpreter.pendingInput = new StringBuilder();
       PrintWriter recWriter;

@@ -5,6 +5,10 @@ import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
 
 import javax.sql.DataSource;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
@@ -369,5 +373,23 @@ public class DBUtil {
       else if (operator.equals("||"))
          return "OR";
       return operator;
+   }
+
+   public static StringBuilder readInputStream(InputStream is) {
+      StringBuilder sb = new StringBuilder();
+
+      BufferedReader bis = new BufferedReader(new InputStreamReader(is));
+      char [] buf = new char[4096];
+      int len;
+      try {
+         while ((len = bis.read(buf, 0, buf.length)) != -1) {
+            sb.append(new String(buf, 0, len));
+         }
+         return sb;
+      }
+      catch (IOException exc) {
+         System.err.println("*** Failed to read from input stream: " + exc);
+      }
+      return null;
    }
 }

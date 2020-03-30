@@ -23,7 +23,7 @@ public class SaveModelWizard extends CommandWizard {
       wizard.currentStep = Step.Confirm;
       wizard.verbose = cmd.system.options.info;
       wizard.modelToSave = modelToSave;
-      cmd.currentWizard = wizard;
+      cmd.addCommandWizard(wizard);
    }
 
    public String prompt() {
@@ -46,16 +46,14 @@ public class SaveModelWizard extends CommandWizard {
             case Confirm:
                if (validateYesNo(input, true)) {
                   commandInterpreter.saveModel(modelToSave);
-                  commandInterpreter.currentWizard = null;
                }
-               else
-                  commandInterpreter.currentWizard = null;
+               commandInterpreter.completeCommandWizard(this);
                break;
          }
       }
       catch (IllegalArgumentException exc) {
          System.err.println(exc.getMessage());
-         commandInterpreter.currentWizard = null;
+         commandInterpreter.completeCommandWizard(this);
       }
       commandInterpreter.pendingInput = new StringBuilder();
       PrintWriter recWriter;

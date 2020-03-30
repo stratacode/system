@@ -25,7 +25,7 @@ public class AddLayerWizard extends CommandWizard {
       wizard.commandInterpreter = cmd;
       wizard.currentStep = Step.LayerNames;
       wizard.verbose = cmd.system.options.info;
-      cmd.currentWizard = wizard;
+      cmd.addCommandWizard(wizard);
    }
 
    public String prompt() {
@@ -59,7 +59,7 @@ public class AddLayerWizard extends CommandWizard {
       }
       catch (IllegalArgumentException exc) {
          System.err.println(exc.getMessage());
-         commandInterpreter.currentWizard = null;
+         commandInterpreter.completeCommandWizard(this);
       }
       commandInterpreter.pendingInput = new StringBuilder();
       return Boolean.TRUE;
@@ -68,7 +68,7 @@ public class AddLayerWizard extends CommandWizard {
    public void doAddLayers() {
       LayeredSystem sys = commandInterpreter.system;
       sys.addLayers(layerNames, isDynamic, commandInterpreter.execContext);
-      commandInterpreter.currentWizard = null;
+      commandInterpreter.completeCommandWizard(this);
       commandInterpreter.setCurrentLayer(sys.lastLayer);
    }
 

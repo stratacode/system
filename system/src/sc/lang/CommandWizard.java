@@ -9,8 +9,9 @@ import sc.util.StringUtil;
 import java.util.List;
 
 public abstract class CommandWizard {
-   AbstractInterpreter commandInterpreter;
+   protected AbstractInterpreter commandInterpreter;
    boolean verbose = false;
+   boolean active = false;
 
    public abstract String prompt();
 
@@ -22,6 +23,10 @@ public abstract class CommandWizard {
 
    public int complete(String command, int cursor, List candidates, Object currentType) {
       return -1;
+   }
+
+   public boolean getActive() {
+      return active;
    }
 
    public boolean validateYesNo(String input, boolean theDefault) {
@@ -38,17 +43,17 @@ public abstract class CommandWizard {
          throw new IllegalArgumentException("Answer must be y or n not: '" + input + "'");
    }
 
-   void vprint(String v) {
+   public void vprint(String v) {
       if (!verbose)
          return;
       System.out.println(StringUtil.insertLinebreaks(v, commandInterpreter.getTermWidth()));
    }
 
-   void print(String v) {
+   public void print(String v) {
       System.out.println(StringUtil.insertLinebreaks(v, commandInterpreter.getTermWidth()));
    }
 
-   void output(String v) {
+   public void output(String v) {
       System.out.println(v);
    }
 

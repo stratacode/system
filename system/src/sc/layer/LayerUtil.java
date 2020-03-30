@@ -128,10 +128,10 @@ public class LayerUtil implements LayerConstants {
       return sys.getStrataCodeHomeDir(modelCacheDirName);
    }
 
-   private final static String currentDBSchemasDirName = "currentDBSchemas";
+   private final static String deployedDBSchemasDirName = "deployedDBSchemas";
 
-   public static String getCurrentDBSchemasDir(LayeredSystem sys) {
-      return sys.getStrataCodeHomeDir(currentDBSchemasDirName);
+   public static String getDeployedDBSchemasDir(LayeredSystem sys) {
+      return sys.getStrataCodeHomeDir(deployedDBSchemasDirName);
    }
 
    private static String getModelCacheBaseDir(LayeredSystem sys, Layer layer, SrcEntry srcEnt) {

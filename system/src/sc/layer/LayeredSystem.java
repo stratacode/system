@@ -319,7 +319,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** A global setting turned on when in the IDE.  If true the original runtime is always 'java' - the default.  In the normal build env, if there's only one runtime, we never create the default runtime. */
    public static boolean javaIsAlwaysDefaultRuntime = false;
 
-   AbstractInterpreter cmd;
+   public AbstractInterpreter cmd;
 
    public IExternalModelIndex externalModelIndex = null;
 
@@ -4135,6 +4135,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             else if (sys.layers.size() == 0) {
                sys.cmd.askCreateLayer();
             }
+
             // If we have stuff to do on this thread, we can't use it for the command interpreter so we spawn a new one.
             // Since we have the dyn lock, the prompt() method in the cmd object will block there until we're finished.
             if (options.runClass != null || options.testPattern != null) {
@@ -4159,6 +4160,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
 
          if (options.runClass != null) {
+
             String runFromDir = sys.getRunFromDir();
             if (runFromDir != null) {
                System.setProperty("user.dir", runFromDir);
@@ -4269,7 +4271,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public boolean commandLineEnabled() {
       return cmd != null;
    }
-
 
    // Clients that use the LayeredSystem as a sync object for metadata, or to edit the currently running program should call initSync() at startup.
    // It defines sync mappings for the metadata classes using the sync apis. If we always compiled StrataCode with StrataCode we could use the annotations to register them

@@ -36,6 +36,33 @@ import sc.lang.java.Statement.RuntimeStatus;
 public abstract class AbstractInterpreter extends EditorContext implements IScheduler, Runnable, IDynObject {
    static SCLanguage vlang = SCLanguage.INSTANCE;
 
+   public void addCommandWizard(CommandWizard wizard) {
+      synchronized (wizardStack) {
+         if (currentWizard == null)
+            currentWizard = wizard;
+         else
+            wizardStack.add(wizard);
+      }
+   }
+
+   public void completeCommandWizard(CommandWizard wizard) {
+      synchronized (wizardStack) {
+         if (currentWizard == wizard) {
+            currentWizard = null;
+            if (wizardStack.size() > 0) {
+               currentWizard = wizardStack.get(0);
+               wizardStack.remove(0);
+            }
+         }
+         else if (!wizardStack.remove(wizard)) {
+            if (currentWizard == null)
+               System.err.println("completeCommandWizard called with no currentWizard");
+            else
+               throw new IllegalArgumentException("completeWizard called on non-active wizard");
+         }
+      }
+   }
+
    public class InputSource {
       String inputFileName;
       String inputRelName;
@@ -64,7 +91,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    // a layer file - e.g. testInit.scr
    Layer includeLayer = null;
 
-   StringBuilder pendingInput = new StringBuilder();
+   public StringBuilder pendingInput = new StringBuilder();
 
    boolean returnOnInputChange = false;
 
@@ -220,6 +247,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
            "\n\n";
 
    /** For commands like createLayer, we add a wizard which processes input temporarily */
+   final List<CommandWizard> wizardStack = new ArrayList<CommandWizard>();
    CommandWizard currentWizard = null;
 
    public boolean echoInput = true;

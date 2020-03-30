@@ -214,11 +214,12 @@ public class Options {
     */
    @Constant public boolean syncTypeFilter = true;
 
+   @Constant public boolean startInterpreter = true;
+
    boolean restartArg = false;
    boolean headlessSet = false;
    List<String> includeFiles = null;  // List of files to process
    boolean includingFiles = false;    // The -f option changes the context so we are reading file names
-   boolean startInterpreter = true;
    boolean editLayer = true;
    String commandDirectory = null;
    ArrayList<String> restartArgs = new ArrayList<String>();

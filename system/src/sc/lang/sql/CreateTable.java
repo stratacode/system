@@ -51,4 +51,8 @@ public class CreateTable extends SQLCommand {
             displayError("Unhandled table definition for migration: ");
       }
    }
+
+   public String toDeclarationString() {
+      return "table " + tableName;
+   }
 }

@@ -6,12 +6,9 @@ import sc.lang.java.*;
 import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
-import sc.layer.SrcEntry;
-import sc.layer.SrcIndexEntry;
 import sc.parser.IParseNode;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
-import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.util.*;
@@ -23,6 +20,8 @@ import java.util.*;
 public class DBProvider {
    public String providerName;
    public Layer definedInLayer;
+
+   private ISchemaUpdater schemaUpdater;
 
    public DBProvider(String providerName) {
       this.providerName = providerName;
@@ -714,7 +713,7 @@ public class DBProvider {
 
       SchemaManager schemaMgr = dbSchemas.get(dataSourceName);
       if (schemaMgr == null)
-         dbSchemas.put(dataSourceName, schemaMgr = new SchemaManager(sqlModel.layeredSystem, dataSourceName));
+         dbSchemas.put(dataSourceName, schemaMgr = new SchemaManager(sqlModel.layeredSystem, this, dataSourceName));
 
       SQLFileModel oldModel = schemaMgr.schemasByType.put(typeName, sqlModel);
 
@@ -742,5 +741,13 @@ public class DBProvider {
             schemaMgr.saveCurrentSchema(buildLayer);
          }
       }
+   }
+
+   public ISchemaUpdater getSchemaUpdater() {
+      if (schemaUpdater != null)
+         return schemaUpdater;
+      // This gets defined at when the program starts up so we access them from DataSourceManager.
+      schemaUpdater = DataSourceManager.getSchemaUpdater(providerName);
+      return schemaUpdater;
    }
 }

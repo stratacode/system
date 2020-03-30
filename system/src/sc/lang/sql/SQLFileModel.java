@@ -417,4 +417,35 @@ public class SQLFileModel extends SCModel {
       if (set)
          setProperty("sqlCommands", newCmds);
    }
+
+   public String getCommandSummary() {
+      if (sqlCommands == null)
+         return "<null commands>";
+      StringBuilder sb = new StringBuilder();
+      boolean first = true;
+      for (SQLCommand cmd:sqlCommands) {
+         if (!first)
+            sb.append(" ");
+         first = false;
+         sb.append(cmd.toDeclarationString());
+      }
+      return sb.toString();
+   }
+
+   public List<String> getCommandList() {
+      ArrayList<String> res = new ArrayList<String>(sqlCommands.size());
+      for (int i = 0; i < sqlCommands.size(); i++) {
+         res.add(removeTrailingSemi(sqlCommands.get(i).toLanguageString().trim()));
+      }
+      return res;
+   }
+
+   private String removeTrailingSemi(String in) {
+      int ix = in.lastIndexOf(';');
+      if (ix != -1)
+         return in.substring(0,ix);
+      else
+         System.err.println("*** Missing trailing semi");
+      return in;
+   }
 }

@@ -1,8 +1,5 @@
 package sc.db;
 
-import javax.sql.DataSource;
-import javax.naming.InitialContext;
-
 import java.util.HashMap;
 
 /**
@@ -27,4 +24,14 @@ public class DataSourceManager {
       }
       dataSources.put(jndiName, ds);
    }
+
+   public static HashMap<String, ISchemaUpdater> schemaUpdaters = new HashMap<String, ISchemaUpdater>();
+   public static ISchemaUpdater getSchemaUpdater(String providerName) {
+      return schemaUpdaters.get(providerName);
+   }
+
+   public static void addSchemaUpdater(String providerName, ISchemaUpdater schemaUpdater) {
+      schemaUpdaters.put(providerName, schemaUpdater);
+   }
+
 }

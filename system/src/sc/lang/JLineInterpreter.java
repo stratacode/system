@@ -74,6 +74,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
       }
 
       initReadThread();
+
       do {
          try {
             String nextLine;
@@ -82,6 +83,11 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                currentLine++;
                Object result = null;
                String lastCommand = null;
+               // Wait to the last minute to call getActive so initTypes etc. will have been called. This lets the wizard
+               // access data sources defined in the running app - to get/set the schema.
+               while (currentWizard != null && !currentWizard.getActive()) {
+                  completeCommandWizard(currentWizard);
+               }
                if (currentWizard != null || nextLine.trim().length() != 0) {
                   pendingInput.append(nextLine);
 

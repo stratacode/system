@@ -33,7 +33,7 @@ public class CreateLayerWizard extends CommandWizard {
       wizard.commandInterpreter = cmd;
       wizard.currentStep = askFirst ? Step.Ask : Step.Name;
       wizard.verbose = cmd.system.options.info;
-      cmd.currentWizard = wizard;
+      cmd.addCommandWizard(wizard);
    }
 
    public String prompt() {
@@ -98,7 +98,7 @@ public class CreateLayerWizard extends CommandWizard {
                if (validateYesNo(input, true))
                   currentStep = Step.Name;
                else
-                  commandInterpreter.currentWizard = null;
+                  commandInterpreter.completeCommandWizard(this);
                break;
             case Name:
                try {
@@ -177,13 +177,13 @@ public class CreateLayerWizard extends CommandWizard {
                   currentStep = Step.Confirm;
                   break;
                }
-               commandInterpreter.currentWizard = null;
+               commandInterpreter.completeCommandWizard(this);
                break;
          }
       }
       catch (IllegalArgumentException exc) {
          System.err.println(exc.getMessage());
-         commandInterpreter.currentWizard = null;
+         commandInterpreter.completeCommandWizard(this);
       }
       commandInterpreter.pendingInput = new StringBuilder();
       PrintWriter recWriter;
