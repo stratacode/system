@@ -286,7 +286,7 @@ public class Sequence extends NestedParselet  {
 
                         // Now see if this computed value extends any of our most specific errors.  If so, this error
                         // can be used to itself extend other errors based on the EOF parsing.
-                        if ((extendsPartialValue(parser, childParselet, value, anyContent, startIndex, err) && anyContent) || err.eof || pv != null || isBetterError) {
+                        if ((extendsPartialValue(parser, childParselet, value, anyContent, startIndex, err) && anyContent) || err.eof || pv != null || (anyContent && isBetterError)) {
                            if (!err.eof || !value.isEmpty()) {
                               if (optional && value.isEmpty())
                                  return null;
