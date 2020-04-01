@@ -11,7 +11,7 @@ import java.util.List;
 public abstract class CommandWizard {
    protected AbstractInterpreter commandInterpreter;
    boolean verbose = false;
-   boolean active = false;
+   boolean active = true;
 
    public abstract String prompt();
 
