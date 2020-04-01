@@ -9,7 +9,7 @@ import java.util.Set;
 public class ColumnDef extends TableDef {
    public SQLIdentifier columnName;
    public SQLDataType columnType;
-   public String collation;
+   public Collation collation;
    public NamedConstraint constraintName;
    public List<SQLConstraint> columnConstraints;
 

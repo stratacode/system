@@ -7,7 +7,7 @@ import java.util.List;
 
 public class ForeignKeyConstraint extends SQLConstraint {
    public List<SQLIdentifier> columnList;
-   public String refTable;
+   public SQLIdentifier refTable;
    public List<SQLIdentifier> refColList;
    public String matchOption;
    public String onOptions;

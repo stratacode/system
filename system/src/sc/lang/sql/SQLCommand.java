@@ -10,4 +10,8 @@ public abstract class SQLCommand extends JavaSemanticNode {
    }
 
    abstract void addTableReferences(Set<String> refTableNames);
+
+   public SQLCommand getDropCommand() {
+      return null;
+   }
 }

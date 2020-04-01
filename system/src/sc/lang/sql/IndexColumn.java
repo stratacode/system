@@ -1,0 +1,7 @@
+package sc.lang.sql;
+
+import sc.lang.SemanticNode;
+
+public class IndexColumn extends BaseIndexColumn {
+   public SQLIdentifier columnName;
+}

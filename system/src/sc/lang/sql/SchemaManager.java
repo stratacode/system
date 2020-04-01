@@ -29,6 +29,7 @@ public class SchemaManager {
    public Map<String,SQLFileModel> schemasByType = new HashMap<String, SQLFileModel>();
    /** Ordered list of SQL commands for for all types */
    public ArrayList<SQLFileModel> currentSchema = new ArrayList<SQLFileModel>();
+   public ArrayList<SQLFileModel> alterSchema = new ArrayList<SQLFileModel>();
 
    /** True the first time a layer is built and we have not yet captured a schema */
    boolean noCurrentSchema = false;
@@ -122,6 +123,7 @@ public class SchemaManager {
                      continue;
                   }
                   SQLFileModel dbModel = (SQLFileModel) ParseUtil.nodeToSemanticValue(parseRes);
+                  dbModel.srcType = newSchema.srcType;
                   // This model already matches what's in the database schema so it's not actually a new model
                   if (dbModel.equals(newSchema)) {
                      newModels.remove(newSchema);
@@ -179,13 +181,14 @@ public class SchemaManager {
             String oldFileBody = FileUtil.getFileAsString(curSchemaFileName);
             String curFileBody = sqlModel.toLanguageString();
             if (!oldFileBody.equals(curFileBody)) {
-               Object parseRes = SQLLanguage.getSQLLanguage().parseString(curFileBody);
+               Object parseRes = SQLLanguage.getSQLLanguage().parseString(oldFileBody);
                if (parseRes instanceof ParseError) {
                   System.err.println("*** Unable to parse deployedSchema sql file: " + curSchemaFileName + ": " + parseRes);
                }
                else {
                   SQLFileModel oldModel = (SQLFileModel) ParseUtil.nodeToSemanticValue(parseRes);
-                  changedTypes.add(new SchemaTypeChange(typeName, sqlModel, oldModel));
+                  oldModel.srcType = sqlModel.srcType;
+                  changedTypes.add(new SchemaTypeChange(typeName, oldModel, sqlModel));
                }
             }
          }
@@ -228,7 +231,6 @@ public class SchemaManager {
    }
 
    void updateAlterSchema(Layer buildLayer) {
-      ArrayList<SQLFileModel> alterSchema = new ArrayList<SQLFileModel>();
       for (SQLFileModel newModel:newModels)
          addToSchemaList(alterSchema, newModel);
       for (SchemaTypeChange change:changedTypes) {
@@ -300,6 +302,10 @@ public class SchemaManager {
       return convertSQLModelsToString(currentSchema, "Database schema");
    }
 
+   public StringBuilder getAlterSchema() {
+      return convertSQLModelsToString(alterSchema, "Alter table script");
+   }
+
    public void saveCurrentSchema(Layer buildLayer) {
       StringBuilder schemaSB = getCurrentSchema();
 
@@ -357,7 +363,7 @@ public class SchemaManager {
          return changedTypes.get(index).fromModel.srcType.getFullTypeName();
    }
 
-   public boolean updateSchema(Layer buildLayer) {
+   public boolean updateSchema(Layer buildLayer, boolean doAlter) {
       ISchemaUpdater updater = provider.getSchemaUpdater();
       if (updater == null) {
          throw new IllegalArgumentException("No schema updater configured");
@@ -373,7 +379,8 @@ public class SchemaManager {
          curVersion.setSchemaSQL(schemaSQL);
          curVersion.setDateApplied(new Date());
          try {
-            updater.applyAlterCommands(dataSourceName, newModel.getCommandList());
+            if (doAlter)
+               updater.applyAlterCommands(dataSourceName, newModel.getCommandList());
          }
          catch (IllegalArgumentException exc) {
             DBUtil.error("Update schema failed: " + exc.getMessage() + exc.getCause());
@@ -393,10 +400,11 @@ public class SchemaManager {
          String alterSQL = change.alterModel.toLanguageString();
          curVersion.setAlterSQL(alterSQL);
          try {
-            updater.applyAlterCommands(dataSourceName, change.alterModel.getCommandList());
+            if (doAlter)
+               updater.applyAlterCommands(dataSourceName, change.alterModel.getCommandList());
          }
          catch (IllegalArgumentException exc) {
-            DBUtil.error("Error applying alter schema SQL for type: " + typeName + ":\n" + alterSQL);
+            DBUtil.error("Applying alter SQL for type: " + typeName + ": " + exc.getMessage() + exc.getCause());
             return false;
          }
          updateDBSchema(updater, typeName, info, newModel, buildLayer);

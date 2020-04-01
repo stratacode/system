@@ -4,5 +4,5 @@ import sc.lang.SemanticNode;
 
 import java.util.Set;
 
-public abstract class TableDef extends SQLDefinition {
+public abstract class AlterCmd extends SemanticNode {
 }

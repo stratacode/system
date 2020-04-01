@@ -52,21 +52,23 @@ public class SchemaUpdateWizard extends CommandWizard {
             break;
       }
       //return "Enter: h - help, u - update, P - show new, O - show deployed: [hulPpOoq]: ";
-      return "Enter [hulPpOoq<i>]: ";
+      return "Enter [hcunolNOtaq<i>]: ";
    }
 
    private void usage() {
       if (mgr.provider.getSchemaUpdater() == null)
          printNoSchemaUpdater();
+      print("   c - show changes to update existing schema");
       print("   u - update schema");
+      print("   n - show new schema");
+      print("   o - show deployed schema for all types");
       print("   l - list new/changed types");
-      print("   P - show all changes");
-      print("   p - show schema for current type");
-      print("   O - show deployed schema for all types");
-      print("   o - show current deployed schema for current type ");
+      print("   N - show schema/changes for current type");
+      print("   O - show current deployed schema for current type ");
       print("   q - quit schema update wizard");
-      print("   n - go to next type");
-      print(" <i> - select by the number of the type");
+      print("   t - go to next type");
+      print("   a - accept current schema for this layer without updating database schema");
+      print(" <i> - select type by number");
    }
 
    private void printNoSchemaUpdater() {
@@ -162,28 +164,39 @@ public class SchemaUpdateWizard extends CommandWizard {
                case 'l':
                   printList();
                   break;
-               case 'p':
+               case 'c':
+                  StringBuilder alterSB = mgr.getAlterSchema();
+                  if (alterSB == null) {
+                     print("--- No deployed db schema. Use 'n' to show new database schema.");
+                  }
+                  else {
+                     print("--- SQL commands to update schema:");
+                     print(alterSB.toString());
+                     print("---");
+                  }
+                  break;
+               case 'N':
                   printNewType();
                   break;
-               case 'P':
-                  print("--- New database schema:");
+               case 'n':
+                  print("--- SQL commands to create new database schema:");
                   print(mgr.getCurrentSchema().toString());
                   print("---");
                   break;
-               case 'n':
+               case 't':
                   if (currentTypeIx + 1 >= mgr.getNumChangedTypes())
                      print("No more changed types - " + mgr.getNumChangedTypes());
                   else
                      currentTypeIx++;
                   printCurrentType();
                   break;
-               case 'o':
+               case 'O':
                   if (mgr.provider.getSchemaUpdater() == null)
                      printNoSchemaUpdater();
                   else
                      printDeployedDBType();
                   break;
-               case 'O':
+               case 'o':
                   if (mgr.provider.getSchemaUpdater() == null)
                      printNoSchemaUpdater();
                   else
@@ -194,11 +207,25 @@ public class SchemaUpdateWizard extends CommandWizard {
                      printNoSchemaUpdater();
                   else {
                      print("Updating schema...");
-                     if (mgr.updateSchema(system.buildLayer))
+                     if (mgr.updateSchema(system.buildLayer, true))
                         print("Schema update complete...");
                      else
                         print("Schema update failed");
                   }
+                  break;
+               case 'a':
+                  if (mgr.provider.getSchemaUpdater() == null)
+                     printNoSchemaUpdater();
+                  else {
+                     print("Accepting existing schema...");
+                     if (mgr.updateSchema(system.buildLayer, false))
+                        print("Accept schema complete...");
+                     else
+                        print("Accept schema failed");
+                  }
+                  break;
+               default:
+                  print("Unrecognized command: " + cmdChar);
                   break;
             }
             break;
@@ -220,6 +247,8 @@ public class SchemaUpdateWizard extends CommandWizard {
          print(change.fromModel.toLanguageString());
          print("   --- new schema:");
          print(change.toModel.toLanguageString());
+         print("   --- alter schema:");
+         print(change.alterModel.toLanguageString());
          // TODO: print alter table schema here?
       }
    }

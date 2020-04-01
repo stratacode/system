@@ -22,7 +22,7 @@ public class SQLLanguage extends SCLanguage {
            "default", "deferrable", "desc", "distinct", "do", "else", "end", "except", "false", "for", "foreign", "from", "grant", "group", "having", "in",
            "initially", "intersect", "into", "limit", "localtime", "localtimestamp", "new", "not", "null", "off", "offset", "old", "on", "only", "or", "order",
            "placing", "primary", "references", "select", "session_user", "some", "symmetric", "table", "then", "to", "trailing", "true", "union", "unique", "user",
-           "using", "when", "where", "with"};
+           "using", "when", "where", "with", "nulls", "include"};
 
    protected static Set<IString> ALL_SQL_KEYWORDS = new HashSet<IString>(Arrays.asList(PString.toPString(ALL_SQL_KEYWORDS_ARR)));
 
@@ -59,6 +59,9 @@ public class SQLLanguage extends SCLanguage {
    class ICSymbolSpace extends SymbolSpace {
       ICSymbolSpace(String s) {
          super(s, IGNORE_CASE);
+      }
+      ICSymbolSpace(String s, int opts) {
+         super(s, opts | IGNORE_CASE);
       }
    }
 
@@ -129,14 +132,24 @@ public class SQLLanguage extends SCLanguage {
                                new Sequence("(,[])", OPTIONAL | REPEAT, new SymbolSpace("."), identifier)));
 
    OrderedChoice sqlIdentifier = new OrderedChoice("(.,.)", sqlQualifiedIdentifier, quotedIdentifier);
+   OrderedChoice optSqlIdentifier = (OrderedChoice) sqlIdentifier.copyWithOptions(OPTIONAL);
 
    Sequence sqlIdentifierList = new Sequence("(,[],[],)", openParen, sqlIdentifier, new Sequence("(,[])", REPEAT | OPTIONAL, comma, sqlIdentifier), closeParen);
+   {
+      sqlIdentifierList.minContentSlot = 1;
+   }
    Sequence optSqlIdentifierList = (Sequence) sqlIdentifierList.copyWithOptions(OPTIONAL);
 
    Sequence withOperand = new Sequence("WithOperand(identifier,,operand)", sqlIdentifier, withKeyword, binaryOperators);
    Sequence withOpList = new Sequence("(,[],[],)", openParen, withOperand, new Sequence("(,[])", REPEAT | OPTIONAL, comma, withOperand), closeParen);
+   {
+      withOpList.minContentSlot = 1;
+   }
 
    Sequence sequenceOptions = new Sequence("(,'',)", OPTIONAL, comma, new OrderedChoice("('','')", digits, new ICSymbolChoiceSpace("start", "with")), comma);
+   {
+      sequenceOptions.minContentSlot = 1;
+   }
 
    public Sequence sqlQuotedStringLiteral = new Sequence("QuotedStringLiteral(,value,)", singleQuote, sqlSingleQuoteEscapedStringBody, endSingleQuote);
    public Sequence escapedStringLiteral = new Sequence("QuotedStringLiteral(,value,)", singleQuote, escapedSingleQuoteString, endSingleQuote);
@@ -163,6 +176,9 @@ public class SQLLanguage extends SCLanguage {
    Sequence sqlBinaryOperands = new Sequence("SQLBinaryOperand(operator,rhs)", OPTIONAL | REPEAT, binaryOperators, sqlPrimary);
    public Sequence sqlExpression = new ChainedResultSequence("SQLBinaryExpression(firstExpr,operands)", sqlPrimary, sqlBinaryOperands);
    Sequence sqlParenExpression = new Sequence("SQLParenExpression(,expression,)" , openParen, sqlExpression, closeParenSkipOnError);
+   {
+      sqlParenExpression.minContentSlot = 1;
+   }
    Sequence sqlExpressionList = new Sequence("([],[])", OPTIONAL, sqlExpression, new Sequence("(,[])", OPTIONAL | REPEAT, comma, sqlExpression));
    Sequence functionCall = new Sequence("FunctionCall(functionName,,expressionList,)", sqlQualifiedIdentifier, openParen, sqlExpressionList, closeParenSkipOnError);
    Sequence trueLiteral = new Sequence("SQLTrueLiteral(value)", trueKeyword);
@@ -226,15 +242,24 @@ public class SQLLanguage extends SCLanguage {
    Sequence colPrimaryKeyConstraint = new Sequence("PrimaryKeyConstraint(,,indexParams)", primaryKeyword, keyKeyword, indexParameters);
    Sequence tablePrimaryKeyConstraint = new Sequence("PrimaryKeyConstraint(,,columnList,indexParams)", primaryKeyword, keyKeyword, sqlIdentifierList, indexParameters);
 
-   Sequence usingMethod = new Sequence("(,'')",OPTIONAL, new ICSymbolSpace("using"), identifier);
+   ICSymbolSpace usingKeyword = new ICSymbolSpace("using");
+
+   Sequence usingMethod = new Sequence("(,'')", OPTIONAL, usingKeyword, identifier);
+
+   Sequence usingExpression = new Sequence("(,.)", OPTIONAL, new ICSymbolSpace("using"), sqlExpression);
 
    Sequence optWhereClause = new Sequence("WhereClause(,expression)", OPTIONAL, whereKeyword, sqlExpression);
 
    Sequence excludeConstraint = new Sequence("ExcludeConstraint(,usingMethod,withOpList,indexParams,whereClause)", new ICSymbolSpace("exclude"), usingMethod, withOpList, indexParameters, optWhereClause);
 
    Sequence optColumnRef = new Sequence("(,.,)", OPTIONAL, openParen, sqlIdentifier, closeParen);
+   {
+      optColumnRef.minContentSlot = 1;
+   }
 
    Sequence matchOption = new Sequence("(,'')", OPTIONAL, matchKeyword, new ICSymbolChoiceSpace("full", "partial", "simple"));
+
+
 
    Sequence onOptions = new Sequence("OnOption(,onType,action)", OPTIONAL | REPEAT, onKeyword, new ICSymbolChoiceSpace("delete", "update"),
                                     new OrderedChoice(new ICSymbolChoiceSpace("restrict", "cascade"), new Sequence(noKeyword, actionKeyword), new Sequence(setKeyword, new OrderedChoice(nullKeyword, defaultKeyword))));
@@ -253,15 +278,20 @@ public class SQLLanguage extends SCLanguage {
                                                  new ICSymbolSpace("foreign"), keyKeyword, sqlIdentifierList,
                                                  referencesKeyword, sqlIdentifier, optSqlIdentifierList, matchOption, onOptions);
 
-   Sequence collation = new Sequence("(,'')", OPTIONAL, new ICSymbolSpace("collate"), quotedIdentifier);
+   // Here we keep the collate keyword as part of the value because it won't generate properly without it.
+   Sequence collation = new Sequence("Collation(, identifier)", OPTIONAL, new ICSymbolSpace("collate"), quotedIdentifier);
 
    ICSymbolChoiceSpace intervalOptions = new ICSymbolChoiceSpace(OPTIONAL, "YEAR", "MONTH", "DAY", "HOUR", "MINUTE", "SECOND", "YEAR TO MONTH", "DAY TO HOUR", "DAY TO MINUTE",
                                                                  "DAY TO SECOND", "HOUR TO MINUTE", "HOUR TO SECOND", "MINUTE TO SECOND");
 
    Sequence sizeList = new Sequence("(,[],)", OPTIONAL | REPEAT, openParen, digits, closeParen);
+   {
+      sizeList.minContentSlot = 1;
+   }
    Sequence dimsList = new Sequence("(,[],)", OPTIONAL | REPEAT, openSqBracket, optDigits, closeSqBracket);
    {
       dimsList.allowNullElements = true; // We need to store an empty element when there are no digits to keep track of the brackets themselves
+      dimsList.minContentSlot = 1;
    }
    public Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
 
@@ -286,6 +316,8 @@ public class SQLLanguage extends SCLanguage {
 
    Sequence ifNotExists = new Sequence("('','','')", OPTIONAL, ifKeyword, notKeyword, existsKeyword);
 
+   Sequence ifExists = new Sequence("('','')", OPTIONAL, ifKeyword, existsKeyword);
+
    Sequence tableSpace = new Sequence("(,'')", OPTIONAL, new ICSymbolSpace("tablespace"), identifier);
 
    Sequence ofType = new Sequence("(,.)", OPTIONAL, ofKeyword, sqlIdentifier);
@@ -304,14 +336,77 @@ public class SQLLanguage extends SCLanguage {
    // TODO: create type 'as enum' and 'as range' and with input/output params
    Sequence createType = new Sequence("CreateType(,typeName,,,tableDefs,)", typeKeyword, sqlIdentifier, asKeyword, openParen, tableDefList, closeParen);
 
-   Sequence dropTable = new Sequence("DropTable(,tableNameList,dropOptions)", tableKeyword, sqlIdentifierList, new ICSymbolChoiceSpace("cascade", "restrict"));
+   ICSymbolSpace indexKeyword = new ICSymbolSpace("index");
 
-   OrderedChoice createChoice = new OrderedChoice("(.,.)", createTable, createType);
+   Sequence indexColIdent = new Sequence("IndexColumn(columnName)", sqlIdentifier);
+   Sequence indexColExpr = new Sequence("IndexColumnExpr(expression)", sqlExpression);
+   OrderedChoice indexColumnElem = new OrderedChoice("(.,.)", indexColIdent, indexColExpr);
+   Sequence indexColumn = new Sequence("(.,collation,opClass,sortDir,nullDir)", indexColumnElem, collation, optIdentifier,
+           new ICSymbolChoiceSpace(OPTIONAL, "asc", "desc"),
+           new Sequence("(,'')", OPTIONAL, new ICSymbolSpace("nulls"), new ICSymbolChoiceSpace("first", "last")));
+
+   Sequence indexColumnList = new Sequence("([],[])", indexColumn, new Sequence("(,[])", REPEAT | OPTIONAL, commaEOL, indexColumn));
+
+   ICSymbolSpace optConcurrentlyKeyword = new ICSymbolSpace("concurrently", OPTIONAL);
+   ICSymbolSpace includeKeyword = new ICSymbolSpace("include");
+
+   Sequence optIncludeColumns = new Sequence("(,.)", OPTIONAL, includeKeyword, sqlIdentifierList);
+
+   Sequence createIndex = new Sequence("CreateIndex(unique,,concurrently,indexName,,tableName,usingMethod,,indexColumns,,includeColumns,withOpList,tableSpace,whereClause)",
+                                       new ICSymbolSpace("unique", OPTIONAL),
+                                       indexKeyword, optConcurrentlyKeyword,
+                                       optSqlIdentifier, onKeyword, sqlIdentifier, usingMethod, openParen, indexColumnList, closeParen,
+                                       optIncludeColumns, indexParameters, tableSpace, optWhereClause);
+
+   OrderedChoice createChoice = new OrderedChoice("(.,.,.)", createTable, createType, createIndex);
    Sequence createCommand = new Sequence("(,.,)", new ICSymbolSpace("create"), createChoice, semicolonEOL);
-   OrderedChoice dropChoice = new OrderedChoice("(.,.)", dropTable);
-   Sequence dropCommand = new Sequence("(,.,)", new ICSymbolSpace("drop"), dropChoice, semicolonEOL);
 
-   public OrderedChoice sqlCommands = new OrderedChoice( "([])", REPEAT | OPTIONAL, createCommand);
+   ICSymbolChoiceSpace dropOptions = new ICSymbolChoiceSpace(OPTIONAL, "cascade", "restrict");
+
+   Sequence dropTable = new Sequence("DropTable(,tableNames,dropOptions)", tableKeyword, sqlIdentifierList, dropOptions);
+   Sequence dropType = new Sequence("DropType(,typeNames,dropOptions)", typeKeyword, sqlIdentifierList, dropOptions);
+   Sequence dropIndex = new Sequence("DropIndex(,concurrently,ifExists,indexNames,dropOptions)", typeKeyword, optConcurrentlyKeyword, ifExists, sqlIdentifierList, dropOptions);
+
+   ICSymbolSpace dropKeyword = new ICSymbolSpace("drop");
+
+   OrderedChoice dropChoice = new OrderedChoice("(.,.,.)", dropTable, dropType, dropIndex);
+
+   Sequence dropCommand = new Sequence("(,.,)", dropKeyword, dropChoice, semicolonEOL);
+
+   ICSymbolSpace optColumnKeyword = new ICSymbolSpace("column", OPTIONAL);
+
+   Sequence addColumn = new Sequence("AddColumn(,,ifNotExists,columnDef)", new ICSymbolSpace("add"), optColumnKeyword, ifNotExists, columnDef);
+   Sequence dropColumn = new Sequence("DropColumn(,,ifExists,columnName,dropOptions)", dropKeyword, optColumnKeyword, ifExists, sqlIdentifier, dropOptions);
+
+   Sequence alterSetType = new Sequence("AlterSetType(,,columnType,collation,usingExpression)",
+                                        new Sequence(OPTIONAL, setKeyword, new ICSymbolSpace("data")),
+                                        typeKeyword, sqlDataType, collation, usingExpression);
+
+   Sequence alterSetDefault = new Sequence("AlterSetDefault(,,expression)", setKeyword, defaultKeyword, sqlExpression);
+   Sequence alterDropDefault = new Sequence("AlterDropDefault(,)", dropKeyword, defaultKeyword);
+   Sequence alterUpdateNotNull = new Sequence("AlterUpdateNotNull(op,)", new ICSymbolChoiceSpace("set", "drop"), new Sequence(notKeyword, nullKeyword));
+
+   OrderedChoice alterCmd = new OrderedChoice("(.,.,.,.)", alterSetType, alterSetDefault, alterDropDefault, alterUpdateNotNull);
+
+   Sequence alterColumn = new Sequence("AlterColumn(,,columnName,alterCmd)", new ICSymbolSpace("alter"), optColumnKeyword, sqlIdentifier, alterCmd);
+
+   ICSymbolSpace renameKeyword = new ICSymbolSpace("rename");
+   ICSymbolSpace toKeyword = new ICSymbolSpace("to");
+
+   Sequence renameColumn = new Sequence("RenameColumn(,,oldColumnName,,newColumnName)", renameKeyword, optColumnKeyword, sqlIdentifier, toKeyword, sqlIdentifier);
+   Sequence renameTable = new Sequence("RenameTable(,,newTableName)", renameKeyword, toKeyword, sqlIdentifier);
+
+   OrderedChoice alterDef = new OrderedChoice("(.,.,.,.,.)", addColumn, dropColumn, alterColumn, renameColumn, renameTable);
+
+   Sequence alterDefs = new Sequence("([],[])", alterDef, new Sequence("(,[])", REPEAT | OPTIONAL, commaEOL, alterDef));
+
+   Sequence alterTable = new Sequence("AlterTable(,ifExists,only,tableName,alterDefs)",
+           new ICSymbolSpace("table"), ifExists, new ICSymbolSpace("only", OPTIONAL), sqlIdentifier, alterDefs);
+
+   OrderedChoice alterChoice = new OrderedChoice("(.)", alterTable);
+   Sequence alterCommand = new Sequence("(,.,)", new ICSymbolSpace("alter"), alterChoice, semicolonEOL);
+
+   public OrderedChoice sqlCommands = new OrderedChoice( "([],[],[])", REPEAT | OPTIONAL, createCommand, alterCommand, dropCommand);
 
    public Sequence sqlFileModel = new Sequence("SQLFileModel(,sqlCommands,)", spacing, sqlCommands, new Symbol(EOF));
 

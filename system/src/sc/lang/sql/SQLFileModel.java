@@ -384,6 +384,7 @@ public class SQLFileModel extends SCModel {
          return newModel;
 
       SQLFileModel resModel = new SQLFileModel();
+      resModel.srcType = newModel.srcType;
 
       for (SQLCommand newCmd:newModel.sqlCommands) {
          if (newCmd instanceof CreateTable) {
@@ -400,6 +401,22 @@ public class SQLFileModel extends SCModel {
          else {
             System.err.println("*** Unhandled case for alterTo in generating schema diffs: ");
          }
+      }
+      return resModel;
+   }
+
+   public SQLFileModel createDropSQL() {
+      SQLFileModel resModel = new SQLFileModel();
+      resModel.srcType = srcType;
+
+      if (sqlCommands == null)
+         return null;
+
+      for (int i = sqlCommands.size() - 1; i >= 0; i--) {
+         SQLCommand srcCmd = sqlCommands.get(i);
+         SQLCommand dropCmd = srcCmd.getDropCommand();
+         if (dropCmd != null)
+            resModel.addCommand(dropCmd);
       }
       return resModel;
    }
@@ -447,5 +464,17 @@ public class SQLFileModel extends SCModel {
       else
          System.err.println("*** Missing trailing semi");
       return in;
+   }
+
+   /** TODO: we should have a way to figure out the parselet for a top-level semantic node class to make this unnecessary */
+   public String toLanguageString() {
+      if (parseNode == null) {
+         Object genRes = SQLLanguage.INSTANCE.generate(this, false);
+         if (genRes instanceof IParseNode)
+            parseNode = (IParseNode) genRes;
+         else
+            System.out.println("Generation error for sql model: " + toModelString());
+      }
+      return super.toLanguageString();
    }
 }

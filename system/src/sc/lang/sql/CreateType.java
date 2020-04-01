@@ -1,6 +1,8 @@
 package sc.lang.sql;
 
+import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
+import sc.lang.SemanticNodeList;
 import sc.parser.IString;
 
 import java.util.List;
@@ -15,5 +17,12 @@ public class CreateType extends SQLCommand {
 
    public String toDeclarationString() {
       return "type " + typeName;
+   }
+
+   public SQLCommand getDropCommand() {
+      DropType dt = new DropType();
+      dt.typeNames = new SemanticNodeList<SQLIdentifier>();
+      dt.typeNames.add((SQLIdentifier) typeName.deepCopy(ISemanticNode.CopyNormal, null));
+      return dt;
    }
 }
