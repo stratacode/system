@@ -5,6 +5,7 @@ import sc.parser.*;
 import sc.type.TypeUtil;
 import sc.util.StringUtil;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -37,6 +38,8 @@ public class SQLLanguage extends SCLanguage {
       super(layer);
       setStartParselet(sqlFileModel);
       addToSemanticValueClassPath("sc.lang.sql");
+      addToSemanticValueClassPath("sc.lang.sql.seqOpt");
+      addToSemanticValueClassPath("sc.lang.sql.funcOpt");
       languageName = "SC SQL";
       defaultExtension = "scsql";
       if (INSTANCE == null)
@@ -74,8 +77,55 @@ public class SQLLanguage extends SCLanguage {
       }
    }
 
+   class ICKeywordChoice extends KeywordChoice {
+      ICKeywordChoice(int options, String...values) {
+         super("('',,)", options | IGNORE_CASE, true, values);
+      }
+      ICKeywordChoice(String...values) {
+         super("('',,)", IGNORE_CASE, true, values);
+      }
+   }
+
+   /**
+    * Works like ICSymbolChoiceSpace but supports multi-word symbols separated by whitespace. Configures this OrderedChoice
+    * to select one of the specific values. It's an OrderedChoice where we use one ICSymbolSpace for each one word symbol
+    * and a Sequence of ICSymbolSpace's for multi-word symbols.
+    */
+   class ICMultiSymbolChoice extends OrderedChoice {
+      public ICMultiSymbolChoice(String baseName, int options, String...values) {
+         super(options);
+         ArrayList<Parselet> children = new ArrayList<Parselet>();
+         int ct = 0;
+         for (String value:values) {
+            Parselet child;
+            if (value.indexOf(' ') != -1) {
+               String[] words = StringUtil.split(value, ' ');
+               ArrayList<Parselet> wordPList = new ArrayList<Parselet>();
+               StringBuilder nameSB = new StringBuilder("<" + baseName + "-" + ct + ">(");
+               int wordCt = 0;
+               for (String word:words) {
+                  if (wordCt != 0)
+                     nameSB.append(", ");
+                  wordPList.add(new ICSymbolSpace(word));
+                  nameSB.append("''");
+                  wordCt++;
+               }
+               nameSB.append(")");
+               child = new Sequence(nameSB.toString(), wordPList.toArray(new Parselet[wordPList.size()]));
+            }
+            else {
+               child = new ICSymbolSpace(value);
+            }
+            children.add(child);
+            ct++;
+         }
+         for (Parselet child:children)
+            add(child);
+      }
+   }
+
    enum DollarTagType {
-      Start, Body, End
+      Start, End
    }
 
    ICSymbolSpace noKeyword = new ICSymbolSpace("no");
@@ -102,6 +152,8 @@ public class SQLLanguage extends SCLanguage {
    ICSymbolSpace typeKeyword = new ICSymbolSpace("type");
    ICSymbolSpace existsKeyword = new ICSymbolSpace("exists");
    ICSymbolSpace dollarKeyword = new ICSymbolSpace("$");
+   ICSymbolSpace byKeyword = new ICSymbolSpace("by");
+   ICSymbolSpace optByKeyword = new ICSymbolSpace("by", OPTIONAL);
 
    ICSymbol dollarSymbol = new ICSymbol("$");
 
@@ -146,20 +198,17 @@ public class SQLLanguage extends SCLanguage {
       withOpList.minContentSlot = 1;
    }
 
-   Sequence sequenceOptions = new Sequence("(,'',)", OPTIONAL, comma, new OrderedChoice("('','')", digits, new ICSymbolChoiceSpace("start", "with")), comma);
-   {
-      sequenceOptions.minContentSlot = 1;
-   }
-
    public Sequence sqlQuotedStringLiteral = new Sequence("QuotedStringLiteral(,value,)", singleQuote, sqlSingleQuoteEscapedStringBody, endSingleQuote);
    public Sequence escapedStringLiteral = new Sequence("QuotedStringLiteral(,value,)", singleQuote, escapedSingleQuoteString, endSingleQuote);
    public Sequence bitStringLiteral = new Sequence("BitStringLiteral(,value,)", singleQuote, binaryDigits, endSingleQuote);
    public Sequence hexStringLiteral = new Sequence("HexStringLiteral(,value,)", singleQuote, hexDigits, endSingleQuote);
 
+   public Symbol dollarTagId = new Symbol(OPTIONAL | NOT | REPEAT, "$");
+
    public Sequence startDollar = new DollarTag(DollarTagType.Start, 0);
    public Sequence endDollar = new DollarTag(DollarTagType.End, 0);
 
-   public Sequence dollarStringBody = new DollarTag(DollarTagType.Body, NOT);
+   public OrderedChoice dollarStringBody = new OrderedChoice("('',)", REPEAT | OPTIONAL, new Symbol(NOT, "$"), new Sequence(dollarSymbol, new DollarTagBody()));
 
    public Sequence dollarStringLiteral = new Sequence("DollarStringLiteral(,value,,)", startDollar, dollarStringBody, endDollar, spacing);
 
@@ -216,6 +265,37 @@ public class SQLLanguage extends SCLanguage {
       sqlPrimary.addDefault(functionCall, sqlIdentifierExpression, sqlPrefixUnaryExpression, keywordLiteral);
    }
 
+   public IndexedChoice sqlStringLiteral = new IndexedChoice();
+   {
+      sqlStringLiteral.put("'", sqlQuotedStringLiteral);
+      sqlStringLiteral.put("$", dollarStringLiteral);
+      // TODO: does escapedStringLiteral belong here?
+   }
+
+   ICSymbolSpace cycleKeyword = new ICSymbolSpace("cycle");
+   ICSymbolSpace minValueKeyword = new ICSymbolSpace("minvalue");
+   ICSymbolSpace maxValueKeyword = new ICSymbolSpace("maxvalue");
+
+   Sequence seqValue = new Sequence("(negativeValue,.)", new ICSymbolSpace("-", OPTIONAL), numericConstant);
+
+   Sequence incrementBy = new Sequence("IncrementSeqOpt(,,value)", new ICSymbolSpace("increment"), optByKeyword, seqValue);
+   Sequence noMinValue = new Sequence("NoMinSeqOpt(,)", noKeyword, minValueKeyword);
+   Sequence noMaxValue = new Sequence("NoMaxSeqOpt(,)", noKeyword, maxValueKeyword);
+   Sequence minValue = new Sequence("MinSeqOpt(,value)", minValueKeyword, seqValue);
+   Sequence maxValue = new Sequence("MaxSeqOpt(,value)", maxValueKeyword, seqValue);
+   Sequence startWith = new Sequence("StartWithSeqOpt(,,value)", new ICSymbolSpace("start"), new ICSymbolSpace("with", OPTIONAL), seqValue);
+   Sequence cacheSize = new Sequence("CacheSizeSeqOpt(,value)", new ICSymbolSpace("cache"), seqValue);
+   Sequence cycleOption = new Sequence("CycleSeqOpt()", cycleKeyword);
+   Sequence noCycleOption = new Sequence("NoCycleSeqOpt(,)", noKeyword, cycleKeyword);
+   Sequence ownedBy = new Sequence("OwnedBySeqOpt(,,name)", new ICSymbolSpace("owned"), byKeyword, sqlIdentifier);
+
+   OrderedChoice sequenceOptions = new OrderedChoice("([],[],[],[],[],[],[],[],[],[])", REPEAT, incrementBy, noMaxValue, noMinValue, minValue, maxValue, startWith, cacheSize, cycleOption, noCycleOption, ownedBy);
+
+   Sequence sequenceOptionsWithParens = new Sequence("(,[],)", OPTIONAL, openParen, sequenceOptions, closeParen);
+   {
+      sequenceOptionsWithParens.minContentSlot = 1;
+   }
+
    Sequence namedConstraint = new Sequence("NamedConstraint(,constraintName)", new ICSymbolSpace("constraint"), sqlIdentifier);
    Sequence optNamedConstraint = (Sequence) namedConstraint.copyWithOptions(OPTIONAL);
 
@@ -259,20 +339,20 @@ public class SQLLanguage extends SCLanguage {
 
    Sequence matchOption = new Sequence("(,'')", OPTIONAL, matchKeyword, new ICSymbolChoiceSpace("full", "partial", "simple"));
 
-
-
    Sequence onOptions = new Sequence("OnOption(,onType,action)", OPTIONAL | REPEAT, onKeyword, new ICSymbolChoiceSpace("delete", "update"),
                                     new OrderedChoice(new ICSymbolChoiceSpace("restrict", "cascade"), new Sequence(noKeyword, actionKeyword), new Sequence(setKeyword, new OrderedChoice(nullKeyword, defaultKeyword))));
 
    Sequence referencesConstraint = new Sequence("ReferencesConstraint(,refTable,columnRef,matchOption,onOptions)",
                                                  referencesKeyword, sqlIdentifier, optColumnRef, matchOption, onOptions);
 
-   OrderedChoice columnConstraints = new OrderedChoice("([],[],[],[],[],[],[],[])", OPTIONAL | REPEAT, notNullConstraint, nullConstraint, checkConstraint, defaultConstraint,
-                                                      new Sequence("GeneratedConstraint(,whenOptions,sequenceOptions)",
-                                                             new ICSymbolSpace("generated"),
-                                                             new OrderedChoice(OPTIONAL, new ICSymbolSpace("always"), new Sequence(new ICSymbolSpace("by"),  new ICSymbolSpace("default"))),
-                                                             new Sequence("(,,.)", new ICSymbolSpace("as"),  new ICSymbolSpace("identity"), sequenceOptions)),
-                                                       colUniqueConstraint, colPrimaryKeyConstraint, referencesConstraint);
+   Sequence generatedConstraint = new Sequence("GeneratedConstraint(,whenOptions,sequenceOptions)",
+                   new ICSymbolSpace("generated"),
+                   new OrderedChoice(OPTIONAL, new ICSymbolSpace("always"), new Sequence(byKeyword, defaultKeyword)),
+                   new Sequence("(,,.)", new ICSymbolSpace("as"),  new ICSymbolSpace("identity"), sequenceOptionsWithParens));
+
+   OrderedChoice columnConstraints = new OrderedChoice("([],[],[],[],[],[],[],[])", OPTIONAL | REPEAT,
+         notNullConstraint, nullConstraint, checkConstraint, defaultConstraint, generatedConstraint,
+         colUniqueConstraint, colPrimaryKeyConstraint, referencesConstraint);
 
    Sequence foreignKeyConstraint = new Sequence("ForeignKeyConstraint(,,columnList,,refTable,refColList,matchOption,onOptions)",
                                                  new ICSymbolSpace("foreign"), keyKeyword, sqlIdentifierList,
@@ -294,6 +374,8 @@ public class SQLLanguage extends SCLanguage {
       dimsList.minContentSlot = 1;
    }
    public Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
+
+   public OrderedChoice sqlParamType = new OrderedChoice("(.,.)", sqlIdentifier, sqlDataType);
 
    Sequence columnDef = new Sequence("ColumnDef(columnName,columnType,collation,constraintName,columnConstraints)",
                                                     sqlIdentifier, sqlDataType, collation, optNamedConstraint, columnConstraints);
@@ -325,12 +407,12 @@ public class SQLLanguage extends SCLanguage {
    Sequence tableInherits = new Sequence("(,.)", OPTIONAL, new ICSymbolSpace("inherits"), sqlIdentifierList);
 
    Sequence tablePartition = new Sequence("TablePartition(,,partitionBy,,expressionList,)", OPTIONAL,
-           new ICSymbolSpace("partition"), new ICSymbolSpace("by"), new ICSymbolChoiceSpace("range", "list"),
+           new ICSymbolSpace("partition"), byKeyword, new ICSymbolChoiceSpace("range", "list"),
            openParen, sqlExpressionList, closeParen);
 
    Sequence createTable = new Sequence("CreateTable(tableOptions,,ifNotExists,tableName,ofType,,tableDefs,,tableInherits,tablePartition,storageParams,tableSpace)",
                    new ICSymbolChoiceSpace(REPEAT | OPTIONAL, "global", "local", "temporary", "temp", "unlogged"),
-                   new ICSymbolSpace("table"), ifNotExists, sqlIdentifier, ofType, openParen, tableDefList, closeParen,
+                   tableKeyword, ifNotExists, sqlIdentifier, ofType, openParen, tableDefList, closeParen,
                    tableInherits, tablePartition, storageParameters, tableSpace);
 
    // TODO: create type 'as enum' and 'as range' and with input/output params
@@ -358,7 +440,41 @@ public class SQLLanguage extends SCLanguage {
                                        optSqlIdentifier, onKeyword, sqlIdentifier, usingMethod, openParen, indexColumnList, closeParen,
                                        optIncludeColumns, indexParameters, tableSpace, optWhereClause);
 
-   OrderedChoice createChoice = new OrderedChoice("(.,.,.)", createTable, createType, createIndex);
+   Sequence createSequence = new Sequence("CreateSequence(temporary,,ifNotExists,sequenceName,sequenceOptions)",
+                                          new ICSymbolChoiceSpace(OPTIONAL, "temporary", "temp"),
+                                          new ICSymbolSpace("sequence"), ifNotExists, sqlIdentifier, sequenceOptions);
+
+   Sequence orReplace = new Sequence("('','')", OPTIONAL, new ICSymbolSpace("or"), new ICSymbolSpace("replace"));
+
+   ICKeywordChoice argMode = new ICKeywordChoice(OPTIONAL, "in", "out", "inout", "variadic");
+
+   Sequence argDefault = new Sequence("ArgDefault(op,expr)", OPTIONAL, new ICSymbolChoiceSpace("default", "="), sqlExpression);
+
+   Sequence funcArg = new Sequence("FuncArg(argMode,argName,dataType,argDefault)", argMode, sqlParamType, optSqlIdentifier, argDefault);
+
+   Sequence funcArgList = new Sequence("(,[],[],)", openParen, funcArg, new Sequence("(,[])", OPTIONAL | REPEAT, comma, funcArg), closeParen);
+
+   Sequence returnTable = new Sequence("ReturnTable(,,tableDefs,)", tableKeyword, openParen, tableDefList, closeParen);
+
+   Sequence returnType = new Sequence("ReturnType(setOf,dataType)", new ICSymbolSpace("setof", OPTIONAL), sqlParamType);
+
+   Sequence funcReturn = new Sequence("(,.)", OPTIONAL, new ICSymbolSpace("returns"), new OrderedChoice("(.,.)", returnTable, returnType));
+
+   Sequence funcDef = new Sequence("FuncDef(,funcBody)", asKeyword, sqlStringLiteral);
+
+   Sequence funcLang = new Sequence("FuncLang(,langName)", new ICSymbolSpace("language"), identifier);
+
+   Sequence funcBehaviorType = new Sequence("FuncBehaviorType(typeStr)",
+           new ICMultiSymbolChoice("funcBehaviorTypes", 0, "immutable", "stable", "volatile", "leakproof", "not leakproof",
+                                   "called on null first input", "returns null on null input", "strict", "security invoker", "security definer",
+                                   "external security invoker", "external security definer", "parallel unsafe", "parallel strict", "parallel safe", "window"));
+
+   OrderedChoice funcOptions = new OrderedChoice("([],[],[])", REPEAT, funcDef, funcBehaviorType, funcLang);
+
+   Sequence createFunction = new Sequence("CreateFunction(orReplace,,funcName,argList,funcReturn,funcOptions)", orReplace, new ICSymbolSpace("function"),
+                                          sqlIdentifier, funcArgList, funcReturn, funcOptions);
+
+   OrderedChoice createChoice = new OrderedChoice("(.,.,.,.,.)", createTable, createType, createIndex, createSequence, createFunction);
    Sequence createCommand = new Sequence("(,.,)", new ICSymbolSpace("create"), createChoice, semicolonEOL);
 
    ICSymbolChoiceSpace dropOptions = new ICSymbolChoiceSpace(OPTIONAL, "cascade", "restrict");
@@ -419,9 +535,12 @@ public class SQLLanguage extends SCLanguage {
    class DollarTag extends Sequence {
       DollarTagType tagType;
       DollarTag(DollarTagType tagType, int options) {
-         // TODO: The identifier here should not contain '$' unlike a normal SQL unquoted identifier
-         super("(,'',)", options, dollarSymbol, identifier, dollarSymbol);
+         super("(,'',)", options, dollarSymbol, dollarTagId, dollarSymbol);
          this.tagType = tagType;
+      }
+
+      public Object parse(Parser parser) {
+         return super.parse(parser);
       }
 
       protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
@@ -430,7 +549,7 @@ public class SQLLanguage extends SCLanguage {
             return res;
 
          ParentParseNode pn = (ParentParseNode) value;
-         Object tagValue = pn.children.get(1);
+         Object tagValue = pn == null || pn.children == null ? null : pn.children.get(1);
 
          String strValue = tagValue == null ? "" : tagValue.toString();
 
@@ -441,7 +560,6 @@ public class SQLLanguage extends SCLanguage {
                if (startIx != -1)
                   sctx.addEntry(strValue, startIx, endIx);
                break;
-            case Body: // Body has the parselet 'NOT' option - it matches just like 'End' but the result will be the opposite
             case End:
                // Currently not doing the tag name stack during generate
                if (startIx == -1)
@@ -450,14 +568,48 @@ public class SQLLanguage extends SCLanguage {
                TagStackSemanticContext hctx = ((TagStackSemanticContext) ctx);
                if (hctx.allowAnyCloseTag) // In diagnostic mode - need to just parse the close tag for an error
                   return null;
-               String openTagName = hctx.getCurrentTagName();
-               if (openTagName == null)
-                  return "No open tag for close tag: " + strValue;
-               if (!openTagName.equals(strValue))
-                  return "Mismatching close tag name: " + value + " does not match open: " + openTagName;
+               String dollarIdent = hctx.getCurrentTagName();
+               if (dollarIdent == null)
+                  dollarIdent = ""; // $$
+               if (!dollarIdent.equals(strValue))
+                  return "Mismatching $ident$ name: " + value + " does not match open: " + dollarIdent;
                hctx.popTagName(startIx);
                break;
          }
+         return null;
+      }
+   }
+
+   class DollarTagBody extends Sequence {
+      DollarTagBody() {
+         super(NOT | LOOKAHEAD, dollarTagId, dollarSymbol);
+      }
+
+      public Object parse(Parser parser) {
+         return super.parse(parser);
+      }
+
+      protected String accept(SemanticContext ctx, Object value, int startIx, int endIx) {
+         String res = super.accept(ctx, value, startIx, endIx);
+         if (res != null)
+            return res;
+
+         ParentParseNode pn = (ParentParseNode) value;
+         Object tagValue = pn.children.get(0);
+
+         // This will have the $ appended even though it's a different parselet because of the optimization so more logic to do the comparison below
+         String strValue = tagValue == null ? "" : tagValue.toString();
+
+         TagStackSemanticContext sctx = (TagStackSemanticContext) ctx;
+
+          String dollarIdent = sctx.getCurrentTagName();
+          if (dollarIdent.length() == 0) {
+             if (strValue.length() != 0)
+                return "Mismatching empty $ident$ ";
+             return null;
+          }
+          if (!strValue.startsWith(dollarIdent) || !strValue.endsWith("$") || strValue.length() -1 != dollarIdent.length())
+             return "Mismatching $ident$ name: " + value + " does not match open: " + dollarIdent;
          return null;
       }
    }

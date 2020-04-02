@@ -55,7 +55,7 @@ public class ModelOutStream extends BinfOutStream {
          writeChar((Character) v);
       }
       else {
-         System.err.println("*** Unrecognized value type for BinfOutStream");
+         System.err.println("*** Unrecognized value type: " + v.getClass() + " for BinfOutStream - should implement ISemanticNode or be handled as a new primitive type");
       }
    }
 

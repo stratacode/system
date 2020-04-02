@@ -9,7 +9,7 @@ import sc.parser.ParseError;
 
 import java.util.List;
 
-public class SQLDataType extends JavaSemanticNode {
+public class SQLDataType extends SQLParamType {
    public String typeName;
    public List<IString> sizeList;
    public List<IString> dimsList;

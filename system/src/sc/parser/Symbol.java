@@ -253,7 +253,10 @@ public class Symbol extends Parselet {
       }
       else if (!match(ctx.semanticContext, value)) {
          if (expectedValue != null && !expectedValue.equals(ANYCHAR) && value == null) {
-            int x = 3;
+            // TODO: do we need a flag to return an error here for some symbols?  Many symbols are not
+            // included in the semantic model so for them we have to accept a rule of 'null'. For symbols
+            // that are in the semantic model, a null value should probably not signal a match. Ran into
+            // this case
          }
          else {
             if (optional)

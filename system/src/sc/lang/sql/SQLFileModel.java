@@ -25,8 +25,7 @@ public class SQLFileModel extends SCModel {
 
       String fullTypeName = getModelTypeName();
       if (fullTypeName == null) {
-         System.err.println("*** No model type for scsql");
-         return;
+         return; // This happens in TestUtil when there's no file registered for the model
       }
       String typeName = CTypeUtil.getClassName(fullTypeName);
 

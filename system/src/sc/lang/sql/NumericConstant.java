@@ -4,6 +4,7 @@ public class NumericConstant extends SQLExpression {
    public String numberPart;
    public String fractionPart;
    public String exponent;
+   public boolean negativeValue;
 
    public String toSafeLanguageString() {
       if (parseNode == null || parseNodeInvalid) {

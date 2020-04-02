@@ -923,6 +923,7 @@ public class TestUtil {
                      Object mnew = getTestResult(reparsedResult);
                      // TODO: this breaks for schtml files - Element.equals uses == cause the deep version of that implementation is too expensive for large pages
                      // TODO: Semantic node list - add deepEquals and use that here
+                     // For case insensitive model strings, need to override deepEquals to do equalsIgnoreCase on such strings
                      if (!((ISemanticNode) mnew).deepEquals(modelObj)) {
                         error("**** FAILURE - reparsed model does not match for: " + fileName);
                         mnew.equals(modelObj);

@@ -1,8 +1,12 @@
 package sc.lang.sql;
 
 import sc.lang.SemanticNode;
+import sc.parser.IString;
+
+import java.util.List;
 
 public class GeneratedConstraint extends SQLConstraint {
    public String whenOptions;
-   public String sequenceOptions;
+
+   public List<SequenceOption> sequenceOptions;
 }
