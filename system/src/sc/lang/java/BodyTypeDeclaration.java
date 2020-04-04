@@ -555,9 +555,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    private void initMethodsByName() {
       methodsByName = new TreeMap<String, List<Statement>>();
       addMethodsFromBody(body);
-      // after transforming an object, we put the types into the hiddenBody.  But at that point we want body to override the clases.  But in general
-      // an object type must be resolved if there's a field in there as well.  If we store body and hiddenBody in the same list - we return the type when
-      // we should resolve the stuff in body.
+      // This causes false duplicates since some methods we add to hiddenBody are also in body and in general we want to search body before hiddenBody
+      // And we don't need to add hiddenBody methods here because we search the hiddenBody in each lookup.
       //addMethodsFromBody(hiddenBody);
    }
 
@@ -571,7 +570,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          for (Statement oldMeth : sts) {
             if (oldMeth == st)
                return;
-            if (oldMeth instanceof AbstractMethodDefinition && ModelUtil.sameMethods(oldMeth, st)) {
+            if (oldMeth instanceof AbstractMethodDefinition && ModelUtil.isMethod(st) && ModelUtil.sameMethods(oldMeth, st)) {
                if (!ModelUtil.anyUnresolvedParamTypes(oldMeth) && !ModelUtil.anyUnresolvedParamTypes(st)) {
                   boolean dummy = ModelUtil.sameMethods(oldMeth, st);
                   oldMeth.displayError("Duplicate method: ");
