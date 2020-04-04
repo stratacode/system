@@ -21,4 +21,8 @@ public class CreateSequence extends SQLCommand {
       dt.seqNames.add((SQLIdentifier) sequenceName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
+
+   public String getIdentifier() {
+      return sequenceName.getIdentifier();
+   }
 }

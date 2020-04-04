@@ -37,29 +37,43 @@ public class CreateTable extends SQLCommand {
       return null;
    }
 
-   public void alterTo(SQLFileModel resModel, CreateTable newTable) {
+   private static List<ColumnDef> getColumnsAdded(CreateTable oldTable, CreateTable newTable) {
       List<ColumnDef> toAddCols = null;
       for (TableDef newTableDef:newTable.tableDefs) {
          if (newTableDef instanceof ColumnDef) {
             ColumnDef newCol = (ColumnDef) newTableDef;
-            ColumnDef oldCol = findColumn(newCol.columnName.getIdentifier());
+            ColumnDef oldCol = oldTable.findColumn(newCol.columnName.getIdentifier());
             if (oldCol == null) {
                if (toAddCols == null)
                   toAddCols = new ArrayList<ColumnDef>();
                toAddCols.add(newCol);
             }
             else if (!oldCol.equals(newCol)) {
-               displayError("Unhandled case of alter column for: ");
+               oldTable.displayError("Unhandled case of alter column for: ");
             }
          }
          else
-            displayError("Unhandled table definition for migration: ");
+            oldTable.displayError("Unhandled table definition for migration: ");
       }
-      if (toAddCols != null) {
+      return toAddCols;
+   }
+
+   public void alterTo(SQLFileModel resModel, SQLCommand newCmd) {
+      CreateTable newTable = (CreateTable) newCmd;
+      List<ColumnDef> toAddCols = getColumnsAdded(this, newTable);
+      List<ColumnDef> toRemCols = getColumnsAdded(newTable, this);
+      if (toAddCols != null || toRemCols != null) {
          // Create:  ALTER TABLE tableName ADD COLUMN colName colType, ADD COLUMN colName, colType;
          AlterTable alterTable = AlterTable.create(newTable.tableName);
-         for (ColumnDef colDef:toAddCols) {
-            alterTable.addAlterDef(AddColumn.create(colDef));
+         if (toAddCols != null) {
+            for (ColumnDef colDef:toAddCols) {
+               alterTable.addAlterDef(AddColumn.create(colDef));
+            }
+         }
+         if (toRemCols != null) {
+            for (ColumnDef colDef:toRemCols) {
+               alterTable.addAlterDef(DropColumn.create(colDef));
+            }
          }
          resModel.addCommand(alterTable);
       }
@@ -74,5 +88,9 @@ public class CreateTable extends SQLCommand {
       dt.tableNames = new SemanticNodeList<SQLIdentifier>();
       dt.tableNames.add((SQLIdentifier) tableName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
+   }
+
+   public String getIdentifier() {
+      return tableName.getIdentifier();
    }
 }

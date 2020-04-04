@@ -16,4 +16,8 @@ public class DropFunction extends SQLCommand {
    public String toDeclarationString() {
       return "drop function " + StringUtil.argsToString(funcNames);
    }
+
+   public String getIdentifier() {
+      return null;
+   }
 }

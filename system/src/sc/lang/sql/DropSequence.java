@@ -16,4 +16,8 @@ public class DropSequence extends SQLCommand {
    public String toDeclarationString() {
       return "drop sequence " + StringUtil.argsToString(seqNames);
    }
+
+   public String getIdentifier() {
+      return null;
+   }
 }

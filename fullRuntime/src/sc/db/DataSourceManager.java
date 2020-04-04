@@ -18,14 +18,16 @@ public class DataSourceManager {
    }
 
    public static void addDBDataSource(String jndiName, DBDataSource ds) {
-      if (dbDisabled && ds != null) {
-         ds.dbDisabled = true;
-         ds.readOnly = true;
-         DBUtil.verbose("Disabling dataSource: " + jndiName + " due to configured dbDisabled flag (-ndb) option");
-      }
-      if (!defaultSchemaReady) {
-         DBUtil.verbose("Marking dataSource: " + jndiName + " schema not ready");
-         ds.setSchemaReady(false);
+      if (ds != null) {
+         if (dbDisabled) {
+            ds.dbDisabled = true;
+            ds.readOnly = true;
+            DBUtil.verbose("Disabling dataSource: " + jndiName + " due to configured dbDisabled flag (-ndb) option");
+         }
+         if (!defaultSchemaReady) {
+            DBUtil.verbose("DataSource: " + jndiName + " - setSchemaRead=false due to defaultSchemaReady=false");
+            ds.setSchemaReady(false);
+         }
       }
       dataSources.put(jndiName, ds);
    }

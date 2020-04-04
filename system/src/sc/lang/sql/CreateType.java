@@ -25,4 +25,8 @@ public class CreateType extends SQLCommand {
       dt.typeNames.add((SQLIdentifier) typeName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
+
+   public String getIdentifier() {
+      return typeName.getIdentifier();
+   }
 }

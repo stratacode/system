@@ -17,4 +17,8 @@ public class DropTable extends SQLCommand {
    public String toDeclarationString() {
       return "drop table " + StringUtil.argsToString(tableNames);
    }
+
+   public String getIdentifier() {
+      return null;
+   }
 }

@@ -76,6 +76,8 @@ public class SQLFileModel extends SCModel {
             else
                displayError("Table name: " + tableName + " - should match type name: " + typeName + " in sql form: " + sqlName);
          }
+         else if (cmd instanceof CreateFunction) {
+         }
       }
 
       if (primaryTable == null) {
@@ -207,6 +209,30 @@ public class SQLFileModel extends SCModel {
             CreateTable ct = (CreateTable) cmd;
             if (ct.tableName.getIdentifier().equals(tableName))
                return ct;
+         }
+      }
+      return null;
+   }
+
+   private SQLCommand findSameCommand(SQLCommand oldCmd) {
+      if (sqlCommands == null)
+         return null;
+      for (SQLCommand cmd:sqlCommands) {
+         if (cmd.getClass() == oldCmd.getClass()) {
+            if (cmd.equals(oldCmd))
+               return cmd;
+         }
+      }
+      return null;
+   }
+
+   private SQLCommand findMatchingCommand(SQLCommand oldCmd) {
+      if (sqlCommands == null)
+         return null;
+      for (SQLCommand cmd:sqlCommands) {
+         if (cmd.getClass() == oldCmd.getClass()) {
+            if (StringUtil.equalStrings(cmd.getIdentifier(), oldCmd.getIdentifier()))
+               return cmd;
          }
       }
       return null;
@@ -388,7 +414,10 @@ public class SQLFileModel extends SCModel {
       }
    }
 
-   /** We have an old SQL model that needs to be altered to define the new toModel */
+   /**
+    * This is the old SQL model that needs to be altered to convert a database schema to the one defined in the new toModel.
+    * We'll return a new model with the differences
+    */
    public SQLFileModel alterTo(SQLFileModel newModel) {
       if (sqlCommands == null || sqlCommands.size() == 0)
          return newModel;
@@ -397,19 +426,17 @@ public class SQLFileModel extends SCModel {
       resModel.srcType = newModel.srcType;
 
       for (SQLCommand newCmd:newModel.sqlCommands) {
-         if (newCmd instanceof CreateTable) {
-            CreateTable newTable = (CreateTable) newCmd;
-            CreateTable oldTable = findCreateTable(newTable.tableName.getIdentifier());
-            if (oldTable == null) {
-               resModel.addCommand((SQLCommand) newTable.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null));
-            }
-            else {
-               oldTable.alterTo(resModel, newTable);
-            }
+         // If this exact SQL command was in the old model just skip it
+         SQLCommand sameCmd = findSameCommand(newCmd);
+         if (sameCmd != null)
+            continue;
+         // Some SQL commands have a name - table, sequence, index, function - so if they don't match we either alter or drop/create
+         SQLCommand oldCmd = findMatchingCommand(newCmd);
+         if (oldCmd == null) {
+            resModel.addCommand((SQLCommand) newCmd.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null));
          }
-         // TODO: handle create sequence, index, view, function, procedure, and more!
          else {
-            System.err.println("*** Unhandled case for alterTo in generating schema diffs: ");
+            oldCmd.alterTo(resModel, newCmd);
          }
       }
       return resModel;

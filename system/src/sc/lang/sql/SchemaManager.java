@@ -48,6 +48,8 @@ public class SchemaManager {
 
    public SchemaMode schemaMode;
 
+   public boolean schemaNotReady = false;
+
    public SchemaManager(LayeredSystem sys, DBProvider provider, String dataSourceName) {
       this.system = sys;
       this.dataSourceName = dataSourceName;
@@ -154,8 +156,17 @@ public class SchemaManager {
             schemaChanged = newModels.size() > 0 || changedTypes.size() > 0;
          }
 
+         // The deployed schema does not match and we are running interactively so tell apps to wait till we fix
+         // the DB schema before running
          if ((initFromDBFailed || schemaChanged) && system.options.startInterpreter) {
             schemaUpdater.setSchemaReady(dataSourceName, false);
+            schemaNotReady = true;
+         }
+         // After initializing from the database, we find that the DB is setup properly - because we turned off
+         // the default schema though, need to tell the apps to go ahead and run
+         else if (!schemaChanged && schemaNotReady) {
+            schemaUpdater.setSchemaReady(dataSourceName, true);
+            schemaNotReady = false;
          }
       }
    }
@@ -164,6 +175,7 @@ public class SchemaManager {
       ISchemaUpdater schemaUpdater = provider.getSchemaUpdater();
       if (schemaUpdater != null)
          schemaUpdater.setSchemaReady(dataSourceName, true);
+      schemaNotReady = false;
    }
 
    private String getDeployedSchemasDir(Layer buildLayer) {
@@ -304,12 +316,15 @@ public class SchemaManager {
          FileUtil.saveStringAsReadOnlyFile(sqlSrcEnt.absFileName, schemaSB.toString(), false);
          buildLayer.addSrcFileIndex(sqlSrcEnt.relFileName, sqlSrcEnt.hash, null, sqlSrcEnt.absFileName);
 
-         DBUtil.info((postfix == null ? "" : postfix) + " schema changed: " + sqlSrcEnt.absFileName);
+         if (srcIndex != null)
+            DBUtil.info("DB" + (postfix == null ? "" : " " + postfix) + " schema changed: " + sqlSrcEnt.absFileName);
+         else
+            DBUtil.verbose("DB" + (postfix == null ? "" : " " + postfix) + " new build for schema: " + sqlSrcEnt.absFileName);
 
          return true;
       }
       else
-         DBUtil.verbose( (postfix == null ? "" : postfix) +  " schema: unchanged: " + sqlSrcEnt.absFileName);
+         DBUtil.verbose("DB" + (postfix == null ? "" : " " + postfix) +  " schema: unchanged: " + sqlSrcEnt.absFileName);
       return false;
    }
 
@@ -350,8 +365,14 @@ public class SchemaManager {
 
       if (changed) {
          if (generateAlterSchema(buildLayer)) {
-            if (system.options.startInterpreter && schemaMode == SchemaMode.Prompt)
+            if (system.options.startInterpreter && schemaMode == SchemaMode.Prompt) {
+               if (noCurrentSchema)
+                  DBUtil.info("No current deployed schema for this app - setting defaultSchemaReady=false");
+               else
+                  DBUtil.info("Schema changes found - setting defaultSchemaReady=false");
                DataSourceManager.defaultSchemaReady = false;
+            }
+            schemaNotReady = true;
          }
       }
    }

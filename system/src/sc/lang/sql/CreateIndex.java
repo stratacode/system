@@ -31,4 +31,8 @@ public class CreateIndex extends SQLCommand {
       dt.indexNames.add((SQLIdentifier) indexName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
+
+   public String getIdentifier() {
+      return indexName.getIdentifier();
+   }
 }

@@ -28,4 +28,8 @@ public class CreateFunction extends SQLCommand {
       dt.funcNames.add((SQLIdentifier) funcName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
+
+   public String getIdentifier() {
+      return funcName.getIdentifier();
+   }
 }

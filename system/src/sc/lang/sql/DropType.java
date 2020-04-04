@@ -17,4 +17,8 @@ public class DropType extends SQLCommand {
    public String toDeclarationString() {
       return "drop type " + StringUtil.argsToString(typeNames);
    }
+
+   public String getIdentifier() {
+      return null;
+   }
 }

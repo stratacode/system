@@ -39,4 +39,8 @@ public class AlterTable extends SQLCommand {
    public String toDeclarationString() {
       return "alter " + tableName;
    }
+
+   public String getIdentifier() {
+      return null; // Returning null here because we are not going to try and 'merge' alter table statements like we do with 'create'
+   }
 }

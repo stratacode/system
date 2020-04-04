@@ -14,6 +14,10 @@ public class DropIndex extends SQLCommand {
    void addTableReferences(Set<String> refTableNames) {
    }
 
+   public String getIdentifier() {
+      return null;
+   }
+
    public String toDeclarationString() {
       return "drop index " + StringUtil.argsToString(indexNames);
    }
