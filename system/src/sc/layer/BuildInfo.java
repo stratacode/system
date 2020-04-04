@@ -584,7 +584,15 @@ public class BuildInfo {
       return true;
    }
 
+   public boolean initMatchingTests(String pattern) {
+      return runOrInitMatchingTests(pattern, true);
+   }
+
    public boolean runMatchingTests(String pattern) {
+      return runOrInitMatchingTests(pattern, false);
+   }
+
+   public boolean runOrInitMatchingTests(String pattern, boolean initOnly) {
       boolean success = true;
       Pattern p = pattern == null ? null : Pattern.compile(pattern);
       if (testInstances != null) {
@@ -599,7 +607,10 @@ public class BuildInfo {
                else {
                   Object cl = system.getRuntimeType(tinst.typeName);
                   if (cl != null) {
-                     if (!tp.executeTest(cl)) {
+                     if (initOnly) {
+                        tp.initTypes();
+                     }
+                     else if (!tp.executeTest(cl)) {
                         if (system.options.verbose)
                            System.err.println("FAILED: " + tinst.typeName);
                         success = false;

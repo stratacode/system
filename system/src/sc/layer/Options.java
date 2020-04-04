@@ -11,6 +11,7 @@ import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.pattern.Pattern;
+import sc.lang.sql.SchemaManager;
 import sc.obj.Constant;
 import sc.obj.ScopeDefinition;
 import sc.sync.SyncManager;
@@ -216,6 +217,8 @@ public class Options {
 
    @Constant public boolean startInterpreter = true;
 
+   @Constant public SchemaManager.SchemaMode schemaMode = SchemaManager.SchemaMode.Prompt;
+
    boolean restartArg = false;
    boolean headlessSet = false;
    List<String> includeFiles = null;  // List of files to process
@@ -284,7 +287,7 @@ public class Options {
                          "   [ -nd ]: Disable the liveDynamicTypes option - so that you cannot modify types at runtime.  This is turned when the editor is enabled by default but you can turn it on with this option.\n" +
                          "   [ -ee ]: Edit the editor itself - when including the program editor, do not exclude it's source from editing.\n" +
                          "   [ -cd <ApplicationTypeName>]: Start the command-interpreter in the context of the given ApplicationTypeName.\n" +
-                         "   [ -npc ]: Turn off page caching by default for schtml in runtimes that support this option (e.g. java but not js where caching is built-in)\n" +
+                         "   [ -schema:update, -schema:accept ]: update the schema database, or accept the current schema without updating. Default is to run the SchemaUpdateWizard to apply the changes interactively\n" +
                          "   [ -version, -h or -help - print version/usage info.\n\n" +
                          StringUtil.insertLinebreaks(AbstractInterpreter.USAGE, 80));
       System.exit(-1);
@@ -395,6 +398,10 @@ public class Options {
                      SyncManager.defaultLanguage = "stratacode";
                   else if (opt.equals("scr"))
                      scriptMode = true;
+                  else if (opt.equals("schema:update"))
+                     schemaMode = SchemaManager.SchemaMode.Update;
+                  else if (opt.equals("schema:accept"))
+                     schemaMode = SchemaManager.SchemaMode.Accept;
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;

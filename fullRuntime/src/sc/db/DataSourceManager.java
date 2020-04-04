@@ -11,6 +11,7 @@ public class DataSourceManager {
    public static HashMap<String,DBDataSource> dataSources = new HashMap<String,DBDataSource>();
 
    public static boolean dbDisabled = false;
+   public static boolean defaultSchemaReady = true;
 
    public static DBDataSource getDBDataSource(String dsName) {
       return dataSources.get(dsName);
@@ -21,6 +22,10 @@ public class DataSourceManager {
          ds.dbDisabled = true;
          ds.readOnly = true;
          DBUtil.verbose("Disabling dataSource: " + jndiName + " due to configured dbDisabled flag (-ndb) option");
+      }
+      if (!defaultSchemaReady) {
+         DBUtil.verbose("Marking dataSource: " + jndiName + " schema not ready");
+         ds.setSchemaReady(false);
       }
       dataSources.put(jndiName, ds);
    }

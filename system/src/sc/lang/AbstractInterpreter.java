@@ -63,6 +63,12 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       }
    }
 
+   public void initCommandWizards() {
+      while (currentWizard != null && !currentWizard.getActive()) {
+         completeCommandWizard(currentWizard);
+      }
+   }
+
    public class InputSource {
       String inputFileName;
       String inputRelName;

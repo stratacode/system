@@ -5,5 +5,6 @@
 package sc.layer;
 
 public interface ITestProcessor {
+   void initTypes();
    boolean executeTest(Object testClass);
 }

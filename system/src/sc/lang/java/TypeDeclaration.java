@@ -502,6 +502,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public Object definesMethod(String name, List<?> types, ITypeParamContext ctx, Object refType, boolean isTransformed, boolean staticOnly, Object inferredType, List<JavaType> methodTypeArgs) {
+      initTypeInfo();
+
       Object v = super.definesMethod(name, types, ctx, refType, isTransformed, staticOnly, inferredType, methodTypeArgs);
       if (v != null)
          return v;
@@ -511,8 +513,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          if (v != null)
             return v;
       }
-
-      initTypeInfo();
 
       if (implementsBoundTypes != null) {
          LayeredSystem sys = getLayeredSystem();

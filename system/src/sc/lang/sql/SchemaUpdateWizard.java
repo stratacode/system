@@ -58,7 +58,7 @@ public class SchemaUpdateWizard extends CommandWizard {
    private void usage() {
       if (mgr.provider.getSchemaUpdater() == null)
          printNoSchemaUpdater();
-      print("   c - show changes to update existing schema");
+      print("   c - show 'create/alter' script to update existing schema");
       print("   u - update schema");
       print("   n - show new schema");
       print("   o - show deployed schema for all types");
@@ -68,6 +68,7 @@ public class SchemaUpdateWizard extends CommandWizard {
       print("   q - quit schema update wizard");
       print("   t - go to next type");
       print("   a - accept current schema for this layer without updating database schema");
+      print("   d - show drop schema");
       print(" <i> - select type by number");
    }
 
@@ -154,6 +155,7 @@ public class SchemaUpdateWizard extends CommandWizard {
          return Boolean.TRUE;
       }
       if (cmdChar == 'q' || cmdChar == 'Q') {
+         mgr.markSchemaReady();
          system.cmd.completeCommandWizard(this);
          return Boolean.TRUE;
       }
@@ -167,10 +169,10 @@ public class SchemaUpdateWizard extends CommandWizard {
                case 'c':
                   StringBuilder alterSB = mgr.getAlterSchema();
                   if (alterSB == null) {
-                     print("--- No deployed db schema. Use 'n' to show new database schema.");
+                     printNewSchema();
                   }
                   else {
-                     print("--- SQL commands to update schema:");
+                     print("--- SQL alter/create commands to update existing schema:");
                      print(alterSB.toString());
                      print("---");
                   }
@@ -179,9 +181,7 @@ public class SchemaUpdateWizard extends CommandWizard {
                   printNewType();
                   break;
                case 'n':
-                  print("--- SQL commands to create new database schema:");
-                  print(mgr.getCurrentSchema().toString());
-                  print("---");
+                  printNewSchema();
                   break;
                case 't':
                   if (currentTypeIx + 1 >= mgr.getNumChangedTypes())
@@ -224,13 +224,25 @@ public class SchemaUpdateWizard extends CommandWizard {
                         print("Accept schema failed");
                   }
                   break;
+               case 'd':
+                  print("--- SQL drop commands to remove existing schema:");
+                  print(mgr.getDropSchema().toString());
+                  print("---");
+                  break;
                default:
                   print("Unrecognized command: " + cmdChar);
+                  usage();
                   break;
             }
             break;
       }
       return Boolean.TRUE;
+   }
+
+   private void printNewSchema() {
+      print("--- SQL commands to create new database schema:");
+      print(mgr.getCurrentSchema().toString());
+      print("---");
    }
 
    private void printNewType() {

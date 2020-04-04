@@ -1,5 +1,6 @@
 package sc.lang.sql;
 
+import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.sql.funcOpt.FuncOpt;
 import sc.lang.sql.funcOpt.FuncReturn;
@@ -21,12 +22,10 @@ public class CreateFunction extends SQLCommand {
       return "function " + funcName;
    }
 
-      /*
    public SQLCommand getDropCommand() {
       DropFunction dt = new DropFunction();
       dt.funcNames = new SemanticNodeList<SQLIdentifier>();
-      dt.funcNames.add((SQLIdentifier) tableName.deepCopy(ISemanticNode.CopyNormal, null));
+      dt.funcNames.add((SQLIdentifier) funcName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
-       */
 }

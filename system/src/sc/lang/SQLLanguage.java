@@ -192,6 +192,8 @@ public class SQLLanguage extends SCLanguage {
    }
    Sequence optSqlIdentifierList = (Sequence) sqlIdentifierList.copyWithOptions(OPTIONAL);
 
+   Sequence sqlIdentifierCommaList = new Sequence("([],[])", sqlIdentifier, new Sequence("(,[])", REPEAT | OPTIONAL, comma, sqlIdentifier));
+
    Sequence withOperand = new Sequence("WithOperand(identifier,,operand)", sqlIdentifier, withKeyword, binaryOperators);
    Sequence withOpList = new Sequence("(,[],[],)", openParen, withOperand, new Sequence("(,[])", REPEAT | OPTIONAL, comma, withOperand), closeParen);
    {
@@ -431,6 +433,7 @@ public class SQLLanguage extends SCLanguage {
 
    ICSymbolSpace optConcurrentlyKeyword = new ICSymbolSpace("concurrently", OPTIONAL);
    ICSymbolSpace includeKeyword = new ICSymbolSpace("include");
+   ICSymbolSpace sequenceKeyword = new ICSymbolSpace("sequence");
 
    Sequence optIncludeColumns = new Sequence("(,.)", OPTIONAL, includeKeyword, sqlIdentifierList);
 
@@ -442,7 +445,7 @@ public class SQLLanguage extends SCLanguage {
 
    Sequence createSequence = new Sequence("CreateSequence(temporary,,ifNotExists,sequenceName,sequenceOptions)",
                                           new ICSymbolChoiceSpace(OPTIONAL, "temporary", "temp"),
-                                          new ICSymbolSpace("sequence"), ifNotExists, sqlIdentifier, sequenceOptions);
+                                          sequenceKeyword, ifNotExists, sqlIdentifier, sequenceOptions);
 
    Sequence orReplace = new Sequence("('','')", OPTIONAL, new ICSymbolSpace("or"), new ICSymbolSpace("replace"));
 
@@ -471,7 +474,9 @@ public class SQLLanguage extends SCLanguage {
 
    OrderedChoice funcOptions = new OrderedChoice("([],[],[])", REPEAT, funcDef, funcBehaviorType, funcLang);
 
-   Sequence createFunction = new Sequence("CreateFunction(orReplace,,funcName,argList,funcReturn,funcOptions)", orReplace, new ICSymbolSpace("function"),
+   ICSymbolSpace functionKeyword = new ICSymbolSpace("function");
+
+   Sequence createFunction = new Sequence("CreateFunction(orReplace,,funcName,argList,funcReturn,funcOptions)", orReplace, functionKeyword,
                                           sqlIdentifier, funcArgList, funcReturn, funcOptions);
 
    OrderedChoice createChoice = new OrderedChoice("(.,.,.,.,.)", createTable, createType, createIndex, createSequence, createFunction);
@@ -479,13 +484,18 @@ public class SQLLanguage extends SCLanguage {
 
    ICSymbolChoiceSpace dropOptions = new ICSymbolChoiceSpace(OPTIONAL, "cascade", "restrict");
 
-   Sequence dropTable = new Sequence("DropTable(,tableNames,dropOptions)", tableKeyword, sqlIdentifierList, dropOptions);
-   Sequence dropType = new Sequence("DropType(,typeNames,dropOptions)", typeKeyword, sqlIdentifierList, dropOptions);
-   Sequence dropIndex = new Sequence("DropIndex(,concurrently,ifExists,indexNames,dropOptions)", typeKeyword, optConcurrentlyKeyword, ifExists, sqlIdentifierList, dropOptions);
+   Sequence dropTable = new Sequence("DropTable(,tableNames,dropOptions)", tableKeyword, sqlIdentifierCommaList, dropOptions);
+   Sequence dropType = new Sequence("DropType(,typeNames,dropOptions)", typeKeyword, sqlIdentifierCommaList, dropOptions);
+   Sequence dropIndex = new Sequence("DropIndex(,concurrently,ifExists,indexNames,dropOptions)", indexKeyword,
+                                     optConcurrentlyKeyword, ifExists, sqlIdentifierCommaList, dropOptions);
+   Sequence dropFunction = new Sequence("DropFunction(,ifExists,funcNames,dropOptions)", functionKeyword, ifExists,
+                                     sqlIdentifierCommaList, dropOptions);
+   Sequence dropSequence = new Sequence("DropSequence(,ifExists,seqNames,dropOptions)", sequenceKeyword, ifExists,
+                                     sqlIdentifierCommaList, dropOptions);
 
    ICSymbolSpace dropKeyword = new ICSymbolSpace("drop");
 
-   OrderedChoice dropChoice = new OrderedChoice("(.,.,.)", dropTable, dropType, dropIndex);
+   OrderedChoice dropChoice = new OrderedChoice("(.,.,.,.,.)", dropTable, dropType, dropIndex, dropFunction, dropSequence);
 
    Sequence dropCommand = new Sequence("(,.,)", dropKeyword, dropChoice, semicolonEOL);
 

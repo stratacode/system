@@ -1,5 +1,8 @@
 package sc.lang.sql;
 
+import sc.lang.ISemanticNode;
+import sc.lang.SemanticNodeList;
+
 import java.util.List;
 import java.util.Set;
 
@@ -12,12 +15,10 @@ public class CreateSequence extends SQLCommand {
    void addTableReferences(Set<String> refTableNames) {
    }
 
-/*
    public SQLCommand getDropCommand() {
       DropSequence dt = new DropSequence();
-      dt.sequenceNames = new SemanticNodeList<SQLIdentifier>();
-      dt.sequenceNames.add((SQLIdentifier) sequenceName.deepCopy(ISemanticNode.CopyNormal, null));
+      dt.seqNames = new SemanticNodeList<SQLIdentifier>();
+      dt.seqNames.add((SQLIdentifier) sequenceName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
-*/
 }

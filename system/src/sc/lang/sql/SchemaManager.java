@@ -1,9 +1,6 @@
 package sc.lang.sql;
 
-import sc.db.DBSchemaType;
-import sc.db.DBSchemaVersion;
-import sc.db.DBUtil;
-import sc.db.ISchemaUpdater;
+import sc.db.*;
 import sc.lang.SQLLanguage;
 import sc.layer.*;
 import sc.parser.ParseError;
@@ -45,10 +42,17 @@ public class SchemaManager {
 
    public List<DBSchemaType> notUsedTypeSchemas = new ArrayList<DBSchemaType>();
 
+   public enum SchemaMode {
+      Prompt, Update, Accept
+   }
+
+   public SchemaMode schemaMode;
+
    public SchemaManager(LayeredSystem sys, DBProvider provider, String dataSourceName) {
       this.system = sys;
       this.dataSourceName = dataSourceName;
       this.provider = provider;
+      this.schemaMode = sys.options.schemaMode;
    }
 
    public Object getDeployedDBSchemaInfo() {
@@ -149,7 +153,17 @@ public class SchemaManager {
             }
             schemaChanged = newModels.size() > 0 || changedTypes.size() > 0;
          }
+
+         if ((initFromDBFailed || schemaChanged) && system.options.startInterpreter) {
+            schemaUpdater.setSchemaReady(dataSourceName, false);
+         }
       }
+   }
+
+   public void markSchemaReady() {
+      ISchemaUpdater schemaUpdater = provider.getSchemaUpdater();
+      if (schemaUpdater != null)
+         schemaUpdater.setSchemaReady(dataSourceName, true);
    }
 
    private String getDeployedSchemasDir(Layer buildLayer) {
@@ -215,15 +229,17 @@ public class SchemaManager {
       }
 
       if (schemaChanged) {
-         if (system.options.startInterpreter) {
-            system.cmd.addCommandWizard(new SchemaUpdateWizard(system.cmd, system, this));
-         }
-         else {
-            if (noCurrentSchema) {
-               system.warning("Database schema may not be in sync: no deployed/cached schema files and not running SchemaUpdateWizard because command interpreter is disabled");
+         if (schemaMode == SchemaMode.Prompt) {
+            if (system.options.startInterpreter) {
+               system.cmd.addCommandWizard(new SchemaUpdateWizard(system.cmd, system, this));
             }
             else {
-               system.warning("Database schema has changed and not running SchemaUpdateWizard because command interpreter is disabled");
+               if (noCurrentSchema) {
+                  system.warning("Database schema may not be in sync: no deployed/cached schema files and not running SchemaUpdateWizard because command interpreter is disabled");
+               }
+               else {
+                  system.warning("Database schema has changed and not running SchemaUpdateWizard because command interpreter is disabled");
+               }
             }
          }
       }
@@ -274,7 +290,6 @@ public class SchemaManager {
       String dataSourceFile = dataSourceName.replace("/", "_");
       if (postfix != null)
          dataSourceFile += "-" + postfix;
-      dataSourceFile = FileUtil.addExtension(dataSourceFile, "sql");
       return new SrcEntry(buildLayer, buildLayer.buildSrcDir, "",  FileUtil.addExtension(dataSourceFile, "sql"), false, null);
    }
 
@@ -289,17 +304,31 @@ public class SchemaManager {
          FileUtil.saveStringAsReadOnlyFile(sqlSrcEnt.absFileName, schemaSB.toString(), false);
          buildLayer.addSrcFileIndex(sqlSrcEnt.relFileName, sqlSrcEnt.hash, null, sqlSrcEnt.absFileName);
 
-         DBUtil.info("Schema: " + (postfix == null ? "" : postfix) + " changed: " + sqlSrcEnt.absFileName);
+         DBUtil.info((postfix == null ? "" : postfix) + " schema changed: " + sqlSrcEnt.absFileName);
 
          return true;
       }
       else
-         DBUtil.verbose("Schema: " + (postfix == null ? "" : postfix) + " unchanged: " + sqlSrcEnt.absFileName);
+         DBUtil.verbose( (postfix == null ? "" : postfix) +  " schema: unchanged: " + sqlSrcEnt.absFileName);
       return false;
    }
 
    public StringBuilder getCurrentSchema() {
       return convertSQLModelsToString(currentSchema, "Database schema");
+   }
+
+   public StringBuilder getDropSchema() {
+      if (currentSchema == null || currentSchema.size() == 0)
+         return null;
+
+      StringBuilder dropSB = new StringBuilder();
+      dropSB.append("/* " + "Script to drop tables, etc" + " for dataSource: " + dataSourceName + " */\n");
+      for (SQLFileModel sqlFileModel:currentSchema) {
+         dropSB.append("\n\n/* Drop schema for type: " + sqlFileModel.srcType.getFullTypeName() + " */\n\n");
+         dropSB.append(sqlFileModel.createDropSQLModel().toLanguageString());
+         dropSB.append("\n");
+      }
+      return dropSB;
    }
 
    public StringBuilder getAlterSchema() {
@@ -314,8 +343,17 @@ public class SchemaManager {
          changed = saveSchemaFile(buildLayer, schemaSB, null);
       }
 
-      if (changed)
-         generateAlterSchema(buildLayer);
+      StringBuilder dropSB = getDropSchema();
+      if (dropSB != null) {
+         saveSchemaFile(buildLayer, dropSB, "drop");
+      }
+
+      if (changed) {
+         if (generateAlterSchema(buildLayer)) {
+            if (system.options.startInterpreter && schemaMode == SchemaMode.Prompt)
+               DataSourceManager.defaultSchemaReady = false;
+         }
+      }
    }
 
    public static void addToSchemaList(List<SQLFileModel> schemaList, SQLFileModel sqlModel) {

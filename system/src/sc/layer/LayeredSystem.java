@@ -4091,7 +4091,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       PerfMon.start("runMain");
       try {
          Thread commandThread = null;
+
+         if (options.testPattern != null) {
+            // First init any unit tests so that we register data sources at this point. That way they can be used to
+            // determine the initial schema manager's config from the database
+            if (sys.buildInfo != null)
+               sys.buildInfo.initMatchingTests(options.testPattern);
+         }
+
          if (options.startInterpreter) {
+            sys.cmd.initCommandWizards();
             if (options.testMode || options.scriptMode) {
                // Change the default for testing
                sys.cmd.edit = false;
@@ -4147,17 +4156,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                sys.cmd.readParseLoop();
          }
 
-         boolean haveReset = false;
-
-         if (options.testPattern != null) {
-            // First run the unit tests which match (i.e. those installed with the @Test annotation)
-            if (sys.buildInfo != null)
-               sys.buildInfo.runMatchingTests(options.testPattern);
-         }
-
          if (options.verbose && !options.testVerifyMode) {
             sys.verbose("Prepared runtime: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
          }
+
+         if (options.schemaMode != SchemaManager.SchemaMode.Prompt) {
+            if (sys.activeDBProviders != null) {
+               for (DBProvider dbProvider:sys.activeDBProviders.values()) {
+                  dbProvider.applySchemaOperation(sys.buildLayer, options.schemaMode);
+               }
+            }
+
+         }
+
 
          if (options.runClass != null) {
 
@@ -4196,8 +4207,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       }
 
       try {
-         // Run any test commands after starting servers and things like that
+         // Run any test commands after starting servers and things like that and after having released the
+         // dyn lock.
          if (options.testPattern != null) {
+            // First run the unit tests which match (i.e. those installed with the @Test annotation)
+            if (sys.buildInfo != null)
+               sys.buildInfo.runMatchingTests(options.testPattern);
+
             // Then run any commands installed by any layers
             sys.runTestCommands();
          }

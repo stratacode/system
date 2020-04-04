@@ -12,4 +12,6 @@ public interface ISchemaUpdater {
    List<DBSchemaType> getDBSchemas(String dataSourceName);
    void applyAlterCommands(String dataSourceName, List<String> alterCommands);
    void updateDBSchemaForType(String dataSourceName, DBSchemaType info);
+   /* Set to false for an application when it's required schema does not match the registered DB schema and we launch the wizard */
+   void setSchemaReady(String dataSourceName, boolean flag);
 }

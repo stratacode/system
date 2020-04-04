@@ -750,4 +750,25 @@ public class DBProvider {
       schemaUpdater = DataSourceManager.getSchemaUpdater(providerName);
       return schemaUpdater;
    }
+
+   public void applySchemaOperation(Layer buildLayer, SchemaManager.SchemaMode schemaMode) {
+      if (dbSchemas != null) {
+         for (Map.Entry<String,SchemaManager> ent:dbSchemas.entrySet()) {
+            SchemaManager schemaMgr = ent.getValue();
+            switch (schemaMode) {
+               case Update:
+                  DBUtil.info("Updating schema for: " + schemaMgr.dataSourceName);
+                  schemaMgr.updateSchema(buildLayer, true);
+                  break;
+               case Accept:
+                  DBUtil.info("Accepting current schema for: " + schemaMgr.dataSourceName);
+                  schemaMgr.updateSchema(buildLayer, false);
+                  break;
+               default:
+                  System.err.println("*** Unrecognized schema apply mode");
+                  break;
+            }
+         }
+      }
+   }
 }

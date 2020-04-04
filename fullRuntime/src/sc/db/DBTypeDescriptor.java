@@ -1303,4 +1303,13 @@ public class DBTypeDescriptor {
          throw new IllegalArgumentException("DBTypeDescriptor being used before being started");
       return dataSource;
    }
+
+   /**
+    * Allow test or application threads to wait until the SchemaManager finishes updating/validating the schema before
+    * continuing
+    */
+   public void waitForSchemaReady() {
+      DBDataSource ds = getDataSource();
+      ds.waitForReady();
+   }
 }

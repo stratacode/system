@@ -325,6 +325,17 @@ public class SQLFileModel extends SCModel {
       }
    }
 
+   /* TODO: Currently we sort for each type using the table's columns references clauses. Within a type, tables are sorted
+    * based on their role primary, auxiliary, multi, sequences, indexes, functions. Do we need a finer grained way to sort
+    * like this?
+   static class ReferenceContext {
+      TreeSet<String> tableRefs = new TreeSet<String>();
+      TreeSet<String> seqRefs = new TreeSet<String>();
+      TreeSet<String> indexRefs = new TreeSet<String>();
+      TreeSet<String> funcRefs = new TreeSet<String>();
+   }
+   */
+
    public boolean hasTableReference(SQLFileModel other) {
       TreeSet<String> tableRefs = new TreeSet<String>();
       for (SQLCommand cmd:sqlCommands)
@@ -404,7 +415,7 @@ public class SQLFileModel extends SCModel {
       return resModel;
    }
 
-   public SQLFileModel createDropSQL() {
+   public SQLFileModel createDropSQLModel() {
       SQLFileModel resModel = new SQLFileModel();
       resModel.srcType = srcType;
 
