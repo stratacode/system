@@ -861,6 +861,14 @@ public class ParentParseNode extends AbstractParseNode {
    }
 
    public void updateSemanticValue(IdentityHashMap<Object, Object> oldNewMap) {
+      // Process children first so that the most specific parent has the last reference in a parse node
+      // so that the rules are consistent with the parse stage which is bottom up
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof IParseNode)
+               ((IParseNode) child).updateSemanticValue(oldNewMap);
+         }
+      }
       if (value != null && value instanceof ISemanticNode) {
          ISemanticNode oldVal = (ISemanticNode) value;
          ISemanticNode newVal = (ISemanticNode) oldNewMap.get(oldVal);
@@ -873,12 +881,6 @@ public class ParentParseNode extends AbstractParseNode {
             newVal = oldVal.deepCopy(ISemanticNode.SkipParseNode, null);
             newVal.setParseNode(this);
             value = newVal;
-         }
-      }
-      if (children != null) {
-         for (Object child:children) {
-            if (child instanceof IParseNode)
-               ((IParseNode) child).updateSemanticValue(oldNewMap);
          }
       }
    }
