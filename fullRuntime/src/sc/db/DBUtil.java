@@ -195,6 +195,81 @@ public class DBUtil {
       IBeanMapper mapper = dbProp.getPropertyMapper();
       Object propertyType = mapper.getPropertyType();
       DBColumnType colType = dbProp.getDBColumnType();
+      return getResultSetByIndex(rs, index, propertyType, colType, dbProp.refDBTypeDesc);
+   }
+
+   public static Object getResultSetByName(ResultSet rs, String colName, DBPropertyDescriptor dbProp) throws SQLException {
+      IBeanMapper mapper = dbProp.getPropertyMapper();
+      Object propertyType = mapper.getPropertyType();
+      DBColumnType colType = dbProp.getDBColumnType();
+      return getResultSetByName(rs, colName, propertyType, colType, dbProp.refDBTypeDesc);
+   }
+
+   public static Object getResultSetByName(ResultSet rs, String colName, Object propertyType, DBColumnType colType, DBTypeDescriptor refType) throws SQLException {
+      switch (colType) {
+         case Int:
+            Object res = rs.getObject(colName);
+            if (res == null || rs.wasNull())
+               return res;
+            if (res instanceof Integer)
+               return res;
+            else {
+               System.err.println("*** Unrecognized result for integer property");
+               return res;
+            }
+         case String:
+            String sres = rs.getString(colName);
+            if (rs.wasNull())
+               return null;
+            return sres;
+         case Long:
+            Long lres = rs.getLong(colName);
+            if (rs.wasNull())
+               return null;
+            return lres;
+         case Boolean:
+            Boolean bres = rs.getBoolean(colName);
+            if (rs.wasNull())
+               return null;
+            return bres;
+         case Float:
+            Float fres = rs.getFloat(colName);
+            if (rs.wasNull())
+               return null;
+            return fres;
+         case Double:
+            Double dres = rs.getDouble(colName);
+            if (rs.wasNull())
+               return null;
+            return dres;
+         case Date:
+            java.sql.Timestamp sqlDate = rs.getTimestamp(colName);
+            if (rs.wasNull())
+               return null;
+            return sqlDate;
+         case Json:
+            Object ores = rs.getObject(colName);
+            if (ores == null)
+               return null;
+            if (ores.getClass().getName().contains("PGobject")) {
+               String jsonStr = (String) DynUtil.getPropertyValue(ores, "value");
+               if (jsonStr == null || jsonStr.length() == 0)
+                  return null;
+               return JSON.toObject(propertyType, jsonStr);
+            }
+            else
+               throw new UnsupportedOperationException("Unrecognized type from getObject");
+         case Reference:
+            if (refType == null)
+               throw new UnsupportedOperationException("No refType provided for Reference column");
+            return getResultSetByName(rs, colName, refType.primaryTable.idColumns.get(0));
+         default:
+            throw new UnsupportedOperationException("Unrecognized type from getObject");
+      }
+
+   }
+
+   public static Object getResultSetByIndex(ResultSet rs, int index, Object propertyType, DBColumnType colType, DBTypeDescriptor refType) throws SQLException {
       switch (colType) {
          case Int:
             Object res = rs.getObject(index);
@@ -249,7 +324,9 @@ public class DBUtil {
             else
                throw new UnsupportedOperationException("Unrecognized type from getObject");
          case Reference:
-            return getResultSetByIndex(rs, index, dbProp.refDBTypeDesc.primaryTable.idColumns.get(0));
+            if (refType == null)
+               throw new UnsupportedOperationException("No refType provided for Reference column");
+            return getResultSetByIndex(rs, index, refType.primaryTable.idColumns.get(0));
          default:
             throw new UnsupportedOperationException("Unrecognized type from getObject");
       }
@@ -289,7 +366,7 @@ public class DBUtil {
          return "double";
       else if (type.equalsIgnoreCase("timestamp"))
          return "java.util.Date";
-      throw new UnsupportedOperationException();
+      return null;
    }
 
    public static boolean isDefinedInDBColumnType(String colType) {
@@ -391,5 +468,15 @@ public class DBUtil {
          System.err.println("*** Failed to read from input stream: " + exc);
       }
       return null;
+   }
+
+   public static String convertSQLToJavaTypeName(String sqlTypeName) {
+      String javaTypeName = getJavaTypeFromSQLType(sqlTypeName);
+      if (javaTypeName != null)
+         return javaTypeName;
+      DBTypeDescriptor dbTypeDesc = DBTypeDescriptor.getByTableName(javaTypeName);
+      if (dbTypeDesc != null)
+         return dbTypeDesc.getTypeName();
+      return "Object";
    }
 }

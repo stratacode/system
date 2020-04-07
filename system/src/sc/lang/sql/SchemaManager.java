@@ -131,7 +131,7 @@ public class SchemaManager {
                   SQLFileModel dbModel = (SQLFileModel) ParseUtil.nodeToSemanticValue(parseRes);
                   dbModel.srcType = newSchema.srcType;
                   // This model already matches what's in the database schema so it's not actually a new model
-                  if (dbModel.equals(newSchema)) {
+                  if (dbModel.sqlCommands.equals(newSchema.sqlCommands)) {
                      newModels.remove(newSchema);
                      removeChangedType(typeName);
                      recordDeployedSchema(typeName, newSchema, buildLayer);
@@ -147,8 +147,10 @@ public class SchemaManager {
                         // else - we already have this change from the file system cache
                      }
                      else {
-                        DBUtil.verbose("Schema for type: " + typeName + " discovered from database schema");
-                        changedTypes.add(new SchemaTypeChange(typeName, dbModel, newSchema));
+                        DBUtil.info("Schema for type: " + typeName + " discovered from database schema");
+                        SchemaTypeChange change = new SchemaTypeChange(typeName, dbModel, newSchema);
+                        updateAlterModel(change);
+                        changedTypes.add(change);
                      }
                   }
                }
@@ -219,6 +221,7 @@ public class SchemaManager {
             }
          }
       }
+
       // TODO: look for deleted types and generate the drop script to remove the old SQL commands?
 
       if (changedTypes.size() == 0 && newModels.size() == 0) {
@@ -258,16 +261,20 @@ public class SchemaManager {
       return schemaChanged;
    }
 
+   void updateAlterModel(SchemaTypeChange change) {
+      // Get the list of alter commands to convert a DDL defined by fromModel.sqlCommands to one defined by toModel.sqlCommands
+      SQLFileModel updateModel = change.fromModel.alterTo(change.toModel);
+      if (updateModel != null)
+         addToSchemaList(alterSchema, updateModel);
+      change.alterModel = updateModel;
+   }
+
    void updateAlterSchema(Layer buildLayer) {
       for (SQLFileModel newModel:newModels)
          addToSchemaList(alterSchema, newModel);
       for (SchemaTypeChange change:changedTypes) {
          try {
-            // Get the list of alter commands to convert a DDL defined by fromModel.sqlCommands to one defined by toModel.sqlCommands
-            SQLFileModel updateModel = change.fromModel.alterTo(change.toModel);
-            if (updateModel != null)
-               addToSchemaList(alterSchema, updateModel);
-            change.alterModel = updateModel;
+            updateAlterModel(change);
          }
          catch (UnsupportedOperationException exc) {
             DBUtil.error("Unable to create SQL script to update for change: " + change.fromModel);
@@ -377,6 +384,12 @@ public class SchemaManager {
       }
    }
 
+   public static void replaceInSchemaList(List<SQLFileModel> schemaList, SQLFileModel oldModel, SQLFileModel sqlModel) {
+      if (!schemaList.remove(oldModel))
+         System.err.println("*** Unable to remove old model");
+      addToSchemaList(schemaList, sqlModel);
+   }
+
    public static void addToSchemaList(List<SQLFileModel> schemaList, SQLFileModel sqlModel) {
       int ix = -1;
       for (int i = 0; i < schemaList.size(); i++) {
@@ -427,6 +440,7 @@ public class SchemaManager {
       if (updater == null) {
          throw new IllegalArgumentException("No schema updater configured");
       }
+      // TODO: need to sort this list
       int nsz = newModels.size();
       for (int i = 0; i < nsz; i++) {
          SQLFileModel newModel = newModels.get(i);
@@ -456,6 +470,10 @@ public class SchemaManager {
          DBSchemaVersion curVersion = info.getCurrentVersion();
          curVersion.setSchemaSQL(newModel.toLanguageString());
          curVersion.setDateApplied(new Date());
+         if (change.alterModel == null) {
+            System.out.println("*** Missing alter schema commands for change");
+            continue;
+         }
          String alterSQL = change.alterModel.toLanguageString();
          curVersion.setAlterSQL(alterSQL);
          try {

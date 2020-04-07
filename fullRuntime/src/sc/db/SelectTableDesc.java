@@ -4,10 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A given database query - i.e. a FetchTablesQuery - contains one or more FetchTableDesc - to describe the info needed to fetch this particular table's properties in this
- * query.
+ * A given database query - i.e. a SelectQuery - contains one or more SelectTableDesc - to describe the info needed
+ * to fetch this particular table's properties in this query.
  */
-class FetchTableDesc {
+class SelectTableDesc {
    TableDescriptor table;
    List<DBPropertyDescriptor> props;
 
@@ -19,8 +19,8 @@ class FetchTableDesc {
    // Only set if this table corresponds to a reference property of the parent type
    DBPropertyDescriptor refProp;
 
-   FetchTableDesc copyForRef(DBPropertyDescriptor refProp) {
-      FetchTableDesc res = new FetchTableDesc();
+   SelectTableDesc copyForRef(DBPropertyDescriptor refProp) {
+      SelectTableDesc res = new SelectTableDesc();
       res.table = table;
       res.props = new ArrayList<DBPropertyDescriptor>(props);
       res.refProp = refProp;
@@ -46,8 +46,8 @@ class FetchTableDesc {
       return sb.toString();
    }
 
-   public FetchTableDesc clone() {
-      FetchTableDesc res = new FetchTableDesc();
+   public SelectTableDesc clone() {
+      SelectTableDesc res = new SelectTableDesc();
       res.table = table;
       res.props = new ArrayList<DBPropertyDescriptor>(props);
       if (res.revProps != null)

@@ -288,7 +288,7 @@ public class DBPropertyDescriptor {
       Object val;
       int numCols = getNumColumns();
       if (numCols == 1)  {
-         val = DBUtil.getResultSetByIndex(rs, rix++, this);
+         val = DBUtil.getResultSetByIndex(rs, rix, this);
          if (refDBTypeDesc != null && val != null)
             val = refDBTypeDesc.lookupInstById(val, true, false);
       }
@@ -302,6 +302,60 @@ public class DBPropertyDescriptor {
             for (int i = 0; i < numCols; i++) {
                IdPropertyDescriptor refIdCol = refIdCols.get(i);
                Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
+               if (idVal != null)
+                  nullId = false;
+               idVals.setVal(idVal, i);
+            }
+            if (!nullId)
+               val = refDBTypeDesc.lookupInstById(idVals, true, false);
+            else
+               val = null;
+         }
+         else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
+            System.err.println("*** Unsupported case - multiCol property that's not a reference");
+            val = null;
+         }
+      }
+      return val;
+   }
+
+   public void updateReferenceForPropValue(Object inst, Object propVal) {
+      if (refDBTypeDesc != null && propVal != null) {
+         if (!(propVal instanceof IDBObject))
+            throw new IllegalArgumentException("Invalid return from get value for reference");
+         DBObject refDBObj = ((IDBObject) propVal).getDBObject();
+         if (refDBObj.isPrototype()) {
+            // Fill in the reverse property
+            if (reversePropDesc != null) {
+               reversePropDesc.getPropertyMapper().setPropertyValue(propVal, inst);
+            }
+            // Because we have stored a reference and there's an integrity constraint, we're going to assume the
+            // reference refers to a persistent object.
+            // TODO: should there be an option to validate the reference here - specifically if it's defined in a
+            // different data store?
+            refDBObj.setPrototype(false);
+         }
+      }
+   }
+
+   public Object getValueFromResultSetByName(ResultSet rs, String colName) throws SQLException {
+      Object val;
+      int numCols = getNumColumns();
+      if (numCols == 1)  {
+         val = DBUtil.getResultSetByName(rs, colName, this);
+         if (refDBTypeDesc != null && val != null)
+            val = refDBTypeDesc.lookupInstById(val, true, false);
+      }
+      else {
+         if (refDBTypeDesc != null) {
+            List<IdPropertyDescriptor> refIdCols = refDBTypeDesc.primaryTable.getIdColumns();
+            if (numCols != refIdCols.size())
+               throw new UnsupportedOperationException();
+            MultiColIdentity idVals = new MultiColIdentity(numCols);
+            boolean nullId = true;
+            for (int i = 0; i < numCols; i++) {
+               IdPropertyDescriptor refIdCol = refIdCols.get(i);
+               Object idVal = DBUtil.getResultSetByName(rs, refIdCol.columnName, refIdCol);
                if (idVal != null)
                   nullId = false;
                idVals.setVal(idVal, i);

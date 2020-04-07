@@ -421,6 +421,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return dbTypeDescriptors.get(typeName);
    }
 
+   public DBTypeDescriptor getDBTypeDescriptorFromTableName(String tableName) {
+      if (dbTypeDescriptors == null)
+         return null;
+      for (DBTypeDescriptor dbTypeDesc:dbTypeDescriptors.values())
+         if (dbTypeDesc.getTableByName(tableName) != null)
+            return dbTypeDesc;
+      return null;
+   }
+
    public void buildReverseTypeIndex(boolean clear) {
       try {
          acquireDynLock(false);

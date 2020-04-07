@@ -1,5 +1,6 @@
 package sc.lang.sql;
 
+import sc.db.DBTypeDescriptor;
 import sc.lang.SQLLanguage;
 import sc.lang.SemanticNode;
 import sc.lang.java.JavaSemanticNode;
@@ -44,6 +45,15 @@ public class SQLDataType extends SQLParamType {
    }
 
    public String getJavaTypeName() {
+      String res = convertToJavaTypeName(typeName);
+      if (res == null) {
+         displayError("No java type name for sql type: " + typeName);
+         res = "Object";
+      }
+      return res;
+   }
+
+   public static String convertToJavaTypeName(String typeName) {
       if (typeName.equalsIgnoreCase("varchar") || typeName.equals("text") || typeName.equals("nvarchar") || typeName.equals("ntext"))
          return "String";
       else if (typeName.equalsIgnoreCase("integer") || typeName.equals("serial"))
@@ -63,8 +73,6 @@ public class SQLDataType extends SQLParamType {
       else if (typeName.equalsIgnoreCase("date") || typeName.equalsIgnoreCase("time") ||
                typeName.equalsIgnoreCase("datetime") || typeName.equals("timestamp"))
          return "java.util.Date";
-      else
-         displayError("Unrecognized data type: " + typeName);
       return null;
    }
 
@@ -77,5 +85,10 @@ public class SQLDataType extends SQLParamType {
          throw new IllegalArgumentException("Invalid SQLDataType: " + typeStr + ": " + res);
       else
          return (SQLDataType) ((IParseNode) res).getSemanticValue();
+   }
+
+   @Override
+   public String getIdentifier() {
+      return typeName;
    }
 }

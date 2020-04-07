@@ -463,170 +463,212 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return sb.toString();
    }
 
-   public String formatFindByQueries() {
-      if (dbTypeDescriptor == null || dbTypeDescriptor.findByQueries == null)
+   public String formatQueries() {
+      if (dbTypeDescriptor == null || dbTypeDescriptor.queries == null)
          return "";
 
       StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < dbTypeDescriptor.findByQueries.size(); i++) {
-         FindByDescriptor fbDesc = dbTypeDescriptor.findByQueries.get(i);
-         sb.append("public static ");
-         if (fbDesc.multiRow) {
-            sb.append("java.util.List<");
-            sb.append(typeBaseName);
-            sb.append(">");
-         }
-         else {
-            sb.append(typeBaseName);
-         }
-         sb.append(" findBy");
-         sb.append(CTypeUtil.capitalizePropertyName(fbDesc.name));
-         sb.append("(");
-         int numProps = fbDesc.propNames.size();
-         int numOpts = fbDesc.optionNames == null ? 0 : fbDesc.optionNames.size();
-         int argCt = 0;
-         ArrayList<String> propVarNames = new ArrayList<String>(numProps);
-         for (int j = 0; j < numProps; j++) {
-            if (j != 0)
-               sb.append(", ");
-            String propPathName = fbDesc.propNames.get(j);
-            String propVarName = propPathName.replace(".", "_");
-            propVarNames.add(propVarName);
-
-            Object propType = fbDesc.propTypes.get(j);
-            sb.append(getTypeName(propType));
-            sb.append(" ");
-            sb.append(propVarName);
-            argCt++;
-         }
-         ArrayList<String> optVarNames = new ArrayList<String>(numOpts);
-         if (numOpts > 0) {
-            for (int j = 0; j < numOpts; j++) {
-               if (argCt != 0)
+      for (int i = 0; i < dbTypeDescriptor.queries.size(); i++) {
+         BaseQueryDescriptor queryDesc = dbTypeDescriptor.queries.get(i);
+         if (queryDesc instanceof FindByDescriptor) {
+            FindByDescriptor fbDesc = (FindByDescriptor) queryDesc;
+            sb.append("public static ");
+            if (fbDesc.multiRow) {
+               sb.append("java.util.List<");
+               sb.append(typeBaseName);
+               sb.append(">");
+            }
+            else {
+               sb.append(typeBaseName);
+            }
+            sb.append(" findBy");
+            sb.append(CTypeUtil.capitalizePropertyName(fbDesc.queryName));
+            sb.append("(");
+            int numProps = fbDesc.propNames.size();
+            int numOpts = fbDesc.optionNames == null ? 0 : fbDesc.optionNames.size();
+            int argCt = 0;
+            ArrayList<String> propVarNames = new ArrayList<String>(numProps);
+            for (int j = 0; j < numProps; j++) {
+               if (j != 0)
                   sb.append(", ");
-               String optName = fbDesc.optionNames.get(j);
-               String optVarName = optName.replace(".","_");
-               optVarNames.add(optVarName);
-               Object propType = fbDesc.optionTypes.get(j);
-               sb.append("boolean _opt");
-               sb.append(j);
-               sb.append("_");
-               sb.append(CTypeUtil.getClassName(optName));
-               sb.append(", ");
+               String propPathName = fbDesc.propNames.get(j);
+               String propVarName = propPathName.replace(".", "_");
+               propVarNames.add(propVarName);
+
+               Object propType = fbDesc.propTypes.get(j);
                sb.append(getTypeName(propType));
                sb.append(" ");
-               sb.append(optVarName);
+               sb.append(propVarName);
                argCt++;
             }
-         }
-         if (fbDesc.multiRow) {
-            if (fbDesc.orderByOption) {
-               if (argCt > 0)
+            ArrayList<String> optVarNames = new ArrayList<String>(numOpts);
+            if (numOpts > 0) {
+               for (int j = 0; j < numOpts; j++) {
+                  if (argCt != 0)
+                     sb.append(", ");
+                  String optName = fbDesc.optionNames.get(j);
+                  String optVarName = optName.replace(".","_");
+                  optVarNames.add(optVarName);
+                  Object propType = fbDesc.optionTypes.get(j);
+                  sb.append("boolean _opt");
+                  sb.append(j);
+                  sb.append("_");
+                  sb.append(CTypeUtil.getClassName(optName));
                   sb.append(", ");
-               sb.append("java.util.List<String> orderBy");
-               argCt++;
+                  sb.append(getTypeName(propType));
+                  sb.append(" ");
+                  sb.append(optVarName);
+                  argCt++;
+               }
             }
-            if (fbDesc.paged) {
-               if (argCt > 0)
-                  sb.append(", ");
-               sb.append("int startIndex, int maxResults");
+            if (fbDesc.multiRow) {
+               if (fbDesc.orderByOption) {
+                  if (argCt > 0)
+                     sb.append(", ");
+                  sb.append("java.util.List<String> orderBy");
+                  argCt++;
+               }
+               if (fbDesc.paged) {
+                  if (argCt > 0)
+                     sb.append(", ");
+                  sb.append("int startIndex, int maxResults");
+               }
             }
-         }
-         sb.append(") {\n");
-
-         if (!objType.isStarted()) {
-            sb.append("  return null;\n");
-            sb.append("}\n\n");
-            continue;
-         }
-
-         sb.append("      ");
-         sb.append(typeBaseName);
-         sb.append(" proto = new ");
-         sb.append(typeBaseName);
-         sb.append("();\n");
-         sb.append("      sc.db.DBObject dbObj = proto.getDBObject();\n");
-         sb.append("      dbObj.setPrototype(true);\n");
-         if (fbDesc.protoProps != null) {
-            sb.append("      dbObj.initProtoProperties(");
-            appendStringArgs(sb, fbDesc.protoProps);
-            sb.append(");\n");
-         }
-
-         for (int j = 0; j < numProps; j++) {
-            String propName = fbDesc.propNames.get(j);
-            sb.append("      proto." + propName + " = " + propVarNames.get(j) + ";\n");
-            /*
-            sb.append("      proto.set");
-            sb.append(CTypeUtil.capitalizePropertyName(propName));
-            sb.append("(");
-            sb.append(propName);
-            sb.append(");\n");
-            */
-         }
-         sb.append("      java.util.List<String> propList = ");
-         if (numOpts > 0)
-            sb.append("new java.util.ArrayList<String>(");
-         if (fbDesc.propNames.size() > 0)
-            appendStringList(sb, fbDesc.propNames);
-         if (numOpts > 0)
-            sb.append(")");
-         sb.append(";\n");
-         for (int j = 0; j < numOpts; j++) {
-            String propName = fbDesc.optionNames.get(j);
-            String propVarName = optVarNames.get(j);
-            String capPropName = CTypeUtil.capitalizePropertyName(propVarName);
-            sb.append("      if (_opt");
-            sb.append(j);
-            sb.append("_");
-            sb.append(CTypeUtil.getClassName(propName));
             sb.append(") {\n");
-            //sb.append("         proto.set");
-            //sb.append(capPropName);
-            //sb.append("(");
-            //sb.append(propName);
-            //sb.append(");\n");
-            sb.append("         proto." + propName + " = " + propVarName + ";\n");
 
-            sb.append("         propList.add(");
-            appendString(sb, propName, false);
-            sb.append(");\n      }\n");
-         }
-         if (fbDesc.orderByProps != null) {
-            sb.append("      java.util.List<String> orderBy = new java.util.ArrayList<String>(");
-            if (fbDesc.orderByProps.size() > 0)
-               appendStringList(sb, fbDesc.orderByProps);
+            if (!objType.isStarted()) {
+               sb.append("  return null;\n");
+               sb.append("}\n\n");
+               continue;
+            }
+
+            sb.append("      ");
+            sb.append(typeBaseName);
+            sb.append(" proto = new ");
+            sb.append(typeBaseName);
+            sb.append("();\n");
+            sb.append("      sc.db.DBObject dbObj = proto.getDBObject();\n");
+            sb.append("      dbObj.setPrototype(true);\n");
+            if (fbDesc.protoProps != null) {
+               sb.append("      dbObj.initProtoProperties(");
+               appendStringArgs(sb, fbDesc.protoProps);
+               sb.append(");\n");
+            }
+
+            for (int j = 0; j < numProps; j++) {
+               String propName = fbDesc.propNames.get(j);
+               sb.append("      proto." + propName + " = " + propVarNames.get(j) + ";\n");
+               /*
+               sb.append("      proto.set");
+               sb.append(CTypeUtil.capitalizePropertyName(propName));
+               sb.append("(");
+               sb.append(propName);
+               sb.append(");\n");
+               */
+            }
+            sb.append("      java.util.List<String> propList = ");
+            if (numOpts > 0)
+               sb.append("new java.util.ArrayList<String>(");
+            if (fbDesc.propNames.size() > 0)
+               appendStringList(sb, fbDesc.propNames);
+            if (numOpts > 0)
+               sb.append(")");
+            sb.append(";\n");
+            for (int j = 0; j < numOpts; j++) {
+               String propName = fbDesc.optionNames.get(j);
+               String propVarName = optVarNames.get(j);
+               String capPropName = CTypeUtil.capitalizePropertyName(propVarName);
+               sb.append("      if (_opt");
+               sb.append(j);
+               sb.append("_");
+               sb.append(CTypeUtil.getClassName(propName));
+               sb.append(") {\n");
+               //sb.append("         proto.set");
+               //sb.append(capPropName);
+               //sb.append("(");
+               //sb.append(propName);
+               //sb.append(");\n");
+               sb.append("         proto." + propName + " = " + propVarName + ";\n");
+
+               sb.append("         propList.add(");
+               appendString(sb, propName, false);
+               sb.append(");\n      }\n");
+            }
+            if (fbDesc.orderByProps != null) {
+               sb.append("      java.util.List<String> orderBy = new java.util.ArrayList<String>(");
+               if (fbDesc.orderByProps.size() > 0)
+                  appendStringList(sb, fbDesc.orderByProps);
+               sb.append(");\n");
+            }
+            sb.append("      return (");
+            if (fbDesc.multiRow) {
+               sb.append("java.util.List<");
+               sb.append(typeBaseName);
+               sb.append(">");
+            }
+            else {
+               sb.append(typeBaseName);
+            }
+            sb.append(") dbTypeDesc.");
+            if (fbDesc.multiRow)
+               sb.append("matchQuery(");
+            else
+               sb.append("matchOne(");
+            sb.append("proto.getDBObject(),");
+            appendString(sb, fbDesc.fetchGroup, false);
+            sb.append(", propList");
+            if (fbDesc.multiRow) {
+               if (fbDesc.orderByOption || fbDesc.orderByProps != null)
+                  sb.append(", orderBy");
+               else
+                  sb.append(", null");
+               if (fbDesc.paged)
+                  sb.append(", startIndex, maxResults");
+               else
+                  sb.append(", 0, 0");
+            }
             sb.append(");\n");
+            sb.append("   }\n\n");
          }
-         sb.append("      return (");
-         if (fbDesc.multiRow) {
-            sb.append("java.util.List<");
-            sb.append(typeBaseName);
-            sb.append(">");
+         else if (queryDesc instanceof NamedQueryDescriptor) {
+            NamedQueryDescriptor namedQuery = (NamedQueryDescriptor) queryDesc;
+            sb.append("   public static ");
+            StringBuilder retTypeName = new StringBuilder();
+            if (namedQuery.multiRow) {
+               retTypeName.append("java.util.List<");
+               retTypeName.append(namedQuery.returnTypeName);
+               retTypeName.append(">");
+            }
+            else {
+               retTypeName.append(namedQuery.returnTypeName);
+            }
+            sb.append(retTypeName);
+            sb.append(" ");
+            sb.append(namedQuery.queryName);
+            sb.append("(");
+            int numParams = namedQuery.paramNames.size();
+            for (int j = 0; j < numParams; j++) {
+               if (j != 0)
+                  sb.append(", ");
+               String paramName = namedQuery.paramNames.get(j);
+               String paramTypeName = namedQuery.paramTypeNames.get(j);
+               sb.append(paramTypeName);
+               sb.append(" ");
+               sb.append(paramName);
+            }
+            sb.append(") {\n");
+            sb.append("      return ");
+            sb.append("(");
+            sb.append(retTypeName);
+            sb.append(") ");
+            sb.append("dbTypeDesc.namedQuery(");
+            appendString(sb, namedQuery.queryName, false);
+            for (int j = 0; j < numParams; j++) {
+               appendIdent(sb, namedQuery.paramNames.get(j), true);
+            }
+            sb.append(");\n");
+            sb.append("   }\n");
          }
-         else {
-            sb.append(typeBaseName);
-         }
-         sb.append(") dbTypeDesc.");
-         if (fbDesc.multiRow)
-            sb.append("query(");
-         else
-            sb.append("queryOne(");
-         sb.append("proto.getDBObject(),");
-         appendString(sb, fbDesc.fetchGroup, false);
-         sb.append(", propList");
-         if (fbDesc.multiRow) {
-            if (fbDesc.orderByOption || fbDesc.orderByProps != null)
-               sb.append(", orderBy");
-            else
-               sb.append(", null");
-            if (fbDesc.paged)
-               sb.append(", startIndex, maxResults");
-            else
-               sb.append(", 0, 0");
-         }
-         sb.append(");\n");
-         sb.append("   }\n\n");
       }
       return sb.toString();
    }
@@ -681,7 +723,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       sb.append(", ");
       appendTableList(sb, dbTypeDescriptor.multiTables, true);
       sb.append(", ");
-      appendFindByQueries(sb, dbTypeDescriptor.findByQueries);
+      appendQueries(sb, dbTypeDescriptor.queries);
       sb.append(", ");
       DBPropertyDescriptor versionProp = dbTypeDescriptor.versionProperty;
       if (versionProp == null)
@@ -691,38 +733,58 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(versionProp.columnName);
          sb.append('"');
       }
+      appendString(sb, dbTypeDescriptor.schemaSQL, true);
+
       sb.append("));");
 
       return sb.toString();
    }
 
-   private void appendFindByQueries(StringBuilder sb, List<FindByDescriptor> findByQueries) {
-      if (findByQueries == null || findByQueries.size() == 0) {
+   private void appendQueries(StringBuilder sb, List<BaseQueryDescriptor> queries) {
+      if (queries == null || queries.size() == 0) {
          sb.append("null");
          return;
       }
       sb.append("java.util.Arrays.asList(");
 
-      for (int i = 0; i < findByQueries.size(); i++) {
+      for (int i = 0; i < queries.size(); i++) {
          if (i != 0)
             sb.append(", ");
-         sb.append("new sc.db.FindByDescriptor(");
-         FindByDescriptor fbDesc = findByQueries.get(i);
-         appendString(sb, fbDesc.name, false);
-         sb.append(", ");
-         appendStringList(sb, fbDesc.propNames);
-         sb.append(", ");
-         appendStringList(sb, fbDesc.optionNames);
-         sb.append(", ");
-         appendStringList(sb, fbDesc.orderByProps);
-         sb.append(", ");
-         sb.append(fbDesc.orderByOption);
-         sb.append(", ");
-         sb.append(fbDesc.multiRow);
-         appendString(sb, fbDesc.fetchGroup, true);
-         sb.append(", ");
-         sb.append(fbDesc.paged);
-         sb.append(")");
+         BaseQueryDescriptor query = queries.get(i);
+         if (query instanceof FindByDescriptor) {
+            sb.append("new sc.db.FindByDescriptor(");
+            FindByDescriptor fbDesc = (FindByDescriptor) query;
+            appendString(sb, fbDesc.queryName, false);
+            sb.append(", ");
+            appendStringList(sb, fbDesc.propNames);
+            sb.append(", ");
+            appendStringList(sb, fbDesc.optionNames);
+            sb.append(", ");
+            appendStringList(sb, fbDesc.orderByProps);
+            sb.append(", ");
+            sb.append(fbDesc.orderByOption);
+            sb.append(", ");
+            sb.append(fbDesc.multiRow);
+            appendString(sb, fbDesc.fetchGroup, true);
+            sb.append(", ");
+            sb.append(fbDesc.paged);
+            sb.append(")");
+         }
+         else if (query instanceof NamedQueryDescriptor) {
+            NamedQueryDescriptor namedQuery = (NamedQueryDescriptor) query;
+            sb.append("new sc.db.NamedQueryDescriptor(");
+            appendString(sb, namedQuery.queryName, false);
+            appendString(sb, namedQuery.dbQueryName, true);
+            sb.append(", ");
+            appendStringList(sb, namedQuery.paramNames);
+            sb.append(", ");
+            appendStringList(sb, namedQuery.paramDBTypeNames);
+            sb.append(", ");
+            sb.append(namedQuery.multiRow);
+            appendString(sb, namedQuery.returnTypeName, true);
+            appendString(sb, namedQuery.returnDBTypeName, true);
+            sb.append(")");
+         }
       }
       sb.append(")");
    }
@@ -840,6 +902,16 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       sb.append(")");
    }
 
+   private void appendIdent(StringBuilder sb, String str, boolean commaPre) {
+      if (commaPre)
+         sb.append(", ");
+      if (str == null)
+         sb.append("null");
+      else {
+         sb.append(str);
+      }
+   }
+
    private void appendString(StringBuilder sb, String str, boolean commaPre) {
       if (commaPre)
          sb.append(", ");
@@ -847,7 +919,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("null");
       else {
          sb.append('"');
-         sb.append(str);
+         sb.append(CTypeUtil.escapeJavaString(str, '"', false));
          sb.append('"');
       }
    }

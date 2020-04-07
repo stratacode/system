@@ -90,6 +90,22 @@ public class TableDescriptor {
       return null;
    }
 
+   public DBPropertyDescriptor getPropertyForColumn(String colName) {
+      if (columns != null) {
+         for (DBPropertyDescriptor col:columns)
+            if (col.columnName.equals(colName))
+               return col;
+      }
+      if (idColumns != null) {
+         for (DBPropertyDescriptor col:idColumns)
+            if (col.columnName.equals(colName))
+               return col;
+      }
+      if (reverseProperty != null && reverseProperty.columnName.equals(colName))
+         return reverseProperty;
+      return null;
+   }
+
    public String getJavaName() {
       return DBUtil.getJavaName(tableName);
    }

@@ -2,12 +2,10 @@ package sc.db;
 
 import sc.bind.*;
 import sc.dyn.DynUtil;
-import sc.obj.Constant;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.util.StringUtil;
 
-import javax.print.attribute.standard.Destination;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -66,6 +64,14 @@ public class DBTypeDescriptor {
       return res;
    }
 
+   public static DBTypeDescriptor getByTableName(String tableName) {
+      for (DBTypeDescriptor dbTypeDesc:typeDescriptorsByName.values()) {
+         if (dbTypeDesc.getTableByName(tableName) != null)
+            return dbTypeDesc;
+      }
+      return null;
+   }
+
    // Class or ITypeDeclaration for dynamic types
    public Object typeDecl;
 
@@ -98,21 +104,28 @@ public class DBTypeDescriptor {
 
    public boolean tablesInitialized = false;
 
-   public List<FindByDescriptor> findByQueries = null;
+   public List<BaseQueryDescriptor> queries = null;
+   private Map<String,NamedQueryDescriptor> namedQueryIndex = null;
+
+   /** Commands in the database's DDL language (usually SQL) to be added after the generated create tables */
+   public String schemaSQL;
 
    /** False during the code-generation phase, true when connected to a database */
    public boolean runtimeMode = false;
 
    /**
     * Defines the type with the id properties of the primary table in tact so it can be used to create references from other types.
-    * Properties may be later added to the primary table and other tables added with initTables
+    * Properties may be later added to the primary table and other tables added with initTables. This version is used from
+    * the code processor as it must create the descriptors in phases.
     */
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<FindByDescriptor> findByQueries) {
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary,
+                           List<BaseQueryDescriptor> queries, String schemaSQL) {
       this.typeDecl = typeDecl;
       this.baseType = baseType;
       this.dataSourceName = dataSourceName;
       this.primaryTable = primary;
-      this.findByQueries = findByQueries;
+      this.queries = queries;
+      this.schemaSQL = schemaSQL;
       primary.init(this);
       primary.primary = true;
 
@@ -120,10 +133,21 @@ public class DBTypeDescriptor {
          needsAutoId = true;
          primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "bigserial", true));
       }
+      initQueriesIndex();
    }
 
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary, List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<FindByDescriptor> findByQueries, String versionPropName) {
-      this(typeDecl, baseType, dataSourceName, primary, findByQueries);
+   private void initQueriesIndex() {
+      if (queries != null) {
+         for (BaseQueryDescriptor queryDesc:queries) {
+            addToQueryIndex(queryDesc);
+         }
+      }
+   }
+
+   /** This is the version used from the runtime code, when all info for defining the type is available in the constructor */
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary,
+                           List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL) {
+      this(typeDecl, baseType, dataSourceName, primary, queries, schemaSQL);
       initTables(auxTables, multiTables, versionPropName);
    }
 
@@ -180,10 +204,21 @@ public class DBTypeDescriptor {
       auxTables.add(table);
    }
 
-   public void addFindByQuery(FindByDescriptor findByDesc) {
-      if (findByQueries == null)
-         findByQueries = new ArrayList<FindByDescriptor>();
-      findByQueries.add(findByDesc);
+   public void addQueryDescriptor(BaseQueryDescriptor queryDesc) {
+      if (queries == null)
+         queries = new ArrayList<BaseQueryDescriptor>();
+      queries.add(queryDesc);
+      addToQueryIndex(queryDesc);
+   }
+
+   private void addToQueryIndex(BaseQueryDescriptor queryDesc) {
+      if (queryDesc instanceof NamedQueryDescriptor) {
+         NamedQueryDescriptor nameDesc = (NamedQueryDescriptor) queryDesc;
+         if (namedQueryIndex == null)
+            namedQueryIndex = new HashMap<String,NamedQueryDescriptor>();
+         namedQueryIndex.put(nameDesc.queryName, nameDesc);
+         nameDesc.dbTypeDesc = this;
+      }
    }
 
    void initFetchGroups() {
@@ -239,7 +274,7 @@ public class DBTypeDescriptor {
       if (query == null) {
          query = new DBFetchGroupQuery(this, null);
          fetchGroups.put(fetchGroup, query);
-         addQuery(query);
+         addFetchQuery(query);
       }
       query.addProperty(prop, false);
       propQueriesIndex.put(prop.propertyName, query);
@@ -264,7 +299,7 @@ public class DBTypeDescriptor {
    //List<DBTypeDescriptor> auxDatabases;
 
    public TableDescriptor getTableByName(String tableName) {
-      if (tableName == null)
+      if (tableName == null || tableName.equalsIgnoreCase(primaryTable.tableName))
          return primaryTable;
       if (auxTables != null) {
          for (TableDescriptor td:auxTables)
@@ -296,10 +331,12 @@ public class DBTypeDescriptor {
       return null;
    }
 
+   // Data structures for queries that fetch property values. We can look up the query for a given property,
+   // and ensure we only queue a single query at a time for that property group, even if requested by more than
+   // one thread.
    Map<String, DBFetchGroupQuery> propQueriesIndex = new HashMap<String, DBFetchGroupQuery>();
-
-   Map<String,DBQuery> queriesIndex = new HashMap<String,DBQuery>();
-   ArrayList<DBQuery> queriesList = new ArrayList<DBQuery>();
+   Map<String,DBQuery> fetchQueriesIndex = new HashMap<String,DBQuery>();
+   ArrayList<DBQuery> fetchQueriesList = new ArrayList<DBQuery>();
 
    public DBFetchGroupQuery getDefaultFetchQuery() {
       return fetchGroups.get(defaultFetchGroup);
@@ -317,12 +354,12 @@ public class DBTypeDescriptor {
       return query;
    }
 
-   public DBQuery getQueryForNum(int queryNum) {
-      return queriesList.get(queryNum);
+   public DBQuery getFetchQueryForNum(int queryNum) {
+      return fetchQueriesList.get(queryNum);
    }
 
    public int getNumFetchPropQueries() {
-      return queriesList.size();
+      return fetchQueriesList.size();
    }
 
    public DBPropertyDescriptor getPropertyDescriptor(String propNamePath) {
@@ -365,10 +402,34 @@ public class DBTypeDescriptor {
       return res;
    }
 
-   public void addQuery(DBQuery query) {
-      query.queryNumber = queriesList.size();
-      queriesList.add(query);
-      queriesIndex.put(query.queryName, query);
+   public DBPropertyDescriptor getPropertyForColumn(String colName) {
+      DBPropertyDescriptor res;
+      if (primaryTable != null) {
+         res = primaryTable.getPropertyForColumn(colName);
+         if (res != null)
+            return res;
+      }
+      if (auxTables != null) {
+         for (TableDescriptor table:auxTables) {
+            res = table.getPropertyForColumn(colName);
+            if (res != null)
+               return res;
+         }
+      }
+      if (multiTables != null) {
+         for (TableDescriptor table:multiTables) {
+            res = table.getPropertyForColumn(colName);
+            if (res != null)
+               return res;
+         }
+      }
+      return null;
+   }
+
+   public void addFetchQuery(DBQuery query) {
+      query.queryNumber = fetchQueriesList.size();
+      fetchQueriesList.add(query);
+      fetchQueriesIndex.put(query.queryName, query);
    }
 
    public String toString() {
@@ -521,9 +582,9 @@ public class DBTypeDescriptor {
             }
          }
       }
-      if (findByQueries != null) {
-         for (FindByDescriptor fbDesc:findByQueries)
-            if (fbDesc.propTypes == null)
+      if (queries != null) {
+         for (BaseQueryDescriptor fbDesc: queries)
+            if (!fbDesc.typesInited())
                fbDesc.initTypes(typeDecl);
       }
    }
@@ -613,11 +674,13 @@ public class DBTypeDescriptor {
    }
 
    /**
-    * The core "declarative query" method to return objects for this type descriptor. The proto object holds the values of the properties
-    * listed in protoProps. Those form a 'where clause' using 'and' for all properties in the list. The orderByProps list
-    * contains the ordered list of sort properties. Use "-propName" for a descending order sort on that property.
+    * The core "declarative query" method to return objects for this type matching a prototype object and list of
+    * protoProp names. The query returns matching objects for all properties (i.e.
+    * 'where clause' using 'and' for all properties in the list). Optionally provide an orderByProps list
+    * for the list of properties used in sorting the result. Use "-propName" for a descending order sort on that property and
+    * start and max properties for limit/offset in the result list.
     */
-   public List<? extends IDBObject> query(DBObject proto, String fetchGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
+   public List<? extends IDBObject> matchQuery(DBObject proto, String fetchGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
       DBFetchGroupQuery groupQuery = initQuery(proto, fetchGroup, protoProps, true);
       addParamValues(groupQuery, proto, protoProps);
       if (orderByProps != null) {
@@ -629,15 +692,15 @@ public class DBTypeDescriptor {
          groupQuery.setMaxResults(maxResults);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
-      return groupQuery.query(curTx, proto.getDBObject());
+      return groupQuery.matchQuery(curTx, proto.getDBObject());
    }
 
-   public IDBObject queryOne(DBObject proto, String fetchGroup, List<String> props) {
+   public IDBObject matchOne(DBObject proto, String fetchGroup, List<String> props) {
       DBFetchGroupQuery groupQuery = initQuery(proto, fetchGroup, props, true);
       addParamValues(groupQuery, proto, props);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
-      return groupQuery.queryOne(curTx, proto.getDBObject());
+      return groupQuery.matchOne(curTx, proto.getDBObject());
    }
 
    public List<IDBObject> mergeResultLists(List<IDBObject> primary, List<IDBObject> other) {
@@ -709,7 +772,7 @@ public class DBTypeDescriptor {
       return res;
    }
 
-   private void appendDBPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
+   private void appendDBPropParamValue(SelectQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
       if (logSB != null) {
          if (compareVal) {
             DBUtil.appendVal(logSB, propValue, null);
@@ -723,7 +786,7 @@ public class DBTypeDescriptor {
       }
    }
 
-   private void appendJSONPropParamValue(FetchTablesQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue, String propPath) {
+   private void appendJSONPropParamValue(SelectQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue, String propPath) {
       if (logSB != null) {
          if (compareVal) {
             DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType());
@@ -740,7 +803,7 @@ public class DBTypeDescriptor {
    private void appendPropParamValues(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, boolean compareVal) {
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       Object propValue = curObj.getPropertyInPath(propNamePath);
-      FetchTablesQuery curQuery = groupQuery.curQuery;
+      SelectQuery curQuery = groupQuery.curQuery;
       StringBuilder logSB = curQuery.logSB;
       if (dbProp != null) {
          appendDBPropParamValue(curQuery, dbProp, logSB, compareVal, propValue);
@@ -825,7 +888,7 @@ public class DBTypeDescriptor {
          for (int i = 0; i < paramBindings.length; i++) {
             IBinding paramBinding = paramBindings[i];
             if (i != 0) {
-               FetchTablesQuery curQuery = groupQuery.curQuery;
+               SelectQuery curQuery = groupQuery.curQuery;
                StringBuilder logSB = curQuery.logSB;
                if (logSB != null) {
                   logSB.append(" ");
@@ -839,7 +902,7 @@ public class DBTypeDescriptor {
       else if (binding instanceof VariableBinding) {
          VariableBinding varBind = (VariableBinding) binding;
          int numInChain = varBind.getNumInChain();
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
          // This is an a.b.c that corresponds to a column in the DB
          if (queryProp != null) {
@@ -888,7 +951,7 @@ public class DBTypeDescriptor {
       }
       else if (binding instanceof ConstantBinding) {
          ConstantBinding cbind = (ConstantBinding) binding;
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          StringBuilder logSB = curQuery.logSB;
          if (logSB != null) {
             Object cval = cbind.getConstantValue();
@@ -904,7 +967,7 @@ public class DBTypeDescriptor {
          }
       }
       else if (binding instanceof ArithmeticBinding) {
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          ArithmeticBinding abind = (ArithmeticBinding) binding;
          StringBuilder logSB = curQuery.logSB;
          if (abind.operator.equals("&")) {
@@ -925,7 +988,7 @@ public class DBTypeDescriptor {
    private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath) {
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
-         FetchTablesQuery newQuery = groupQuery.addProperty(dbProp, true);
+         SelectQuery newQuery = groupQuery.addProperty(dbProp, true);
          if (newQuery != groupQuery.curQuery) {
             if (groupQuery.curQuery != null) {
                throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -941,7 +1004,7 @@ public class DBTypeDescriptor {
             String propName = propNames[i];
             DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(propName);
             if (pathProp != null) {
-               FetchTablesQuery newQuery = groupQuery.addProperty(pathProp, true);
+               SelectQuery newQuery = groupQuery.addProperty(pathProp, true);
                if (newQuery != groupQuery.curQuery) {
                   if (groupQuery.curQuery != null) {
                      throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1021,7 +1084,7 @@ public class DBTypeDescriptor {
                if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
                   String nextPropName = getPathPropertyName(varBind, i);
                   DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(nextPropName);
-                  FetchTablesQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
+                  SelectQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
                   if (newQuery != groupQuery.curQuery) {
                      if (groupQuery.curQuery != null) {
                         throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1060,7 +1123,7 @@ public class DBTypeDescriptor {
                      String propName = nextProp.getPropertyName();
                      DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(propName);
                      if (nextPropDesc != null && nextPropDesc.getDBColumnType() == DBColumnType.Json) {
-                        FetchTablesQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
+                        SelectQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
                         if (newQuery != groupQuery.curQuery) {
                            if (groupQuery.curQuery != null) {
                               throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1097,7 +1160,7 @@ public class DBTypeDescriptor {
       else if (binding instanceof ConditionalBinding) {
          ConditionalBinding cond = (ConditionalBinding) binding;
          IBinding[] params = cond.getBoundParams();
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          boolean needsParen = curQuery != null;
          if (needsParen) {
             curQuery.whereAppend("(");
@@ -1118,7 +1181,7 @@ public class DBTypeDescriptor {
       else if (binding instanceof VariableBinding) {
          VariableBinding varBind = (VariableBinding) binding;
          int numInChain = varBind.getNumInChain();
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
          if (queryProp != null) {
             appendPropToWhereClause(groupQuery, queryProp.dbTypeDesc, curObj, queryProp.propertyName, false, false);
@@ -1161,7 +1224,7 @@ public class DBTypeDescriptor {
       else if (binding instanceof ConstantBinding) {
          ConstantBinding cbind = (ConstantBinding) binding;
          Object cval = cbind.getConstantValue();
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          if (cval == null)
             curQuery.whereAppend(" IS NULL");
          else if (cval instanceof CharSequence) {
@@ -1173,7 +1236,7 @@ public class DBTypeDescriptor {
             curQuery.whereAppend(cval.toString());
       }
       else if (binding instanceof ArithmeticBinding) {
-         FetchTablesQuery curQuery = groupQuery.curQuery;
+         SelectQuery curQuery = groupQuery.curQuery;
          ArithmeticBinding abind = (ArithmeticBinding) binding;
          if (abind.operator.equals("&")) {
             IBinding[] boundParams = abind.getBoundParams();
@@ -1202,10 +1265,10 @@ public class DBTypeDescriptor {
    }
 
    private void appendPropToWhereClause(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, boolean compareVal) {
-      FetchTablesQuery curQuery = groupQuery.curQuery;
+      SelectQuery curQuery = groupQuery.curQuery;
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
-         FetchTablesQuery newQuery = groupQuery.findQueryForProperty(dbProp, true);
+         SelectQuery newQuery = groupQuery.findQueryForProperty(dbProp, true);
          if (newQuery == null) // should have been added in the first pass
             throw new IllegalArgumentException("Missing query for db property: " + propNamePath);
 
@@ -1311,5 +1374,13 @@ public class DBTypeDescriptor {
    public void waitForSchemaReady() {
       DBDataSource ds = getDataSource();
       ds.waitForReady();
+   }
+
+   public Object namedQuery(String queryName, Object...args) {
+      DBTransaction curTx = DBTransaction.getOrCreate();
+      NamedQueryDescriptor namedQuery = namedQueryIndex == null ? null : namedQueryIndex.get(queryName);
+      if (namedQuery != null)
+         return namedQuery.execute(curTx, args);
+      throw new IllegalArgumentException("No query named: " + queryName + " for type: " + getTypeName());
    }
 }

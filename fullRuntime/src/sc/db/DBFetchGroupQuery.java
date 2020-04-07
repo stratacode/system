@@ -5,12 +5,12 @@ import java.util.List;
 
 public class DBFetchGroupQuery extends DBQuery {
    DBTypeDescriptor dbTypeDesc;
-   List<FetchTablesQuery> queries = new ArrayList<FetchTablesQuery>();
+   List<SelectQuery> queries = new ArrayList<SelectQuery>();
    List<String> propNames;
    List<String> orderByProps;
    int startIx, maxResults;
 
-   FetchTablesQuery curQuery;
+   SelectQuery curQuery;
 
    public DBFetchGroupQuery(DBTypeDescriptor dbTypeDesc, List<String> propNames) {
       this.dbTypeDesc = dbTypeDesc;
@@ -21,36 +21,36 @@ public class DBFetchGroupQuery extends DBQuery {
       DBFetchGroupQuery fgQuery = dbTypeDesc.getFetchGroupQuery(fetchGroup);
       if (fgQuery == null)
          throw new IllegalArgumentException("No fetch group query: " + fetchGroup + " for type: " + dbTypeDesc);
-      for (FetchTablesQuery ftq:fgQuery.queries) {
-         FetchTablesQuery newFtq = ftq.clone();
+      for (SelectQuery ftq:fgQuery.queries) {
+         SelectQuery newFtq = ftq.clone();
          newFtq.multiRow = multiRow;
          newFtq.propNames = propNames;
          queries.add(newFtq);
       }
    }
 
-   public FetchTablesQuery addProperty(DBPropertyDescriptor prop, boolean multiRowFetch) {
+   public SelectQuery addProperty(DBPropertyDescriptor prop, boolean multiRowFetch) {
       TableDescriptor table = prop.getTable();
       String dataSourceName = table.getDataSourceName();
 
-      FetchTablesQuery query = getFetchTablesQuery(dataSourceName, multiRowFetch || prop.multiRow);
+      SelectQuery query = getSelectQuery(dataSourceName, multiRowFetch || prop.multiRow);
       query.addProperty(table, prop);
       return query;
    }
 
-   public FetchTablesQuery getFetchTablesQuery(String dataSourceName, boolean multiRow) {
-      for (FetchTablesQuery query:queries)
+   public SelectQuery getSelectQuery(String dataSourceName, boolean multiRow) {
+      for (SelectQuery query:queries)
          if (query.dataSourceName.equals(dataSourceName) && query.multiRow == multiRow)
             return query;
-      FetchTablesQuery ftq = new FetchTablesQuery(dataSourceName, multiRow);
+      SelectQuery ftq = new SelectQuery(dataSourceName, multiRow);
       ftq.propNames = propNames;
       queries.add(ftq);
       return ftq;
    }
 
-   public FetchTablesQuery findQueryForProperty(DBPropertyDescriptor pdesc, boolean multi) {
+   public SelectQuery findQueryForProperty(DBPropertyDescriptor pdesc, boolean multi) {
       String dataSourceName = pdesc.getDataSourceForProp();
-      for (FetchTablesQuery query:queries)
+      for (SelectQuery query:queries)
          if (query.dataSourceName.equals(dataSourceName) && query.multiRow == multi && query.containsProperty(pdesc))
             return query;
       return null;
@@ -58,7 +58,7 @@ public class DBFetchGroupQuery extends DBQuery {
 
    public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {
       boolean res = true;
-      for (FetchTablesQuery query:queries) {
+      for (SelectQuery query:queries) {
          boolean any = query.fetchProperties(transaction, dbObj);
          if (!any && query.includesPrimary)
             res = false;
@@ -70,29 +70,29 @@ public class DBFetchGroupQuery extends DBQuery {
       DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc, propNames);
       res.queryNumber = queryNumber;
       res.queryName = queryName;
-      for (FetchTablesQuery ftq:queries)
+      for (SelectQuery ftq:queries)
          res.queries.add(ftq.clone());
       return res;
    }
 
-   public List<IDBObject> query(DBTransaction transaction, DBObject proto) {
+   public List<IDBObject> matchQuery(DBTransaction transaction, DBObject proto) {
       // Here we pick the main query, run it first, look for queries that just fetch additional properties (i.e. without a 'where clause') and do
       // fetchProperties on them.
       // For any additional queries with 'where' clauses, I think we need to just make sure we fetch those properties, then do the test against each item
       // to remove it from the list.
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");
-      return curQuery.query(transaction, proto);
+      return curQuery.matchQuery(transaction, proto);
    }
 
-   public IDBObject queryOne(DBTransaction transaction, DBObject proto) {
+   public IDBObject matchOne(DBTransaction transaction, DBObject proto) {
       // Here we pick the main query, run it first, look for queries that just fetch additional properties (i.e. without a 'where clause') and do
       // fetchProperties on them.
       // For any additional queries with 'where' clauses, I think we need to just make sure we fetch those properties, then do the test against each item
       // to remove it from the list.
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");
-      return curQuery.queryOne(transaction, proto);
+      return curQuery.matchOne(transaction, proto);
    }
 
    public void setOrderBy(List<String> orderByProps) {
@@ -108,7 +108,7 @@ public class DBFetchGroupQuery extends DBQuery {
          if (propDesc.multiRow)
             throw new IllegalArgumentException("Multi valued property: " + orderByProp + " used in orderBy: " + dbTypeDesc);
          String dataSourceName = propDesc.getDataSourceForProp();
-         FetchTablesQuery query = getFetchTablesQuery(dataSourceName, false);
+         SelectQuery query = getSelectQuery(dataSourceName, false);
          if (query.orderByProps == null) {
             query.orderByProps = new ArrayList<DBPropertyDescriptor>(orderByProps.size());
             query.orderByDirs = new ArrayList<Boolean>(orderByProps.size());
@@ -121,7 +121,7 @@ public class DBFetchGroupQuery extends DBQuery {
    public void setStartIndex(int ix) {
       this.startIx = ix;
       if (queries != null) {
-         for (FetchTablesQuery query:queries)
+         for (SelectQuery query:queries)
             query.startIndex = ix;
       }
    }
@@ -129,7 +129,7 @@ public class DBFetchGroupQuery extends DBQuery {
    public void setMaxResults(int max) {
       this.maxResults = max;
       if (queries != null) {
-         for (FetchTablesQuery query:queries)
+         for (SelectQuery query:queries)
             query.maxResults = max;
       }
    }

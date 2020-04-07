@@ -10,14 +10,14 @@ import java.sql.SQLException;
 import java.util.*;
 
 /** Corresponds to a single database query - either for a single row or multi-row but not both */
-public class FetchTablesQuery {
+public class SelectQuery {
    public String dataSourceName;
    public boolean multiRow;
    /** Does this query include the primary table - i.e. if the row does not exist, does it mean the parent item does not exist */
    public boolean includesPrimary;
 
-   List<FetchTableDesc> fetchTables = new ArrayList<FetchTableDesc>();
-   Map<String, FetchTableDesc> fetchTablesIndex = new TreeMap<String, FetchTableDesc>();
+   List<SelectTableDesc> fetchTables = new ArrayList<SelectTableDesc>();
+   Map<String, SelectTableDesc> fetchTablesIndex = new TreeMap<String, SelectTableDesc>();
 
    List<DBPropertyDescriptor> orderByProps = null;
    List<Boolean> orderByDirs = null;
@@ -38,18 +38,18 @@ public class FetchTablesQuery {
    public int startIndex = 0;
    public int maxResults = 0; // unlimited
 
-   public FetchTablesQuery(String dataSourceName, boolean multiRow) {
+   public SelectQuery(String dataSourceName, boolean multiRow) {
       this.dataSourceName = dataSourceName;
       this.multiRow = multiRow;
    }
 
    public void addProperty(TableDescriptor table, DBPropertyDescriptor prop) {
       String tableName = table.tableName;
-      FetchTableDesc ftd;
+      SelectTableDesc ftd;
       ftd = fetchTablesIndex.get(tableName);
 
       if (ftd == null) {
-         ftd = new FetchTableDesc();
+         ftd = new SelectTableDesc();
          ftd.table = table;
          ftd.props = new ArrayList<DBPropertyDescriptor>();
 
@@ -86,7 +86,7 @@ public class FetchTablesQuery {
                if (!revTable.tableName.equals(tableName)) {
                   ftd = fetchTablesIndex.get(revTable.tableName);
                   if (ftd == null) {
-                     ftd = new FetchTableDesc();
+                     ftd = new SelectTableDesc();
                      ftd.table = revTable;
                      ftd.props = Collections.emptyList();
                      ftd.revProps = new ArrayList<DBPropertyDescriptor>();
@@ -116,14 +116,14 @@ public class FetchTablesQuery {
             else { // TODO: is this right - a completely separate 1-1 query we just tack onto the current one by adding more join tables?
                refType.initFetchGroups();
                DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
-               for (FetchTablesQuery defQuery:defaultRefQuery.queries) {
+               for (SelectQuery defQuery:defaultRefQuery.queries) {
                   if (!defQuery.multiRow) {
-                     for (FetchTableDesc defQueryFetch:defQuery.fetchTables) {
+                     for (SelectTableDesc defQueryFetch:defQuery.fetchTables) {
                         // Skip any references back to the table of the property
                         // TODO: should this be a comparison against the primary table of the type of the property?
                         if (defQueryFetch.table.tableName.equalsIgnoreCase(table.tableName))
                            continue;
-                        FetchTableDesc refQueryFetch = defQueryFetch.copyForRef(prop);
+                        SelectTableDesc refQueryFetch = defQueryFetch.copyForRef(prop);
                         fetchTables.add(refQueryFetch);
                         fetchTablesIndex.put(refQueryFetch.table.tableName, refQueryFetch);
                      }
@@ -135,7 +135,7 @@ public class FetchTablesQuery {
    }
 
    public boolean containsProperty(DBPropertyDescriptor pdesc) {
-      for (FetchTableDesc ftd:fetchTables) {
+      for (SelectTableDesc ftd:fetchTables) {
          if (ftd.containsProperty(pdesc))
             return true;
       }
@@ -197,7 +197,7 @@ public class FetchTablesQuery {
       }
    }
 
-   public List<IDBObject> query(DBTransaction transaction, DBObject proto) {
+   public List<IDBObject> matchQuery(DBTransaction transaction, DBObject proto) {
       TableDescriptor mainTable = fetchTables.get(0).table;
       StringBuilder qsb = buildTableQueryBase(mainTable, fetchTables);
       ResultSet rs = null;
@@ -290,8 +290,8 @@ public class FetchTablesQuery {
       }
    }
 
-   public IDBObject queryOne(DBTransaction transaction, DBObject proto) {
-      List<IDBObject> res = query(transaction, proto);
+   public IDBObject matchOne(DBTransaction transaction, DBObject proto) {
+      List<IDBObject> res = matchQuery(transaction, proto);
       if (res == null)
          return null;
       if (res.size() > 1)
@@ -309,7 +309,7 @@ public class FetchTablesQuery {
       }
 
       int rix = 1;
-      for (FetchTableDesc ftd:fetchTables) {
+      for (SelectTableDesc ftd:fetchTables) {
          Object fetchInst = ftd.refProp == null ? inst : ftd.refProp.getPropertyMapper().getPropertyValue(inst, false, false);
          for (DBPropertyDescriptor propDesc:ftd.props) {
             if (logSB != null && rix != 1)
@@ -324,22 +324,7 @@ public class FetchTablesQuery {
             Object val = propDesc.getValueFromResultSet(rs, rix);
             rix += propDesc.getNumColumns();
 
-            if (propDesc.refDBTypeDesc != null && val != null) {
-               if (!(val instanceof IDBObject))
-                  throw new IllegalArgumentException("Invalid return from get value for reference");
-               DBObject refDBObj = ((IDBObject) val).getDBObject();
-               if (refDBObj.isPrototype()) {
-                  // Fill in the reverse property
-                  if (propDesc.reversePropDesc != null) {
-                     propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
-                  }
-                  // Because we have stored a reference and there's an integrity constraint, we're going to assume the
-                  // reference refers to a persistent object.
-                  // TODO: should there be an option to validate the reference here - specifically if it's defined in a
-                  // different data store?
-                  refDBObj.setPrototype(false);
-               }
-            }
+            propDesc.updateReferenceForPropValue(inst, val);
             propMapper.setPropertyValue(fetchInst, val);
 
             if (logSB != null) {
@@ -400,7 +385,7 @@ public class FetchTablesQuery {
          }
 
          for (int fi = 0; fi < fetchTables.size(); fi++) {
-            FetchTableDesc fetchTable = fetchTables.get(fi);
+            SelectTableDesc fetchTable = fetchTables.get(fi);
 
             boolean rowValSet = false;
             for (DBPropertyDescriptor propDesc:fetchTable.props) {
@@ -585,7 +570,7 @@ public class FetchTablesQuery {
       return true;
    }
 
-   private static StringBuilder buildTableFetchQuery(List<FetchTableDesc> fetchTables) {
+   private static StringBuilder buildTableFetchQuery(List<SelectTableDesc> fetchTables) {
       TableDescriptor mainTable = fetchTables.get(0).table;
       StringBuilder qsb = buildTableQueryBase(mainTable, fetchTables);
       qsb.append(" WHERE ");
@@ -602,14 +587,14 @@ public class FetchTablesQuery {
       return qsb;
    }
 
-   private static StringBuilder buildTableQueryBase(TableDescriptor mainTable, List<FetchTableDesc> fetchTables) {
+   private static StringBuilder buildTableQueryBase(TableDescriptor mainTable, List<SelectTableDesc> fetchTables) {
       StringBuilder res = new StringBuilder();
       boolean hasAuxTables = fetchTables.size() > 1;
       res.append("SELECT ");
       for (int i = 0; i < fetchTables.size(); i++) {
          if (i != 0)
             res.append(", ");
-         FetchTableDesc fetchTable = fetchTables.get(i);
+         SelectTableDesc fetchTable = fetchTables.get(i);
          appendTableSelect(res, fetchTable, hasAuxTables);
       }
       res.append(" FROM ");
@@ -655,7 +640,7 @@ public class FetchTablesQuery {
       }
    }
 
-   private static void appendTableSelect(StringBuilder queryStr, FetchTableDesc fetchTable, boolean addTablePrefix) {
+   private static void appendTableSelect(StringBuilder queryStr, SelectTableDesc fetchTable, boolean addTablePrefix) {
       String prefix = addTablePrefix ? fetchTable.table.tableName + "." : null;
       boolean first = true;
       for (DBPropertyDescriptor prop:fetchTable.props) {
@@ -685,7 +670,7 @@ public class FetchTablesQuery {
       sb.append("select-query: ");
       if (fetchTables != null) {
          for (int i = 0; i < fetchTables.size(); i++) {
-            FetchTableDesc fetchTable = fetchTables.get(i);
+            SelectTableDesc fetchTable = fetchTables.get(i);
             if (i != 0)
                sb.append(", ");
             sb.append(fetchTable);
@@ -708,12 +693,12 @@ public class FetchTablesQuery {
       return sb.toString();
    }
 
-   public FetchTablesQuery clone() {
-      FetchTablesQuery res = new FetchTablesQuery(dataSourceName, multiRow);
+   public SelectQuery clone() {
+      SelectQuery res = new SelectQuery(dataSourceName, multiRow);
       res.includesPrimary = includesPrimary;
       res.propNames = propNames;
-      for (FetchTableDesc ftd:fetchTables) {
-         FetchTableDesc nftd = ftd.clone();
+      for (SelectTableDesc ftd:fetchTables) {
+         SelectTableDesc nftd = ftd.clone();
          res.fetchTables.add(nftd);
          res.fetchTablesIndex.put(ftd.table.tableName, ftd);
       }
@@ -802,7 +787,7 @@ public class FetchTablesQuery {
    }
 
    public void insertIdProperty() {
-      FetchTableDesc mainTableFetch = fetchTables.get(0);
+      SelectTableDesc mainTableFetch = fetchTables.get(0);
       List<IdPropertyDescriptor> idCols = mainTableFetch.table.getIdColumns();
       int idSz = idCols.size();
       for (int i = idSz - 1; i >= 0; i--) {

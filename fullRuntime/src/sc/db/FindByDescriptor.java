@@ -1,20 +1,15 @@
 package sc.db;
 
 import sc.dyn.DynUtil;
-import sc.type.IBeanMapper;
 import sc.util.StringUtil;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 /**
  * The metadata for a FindBy query - generated from the @FindBy annotation
  */
-public class FindByDescriptor {
-   public String name;
+public class FindByDescriptor extends BaseQueryDescriptor {
    public List<String> propNames;
    public List<String> optionNames;
    public List<String> orderByProps;
@@ -33,7 +28,7 @@ public class FindByDescriptor {
    public List<String> protoProps;
 
    public FindByDescriptor(String name, List<String> properties, List<String> options, List<String> orderByProps, boolean orderByOption, boolean multiRow, String fetchGroup, boolean paged) {
-      this.name = name;
+      this.queryName = name;
       this.propNames = properties;
       this.optionNames = options;
       this.multiRow = multiRow;
@@ -41,6 +36,10 @@ public class FindByDescriptor {
       this.orderByProps = orderByProps;
       this.orderByOption = orderByOption;
       this.paged = paged;
+   }
+
+   public boolean typesInited() {
+      return propTypes != null;
    }
 
    public void initTypes(Object typeDecl) {
@@ -64,7 +63,7 @@ public class FindByDescriptor {
             String propName = propPathArr[p];
             Object propType = DynUtil.getPropertyType(curType, propName);
             if (propType == null) {
-               DBUtil.error("Missing property type for property: " + propName + " in FindBy query: " + name + " for type: " + typeDecl);
+               DBUtil.error("Missing property type for property: " + propName + " in FindBy query: " + queryName + " for type: " + typeDecl);
                break;
             }
             else
@@ -90,6 +89,6 @@ public class FindByDescriptor {
    }
 
    public String toString() {
-      return name;
+      return queryName;
    }
 }

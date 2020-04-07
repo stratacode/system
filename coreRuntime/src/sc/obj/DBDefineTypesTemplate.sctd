@@ -11,7 +11,7 @@
 
    public static sc.db.DBTypeDescriptor dbTypeDesc;
 
-   <%= formatFindByQueries() %>
+   <%= formatQueries() %>
 
    <%    if (dbTypeDescriptor.baseType == null) { %>
       // Stores persistent state for the instance

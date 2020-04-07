@@ -25,7 +25,7 @@ public class DataSourceManager {
             DBUtil.verbose("Disabling dataSource: " + jndiName + " due to configured dbDisabled flag (-ndb) option");
          }
          if (!defaultSchemaReady) {
-            DBUtil.verbose("DataSource: " + jndiName + " - setSchemaRead=false due to defaultSchemaReady=false");
+            DBUtil.verbose("DataSource: " + jndiName + " - setSchemaReady=false due to defaultSchemaReady=false");
             ds.setSchemaReady(false);
          }
       }

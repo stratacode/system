@@ -7,6 +7,7 @@ import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.parser.IParseNode;
+import sc.parser.ParseError;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.util.StringUtil;
@@ -109,6 +110,11 @@ public class DBProvider {
          boolean persist = true;
          String dataSourceName = null;
          String primaryTableName = null;
+         String schemaSQL = null;
+         SQLFileModel schemaSQLModel = null;
+
+         List<BaseQueryDescriptor> queries = null;
+
          for (Object annot:typeSettings) {
             Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
             if (tmpPersist != null)
@@ -119,6 +125,31 @@ public class DBProvider {
             String tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "primaryTable");
             if (tmpPrimaryTableName != null) {
                primaryTableName = tmpPrimaryTableName;
+            }
+         }
+
+         String tmpSchemaSQL = (String) ModelUtil.getAnnotationValue(typeDecl, "sc.db.SchemaSQL", "value");
+         if (tmpSchemaSQL != null) {
+            schemaSQL = tmpSchemaSQL;
+
+            if (schemaSQL.length() > 0) {
+               Object parseRes = SQLLanguage.getSQLLanguage().parseString(schemaSQL);
+               if (parseRes instanceof ParseError) {
+                  System.err.println("*** SchemaSQL - parse error: " + parseRes);
+               }
+               else {
+                  schemaSQLModel = (SQLFileModel) ParseUtil.nodeToSemanticValue(parseRes);
+                  if (schemaSQLModel.sqlCommands != null) {
+                     for (SQLCommand schemaCmd: schemaSQLModel.sqlCommands) {
+                        if (schemaCmd instanceof CreateFunction) {
+                           NamedQueryDescriptor namedQuery = ((CreateFunction) schemaCmd).convertToNamedQuery(sys);
+                           if (queries == null)
+                              queries = new ArrayList<BaseQueryDescriptor>();
+                           queries.add(namedQuery);
+                        }
+                     }
+                  }
+               }
             }
          }
 
@@ -146,8 +177,6 @@ public class DBProvider {
             if (primaryTableName == null)
                primaryTableName = SQLUtil.getSQLName(typeName);
             TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
-
-            List<FindByDescriptor> findByQueries = null;
 
             Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, true, true, false);
             if (properties != null) {
@@ -204,9 +233,9 @@ public class DBProvider {
                      }
 
                      FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, fetchGroup, paged != null && paged);
-                     if (findByQueries == null)
-                        findByQueries = new ArrayList<FindByDescriptor>();
-                     findByQueries.add(fbDesc);
+                     if (queries == null)
+                        queries = new ArrayList<BaseQueryDescriptor>();
+                     queries.add(fbDesc);
 
                      initFindByParamTypes(sys, typeDecl, fbDesc, false);
                   }
@@ -280,15 +309,15 @@ public class DBProvider {
                   }
 
                   FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, fetchGroup, paged != null && paged);
-                  if (findByQueries == null)
-                     findByQueries = new ArrayList<FindByDescriptor>();
-                  findByQueries.add(fbDesc);
+                  if (queries == null)
+                     queries = new ArrayList<BaseQueryDescriptor>();
+                  queries.add(fbDesc);
 
                   initFindByParamTypes(sys, typeDecl, fbDesc, false);
                }
             }
 
-            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, findByQueries);
+            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, queries, schemaSQL);
 
             sys.addDBTypeDescriptor(fullTypeName, dbTypeDesc);
 
@@ -356,6 +385,36 @@ public class DBProvider {
          }
       }
       return curProp;
+   }
+
+   public static void initQueryParamTypes(LayeredSystem sys, Layer refLayer, Object typeDecl, BaseQueryDescriptor query, boolean resolve) {
+      if (query instanceof NamedQueryDescriptor)
+         initNamedQueryParamTypes(sys, refLayer, typeDecl, (NamedQueryDescriptor) query, resolve);
+      else
+         initFindByParamTypes(sys, typeDecl, (FindByDescriptor) query, resolve);;
+   }
+
+   public static void initNamedQueryParamTypes(LayeredSystem sys, Layer refLayer, Object typeDecl, NamedQueryDescriptor namedQuery, boolean resolve) {
+      int sz = namedQuery.paramDBTypeNames.size();
+      namedQuery.paramTypes = new ArrayList<Object>(sz);
+      namedQuery.paramTypeNames = new ArrayList<String>(sz);
+      for (int i = 0; i < sz; i++) {
+         String paramDBTypeName = namedQuery.paramDBTypeNames.get(i);
+         String paramTypeName = SQLUtil.convertSQLToJavaTypeName(sys, paramDBTypeName);
+         namedQuery.paramTypeNames.add(paramTypeName);
+         Object paramType = resolveType(sys, refLayer, typeDecl, paramTypeName);
+         namedQuery.paramTypes.add(paramType);
+      }
+      String returnDBTypeName = namedQuery.returnDBTypeName;
+      if (returnDBTypeName != null) {
+         namedQuery.returnTypeName = SQLUtil.convertSQLToJavaTypeName(sys, returnDBTypeName);
+         namedQuery.returnType = resolveType(sys, refLayer, typeDecl, namedQuery.returnTypeName);
+      }
+   }
+
+   private static Object resolveType(LayeredSystem sys, Layer refLayer, Object typeDecl, String toResolveTypeName) {
+      return typeDecl instanceof ITypeDeclaration ? ((ITypeDeclaration) typeDecl).findTypeDeclaration(toResolveTypeName, true) :
+              sys.getTypeDeclaration(toResolveTypeName, false, refLayer, false);
    }
 
    public static void initFindByParamTypes(LayeredSystem sys, Object typeDecl, FindByDescriptor fbDesc, boolean resolve) {
@@ -647,9 +706,9 @@ public class DBProvider {
          }
          dbTypeDesc.initTables(auxTables, multiTables, versionProp);
 
-         if (dbTypeDesc.findByQueries != null) {
-            for (FindByDescriptor fbDesc:dbTypeDesc.findByQueries)
-               initFindByParamTypes(sys, typeDecl, fbDesc, true);
+         if (dbTypeDesc.queries != null) {
+            for (BaseQueryDescriptor query:dbTypeDesc.queries)
+               initQueryParamTypes(sys, refLayer, typeDecl, query, true);
          }
       }
    }
@@ -717,7 +776,10 @@ public class DBProvider {
 
       SQLFileModel oldModel = schemaMgr.schemasByType.put(typeName, sqlModel);
 
-      SchemaManager.addToSchemaList(schemaMgr.currentSchema, sqlModel);
+      if (oldModel != null)
+         SchemaManager.replaceInSchemaList(schemaMgr.currentSchema, oldModel, sqlModel);
+      else
+         SchemaManager.addToSchemaList(schemaMgr.currentSchema, sqlModel);
 
       return oldModel;
    }

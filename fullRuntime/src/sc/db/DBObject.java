@@ -451,7 +451,7 @@ public class DBObject implements IDBObject {
       DBTransaction curTransaction = DBTransaction.getOrCreate();
       while (fetchState != 0) {
          if ((fetchState & (FETCHED | PENDING)) != 0) {
-            DBQuery query = dbTypeDesc.getQueryForNum(queryNum);
+            DBQuery query = dbTypeDesc.getFetchQueryForNum(queryNum);
             if (query instanceof DBFetchGroupQuery) {
                if (!runQueryOnce(curTransaction, (DBFetchGroupQuery) query))
                   System.out.println("*** DBrefresh of query: " + query + " returned no rows");

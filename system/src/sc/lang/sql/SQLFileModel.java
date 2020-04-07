@@ -23,6 +23,8 @@ public class SQLFileModel extends SCModel {
    public void init() {
       if (initialized) return;
 
+      restoreParseNode();
+
       String fullTypeName = getModelTypeName();
       if (fullTypeName == null) {
          return; // This happens in TestUtil when there's no file registered for the model
@@ -57,6 +59,7 @@ public class SQLFileModel extends SCModel {
 
       String sqlName = SQLUtil.getSQLName(typeName);
       String auxPrefix = sqlName + "_";
+      StringBuilder schemaSQL = null;
       CreateTable primaryTable = null;
       List<CreateTable> auxTables = new ArrayList<CreateTable>();
       for (SQLCommand cmd:sqlCommands) {
@@ -76,7 +79,10 @@ public class SQLFileModel extends SCModel {
             else
                displayError("Table name: " + tableName + " - should match type name: " + typeName + " in sql form: " + sqlName);
          }
-         else if (cmd instanceof CreateFunction) {
+         else {
+            if (schemaSQL == null)
+               schemaSQL = new StringBuilder();
+            schemaSQL.append(cmd.toLanguageString());
          }
       }
 
@@ -92,6 +98,9 @@ public class SQLFileModel extends SCModel {
 
       // Mark this type with DBTypeSettings - to enable persistence for this type
       mods.add(Annotation.create("sc.db.DBTypeSettings"));
+      if (schemaSQL != null) {
+         mods.add(Annotation.create("sc.db.SchemaSQL", "value", schemaSQL.toString()));
+      }
 
       if (prevType == null) {
          newType = ClassDeclaration.create("class", typeName, null);
@@ -214,7 +223,7 @@ public class SQLFileModel extends SCModel {
       return null;
    }
 
-   private SQLCommand findSameCommand(SQLCommand oldCmd) {
+   public SQLCommand findSameCommand(SQLCommand oldCmd) {
       if (sqlCommands == null)
          return null;
       for (SQLCommand cmd:sqlCommands) {
@@ -226,7 +235,7 @@ public class SQLFileModel extends SCModel {
       return null;
    }
 
-   private SQLCommand findMatchingCommand(SQLCommand oldCmd) {
+   public SQLCommand findMatchingCommand(SQLCommand oldCmd) {
       if (sqlCommands == null)
          return null;
       for (SQLCommand cmd:sqlCommands) {
@@ -236,6 +245,28 @@ public class SQLFileModel extends SCModel {
          }
       }
       return null;
+   }
+
+   public void replaceCommand(SQLCommand newCmd) {
+      if (sqlCommands == null) {
+         addCommand(newCmd);
+         return;
+      }
+      for (int i = 0; i < sqlCommands.size(); i++) {
+         SQLCommand oldCmd = sqlCommands.get(i);
+         if (oldCmd.getClass() == newCmd.getClass()) {
+            if (newCmd.equals(oldCmd))
+               return;
+            String ident = newCmd.getIdentifier();
+            if (ident == null) { // TODO: not sure what to do here
+               System.err.println("*** Unable to replace/merge SQL commands");
+            }
+            else if (StringUtil.equalStrings(newCmd.getIdentifier(), oldCmd.getIdentifier())) {
+               sqlCommands.set(i, newCmd);
+               return;
+            }
+         }
+      }
    }
 
    public void addCreateTable(TableDescriptor tableDesc) {
@@ -479,7 +510,7 @@ public class SQLFileModel extends SCModel {
       boolean first = true;
       for (SQLCommand cmd:sqlCommands) {
          if (!first)
-            sb.append(" ");
+            sb.append(", ");
          first = false;
          sb.append(cmd.toDeclarationString());
       }
@@ -488,6 +519,7 @@ public class SQLFileModel extends SCModel {
 
    public List<String> getCommandList() {
       ArrayList<String> res = new ArrayList<String>(sqlCommands.size());
+      String wholeStr = toLanguageString();
       for (int i = 0; i < sqlCommands.size(); i++) {
          res.add(removeTrailingSemi(sqlCommands.get(i).toLanguageString().trim()));
       }

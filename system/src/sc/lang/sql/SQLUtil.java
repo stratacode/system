@@ -9,6 +9,8 @@ import sc.lang.java.JavaModel;
 import sc.lang.java.ModelUtil;
 import sc.layer.LayeredSystem;
 import sc.parser.PString;
+import sc.parser.ParseError;
+import sc.parser.ParseUtil;
 
 public class SQLUtil {
    // TODO: if we already have a SQLFileModel, we could modify the existing one to preserve aspects of the SQL we don't
@@ -50,6 +52,20 @@ public class SQLUtil {
                res.addCreateTable(multiTable);
          }
       }
+      if (dbTypeDesc.schemaSQL != null) {
+         Object schemaSQLRes = SQLLanguage.getSCLanguage().parseString(dbTypeDesc.schemaSQL);
+         if (schemaSQLRes instanceof ParseError) {
+            fromModel.displayError("SchemaSQL parse error: " + schemaSQLRes);
+         }
+         else {
+            SQLFileModel schemaSQLCmds = (SQLFileModel) ParseUtil.nodeToSemanticValue(schemaSQLRes);
+            if (schemaSQLCmds.sqlCommands != null) {
+               for (SQLCommand newCmd:schemaSQLCmds.sqlCommands) {
+                  res.replaceCommand(newCmd);
+               }
+            }
+         }
+      }
       if (provider != null)
          provider.addSchema(dataSourceName, typeName, res);
       return res;
@@ -61,6 +77,18 @@ public class SQLUtil {
          return res + "_";
       else
          return res;
+   }
+
+   public static String convertSQLToJavaTypeName(LayeredSystem sys, String sqlTypeName) {
+      String javaTypeName = SQLDataType.convertToJavaTypeName(sqlTypeName);
+      if (javaTypeName != null)
+         return javaTypeName;
+      DBTypeDescriptor dbTypeDesc = sys.getDBTypeDescriptorFromTableName(sqlTypeName);
+      if (dbTypeDesc == null)
+         dbTypeDesc = DBTypeDescriptor.getByTableName(javaTypeName);
+      if (dbTypeDesc != null)
+         return dbTypeDesc.getTypeName();
+      return "Object";
    }
 
 }
