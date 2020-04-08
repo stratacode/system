@@ -25,6 +25,15 @@ public class CreateIndex extends SQLCommand {
          refTableNames.add(tableName.getIdentifier());
    }
 
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      if (cmd instanceof CreateTable) {
+         CreateTable cr = (CreateTable) cmd;
+         if (cr.tableName.getIdentifier().equals(tableName.getIdentifier()))
+            return true;
+      }
+      return false;
+   }
+
    public SQLCommand getDropCommand() {
       DropIndex dt = new DropIndex();
       dt.indexNames = new SemanticNodeList<SQLIdentifier>();

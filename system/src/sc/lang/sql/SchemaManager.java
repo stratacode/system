@@ -13,8 +13,24 @@ import java.io.File;
 import java.util.*;
 
 /**
- * Manages the synchronization of current schema generated from the application and the
- * schema in the database.
+ * Manages the synchronization of current schema generated from the application and the schema in the database for
+ * a single data source.  An instance is created when code is processed for a data source, and types that use that
+ * data source add themselves to the currentSchema (also represented in schemasByType).
+ *
+ * We keep track of the current 'deployedSchemas' for each type for a given buildLayer in the .stratacode/deployedSchemas.
+ * We also keep track in the database with db_schema_type, db_schema_version, and db_schema_current_version tables. That
+ * stores the .sql used to create each version of the database. We can use that to produce diffs - i.e. the alter commands
+ * required to move from one version of the schema to the next.
+ *
+ * When a process has completed the code-processing phase, create, drop and optionally 'alter' schemas are generated
+ * by looking at changes from this build to the last deployed version.
+ *
+ * If there are schema changes and the app is run interactively, the SchemaUpdateWizard is started. It can apply the
+ * alter script and update the database , including the db_schema_ tables. Use it to print the new schema, the alter schema
+ * to be applied to the current deployed DB, etc.
+ *
+ * If available, the database metadata is used to validate the db_schema tables and determine whether the existing
+ * DB is at least a basic match for the current schema.
  */
 public class SchemaManager {
    public LayeredSystem system;
@@ -37,8 +53,14 @@ public class SchemaManager {
    public ArrayList<SQLFileModel> newModels = new ArrayList<SQLFileModel>();
 
    boolean needsInitFromDB = true;
-   public boolean initFromDBFailed = false;
+   public boolean initFromDBFailed = false, dbMetadataFailed = false;
+   /** Contents of the db_schema_ tables for the current database, if initFromDBFailed = false. */
    public List<DBSchemaType> dbSchemaTypes;
+   /** Metadata from the current database - used to validate the dbSchemaTypes and match against current schema */
+   public DBMetadata dbMetadata;
+
+   /** The tables/columns in currentSchema not found in dbMetadata */
+   public DBMetadata dbMissingMetadata;
 
    public List<DBSchemaType> notUsedTypeSchemas = new ArrayList<DBSchemaType>();
 
@@ -107,6 +129,9 @@ public class SchemaManager {
          if (dataSourceName != null) {
             dbSchemaTypes = schemaUpdater.getDBSchemas(dataSourceName);
             initFromDBFailed = dbSchemaTypes == null;
+
+            dbMetadata = schemaUpdater.getDBMetadata(dataSourceName);
+            dbMetadataFailed = dbMetadata == null;
          }
 
          if (!initFromDBFailed) {
@@ -130,6 +155,14 @@ public class SchemaManager {
                   }
                   SQLFileModel dbModel = (SQLFileModel) ParseUtil.nodeToSemanticValue(parseRes);
                   dbModel.srcType = newSchema.srcType;
+
+                  // Check the current database schema against what we have in the db_schema_ tables
+                  DBMetadata missingTableInfo = dbModel.getMissingTableInfo(dbMetadata);
+                  if (missingTableInfo != null) {
+                     DBUtil.error("Current db_schema_type table for: " + typeName + " has: " + missingTableInfo + " missing in current DB");
+                     schemaUpdater.removeDBSchemaForType(dataSourceName, typeName);
+                  }
+
                   // This model already matches what's in the database schema so it's not actually a new model
                   if (dbModel.sqlCommands.equals(newSchema.sqlCommands)) {
                      newModels.remove(newSchema);
@@ -158,9 +191,26 @@ public class SchemaManager {
             schemaChanged = newModels.size() > 0 || changedTypes.size() > 0;
          }
 
+         // There's no db_schema_type metadata, but there is metadata provided by the DB. We'll check it against the
+         // current schema for differences:
+         if (!dbMetadataFailed) {
+            if (currentSchema != null) {
+               for (SQLFileModel typeSchema:currentSchema) {
+                  DBMetadata missingData = typeSchema.getMissingTableInfo(dbMetadata);
+                  if (missingData != null) {
+                     if (dbMissingMetadata == null)
+                        dbMissingMetadata = missingData;
+                     else
+                        dbMissingMetadata.addMetadata(missingData);
+                  }
+               }
+            }
+            DBUtil.info("Missing from database schema: " + dbMissingMetadata);
+         }
+
          // The deployed schema does not match and we are running interactively so tell apps to wait till we fix
          // the DB schema before running
-         if ((initFromDBFailed || schemaChanged) && system.options.startInterpreter) {
+         if ((initFromDBFailed || schemaChanged || dbMissingMetadata != null) && system.options.startInterpreter) {
             schemaUpdater.setSchemaReady(dataSourceName, false);
             schemaNotReady = true;
          }
@@ -196,6 +246,7 @@ public class SchemaManager {
 
    public boolean generateAlterSchema(Layer buildLayer) {
       String deployedSchemasDir = getDeployedSchemasDir(buildLayer);
+      boolean allNewSchema = true;
 
       for (Map.Entry<String,SQLFileModel> ent:schemasByType.entrySet()) {
          String typeName = ent.getKey();
@@ -203,9 +254,10 @@ public class SchemaManager {
 
          String curSchemaFileName = getDeployedSchemaFile(deployedSchemasDir, typeName);
          if (!new File(curSchemaFileName).canRead()) {
-            newModels.add(sqlModel);
+            addToSchemaList(newModels, sqlModel);
          }
          else {
+            allNewSchema = false;
             String oldFileBody = FileUtil.getFileAsString(curSchemaFileName);
             String curFileBody = sqlModel.toLanguageString();
             if (!oldFileBody.equals(curFileBody)) {
@@ -227,7 +279,7 @@ public class SchemaManager {
       if (changedTypes.size() == 0 && newModels.size() == 0) {
          DBUtil.verbose("No changes to schema for dataSource: " + dataSourceName + " for buildLayer: " + buildLayer);
       }
-      else if (changedTypes.size() > 0) {
+      else if (changedTypes.size() > 0 || !allNewSchema) {
          updateAlterSchema(buildLayer);
       }
       else {
@@ -240,6 +292,7 @@ public class SchemaManager {
             FileUtil.removeFileOrDirectory(alterFile);
             DBUtil.info("Removing alter file - no deployed database schema " + alterFile);
          }
+
          schemaChanged = true;
       }
 
@@ -280,6 +333,7 @@ public class SchemaManager {
             DBUtil.error("Unable to create SQL script to update for change: " + change.fromModel);
          }
       }
+
       // TODO: include info in this file in the from and to schema versions, or maybe the dates? The deployedSchema files should have the dates, version
       // info stored (optionally) so we can track the database using the metadata table. Otherwise, we'll just use the last build date and snag the last
       // build version of the program in the deployed schema directory.

@@ -21,4 +21,12 @@ public class ReferencesConstraint extends SQLConstraint {
       if (refTable != null)
          refTableNames.add(refTable.toString());
    }
+
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      if (cmd instanceof CreateTable && refTable != null) {
+         SQLIdentifier tableName = ((CreateTable) cmd).tableName;
+         return refTable.getIdentifier().equals(tableName.getIdentifier());
+      }
+      return false;
+   }
 }

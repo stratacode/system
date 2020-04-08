@@ -13,6 +13,10 @@ public class DropFunction extends SQLCommand {
    void addTableReferences(Set<String> refTableNames) {
    }
 
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      return false;
+   }
+
    public String toDeclarationString() {
       return "drop function " + StringUtil.argsToString(funcNames);
    }

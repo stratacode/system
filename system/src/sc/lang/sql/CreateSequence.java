@@ -15,6 +15,10 @@ public class CreateSequence extends SQLCommand {
    void addTableReferences(Set<String> refTableNames) {
    }
 
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      return false;
+   }
+
    public SQLCommand getDropCommand() {
       DropSequence dt = new DropSequence();
       dt.seqNames = new SemanticNodeList<SQLIdentifier>();

@@ -24,6 +24,23 @@ public class AlterTable extends SQLCommand {
       }
    }
 
+   public boolean hasReferenceTo(SQLCommand other) {
+      if (tableName == null)
+         return false;
+      if (other instanceof CreateTable)  {
+         CreateTable otherTable = (CreateTable) other;
+         if (otherTable.tableName == null)
+            return false;
+         return otherTable.tableName.getIdentifier().equals(tableName.getIdentifier());
+      }
+      if (alterDefs != null) {
+         for (AlterDef def:alterDefs)
+            if (def.hasReferenceTo(other))
+               return true;
+      }
+      return false;
+   }
+
    void addAlterDef(AlterDef alterDef) {
       SemanticNodeList<AlterDef> defs = alterDefs;
       boolean setProp = false;

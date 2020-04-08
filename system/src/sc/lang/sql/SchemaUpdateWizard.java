@@ -106,6 +106,10 @@ public class SchemaUpdateWizard extends CommandWizard {
          print(" Changes to types: " + this.mgr.changedTypes.size());
          printChangesList();
       }
+
+      if (mgr.dbMissingMetadata != null && (mgr.noCurrentSchema || mgr.initFromDBFailed)) {
+         print(" Database metadata shows missing items: " + mgr.dbMissingMetadata);
+      }
    }
 
    private void printNewModelsList() {
@@ -113,7 +117,7 @@ public class SchemaUpdateWizard extends CommandWizard {
       int nsz = newModels.size();
       for (int i = 0; i < nsz; i++) {
          SQLFileModel model = newModels.get(i);
-         print("   " + (i == currentTypeIx? "*" : "") + "[" + i + "]: " + model.srcType.getFullTypeName() + ": " + model.getCommandSummary());
+         print("     " + (i == currentTypeIx? "*" : " ") + "[" + i + "]: " + model.srcType.getFullTypeName() + ": " + model.getCommandSummary());
       }
    }
 

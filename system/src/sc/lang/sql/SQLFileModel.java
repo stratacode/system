@@ -503,6 +503,31 @@ public class SQLFileModel extends SCModel {
          setProperty("sqlCommands", newCmds);
    }
 
+   public void sortCommands() {
+      if (sqlCommands == null)
+         return;
+
+      // First build list of references to SQL commands
+      // Set graph depth of each node - 0
+      // sort by depth in the graph
+
+      // insertion sort
+      int num = sqlCommands.size();
+      for (int i = 1; i < num; i++) {
+         SQLCommand cur = sqlCommands.get(i);
+         int j = i - 1;
+         for (; j >= 0; j--) {
+            SQLCommand next = sqlCommands.get(j);
+            if (cur.hasReferenceTo(next)) {
+               sqlCommands.set(j + 1, next);
+            }
+            else
+               break;
+         }
+         sqlCommands.set(j + 1, cur);
+      }
+   }
+
    public String getCommandSummary() {
       if (sqlCommands == null)
          return "<null commands>";
@@ -545,5 +570,39 @@ public class SQLFileModel extends SCModel {
             System.out.println("Generation error for sql model: " + toModelString());
       }
       return super.toLanguageString();
+   }
+
+   /**
+    * Compare the schema required here against the metadata we found in the database and return
+    * 'diffs' if there are any missing tables, columns
+    * TODO: add indexes, sequences, functions
+    */
+   public DBMetadata getMissingTableInfo(DBMetadata dbMetadata) {
+      if (sqlCommands == null)
+         return null;
+
+      DBMetadata diffs = null;
+
+      for (SQLCommand cmd:sqlCommands) {
+         if (cmd instanceof CreateTable) {
+            CreateTable table = ((CreateTable) cmd);
+            String tableName = table.tableName.getIdentifier();
+            TableInfo ti = dbMetadata.getTableInfo(tableName);
+            if (ti == null) {
+               if (diffs == null)
+                  diffs = new DBMetadata();
+               diffs.tableInfos.add(new TableInfo(tableName));
+            }
+            else {
+               ti = table.getMissingTableInfo(ti);
+               if (ti != null) {
+                  if (diffs == null)
+                     diffs = new DBMetadata();
+                  diffs.tableInfos.add(ti);
+               }
+            }
+         }
+      }
+      return diffs;
    }
 }

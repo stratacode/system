@@ -27,6 +27,11 @@ public class CreateFunction extends SQLCommand {
       // TODO: look for references in the return type and parameter list
    }
 
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      // TODO: also look for references in the return type and parameter list
+      return false;
+   }
+
    public String toDeclarationString() {
       return "function " + funcName;
    }

@@ -1,6 +1,8 @@
 package sc.lang.sql;
 
+import sc.db.ColumnInfo;
 import sc.db.DBUtil;
+import sc.db.TableInfo;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
@@ -26,6 +28,14 @@ public class CreateTable extends SQLCommand {
          for (TableDef def:tableDefs)
             def.addTableReferences(refTableNames);
       }
+   }
+
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      if (tableDefs != null) {
+         for (TableDef def:tableDefs)
+            def.hasReferenceTo(cmd);
+      }
+      return false;
    }
 
    public ColumnDef findColumn(String colName) {
@@ -92,5 +102,33 @@ public class CreateTable extends SQLCommand {
 
    public String getIdentifier() {
       return tableName.getIdentifier();
+   }
+
+   /** Given the current database metadata, return any missing information */
+   public TableInfo getMissingTableInfo(TableInfo ti) {
+      if (tableDefs == null)
+         return null;
+      TableInfo diffs = null;
+      for (TableDef tableDef:tableDefs) {
+         if (tableDef instanceof ColumnDef) {
+            ColumnDef colDef = (ColumnDef) tableDef;
+            ColumnInfo dbColInfo = ti.getColumnInfo(colDef.columnName.getIdentifier());
+            if (dbColInfo == null) {
+               if (diffs == null)
+                  diffs = new TableInfo(tableName.getIdentifier());
+               diffs.colInfos.add(colDef.createColumnInfo());
+            }
+            else {
+               /** Does the db entity match - if not, get the diffs and add them to the list */
+               ColumnInfo colDiffs = colDef.getMissingColumnInfo(dbColInfo);
+               if (colDiffs != null) {
+                  if (diffs == null)
+                     diffs = new TableInfo(tableName.getIdentifier());
+                  diffs.colInfos.add(colDiffs);
+               }
+            }
+         }
+      }
+      return null;
    }
 }

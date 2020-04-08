@@ -6,9 +6,14 @@ public class TableConstraint extends TableDef {
    public NamedConstraint namedConstraint;
    public SQLConstraint constraint;
 
-   @Override
    public void addTableReferences(Set<String> refTableNames) {
       if (constraint != null)
          constraint.addTableReferences(refTableNames);
+   }
+
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      if (constraint != null)
+         return constraint.hasReferenceTo(cmd);
+      return false;
    }
 }

@@ -10,4 +10,8 @@ public class LikeDef extends TableDef {
 
    public void addTableReferences(Set<String> refTableNames) {
    }
+
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      return false;
+   }
 }

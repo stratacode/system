@@ -18,6 +18,8 @@ public abstract class SQLCommand extends JavaSemanticNode {
 
    public abstract String getIdentifier();
 
+   public abstract boolean hasReferenceTo(SQLCommand other);
+
    public void alterTo(SQLFileModel resModel, SQLCommand newCmd) {
       SQLCommand dropCmd = getDropCommand();
       if (dropCmd != null) {

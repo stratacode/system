@@ -7,4 +7,8 @@ import java.util.Set;
 public abstract class SQLConstraint extends SemanticNode {
 
    public void addTableReferences(Set<String> refTableNames) {}
+
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      return false;
+   }
 }

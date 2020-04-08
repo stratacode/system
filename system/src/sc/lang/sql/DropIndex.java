@@ -14,6 +14,10 @@ public class DropIndex extends SQLCommand {
    void addTableReferences(Set<String> refTableNames) {
    }
 
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      return false;
+   }
+
    public String getIdentifier() {
       return null;
    }

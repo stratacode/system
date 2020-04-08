@@ -35,7 +35,6 @@ public class DBSchemaVersion {
       this.dateApplied = dateApplied;
    }
 
-
    private String versionInfo;
    public String getVersionInfo() {
       return versionInfo;

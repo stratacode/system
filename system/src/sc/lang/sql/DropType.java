@@ -14,6 +14,10 @@ public class DropType extends SQLCommand {
          refTableNames.add(nm.getIdentifier());
    }
 
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      return false;
+   }
+
    public String toDeclarationString() {
       return "drop type " + StringUtil.argsToString(typeNames);
    }

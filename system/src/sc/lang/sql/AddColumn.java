@@ -19,4 +19,10 @@ public class AddColumn extends AlterDef {
       if (columnDef != null)
          columnDef.addTableReferences(refTableNames);
    }
+
+   public boolean hasReferenceTo(SQLCommand cmd) {
+      if (columnDef != null)
+         return columnDef.hasReferenceTo(cmd);
+      return false;
+   }
 }
