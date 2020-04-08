@@ -470,6 +470,13 @@ public class SQLFileModel extends SCModel {
             oldCmd.alterTo(resModel, newCmd);
          }
       }
+
+      for (SQLCommand oldCmd:sqlCommands) {
+         SQLCommand matchingCmd = newModel.findMatchingCommand(oldCmd);
+         if (matchingCmd == null) {
+            resModel.addCommand(oldCmd.getDropCommand());
+         }
+      }
       return resModel;
    }
 

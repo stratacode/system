@@ -161,6 +161,7 @@ public class SchemaManager {
                   if (missingTableInfo != null) {
                      DBUtil.error("Current db_schema_type table for: " + typeName + " has: " + missingTableInfo + " missing in current DB");
                      schemaUpdater.removeDBSchemaForType(dataSourceName, typeName);
+                     continue;
                   }
 
                   // This model already matches what's in the database schema so it's not actually a new model

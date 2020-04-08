@@ -177,7 +177,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
          }
          finally {
             transaction.applyingDBChanges = false;
-            DBUtil.close(conn, st, rs);
+            DBUtil.close(null, st, rs);
          }
       }
       else {

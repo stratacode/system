@@ -83,18 +83,23 @@ public class DBUtil {
       if (rs != null)
         rs.close();
     }
-    catch (SQLException exc) {}
-    close(conn,stmt);
+    catch (SQLException exc) {
+    }
+    finally {
+       close(conn,stmt);
+    }
   }
 
   public static void close(Connection conn, PreparedStatement stmt) {
-    close(conn);
     try {
       if (stmt != null)
         stmt.close();
     }
     catch (SQLException exc) {
       System.err.println("*** error closing statement: " + exc);
+    }
+    finally {
+       close(conn);
     }
   }
 
