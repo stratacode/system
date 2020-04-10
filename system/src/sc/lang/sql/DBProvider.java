@@ -537,6 +537,7 @@ public class DBProvider {
                boolean propOnDemand = false;
                boolean propRequired = false;
                boolean propUnique = false;
+               boolean propIndexed = false;
                String propDataSourceName = null;
                String propFetchGroup = null;
                String propReverseProperty = null;
@@ -574,6 +575,10 @@ public class DBProvider {
                   Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
                   if (tmpUnique != null) {
                      propUnique = tmpUnique;
+                  }
+                  Boolean tmpIndexed  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "indexed");
+                  if (tmpIndexed != null) {
+                     propIndexed = tmpIndexed;
                   }
 
                   String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
@@ -663,14 +668,14 @@ public class DBProvider {
 
                if (isMultiCol) {
                   propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
-                          propColumnType, propTableName, propRequired, propUnique, propOnDemand,
+                          propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault);
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
-                          propColumnType, propTableName, propRequired, propUnique, propOnDemand,
+                          propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault);

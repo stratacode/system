@@ -1,11 +1,12 @@
 package sc.db;
 
 public @interface DBPropertySettings {
-   boolean onDemand() default false;
    String columnName() default "";
    String columnType() default "";
    boolean required() default false;
    boolean unique() default false;
+   boolean onDemand() default false;
+   boolean indexed() default true;
    String fetchGroup() default "";
    String tableName() default "";
    String dataSourceName() default "";

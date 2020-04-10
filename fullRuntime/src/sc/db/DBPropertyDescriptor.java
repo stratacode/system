@@ -27,6 +27,9 @@ public class DBPropertyDescriptor {
    /** For relationships, should the referenced value be fetched in-line, or should we wait till the properties of the referenced object are access to fetch them */
    public boolean onDemand;
 
+   /** Set to true for a property that should be indexed in the database for faster searches */
+   public boolean indexed;
+
    /** When the property is stored in a separate data source, specifies that data source name */
    public String dataSourceName;
 
@@ -75,7 +78,7 @@ public class DBPropertyDescriptor {
    private boolean started = false;
 
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
-                               boolean required, boolean unique, boolean onDemand, String dataSourceName, String fetchGroup,
+                               boolean required, boolean unique, boolean onDemand, boolean indexed, String dataSourceName, String fetchGroup,
                                String refTypeName, boolean multiRow, String reverseProperty, String dbDefault) {
       this.propertyName = propertyName;
       this.columnName = columnName;
@@ -84,6 +87,7 @@ public class DBPropertyDescriptor {
       this.required = required;
       this.unique = unique;
       this.onDemand = onDemand;
+      this.indexed = indexed;
       this.dataSourceName = dataSourceName;
       this.fetchGroup = fetchGroup;
       this.refTypeName = refTypeName;

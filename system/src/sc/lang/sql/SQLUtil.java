@@ -1,10 +1,9 @@
 package sc.lang.sql;
 
-import sc.db.DBTypeDescriptor;
-import sc.db.DBUtil;
-import sc.db.TableDescriptor;
+import sc.db.*;
 import sc.lang.ISemanticNode;
 import sc.lang.SQLLanguage;
+import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaModel;
 import sc.lang.java.ModelUtil;
 import sc.layer.LayeredSystem;
@@ -63,6 +62,26 @@ public class SQLUtil {
                for (SQLCommand newCmd:schemaSQLCmds.sqlCommands) {
                   res.replaceCommand(newCmd);
                }
+            }
+         }
+      }
+      // For any properties with indexed=true, create the appropriate index unless it's been defined already
+      if (dbTypeDesc.allDBProps != null) {
+         for (DBPropertyDescriptor prop:dbTypeDesc.allDBProps) {
+            // These are indexed via the primary key
+            if (prop instanceof IdPropertyDescriptor)
+               continue;
+
+            if (prop.indexed) {
+               CreateIndex propIndex = new CreateIndex();
+               propIndex.indexName = SQLIdentifier.create(prop.getTableName() + "_" + prop.columnName + "_index");
+               propIndex.tableName = SQLIdentifier.create(prop.getTableName());
+               propIndex.indexColumns = new SemanticNodeList<BaseIndexColumn>();
+               propIndex.indexColumns.add(IndexColumn.create(prop.columnName));
+
+               // If we've already added an index with this name, it overrides this version
+               if (res.findMatchingCommand(propIndex) == null)
+                  res.addCommand(propIndex);
             }
          }
       }

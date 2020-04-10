@@ -887,6 +887,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(propDesc.unique);
          sb.append(", ");
          sb.append(propDesc.onDemand);
+         sb.append(", ");
+         sb.append(propDesc.indexed);
          appendString(sb, propDesc.dataSourceName, true);
          appendString(sb, propDesc.fetchGroup, true);
          appendString(sb, propDesc.refTypeName, true);
