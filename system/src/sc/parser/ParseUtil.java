@@ -1029,8 +1029,9 @@ public class ParseUtil  {
    }
 
    /**
-    * Takes a parent child node and does a search through the parse-node tree looking for the semantic-value specified.  Returns the comments (aka whitespace) right
-    * before that node, i.e. javadoc style comments */
+    * Takes a parent child node and does a search through the parse-node tree looking for the semantic-value specified.
+    * Returns the comments (aka whitespace) right before that node, i.e. javadoc style comments
+    */
    public static SpaceBeforeResult getSpaceBefore(IParseNode parseNode, ISemanticNode value, Parselet spacing) {
       StringBuilder sb = new StringBuilder();
       if (parseNode instanceof ParentParseNode) {
