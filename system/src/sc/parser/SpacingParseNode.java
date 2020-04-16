@@ -152,6 +152,12 @@ public class SpacingParseNode extends FormattingParseNode {
                   if (prevChar == '+' || prevChar == '-')
                      ctx.appendWithStyle(" ");
                   break;
+
+               // If we have (bar), as in SQL Language, no space after the )
+               case ',':
+                  if (prevChar == ')')
+                     return;
+                  break;
             }
             if (ctx.tagMode) {
                // TODO: what additional rules do we need for tag mode, the context set for parsing HTML tags
