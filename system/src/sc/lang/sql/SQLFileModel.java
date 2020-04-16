@@ -293,6 +293,8 @@ public class SQLFileModel extends SCModel {
          }
          sqlCommands.add(createTable);
       }
+
+      createTable.setComment("/* " + (tableDesc.primary ? "Primary" : (tableDesc.multiRow ? "Multi for: " + tableDesc.columns.get(0) : "Auxiliary")) + " */");
    }
 
    private void appendColumnDefs(CreateTable createTable, List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList, boolean isId, boolean multiRow) {
@@ -395,12 +397,14 @@ public class SQLFileModel extends SCModel {
 
    public boolean hasTableReference(SQLFileModel other) {
       TreeSet<String> tableRefs = new TreeSet<String>();
-      for (SQLCommand cmd:sqlCommands)
-         cmd.addTableReferences(tableRefs);
-      for (SQLCommand cmd:other.sqlCommands) {
-         if (cmd instanceof CreateTable) {
-            if (tableRefs.contains(((CreateTable) cmd).tableName.toString()))
-               return true;
+      if (sqlCommands != null) {
+         for (SQLCommand cmd:sqlCommands)
+            cmd.addTableReferences(tableRefs);
+         for (SQLCommand cmd:other.sqlCommands) {
+            if (cmd instanceof CreateTable) {
+               if (tableRefs.contains(((CreateTable) cmd).tableName.toString()))
+                  return true;
+            }
          }
       }
       return false;

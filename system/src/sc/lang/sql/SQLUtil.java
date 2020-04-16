@@ -32,13 +32,17 @@ public class SQLUtil {
       }
 
       SQLFileModel res = old == null ? new SQLFileModel() : (SQLFileModel) old.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null);
+      // Do this to create the parseNode so that we can insert comments for the commands before we generate
+      res.setParselet(SQLLanguage.getSQLLanguage().sqlFileModel);
       if (!dbTypeDesc.tablesInitialized)
          DBProvider.completeDBTypeDescriptor(dbTypeDesc, sys, fromModel.layer, dbTypeDesc);
       dbTypeDesc.init();
       dbTypeDesc.start();
       res.layeredSystem = sys;
       res.layer = fromModel.layer;
-      res.addCreateTable(dbTypeDesc.primaryTable);
+      // The base type will have defined the primaryTable for this type
+      if (dbTypeDesc.baseType == null || dbTypeDesc.primaryTable != dbTypeDesc.baseType.primaryTable)
+         res.addCreateTable(dbTypeDesc.primaryTable);
       if (dbTypeDesc.auxTables != null) {
          for (TableDescriptor auxTable:dbTypeDesc.auxTables) {
             if (!auxTable.reference)

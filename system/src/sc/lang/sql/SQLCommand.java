@@ -1,11 +1,16 @@
 package sc.lang.sql;
 
 import sc.lang.ISemanticNode;
+import sc.lang.SQLLanguage;
+import sc.lang.java.JavaModel;
 import sc.lang.java.JavaSemanticNode;
+import sc.parser.ParseUtil;
 
 import java.util.Set;
 
 public abstract class SQLCommand extends JavaSemanticNode {
+   private transient String comment;
+
    public int getChildNestingDepth() {
       return 1;
    }
@@ -14,6 +19,14 @@ public abstract class SQLCommand extends JavaSemanticNode {
 
    public SQLCommand getDropCommand() {
       return null;
+   }
+
+   public void init() {
+      if (comment == null) {
+         JavaModel model = getJavaModel();
+         if (model.parseNode != null)
+         comment = ParseUtil.getCommentsBefore(model.parseNode, this, SQLLanguage.getSQLLanguage().spacing);
+      }
    }
 
    public abstract String getIdentifier();
@@ -30,4 +43,11 @@ public abstract class SQLCommand extends JavaSemanticNode {
          throw new UnsupportedOperationException("Unable to alter DB entity type: " + getClass());
    }
 
+   public void setComment(String comment) {
+      this.comment = comment;
+   }
+
+   public String getDefaultComment() {
+      return comment;
+   }
 }

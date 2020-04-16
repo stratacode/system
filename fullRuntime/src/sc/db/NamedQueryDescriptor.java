@@ -62,9 +62,13 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
 
    public Object execute(DBTransaction transaction, Object...paramValues) {
       StringBuilder querySB = new StringBuilder();
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder() : null;
       querySB.append("SELECT * FROM ");
       querySB.append(dbQueryName);
       querySB.append("(");
+
+      if (logSB != null)
+         logSB.append(querySB);
       for (int aix = 0; aix < paramValues.length; aix++) {
          if (aix != 0)
             querySB.append(", ");
@@ -83,7 +87,17 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
             st = conn.prepareStatement(querySB.toString());
             for (int aix = 0; aix < paramValues.length; aix++) {
                Object paramType = paramTypes.get(aix);
-               DBUtil.setStatementValue(st, col++, DBColumnType.fromJavaType(paramType), paramValues[aix]);
+               DBColumnType colType = DBColumnType.fromJavaType(paramType);
+               Object paramVal = paramValues[aix];
+               DBUtil.setStatementValue(st, col++, colType, paramVal);
+               if (logSB != null) {
+                  DBUtil.appendVal(logSB, paramVal, DBColumnType.fromJavaType(paramTypes.get(aix)));
+               }
+            }
+            if (logSB != null) {
+               logSB.append(") -> ");
+               if (multiRow)
+                  logSB.append("\n");
             }
 
             rs = st.executeQuery();
@@ -108,6 +122,13 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
             while (rs.next()) {
                if (!multiRow && rowCt > 0)
                   throw new IllegalArgumentException("More than one result set for single valued query");
+
+               if (logSB != null && multiRow) {
+                  logSB.append("   [");
+                  logSB.append(rowCt);
+                  logSB.append("]: ");
+               }
+
                if (DynUtil.isAssignableFrom(IDBObject.class, returnType)) {
                   DBTypeDescriptor resType = DBTypeDescriptor.getByType(returnType, true);
                   if (resType == null) {
@@ -129,30 +150,57 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                      }
                      idVal = idVals;
                   }
-                  IDBObject rowInst = resType.lookupInstById(idVal, true, false);
-                  rowInst.getDBObject().setPrototype(false);
+
+                  DBPropertyDescriptor typeIdProp = dbTypeDesc.getTypeIdProperty();
+                  int typeId = -1;
+                  if (typeIdProp != null) {
+                     typeId = (int) DBUtil.getResultSetByName(rs, typeIdProp.columnName, typeIdProp);
+                  }
+
+                  IDBObject rowInst = resType.lookupInstById(idVal, typeId, true, false);
+                  DBObject rowDBObj = rowInst.getDBObject();
+                  rowDBObj.setPrototype(false);
 
                   rowVal = rowInst;
 
+                  if (logSB != null) {
+                     logSB.append(rowDBObj);
+                     logSB.append("(");
+                  }
+
+                  boolean first = true;
                   for (int cix = 0; cix < colCt; cix++) {
                      String colName = md.getColumnName(cix+1);
 
                      DBPropertyDescriptor resProp = resType.getPropertyForColumn(colName);
-                     if (resProp instanceof IdPropertyDescriptor)
+                     if (resProp instanceof IdPropertyDescriptor || resProp == typeIdProp)
                         continue;
+
+                     if (logSB != null && !first)
+                        logSB.append(", ");
 
                      Object propVal = resProp.getValueFromResultSetByName(rs, colName);
 
                      resProp.updateReferenceForPropValue(rowInst, propVal);
 
                      resProp.getPropertyMapper().setPropertyValue(rowInst, propVal);
+
+                     if (logSB != null) {
+                        logSB.append(colName);
+                        logSB.append("=");
+                        DBUtil.appendVal(logSB, propVal, resProp.getDBColumnType());
+                     }
+                     first = false;
+                  }
+                  if (logSB != null) {
+                     logSB.append(")");
                   }
                }
                else {
                   if (colCt > 1) {
                      // TODO: not sure entirely about this case - do we need to know the data types being returned?
                      HashMap<String,Object> rowMap = new HashMap<String,Object>();
-                     for (int cix = 0; cix > colCt; cix++) {
+                     for (int cix = 0; cix < colCt; cix++) {
                         String colName = md.getColumnName(cix);
                         rowMap.put(colName, rs.getObject(cix));
                      }
@@ -161,12 +209,20 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                   else {
                      rowVal = DBUtil.getResultSetByIndex(rs, 1, returnType, DBColumnType.fromJavaType(returnType), null);
                   }
-               }
-               rowCt++;
 
-               if (multiRow)
+                  if (logSB != null)
+                     DBUtil.appendVal(logSB, rowVal, DBColumnType.fromJavaType(returnType));
+               }
+
+               if (multiRow) {
                   listRes.add(rowVal);
+               }
+
+               rowCt++;
             }
+            if (logSB != null)
+               DBUtil.verbose(logSB);
+
             if (multiRow)
                return listRes;
             return rowVal;

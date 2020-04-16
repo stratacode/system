@@ -7,6 +7,7 @@ import sc.type.CTypeUtil;
 import sc.util.StringUtil;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -605,7 +606,8 @@ public class DBObject implements IDBObject {
       return sb.toString();
    }
 
-   void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList, DBPropertyDescriptor versProp, long newVersion) {
+   void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList, DBPropertyDescriptor versProp, long newVersion,
+                     DBPropertyDescriptor lastModifiedProp, Date lmtValue) {
       synchronized (pendingOps) {
          transaction.commitInProgress = true;
          try {
@@ -615,6 +617,8 @@ public class DBObject implements IDBObject {
             }
             if (versProp != null)
                versProp.getPropertyMapper().setPropertyValue(inst, newVersion);
+            if (lastModifiedProp != null)
+               lastModifiedProp.getPropertyMapper().setPropertyValue(inst, lmtValue);
          }
          finally {
             transaction.commitInProgress = false;

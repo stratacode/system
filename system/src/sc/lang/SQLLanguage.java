@@ -414,11 +414,11 @@ public class SQLLanguage extends SCLanguage {
 
    Sequence createTable = new Sequence("CreateTable(tableOptions,,ifNotExists,tableName,ofType,,tableDefs,,tableInherits,tablePartition,storageParams,tableSpace)",
                    new ICSymbolChoiceSpace(REPEAT | OPTIONAL, "global", "local", "temporary", "temp", "unlogged"),
-                   tableKeyword, ifNotExists, sqlIdentifier, ofType, openParen, tableDefList, closeParen,
+                   tableKeyword, ifNotExists, sqlIdentifier, ofType, openParenEOL, tableDefList, closeParen,
                    tableInherits, tablePartition, storageParameters, tableSpace);
 
    // TODO: create type 'as enum' and 'as range' and with input/output params
-   Sequence createType = new Sequence("CreateType(,typeName,,,tableDefs,)", typeKeyword, sqlIdentifier, asKeyword, openParen, tableDefList, closeParen);
+   Sequence createType = new Sequence("CreateType(,typeName,,,tableDefs,)", typeKeyword, sqlIdentifier, asKeyword, openParenEOL, tableDefList, closeParen);
 
    ICSymbolSpace indexKeyword = new ICSymbolSpace("index");
 
@@ -480,7 +480,7 @@ public class SQLLanguage extends SCLanguage {
                                           sqlIdentifier, funcArgList, funcReturn, funcOptions);
 
    OrderedChoice createChoice = new OrderedChoice("(.,.,.,.,.)", createTable, createType, createIndex, createSequence, createFunction);
-   Sequence createCommand = new Sequence("(,.,)", new ICSymbolSpace("create"), createChoice, semicolonEOL);
+   Sequence createCommand = new Sequence("(,.,)", new ICSymbolSpace("create"), createChoice, semicolonEOL2);
 
    ICSymbolChoiceSpace dropOptions = new ICSymbolChoiceSpace(OPTIONAL, "cascade", "restrict");
 
@@ -497,7 +497,7 @@ public class SQLLanguage extends SCLanguage {
 
    OrderedChoice dropChoice = new OrderedChoice("(.,.,.,.,.)", dropTable, dropType, dropIndex, dropFunction, dropSequence);
 
-   Sequence dropCommand = new Sequence("(,.,)", dropKeyword, dropChoice, semicolonEOL);
+   Sequence dropCommand = new Sequence("(,.,)", dropKeyword, dropChoice, semicolonEOL2);
 
    ICSymbolSpace optColumnKeyword = new ICSymbolSpace("column", OPTIONAL);
 

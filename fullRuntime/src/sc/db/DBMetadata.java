@@ -24,8 +24,7 @@ public class DBMetadata {
    public String toString() {
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < tableInfos.size(); i++) {
-         if (i != 0)
-            sb.append(", ");
+         sb.append("\n    ");
          sb.append(tableInfos.get(i));
       }
       return sb.toString();

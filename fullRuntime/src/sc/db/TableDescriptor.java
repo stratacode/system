@@ -3,8 +3,11 @@ package sc.db;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Used to represent a table which stores properties for items in DBTypeDescriptor - could be a primary table, or auxiliary table.
- * MultiTables use a sub-class. */
+/**
+ * Used to represent a table storing properties for items in a DBTypeDescriptor.
+ * This one class is used for primary, auxiliary, and multi valued tables. This same class is used to define tables
+ * during code-processing, as well as to represent the table info during runtime.
+ */
 public class TableDescriptor {
    public DBTypeDescriptor dbTypeDesc;
 
@@ -54,6 +57,9 @@ public class TableDescriptor {
       else {
          for (DBPropertyDescriptor col:columns) {
             col.init(dbTypeDesc, this);
+            // TODO: this gets put into the runtime version as a normal column so identifying here by name but maybe
+            if (col.columnName.equals(DBTypeDescriptor.DBTypeIdColumnName))
+               col.typeIdProperty = true;
          }
       }
       if (idColumns != null) {
@@ -156,5 +162,15 @@ public class TableDescriptor {
          if (colProp.columnName.equalsIgnoreCase(prop.columnName))
             return true;
       return false;
+   }
+
+   public DBPropertyDescriptor getTypeIdProperty() {
+      if (primary)
+         return dbTypeDesc.getTypeIdProperty();
+      return null;
+   }
+
+   public void addTypeIdProperty(DBPropertyDescriptor typeIdProperty) {
+      columns.add(0, typeIdProperty);
    }
 }

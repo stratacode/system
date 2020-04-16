@@ -120,7 +120,10 @@ public class SchemaManager {
       }
    }
 
-   /** Connect to the database and return the metadata about the schema. */
+   /**
+    * Connect to the database and populate the schema manager with two types of metadata about the schema. Use the db_schema_
+    * tables to retrieve our record of the schema along with (optionally) the database table/column metadata to see what's actually there.
+    */
    public void initFromDB(Layer buildLayer) {
       if (!needsInitFromDB)
          return;
@@ -206,7 +209,6 @@ public class SchemaManager {
                   }
                }
             }
-            DBUtil.info("Missing from database schema: " + dbMissingMetadata);
          }
 
          // The deployed schema does not match and we are running interactively so tell apps to wait till we fix
@@ -278,7 +280,7 @@ public class SchemaManager {
       // TODO: look for deleted types and generate the drop script to remove the old SQL commands?
 
       if (changedTypes.size() == 0 && newModels.size() == 0) {
-         DBUtil.verbose("No changes to schema for dataSource: " + dataSourceName + " for buildLayer: " + buildLayer);
+         DBUtil.verbose("No changes to deployed schema for dataSource: " + dataSourceName + " for buildLayer: " + buildLayer);
       }
       else if (changedTypes.size() > 0 || !allNewSchema) {
          updateAlterSchema(buildLayer);
@@ -338,23 +340,21 @@ public class SchemaManager {
       // TODO: include info in this file in the from and to schema versions, or maybe the dates? The deployedSchema files should have the dates, version
       // info stored (optionally) so we can track the database using the metadata table. Otherwise, we'll just use the last build date and snag the last
       // build version of the program in the deployed schema directory.
-      StringBuilder alterSB = convertSQLModelsToString(alterSchema, "Alter table script");
+      StringBuilder alterSB = convertSQLModelsToString(alterSchema, "Alter table script", buildLayer);
       if (saveSchemaFile(buildLayer, alterSB, "alter")) {
-         DBUtil.info("Alter script changed for dataSource: " + dataSourceName);
          schemaChanged = true;
       }
    }
 
-   StringBuilder convertSQLModelsToString(List<SQLFileModel> sqlFileModels, String message) {
+   StringBuilder convertSQLModelsToString(List<SQLFileModel> sqlFileModels, String message, Layer buildLayer) {
       if (sqlFileModels == null || sqlFileModels.size() == 0)
          return null;
 
       StringBuilder schemaSB = new StringBuilder();
-      schemaSB.append("/* " + message + " for dataSource: " + dataSourceName + " */\n");
+      schemaSB.append("/*** " + message + " for dataSource: " + dataSourceName + " built from layer: " + buildLayer.getLayerName() + " */\n");
       for (SQLFileModel sqlFileModel:sqlFileModels) {
-         schemaSB.append("\n\n/* Schema for type: " + sqlFileModel.srcType.getFullTypeName() + " */\n\n");
+         schemaSB.append("\n/* Type: " + sqlFileModel.srcType.getFullTypeName() + " */\n");
          schemaSB.append(sqlFileModel.toLanguageString());
-         schemaSB.append("\n");
       }
       return schemaSB;
    }
@@ -375,14 +375,29 @@ public class SchemaManager {
       SrcIndexEntry srcIndex = buildLayer.getSrcFileIndex(sqlSrcEnt.relFileName);
       // Avoid rewriting unchanged files
       if (srcIndex == null || !Arrays.equals(srcIndex.hash, sqlSrcEnt.hash)) {
-         FileUtil.saveStringAsReadOnlyFile(sqlSrcEnt.absFileName, schemaSB.toString(), false);
+         FileUtil.saveStringAsReadOnlyFile(sqlSrcEnt.absFileName, schemaStr, false);
          buildLayer.addSrcFileIndex(sqlSrcEnt.relFileName, sqlSrcEnt.hash, null, sqlSrcEnt.absFileName);
 
-         if (srcIndex != null)
-            DBUtil.info("DB" + (postfix == null ? "" : " " + postfix) + " schema changed: " + sqlSrcEnt.absFileName);
+         StringBuilder logSB = new StringBuilder("- ");
+         boolean info = false;
+         if (srcIndex != null) {
+            if (postfix == null)
+               logSB.append("Schema changed: ");
+            else
+               logSB.append(CTypeUtil.capitalizePropertyName(postfix) + " schema changed: ");
+            info = true;
+         }
+         else {
+            logSB.append("New build for " + (postfix == null ? "" : postfix + " ") + "schema: ");
+         }
+         logSB.append(sqlSrcEnt.absFileName);
+         logSB.append("\n");
+         logSB.append(schemaStr);
+         logSB.append("---");
+         if (info)
+            DBUtil.info(logSB);
          else
-            DBUtil.verbose("DB" + (postfix == null ? "" : " " + postfix) + " new build for schema: " + sqlSrcEnt.absFileName);
-
+            DBUtil.verbose(logSB);
          return true;
       }
       else
@@ -391,7 +406,7 @@ public class SchemaManager {
    }
 
    public StringBuilder getCurrentSchema() {
-      return convertSQLModelsToString(currentSchema, "Database schema");
+      return convertSQLModelsToString(currentSchema, "Database schema", buildLayer);
    }
 
    public StringBuilder getDropSchema() {
@@ -399,20 +414,20 @@ public class SchemaManager {
          return null;
 
       StringBuilder dropSB = new StringBuilder();
-      dropSB.append("/* " + "Script to drop tables, etc" + " for dataSource: " + dataSourceName + " */\n");
+      dropSB.append("/* " + "Drop schema - dataSource: " + dataSourceName + " */\n\n");
       for (SQLFileModel sqlFileModel:currentSchema) {
-         dropSB.append("\n\n/* Drop schema for type: " + sqlFileModel.srcType.getFullTypeName() + " */\n\n");
+         dropSB.append("/* Drop type: " + sqlFileModel.srcType.getFullTypeName() + " */\n");
          dropSB.append(sqlFileModel.createDropSQLModel().toLanguageString());
-         dropSB.append("\n");
       }
       return dropSB;
    }
 
    public StringBuilder getAlterSchema() {
-      return convertSQLModelsToString(alterSchema, "Alter table script");
+      return convertSQLModelsToString(alterSchema, "Alter table script", buildLayer);
    }
 
    public void saveCurrentSchema(Layer buildLayer) {
+      this.buildLayer = buildLayer;
       StringBuilder schemaSB = getCurrentSchema();
 
       boolean changed = false;

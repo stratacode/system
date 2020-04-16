@@ -2106,7 +2106,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 
-   // Inject a comment that we are a source file in merging into this file.  Also add our base type.
+   // Injects the chain of comments including all file names merged into. The baseCommentNode should be the parseNode of
+   // the first type in the chain - the one where we add this comment.
    public void addModelMergingComment(ParentParseNode baseCommentNode) {
       // Not necessary when processing a model stream and breaks cause there's no src file.
       if (!mergeDeclaration)

@@ -117,6 +117,8 @@ public class SelectQuery {
                refType.initFetchGroups();
                DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
                for (SelectQuery defQuery:defaultRefQuery.queries) {
+                  if (defQuery == this)
+                     continue;
                   if (!defQuery.multiRow) {
                      for (SelectTableDesc defQueryFetch:defQuery.fetchTables) {
                         // Skip any references back to the table of the property
@@ -154,7 +156,7 @@ public class SelectQuery {
             Connection conn = transaction.getConnection(mainTable.getDataSourceName());
             PreparedStatement st = conn.prepareStatement(queryStr);
             String logStr = DBUtil.verbose ? queryStr : null;
-            Object inst = dbObj.getInst();
+            IDBObject inst = dbObj.getInst();
             for (int i = 0; i < idColumns.size(); i++) {
                DBPropertyDescriptor propDesc = idColumns.get(i);
                IBeanMapper propMapper = propDesc.getPropertyMapper();
@@ -174,8 +176,16 @@ public class SelectQuery {
 
             transaction.applyingDBChanges = true;
 
-            if (!multiRow) // populate properties of dbObj from the tables in this query
-               res = processOneRowQueryResults(dbObj, inst, rs, logSB);
+            if (!multiRow) {
+               // populate properties of dbObj from the tables in this query, or return null or return a sub-type of dbObj
+               IDBObject newInst = processOneRowQueryResults(dbObj, inst, rs, logSB);
+               res = newInst != null;
+               if (res && newInst != inst) {
+                  DBUtil.error("fetchProperties detected type change");
+                  // TODO: do we set replacedBy here because somehow we ended up fetching a typeId that conflicts with
+                  // the concrete type of the old instance.
+               }
+            }
             else // fetch a multi-valued property
                res = processMultiResults(null, dbObj, inst, rs, logSB);
 
@@ -228,7 +238,7 @@ public class SelectQuery {
          if (!dbTypeDesc.dbDisabled) {
             Connection conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
             PreparedStatement st = conn.prepareStatement(queryStr);
-            Object inst = proto.getInst();
+            IDBObject inst = proto.getInst();
             for (int i = 0; i < paramValues.size(); i++) {
                Object paramValue = paramValues.get(i);
                DBColumnType propType = paramTypes.get(i);
@@ -243,9 +253,10 @@ public class SelectQuery {
             transaction.applyingDBChanges = true;
 
             if (!multiRow) {
-               if (!processOneRowQueryResults(proto, inst, rs, logSB))
+               IDBObject resInst = processOneRowQueryResults(proto, inst, rs, logSB);
+               if (resInst == null)
                   return null;
-               res.add(proto);
+               res.add(resInst);
                return res;
             }
             else {
@@ -299,17 +310,21 @@ public class SelectQuery {
       return res.size() == 0 ? null : res.get(0);
    }
 
-   boolean processOneRowQueryResults(DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
+   IDBObject processOneRowQueryResults(DBObject dbObj, IDBObject inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       if (!rs.next()) {
          if (dbObj.isPrototype())
-            return false;
+            return null;
 
          dbObj.setTransient(true);
-         return false;
+         return null;
       }
+
+      DBPropertyDescriptor typeIdProp = dbObj.dbTypeDesc.getTypeIdProperty();
 
       int rix = 1;
       for (SelectTableDesc ftd:fetchTables) {
+         // If this table is actually defined in another type, and represents a reference an instance of that type (a 1-1 relationship),
+         // this row sets properties of that referenced instance. Otherwise, its a normal table setting properties on the main instance.
          Object fetchInst = ftd.refProp == null ? inst : ftd.refProp.getPropertyMapper().getPropertyValue(inst, false, false);
          for (DBPropertyDescriptor propDesc:ftd.props) {
             if (logSB != null && rix != 1)
@@ -324,8 +339,24 @@ public class SelectQuery {
             Object val = propDesc.getValueFromResultSet(rs, rix);
             rix += propDesc.getNumColumns();
 
-            propDesc.updateReferenceForPropValue(inst, val);
-            propMapper.setPropertyValue(fetchInst, val);
+            if (propDesc != typeIdProp) {
+               propDesc.updateReferenceForPropValue(inst, val);
+               propMapper.setPropertyValue(fetchInst, val);
+            }
+            else {
+               int typeId = (int) val;
+               DBTypeDescriptor newType = dbObj.dbTypeDesc.subTypesById.get(typeId);
+               if (newType == null) {
+                  DBUtil.error("No sub-type of: " + dbObj.dbTypeDesc + " with typeId: " + typeId);
+               }
+               else {
+                  if (newType != dbObj.dbTypeDesc) {
+                     IDBObject newInst = dbObj.dbTypeDesc.createInstance();
+                     newInst.getDBObject().setDBId(inst.getDBId());
+                     inst = newInst;
+                  }
+               }
+            }
 
             if (logSB != null) {
                DBUtil.appendVal(logSB, val, null);
@@ -344,7 +375,7 @@ public class SelectQuery {
                }
 
                Object val = propDesc.getValueFromResultSet(rs, rix);
-               rix += propDesc.getNumColumns();
+               rix += propDesc.getNumResultSetColumns();
 
                Object revInst = ftd.revProps.get(ri).getPropertyMapper().getPropertyValue(fetchInst, false, false);
                if (revInst != null) {
@@ -361,7 +392,7 @@ public class SelectQuery {
       }
       if (rs.next())
          throw new IllegalArgumentException("Fetch query returns more than one row!");
-      return true;
+      return inst;
    }
 
    /**
@@ -396,7 +427,11 @@ public class SelectQuery {
                if (numCols == 1)  {
                   val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
                   if (colTypeDesc != null) {
-                     val = colTypeDesc.lookupInstById(val, true, false);
+                     DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
+                     int typeId = -1;
+                     if (colTypeIdProp != null)
+                        typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
+                     val = colTypeDesc.lookupInstById(val, typeId, true, false);
 
                      if (val != null) {
                         IDBObject valObj = (IDBObject) val;
@@ -421,7 +456,11 @@ public class SelectQuery {
                         Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
                         idVals.setVal(idVal, ci);
                      }
-                     val = colTypeDesc.lookupInstById(idVals, true, false);
+                     DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
+                     int typeId = -1;
+                     if (colTypeIdProp != null)
+                        typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
+                     val = colTypeDesc.lookupInstById(idVals, typeId, true, false);
 
                      if (val != null) {
                         IDBObject valObj = (IDBObject) val;
@@ -484,7 +523,11 @@ public class SelectQuery {
                      val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
 
                      if (refTypeDesc != null) {
-                        val = refTypeDesc.lookupInstById(val, true, false);
+                        int typeId = -1;
+                        DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
+                        if (refTypeIdProp != null)
+                           typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, refTypeIdProp);
+                        val = refTypeDesc.lookupInstById(val, typeId, true, false);
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
@@ -509,7 +552,11 @@ public class SelectQuery {
                            Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
                            idVals.setVal(idVal, ci);
                         }
-                        val = refTypeDesc.lookupInstById(idVals, true, false);
+                        int typeId = -1;
+                        DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
+                        if (refTypeIdProp != null)
+                           typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, refTypeIdProp);
+                        val = refTypeDesc.lookupInstById(idVals, typeId, true, false);
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
@@ -788,12 +835,24 @@ public class SelectQuery {
 
    public void insertIdProperty() {
       SelectTableDesc mainTableFetch = fetchTables.get(0);
-      List<IdPropertyDescriptor> idCols = mainTableFetch.table.getIdColumns();
+      TableDescriptor mainTable = mainTableFetch.table;
+      List<DBPropertyDescriptor> fetchProps = mainTableFetch.props;
+      List<IdPropertyDescriptor> idCols = mainTable.getIdColumns();
       int idSz = idCols.size();
       for (int i = idSz - 1; i >= 0; i--) {
          IdPropertyDescriptor idCol = idCols.get(i);
-         if (!mainTableFetch.props.contains(idCol))
-            mainTableFetch.props.add(0, idCol);
+         if (!fetchProps.contains(idCol))
+            fetchProps.add(0, idCol);
+      }
+      // Add the typeId right after the id properties in the select list
+      DBPropertyDescriptor typeIdProp = mainTable.getTypeIdProperty();
+      if (typeIdProp != null) {
+         if (!mainTableFetch.props.contains(typeIdProp)) {
+            if (fetchProps.size() == idSz)
+               mainTableFetch.props.add(typeIdProp);
+            else
+               mainTableFetch.props.add(idSz, typeIdProp);
+         }
       }
    }
 }

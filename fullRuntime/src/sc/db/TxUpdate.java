@@ -6,6 +6,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.TreeMap;
 
@@ -49,6 +50,8 @@ public class TxUpdate extends VersionedOperation {
       // TODO: if we are only updating a non-aux or multi table in a transaction, do we always join in the primary
       // table just to check and update the version
       DBPropertyDescriptor versProp = isPrimary ? dbTypeDesc.versionProperty : null;
+      DBPropertyDescriptor lmtProp = isPrimary ? dbTypeDesc.lastModifiedProperty : null;
+      Date lmtValue = null;
 
       List<IdPropertyDescriptor> idCols = updateTable.getIdColumns();
       List<Object> idVals = new ArrayList<Object>();
@@ -80,6 +83,10 @@ public class TxUpdate extends VersionedOperation {
          columnProps.add(versProp);
          newVersion = version + 1;
          columnValues.add(newVersion);
+      }
+      if (lmtProp != null && !columnProps.contains(lmtProp)) {
+         columnProps.add(lmtProp);
+         columnValues.add(lmtValue = new Date());
       }
 
       StringBuilder sb = new StringBuilder();
@@ -148,14 +155,14 @@ public class TxUpdate extends VersionedOperation {
                if (versProp != null || isPrimary) {
                   throw new StaleDataException(dbObject, version);
                }
-               dbObject.applyUpdates(transaction, updateList, null, 0);
+               dbObject.applyUpdates(transaction, updateList, null, 0, null, null);
                doInsert(updateTable);
             }
             else if (ct != 1) {
                throw new UnsupportedOperationException("Invalid return from executeUpdate in doUpdate(): " + ct);
             }
             else {
-               dbObject.applyUpdates(transaction, updateList, versProp, newVersion);
+               dbObject.applyUpdates(transaction, updateList, versProp, newVersion, lmtProp, lmtValue);
 
                if (logSB != null) {
                   logSB.append(" updated: " + ct);
@@ -166,7 +173,7 @@ public class TxUpdate extends VersionedOperation {
             }
          }
          else {
-            dbObject.applyUpdates(transaction, updateList, versProp, newVersion);
+            dbObject.applyUpdates(transaction, updateList, versProp, newVersion, lmtProp, lmtValue);
             if (logSB != null) {
                logSB.append(" updated - dbDisabled ");
                if (versProp != null)

@@ -58,7 +58,17 @@ public class DBPropertyDescriptor {
    /** True for properties that are read from the database, but not updated. This is set in particular for reverse properties in a relationship - only one side needs to update based on the change. */
    public boolean readOnly;
 
-   /** The type this property descriptor is part of */
+   /** Set to true for the typeId property */
+   public boolean typeIdProperty;
+
+   /**
+    * For properties defined in a subclass, specifies the type name of the class where this property is defined.
+    * We can't just use dbTypeDesc to define this because we need to define the Table with this property before we
+    * define the subtype itself.
+    */
+   public String ownerTypeName;
+
+   /** The type this property descriptor is defined in. When a subclass shares a table with a base class, this points to the subclass the property is defined in */
    public DBTypeDescriptor dbTypeDesc;
 
    /** Reference to the table for this property */
@@ -77,9 +87,10 @@ public class DBPropertyDescriptor {
 
    private boolean started = false;
 
+   // TODO - restructure as (propertyName, colName, colType).withTable(tableName).withFlags(required, unique, onDemand, indexed).withDataSource(...), etc.
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
                                boolean required, boolean unique, boolean onDemand, boolean indexed, String dataSourceName, String fetchGroup,
-                               String refTypeName, boolean multiRow, String reverseProperty, String dbDefault) {
+                               String refTypeName, boolean multiRow, String reverseProperty, String dbDefault, String ownerTypeName) {
       this.propertyName = propertyName;
       this.columnName = columnName;
       this.columnType = columnType;
@@ -94,10 +105,14 @@ public class DBPropertyDescriptor {
       this.multiRow = multiRow;
       this.reverseProperty = reverseProperty;
       this.dbDefault = dbDefault;
+      this.ownerTypeName = ownerTypeName;
    }
 
    void init(DBTypeDescriptor typeDesc, TableDescriptor tableDesc) {
-      this.dbTypeDesc = typeDesc;
+      if (ownerTypeName != null && typeDesc != null)
+         this.dbTypeDesc = typeDesc.findSubType(ownerTypeName);
+      else
+         this.dbTypeDesc = typeDesc;
       this.tableDesc = tableDesc;
       started = false;
    }
@@ -163,6 +178,9 @@ public class DBPropertyDescriptor {
    public IBeanMapper getPropertyMapper() {
       if (propertyMapper == null)
          propertyMapper = DynUtil.getPropertyMapping(dbTypeDesc.typeDecl, propertyName);
+      if (propertyMapper == null) {
+         DBUtil.error("No property: " + propertyName + " found on type: " + dbTypeDesc.getTypeName());
+      }
       return propertyMapper;
    }
 
@@ -218,6 +236,13 @@ public class DBPropertyDescriptor {
 
    public int getNumColumns() {
       return 1;
+   }
+
+   public int getNumResultSetColumns() {
+      int res = getNumColumns();
+      if (refDBTypeDesc != null && refDBTypeDesc.getTypeIdProperty() != null)
+         res++;
+      return res;
    }
 
    public String getColumnName(int colIx) {
@@ -293,8 +318,14 @@ public class DBPropertyDescriptor {
       int numCols = getNumColumns();
       if (numCols == 1)  {
          val = DBUtil.getResultSetByIndex(rs, rix, this);
-         if (refDBTypeDesc != null && val != null)
-            val = refDBTypeDesc.lookupInstById(val, true, false);
+         if (refDBTypeDesc != null && val != null) {
+            DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
+            int typeId = -1;
+            if (typeIdProperty != null) {
+               typeId = (int) DBUtil.getResultSetByIndex(rs, rix+1, typeIdProperty);
+            }
+            val = refDBTypeDesc.lookupInstById(val, typeId, true, false);
+         }
       }
       else {
          if (refDBTypeDesc != null) {
@@ -310,8 +341,13 @@ public class DBPropertyDescriptor {
                   nullId = false;
                idVals.setVal(idVal, i);
             }
+            DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
+            int typeId = -1;
+            if (typeIdProperty != null) {
+               typeId = (int) DBUtil.getResultSetByIndex(rs, rix, typeIdProperty);
+            }
             if (!nullId)
-               val = refDBTypeDesc.lookupInstById(idVals, true, false);
+               val = refDBTypeDesc.lookupInstById(idVals, typeId, true, false);
             else
                val = null;
          }
@@ -347,8 +383,14 @@ public class DBPropertyDescriptor {
       int numCols = getNumColumns();
       if (numCols == 1)  {
          val = DBUtil.getResultSetByName(rs, colName, this);
-         if (refDBTypeDesc != null && val != null)
-            val = refDBTypeDesc.lookupInstById(val, true, false);
+         if (refDBTypeDesc != null && val != null) {
+            DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
+            int typeId = -1;
+            if (typeIdProperty != null) {
+               typeId = (int) DBUtil.getResultSetByName(rs, DBTypeDescriptor.DBTypeIdColumnName, typeIdProperty);
+            }
+            val = refDBTypeDesc.lookupInstById(val, typeId, true, false);
+         }
       }
       else {
          if (refDBTypeDesc != null) {
@@ -364,8 +406,13 @@ public class DBPropertyDescriptor {
                   nullId = false;
                idVals.setVal(idVal, i);
             }
+            DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
+            int typeId = -1;
+            if (typeIdProperty != null) {
+               typeId = (int) DBUtil.getResultSetByName(rs, DBTypeDescriptor.DBTypeIdColumnName, typeIdProperty);
+            }
             if (!nullId)
-               val = refDBTypeDesc.lookupInstById(idVals, true, false);
+               val = refDBTypeDesc.lookupInstById(idVals, typeId, true, false);
             else
                val = null;
          }
@@ -391,6 +438,8 @@ public class DBPropertyDescriptor {
    public DBColumnType getDBColumnType() {
       if (refDBTypeDesc != null)
          return DBColumnType.Reference;
+      if (typeIdProperty)
+         return DBColumnType.Int;
       Object propertyType = getPropertyMapper().getPropertyType();
       DBColumnType res = DBColumnType.fromJavaType(propertyType);
       // TODO: should we have an annotation for this and print an error if it's not set?  Not all objects can be converted
@@ -424,5 +473,11 @@ public class DBPropertyDescriptor {
       if (dbDefault.equalsIgnoreCase("now()"))
          return new java.util.Date();
       throw new UnsupportedOperationException("Unrecognized dbDefault value for memory database");
+   }
+
+   public boolean ownedByOtherType(DBTypeDescriptor otherTypeDesc) {
+      if (ownerTypeName == null || otherTypeDesc == dbTypeDesc)
+         return false;
+      return !DynUtil.isAssignableFrom(dbTypeDesc.typeDecl, otherTypeDesc.typeDecl);
    }
 }

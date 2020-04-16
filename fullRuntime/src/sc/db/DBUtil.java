@@ -275,11 +275,17 @@ public class DBUtil {
    }
 
    public static Object getResultSetByIndex(ResultSet rs, int index, Object propertyType, DBColumnType colType, DBTypeDescriptor refType) throws SQLException {
+      if (colType == null) {
+         Object res = rs.getObject(index);
+         if (res == null || rs.wasNull())
+            return null;
+         return res;
+      }
       switch (colType) {
          case Int:
             Object res = rs.getObject(index);
             if (res == null || rs.wasNull())
-               return res;
+               return null;
             if (res instanceof Integer)
                return res;
             else {

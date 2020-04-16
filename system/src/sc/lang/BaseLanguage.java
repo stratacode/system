@@ -145,8 +145,10 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    }
    public Symbol period = new Symbol(".");
    public SymbolSpace semicolonEOL = new SymbolSpace(";", SKIP_ON_ERROR);
+   public SymbolSpace semicolonEOL2 = new SymbolSpace(";", SKIP_ON_ERROR);
    {
       semicolonEOL.generateParseNode = new NewlineParseNode(semicolonEOL, ";");
+      semicolonEOL2.generateParseNode = new NewlineParseNode(semicolonEOL2, ";\n");
    }
    // A semicolon followed by 2 newlines for package, imports
    public SymbolSpace semicolonNewline = new SymbolSpace(";", SKIP_ON_ERROR);
@@ -182,12 +184,15 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       closeBraceEOL.popIndent = true;
    }
    public SymbolSpace openParen = new SymbolSpace("(");
+
    public SymbolSpace closeParenSkipOnError = new SymbolSpace(")", SKIP_ON_ERROR);
    // TODO: should all closeParen's have skip on error?  Right now for cast expressions, we'll terminate those with the ; there's a chance the "skip on error" will lead to ambiguities when the body of the construct we are skipping has not enough info to differentiate it
    public SymbolSpace closeParen = new SymbolSpace(")");
    // Use this one for annotations
+   public SymbolSpace openParenEOL = new SymbolSpace("(");
    public SymbolSpace closeParenEOL = new SymbolSpace(")", SKIP_ON_ERROR);
    {
+      openParenEOL.generateParseNode = new NewlineParseNode(openParenEOL, "(");
       closeParenEOL.generateParseNode = new NewlineParseNode(closeParenEOL, ")");
    }
    // and this one for if statements where we need to indent

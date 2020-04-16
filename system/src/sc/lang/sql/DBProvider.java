@@ -114,6 +114,7 @@ public class DBProvider {
          SQLFileModel schemaSQLModel = null;
 
          List<BaseQueryDescriptor> queries = null;
+         int typeId = ModelUtil.hasModifier(typeDecl, "abstract") ? DBTypeDescriptor.DBAbstractTypeId : DBTypeDescriptor.DBUnsetTypeId;
 
          for (Object annot:typeSettings) {
             Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
@@ -122,10 +123,13 @@ public class DBProvider {
             String tmpDataSourceName  = (String) ModelUtil.getAnnotationValue(annot, "dataSourceName");
             if (tmpDataSourceName != null)
                dataSourceName = tmpDataSourceName;
-            String tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "primaryTable");
+            String tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "tableName");
             if (tmpPrimaryTableName != null) {
                primaryTableName = tmpPrimaryTableName;
             }
+            Integer tmpTypeId  = (Integer) ModelUtil.getAnnotationValue(annot, "typeId");
+            if (tmpTypeId != null)
+               typeId = tmpTypeId;
          }
 
          String tmpSchemaSQL = (String) ModelUtil.getAnnotationValue(typeDecl, "sc.db.SchemaSQL", "value");
@@ -176,7 +180,9 @@ public class DBProvider {
             String typeName = CTypeUtil.getClassName(fullTypeName);
             if (primaryTableName == null)
                primaryTableName = SQLUtil.getSQLName(typeName);
-            TableDescriptor primaryTable = new TableDescriptor(primaryTableName);
+
+            // We reuse the primary table here - by default adding subclass properties into the same table unless they set their own table.
+            TableDescriptor primaryTable = baseTD == null ? new TableDescriptor(primaryTableName) : baseTD.primaryTable;
 
             Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, true, true, false);
             if (properties != null) {
@@ -269,9 +275,22 @@ public class DBProvider {
                            throw new IllegalArgumentException("Invalid property type: " + propType + " for id: " + idColumnName);
                      }
 
-                     IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
 
-                     primaryTable.addIdColumnProperty(idDesc);
+                     if (baseTD != null) {
+                        boolean found = false;
+                        for (IdPropertyDescriptor baseIdProp:baseTD.getIdProperties()) {
+                           if (baseIdProp.propertyName.equals(propName)) {
+                              found = true;
+                              break;
+                           }
+                        }
+                        if (!found)
+                           DBUtil.error("IdSettings set on property: " + propName + " in class: " + typeName + " conflicts with id properties in base class: " + baseTD);
+                     }
+                     else {
+                        IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
+                        primaryTable.addIdColumnProperty(idDesc);
+                     }
                   }
                }
             }
@@ -317,7 +336,7 @@ public class DBProvider {
                }
             }
 
-            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, dataSourceName, primaryTable, queries, schemaSQL);
+            dbTypeDesc = new DBTypeDescriptor(typeDecl, baseTD, typeId, dataSourceName, primaryTable, queries, schemaSQL);
 
             sys.addDBTypeDescriptor(fullTypeName, dbTypeDesc);
 
@@ -482,10 +501,14 @@ public class DBProvider {
       ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
       dbTypeDesc.tablesInitialized = true;
 
-      Object[] properties = ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false);
+      Object baseType = ModelUtil.getExtendsClass(typeDecl);
+
+      DBTypeDescriptor baseTD = dbTypeDesc.baseType;
 
       String versionProp = null;
       ArrayList<String> auxTableNames = null;
+
+      boolean inheritProperties = baseTD == null;
 
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
 
@@ -499,6 +522,9 @@ public class DBProvider {
             if (tmpAuxTableNames != null) {
                auxTableNames = new ArrayList<String>(Arrays.asList(StringUtil.split(tmpAuxTableNames, ',')));
             }
+            Boolean tmpInheritProperties = (Boolean) ModelUtil.getAnnotationValue(annot, "inheritProperties");
+            if (tmpInheritProperties != null)
+               inheritProperties = tmpInheritProperties;
          }
 
          ArrayList<TableDescriptor> auxTables = new ArrayList<TableDescriptor>();
@@ -508,6 +534,11 @@ public class DBProvider {
             for (String auxTableName:auxTableNames)
                auxTables.add(new TableDescriptor(auxTableName));
          }
+
+         Object[] properties = !inheritProperties ?
+                 ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false) :
+                 ModelUtil.getProperties(typeDecl, null, false);
+
          if (properties != null) {
             for (Object property:properties) {
                Object idSettings = ModelUtil.getAnnotation(property, "sc.db.IdSettings");
@@ -542,10 +573,14 @@ public class DBProvider {
                String propFetchGroup = null;
                String propReverseProperty = null;
                String propDBDefault = null;
+               boolean explicitPersist = false;
                if (propSettings != null) {
                   Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
-                  if (tmpPersist != null && !tmpPersist) {
-                     continue;
+                  if (tmpPersist != null) {
+                     if (!tmpPersist)
+                        continue;
+                     else
+                        explicitPersist = true;
                   }
 
                   String tmpTableName = (String) ModelUtil.getAnnotationValue(propSettings, "tableName");
@@ -610,6 +645,19 @@ public class DBProvider {
                   }
                }
 
+               // For inherited properties, need an extra check in case the type the property is defined in
+               // has DBTypeSettings(persist=false) - meaning that property should not be persisted.  In that
+               // case we would have had to inherit and override the typeSettings from the base class so we
+               // only need to check if there's more than one annotation set for this type.
+               if (!explicitPersist && inheritProperties) {
+                  Object propEnclType = ModelUtil.getEnclosingType(property);
+                  if (!ModelUtil.sameTypes(propEnclType, typeDecl) && typeSettings.size() > 1) {
+                     Boolean persistPropType = getPersistSetting(sys, refLayer, propEnclType);
+                     if (persistPropType != null && !persistPropType)
+                        continue;
+                  }
+               }
+
                if (propColumnName == null)
                   propColumnName = SQLUtil.getSQLName(propName);
                DBTypeDescriptor refDBTypeDesc = null;
@@ -665,20 +713,21 @@ public class DBProvider {
                   multiRow = true;
 
                DBPropertyDescriptor propDesc;
+               String fullTypeName = ModelUtil.getTypeName(typeDecl);
 
                if (isMultiCol) {
                   propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                          multiRow, propReverseProperty, propDBDefault);
+                          multiRow, propReverseProperty, propDBDefault, fullTypeName);
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
-                          multiRow, propReverseProperty, propDBDefault);
+                          multiRow, propReverseProperty, propDBDefault, fullTypeName);
                }
 
                propDesc.refDBTypeDesc = refDBTypeDesc;
@@ -709,7 +758,8 @@ public class DBProvider {
                propTable.addColumnProperty(propDesc);
             }
          }
-         dbTypeDesc.initTables(auxTables, multiTables, versionProp);
+         dbTypeDesc.initTables(auxTables, multiTables, versionProp, false);
+         initTableProperties(sys, refLayer, dbTypeDesc);
 
          if (dbTypeDesc.queries != null) {
             for (BaseQueryDescriptor query:dbTypeDesc.queries)
@@ -718,8 +768,31 @@ public class DBProvider {
       }
    }
 
+   private static void initTableProperties(LayeredSystem sys, Layer refLayer, DBTypeDescriptor dbTypeDesc) {
+      for (DBPropertyDescriptor prop:dbTypeDesc.allDBProps) {
+         if (prop.dbTypeDesc == null && prop.ownerTypeName != null) {
+            prop.dbTypeDesc = sys.getDBTypeDescriptor(prop.ownerTypeName);
+            if (prop.dbTypeDesc == null)
+               DBUtil.error("No ownerTypeName: " + prop.ownerTypeName + " for property: " + prop);
+         }
+      }
+   }
+
+   private static Boolean getPersistSetting(LayeredSystem sys, Layer refLayer, Object typeDecl) {
+      ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
+      if (typeSettings == null)
+         return null;
+
+      for (Object annot:typeSettings) {
+         Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
+         if (tmpPersist != null)
+            return tmpPersist;
+      }
+      return null;
+   }
+
    public boolean getNeedsGetSet() {
-      return true;
+         return true;
    }
 
    private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.fetch(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +

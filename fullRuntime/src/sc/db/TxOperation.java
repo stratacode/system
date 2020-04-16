@@ -466,10 +466,22 @@ public abstract class TxOperation {
                                     ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
                                     List<DBPropertyDescriptor> dbReturnCols) {
       Object inst = dbObject.getInst();
+
       for (DBPropertyDescriptor col:cols) {
          int numCols = col.getNumColumns();
-         IBeanMapper mapper = col.getPropertyMapper();
-         Object val = mapper.getPropertyValue(inst, false, false);
+         Object val;
+         if (col.typeIdProperty) {
+            int typeId = dbTypeDesc.typeId;
+            val = typeId;
+            if (typeId == DBTypeDescriptor.DBAbstractTypeId)
+               throw new IllegalArgumentException("Unable to insert instance of abstract type: " + dbTypeDesc);
+         }
+         else {
+            if (col.ownedByOtherType(dbTypeDesc))
+               continue;
+            IBeanMapper mapper = col.getPropertyMapper();
+            val = mapper.getPropertyValue(inst, false, false);
+         }
          if (numCols == 1) {
             if (val != null) {
                DBColumnType colType;
@@ -567,15 +579,19 @@ public abstract class TxOperation {
 
       List<DBPropertyDescriptor> allProps = dbObject.dbTypeDesc.allDBProps;
       int psz = allProps.size();
+
       for (int i = 0; i < psz; i++) {
          DBPropertyDescriptor prop = allProps.get(i);
+         if (prop.typeIdProperty)
+            continue;
+
          IBeanMapper mapper = prop.getPropertyMapper();
          if (prop.refDBTypeDesc != null) {
             if ((prop.readOnly && doPreRefs) || (!prop.readOnly && !doPreRefs))
                continue;
             if (prop.multiRow) {
                List<IDBObject> refList = (List<IDBObject>) mapper.getPropertyValue(inst, false, false);
-               int rsz = refList.size();
+               int rsz = refList == null ? 0 : refList.size();
                for (int j = 0; j < rsz; j++) {
                   IDBObject ref = refList.get(j);
                   if (ref == null)

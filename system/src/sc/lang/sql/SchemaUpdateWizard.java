@@ -99,16 +99,18 @@ public class SchemaUpdateWizard extends CommandWizard {
 
       print("Schema changes:");
       if (this.mgr.newModels.size() > 0) {
-         print("   New types: " + this.mgr.newModels.size());
+         print("- New types: " + this.mgr.newModels.size());
          printNewModelsList();
+         print("---");
       }
       if (this.mgr.changedTypes.size() > 0) {
-         print(" Changes to types: " + this.mgr.changedTypes.size());
+         print("- Changes to types: " + this.mgr.changedTypes.size());
          printChangesList();
+         print("---");
       }
 
       if (mgr.dbMissingMetadata != null && (mgr.noCurrentSchema || mgr.initFromDBFailed)) {
-         print(" Database metadata shows missing items: " + mgr.dbMissingMetadata);
+         print("- Database missing items:" + mgr.dbMissingMetadata + "\n---");
       }
    }
 

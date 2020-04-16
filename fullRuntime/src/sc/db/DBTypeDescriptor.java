@@ -19,6 +19,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * created for each table.
  */
 public class DBTypeDescriptor {
+   public final static String DBTypeIdPropertyName = "dbTypeId";
+   public final static String DBTypeIdColumnName = "db_type_id";
+   public final static String LastModifiedPropertyName = "lastModified";
+
+   /** Two reserved type ids - either not specified or it's an abstract type so it's not created */
+   public final static int DBUnsetTypeId = -1;
+   public final static int DBAbstractTypeId = -2;
+
    static Map<Object,DBTypeDescriptor> typeDescriptorsByType = new HashMap<Object,DBTypeDescriptor>();
    static Map<String,DBTypeDescriptor> typeDescriptorsByName = new HashMap<String,DBTypeDescriptor>();
 
@@ -28,17 +36,23 @@ public class DBTypeDescriptor {
       }
    }
 
-   public static void add(DBTypeDescriptor typeDescriptor) {
-      Object typeDecl = typeDescriptor.typeDecl;
-      typeDescriptor.runtimeMode = true;
-      DBTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, typeDescriptor);
-      String typeName = DynUtil.getTypeName(typeDecl, false);
-      DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, typeDescriptor);
-      typeDescriptor.init();
+   public static DBTypeDescriptor create(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
+              List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL) {
 
-      if ((oldType != null && oldType != typeDescriptor) | (oldName != null && oldName != typeDescriptor)) {
+      DBTypeDescriptor dbTypeDesc = new DBTypeDescriptor(typeDecl, baseType, typeId, dataSourceName, primary, auxTables, multiTables, queries, versionPropName, schemaSQL);
+
+      DBTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, dbTypeDesc);
+      String typeName = DynUtil.getTypeName(typeDecl, false);
+      DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, dbTypeDesc);
+
+      dbTypeDesc.initTables(auxTables, multiTables, versionPropName, true);
+
+      dbTypeDesc.init();
+
+      if ((oldType != null && oldType != dbTypeDesc) | (oldName != null && oldName != dbTypeDesc)) {
          System.err.println("Replacing type descriptor for type: " + typeName);
       }
+      return dbTypeDesc;
    }
 
    public static DBTypeDescriptor getByType(Object type, boolean start) {
@@ -56,6 +70,16 @@ public class DBTypeDescriptor {
 
    public static DBTypeDescriptor getByName(String typeName, boolean start) {
       DBTypeDescriptor res = typeDescriptorsByName.get(typeName);
+      if (res == null) {
+         Object findType = DynUtil.findType(typeName);
+         if (findType == null) {
+            DBUtil.error("No type: " + typeName + " for persistent reference");
+         }
+         else {
+            res = typeDescriptorsByName.get(typeName);
+
+         }
+      }
       if (res != null) {
          if (start && !res.started) {
             res.start();
@@ -113,27 +137,92 @@ public class DBTypeDescriptor {
    /** False during the code-generation phase, true when connected to a database */
    public boolean runtimeMode = false;
 
+   public Map<Integer,DBTypeDescriptor> subTypesById = null;
+   public int typeId = -1;
+   private DBPropertyDescriptor typeIdProperty = null;
+
+   public DBTypeDescriptor findSubType(String subTypeName) {
+      // During code-processing time, this is not set yet
+      if (subTypesById == null || subTypeName.equals(getTypeName()))
+         return this;
+      for (DBTypeDescriptor subType:subTypesById.values())
+         if (subType.getTypeName().equals(subTypeName))
+            return subType;
+      DBUtil.error("*** No sub-type: " + subTypeName + " for: " + getTypeName());
+      return null;
+   }
+
    /**
     * Defines the type with the id properties of the primary table in tact so it can be used to create references from other types.
     * Properties may be later added to the primary table and other tables added with initTables. This version is used from
     * the code processor as it must create the descriptors in phases.
     */
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary,
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
                            List<BaseQueryDescriptor> queries, String schemaSQL) {
       this.typeDecl = typeDecl;
       this.baseType = baseType;
+      this.typeId = typeId;
       this.dataSourceName = dataSourceName;
-      this.primaryTable = primary;
+      if (baseType != null) {
+         this.primaryTable = baseType.primaryTable;
+         if (primary != null && primaryTable != primary)
+            System.err.println("*** Subtype should not have it's own primary table");
+      }
+      else
+         this.primaryTable = primary;
       this.queries = queries;
       this.schemaSQL = schemaSQL;
-      primary.init(this);
-      primary.primary = true;
 
-      if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
-         needsAutoId = true;
-         primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "bigserial", true));
+      if (baseType == null) {
+         if (primary == null) {
+            DBUtil.error("No primary table for DB type: " + DynUtil.getType(typeDecl));
+         }
+         else {
+            primary.init(this);
+            primary.primary = true;
+
+            if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
+               needsAutoId = true;
+               primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "bigserial", true));
+            }
+         }
+      }
+      else {
+         if (typeId != DBAbstractTypeId)
+            baseType.addSubType(this);
       }
       initQueriesIndex();
+   }
+
+   public DBTypeDescriptor getRootType() {
+      if (baseType != null) {
+         return baseType.getRootType();
+      }
+      return this;
+   }
+
+   public void addSubType(DBTypeDescriptor subType) {
+      int typeId = subType.typeId;
+      if (typeId == -1) {
+         DBUtil.error("Sub type: " + subType.getTypeName() + " missing typeId: " + typeId);
+         return;
+      }
+      if (subTypesById == null) {
+         subTypesById = new HashMap<Integer,DBTypeDescriptor>();
+         if (!runtimeMode) {
+            typeIdProperty = new DBPropertyDescriptor("dbTypeId", "db_type_id", "integer", null,
+                    true, false, false, false, null, null,
+                    null, false,  null, null, getTypeName());
+            typeIdProperty.typeIdProperty = true;
+            primaryTable.addTypeIdProperty(typeIdProperty);
+         }
+      }
+      DBTypeDescriptor old = subTypesById.put(typeId, subType);
+      if (old != null && old != subType && !old.getTypeName().equals(subType.getTypeName())) {
+         DBUtil.error("Error - same typeId used for different types: " + old.getTypeName() + " and " + subType.getTypeName() + " have: " + typeId);
+      }
+      if (subType.subTypesById == null)
+         subType.subTypesById = subTypesById;
    }
 
    private void initQueriesIndex() {
@@ -145,14 +234,14 @@ public class DBTypeDescriptor {
    }
 
    /** This is the version used from the runtime code, when all info for defining the type is available in the constructor */
-   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, String dataSourceName, TableDescriptor primary,
+   public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
                            List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL) {
-      this(typeDecl, baseType, dataSourceName, primary, queries, schemaSQL);
-      initTables(auxTables, multiTables, versionPropName);
+      this(typeDecl, baseType, typeId, dataSourceName, primary, queries, schemaSQL);
    }
 
-   public void initTables(List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName) {
+   public void initTables(List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName, boolean runtimeMode) {
       tablesInitialized = true;
+      this.runtimeMode = runtimeMode;
       if (auxTables != null) {
          for (TableDescriptor auxTable:auxTables)
             auxTable.init(this);
@@ -165,8 +254,11 @@ public class DBTypeDescriptor {
       }
       this.multiTables = multiTables;
       this.auxTables = auxTables;
-      if (versionPropName != null)
-         this.versionProperty = primaryTable.getPropertyDescriptor(versionPropName);
+      if (versionPropName != null) {
+         this.versionProperty = getPrimaryTable().getPropertyDescriptor(versionPropName);
+      }
+      // An optional property, but if it's here update it automatically.
+      this.lastModifiedProperty = getPrimaryTable().getPropertyDescriptor(LastModifiedPropertyName);
 
       allDBProps.addAll(primaryTable.idColumns);
       allDBProps.addAll(primaryTable.columns);
@@ -187,8 +279,13 @@ public class DBTypeDescriptor {
                allDBProps.addAll(mtd.columns);
          }
       }
+      /** Initialize the property descriptor's backpointer to its owner type */
       for (DBPropertyDescriptor prop:allDBProps) {
-         prop.dbTypeDesc = this;
+         if (runtimeMode && prop.ownerTypeName != null && !prop.ownerTypeName.equals(getTypeName())) {
+            prop.dbTypeDesc = DBTypeDescriptor.getByName(prop.ownerTypeName, false);
+         }
+         else
+            prop.dbTypeDesc = this;
       }
    }
 
@@ -288,6 +385,7 @@ public class DBTypeDescriptor {
    public List<TableDescriptor> multiTables;
 
    public DBPropertyDescriptor versionProperty;
+   public DBPropertyDescriptor lastModifiedProperty;
 
    public List<DBPropertyDescriptor> allDBProps = new ArrayList<DBPropertyDescriptor>();
 
@@ -446,7 +544,7 @@ public class DBTypeDescriptor {
       else
          id = new MultiColIdentity(idArgs);
 
-      return lookupInstById(id, false, true);
+      return lookupInstById(id, -1, false, true);
    }
 
    private void initTypeInstances() {
@@ -465,12 +563,16 @@ public class DBTypeDescriptor {
     * is true, that prototype is populated with the default property group if the row exists and returned. If the row does not exist
     * null is returned in that case.
     */
-   public IDBObject lookupInstById(Object id, boolean createProto, boolean fetchDefault) {
+   public IDBObject lookupInstById(Object id, int typeId, boolean createProto, boolean fetchDefault) {
       if (typeInstances == null) {
          initTypeInstances();
       }
-      // TODO: do we need to do dbRefresh() on the returned instance - check the status and return null if the item no longer exists?
-      // check cache mode here to determine what to fetch?
+      DBTypeDescriptor resTypeDesc = typeId == DBUnsetTypeId ? this : subTypesById.get(typeId);
+      if (resTypeDesc == null) {
+         throw new IllegalArgumentException("Attempt to lookup instance of abstract type: " + this);
+      }
+
+      // TODO: add a cacheMode option to enable a call to dbRefresh() or dbFetchDefault() on the returned instance, then return null if the item no longer exists
       IDBObject inst = typeInstances.get(id);
       if (inst != null) {
          return inst;
@@ -480,10 +582,12 @@ public class DBTypeDescriptor {
 
       DBObject dbObj;
       synchronized (this) {
-         inst = createPrototype();
+         inst = resTypeDesc.createPrototype();
          dbObj = inst.getDBObject();
          dbObj.setDBId(id);
          typeInstances.put(id, inst);
+         if (resTypeDesc != this)
+            resTypeDesc.typeInstances.put(id, inst);
       }
 
       // If requested, fetch the default (primary table) property group - if the row does not exist, the object does not exist
@@ -494,8 +598,14 @@ public class DBTypeDescriptor {
       return inst;
    }
 
+   public IDBObject createInstance() {
+      return (IDBObject) DynUtil.createInstance(typeDecl, null);
+   }
+
    public IDBObject createPrototype() {
-      IDBObject inst = (IDBObject) DynUtil.createInstance(typeDecl, null);
+      if (typeId == DBAbstractTypeId)
+         throw new IllegalArgumentException("Unable to create prototype of abstract type: " + this);
+      IDBObject inst = createInstance();
       DBObject dbObj = inst.getDBObject();
       dbObj.setPrototype(true);
       return inst;
@@ -562,11 +672,26 @@ public class DBTypeDescriptor {
       return primaryTable.idColumns.get(ci).getDBColumnType();
    }
 
+   public List<IdPropertyDescriptor> getIdProperties() {
+      if (baseType != null)
+         return baseType.getIdProperties();
+      return primaryTable.idColumns;
+   }
+
+   public TableDescriptor getPrimaryTable() {
+      if (baseType != null)
+         return baseType.getPrimaryTable();
+      return primaryTable;
+   }
+
    public void init() {
       if (initialized)
          return;
 
       initialized = true;
+
+      if (baseType != null)
+         baseType.init();
 
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.resolve();
@@ -593,6 +718,9 @@ public class DBTypeDescriptor {
       if (started)
          return;
       started = true;
+      if (baseType != null)
+         baseType.start();
+
       if (dataSource == null) {
          dataSource = DataSourceManager.getDBDataSource(dataSourceName);
          if (dataSource == null) {
@@ -1382,5 +1510,11 @@ public class DBTypeDescriptor {
       if (namedQuery != null)
          return namedQuery.execute(curTx, args);
       throw new IllegalArgumentException("No query named: " + queryName + " for type: " + getTypeName());
+   }
+
+   public DBPropertyDescriptor getTypeIdProperty() {
+      if (baseType != null)
+         return baseType.getTypeIdProperty();
+      return typeIdProperty;
    }
 }

@@ -693,7 +693,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       dbTypeDescriptor.start();
 
       StringBuilder sb = new StringBuilder();
-      sb.append("sc.db.DBTypeDescriptor.add(dbTypeDesc = new sc.db.DBTypeDescriptor(");
+      sb.append("dbTypeDesc = sc.db.DBTypeDescriptor.create(");
 
       if (typeIsDynamic)
          sb.append("sc.dyn.DynUtil.findType(\\\"\" + typeName + \"\\\")\"");
@@ -704,7 +704,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
       sb.append(", ");
 
-      if (dbTypeDescriptor.baseType != null) {
+      DBTypeDescriptor baseType = dbTypeDescriptor.baseType;
+      if (baseType != null) {
          sb.append("sc.db.DBTypeDescriptor.getByName(\"");
          sb.append(ModelUtil.getTypeName(dbTypeDescriptor.baseType.typeDecl));
          sb.append("\", false)");
@@ -712,12 +713,15 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       else
          sb.append("null");
 
+      sb.append(",");
+      sb.append(dbTypeDescriptor.typeId);
       sb.append(", \"");
       sb.append(dbTypeDescriptor.dataSourceName);
 
       sb.append("\", ");
 
-      appendTable(sb, dbTypeDescriptor.primaryTable, false);
+      // If there's a base type, we inherit the base type's primary table and don't specific it here
+      appendTable(sb, baseType == null ? dbTypeDescriptor.primaryTable : null, false);
       sb.append(", ");
       appendTableList(sb, dbTypeDescriptor.auxTables, false);
       sb.append(", ");
@@ -735,7 +739,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       }
       appendString(sb, dbTypeDescriptor.schemaSQL, true);
 
-      sb.append("));");
+      sb.append(");");
 
       return sb.toString();
    }
@@ -812,11 +816,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       }
       String className = "TableDescriptor";
       // TODO: simplify this to just use Arrays.asList
-      sb.append("new java.util.ArrayList<sc.db.");
-      sb.append(className);
-      sb.append(">(java.util.Arrays.asList(new sc.db.");
-      sb.append(className);
-      sb.append("[]{");
+      sb.append("java.util.Arrays.asList(");
 
       boolean first = true;
       for (TableDescriptor tableDesc:tableList) {
@@ -826,10 +826,14 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             sb.append(", ");
          appendTable(sb, tableDesc, multi);
       }
-      sb.append("}))");
+      sb.append(")");
    }
 
    private void appendTable(StringBuilder sb, TableDescriptor tableDesc, boolean multi) {
+      if (tableDesc == null) {
+         sb.append("null");
+         return;
+      }
       sb.append("new sc.db.TableDescriptor(\"");
 
       sb.append(tableDesc.tableName);
@@ -853,11 +857,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       }
       // TODO: simplify!
       String descClassName = isIdProperty ? "sc.db.IdPropertyDescriptor" : "sc.db.DBPropertyDescriptor";
-      sb.append("new java.util.ArrayList<");
-      sb.append(descClassName);
-      sb.append(">(java.util.Arrays.asList(new ");
-      sb.append(descClassName);
-      sb.append("[]{");
+      sb.append("java.util.Arrays.asList(");
       boolean first = true;
       for (DBPropertyDescriptor propDesc:propList) {
          if (first)
@@ -866,7 +866,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             sb.append(", ");
          appendProperty(sb, propDesc, isIdProperty, descClassName);
       }
-      sb.append("}))");
+      sb.append(")");
    }
 
    private void appendProperty(StringBuilder sb, DBPropertyDescriptor propDesc, boolean isIdProperty, String descName) {
@@ -896,6 +896,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(propDesc.multiRow);
          appendString(sb, propDesc.reverseProperty, true);
          appendString(sb, propDesc.dbDefault, true);
+         appendString(sb, propDesc.ownerTypeName, true);
       }
       else {
          sb.append(", ");

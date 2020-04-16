@@ -4,8 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A given database query - i.e. a SelectQuery - contains one or more SelectTableDesc - to describe the info needed
- * to fetch this particular table's properties in this query.
+ * A given database SelectQuery is composed of one SelectTableDesc for each table in the query. The SelectTableDesc stores
+ * info about the properties/columns to fetch from this table. If the table is an association table, it stores the reference property
+ * being fetched.
  */
 class SelectTableDesc {
    TableDescriptor table;

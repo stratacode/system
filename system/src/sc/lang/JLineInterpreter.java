@@ -232,7 +232,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
    }
 
    public int getTermWidth() {
-      if (system.options.testVerifyMode) // allow the logs to look the same
+      if (system.options.testVerifyMode || !smartTerminal) // allow the logs to look the same and for IntelliJ's terminal don't chop at 80
          return super.getTermWidth();
       return input.getTerminal().getWidth();
    }
