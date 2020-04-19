@@ -664,7 +664,7 @@ public class SelectQuery implements Cloneable {
                      if (refTypeDesc != null) {
                         int typeId = -1;
                         DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
-                        if (refTypeIdProp != null && readProp.eagerJoinForTypeId(selectTable))
+                        if (refTypeIdProp != null && (rci == 0 || readProp.eagerJoinForTypeId(selectTable)))
                            typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, refTypeIdProp);
                         val = val == null ? null : refTypeDesc.lookupInstById(val, typeId, true, false);
 
