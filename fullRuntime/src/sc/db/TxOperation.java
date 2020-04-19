@@ -577,12 +577,18 @@ public abstract class TxOperation {
    public void insertTransientRefs(boolean doPreRefs) {
       Object inst = dbObject.getInst();
 
-      List<DBPropertyDescriptor> allProps = dbObject.dbTypeDesc.allDBProps;
+      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+
+      List<DBPropertyDescriptor> allProps = dbTypeDesc.allDBProps;
       int psz = allProps.size();
 
       for (int i = 0; i < psz; i++) {
          DBPropertyDescriptor prop = allProps.get(i);
          if (prop.typeIdProperty)
+            continue;
+
+         // Skip properties owned by a different subclass that shares the same table
+         if (prop.ownedByOtherType(dbTypeDesc))
             continue;
 
          IBeanMapper mapper = prop.getPropertyMapper();

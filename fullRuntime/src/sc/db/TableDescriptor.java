@@ -46,6 +46,16 @@ public class TableDescriptor {
       this.idColumns = idColumns;
       this.columns = columns;
       this.reverseProperty = reverseProp;
+      if (idColumns != null) {
+         for (IdPropertyDescriptor idCol:idColumns)
+            idCol.tableName = tableName;
+      }
+      if (columns != null) {
+         for (DBPropertyDescriptor col:columns)
+            col.tableName = tableName;
+      }
+      if (reverseProp != null)
+         reverseProp.tableName = tableName;
    }
 
    void init(DBTypeDescriptor dbTypeDesc) {
@@ -58,8 +68,10 @@ public class TableDescriptor {
          for (DBPropertyDescriptor col:columns) {
             col.init(dbTypeDesc, this);
             // TODO: this gets put into the runtime version as a normal column so identifying here by name but maybe
-            if (col.columnName.equals(DBTypeDescriptor.DBTypeIdColumnName))
+            if (col.columnName.equals(DBTypeDescriptor.DBTypeIdColumnName)) {
                col.typeIdProperty = true;
+               dbTypeDesc.typeIdProperty = col;
+            }
          }
       }
       if (idColumns != null) {

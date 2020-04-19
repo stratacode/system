@@ -3,6 +3,7 @@ package sc.lang.sql;
 import sc.db.ColumnInfo;
 import sc.db.DBUtil;
 import sc.db.TableInfo;
+import sc.dyn.DynUtil;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
@@ -47,7 +48,7 @@ public class CreateTable extends SQLCommand {
       return null;
    }
 
-   private static List<ColumnDef> getColumnsAdded(CreateTable oldTable, CreateTable newTable) {
+   private static List<ColumnDef> getColumnsAdded(CreateTable oldTable, CreateTable newTable, List<AlterDef> alterDefs) {
       List<ColumnDef> toAddCols = null;
       for (TableDef newTableDef:newTable.tableDefs) {
          if (newTableDef instanceof ColumnDef) {
@@ -59,7 +60,20 @@ public class CreateTable extends SQLCommand {
                toAddCols.add(newCol);
             }
             else if (!oldCol.equals(newCol)) {
-               oldTable.displayError("Unhandled case of alter column for: ");
+               boolean sameType = oldCol.columnType.equals(newCol.columnType);
+               boolean sameConstraints = DynUtil.equalObjects(oldCol.constraintName, newCol.constraintName) &&
+                       DynUtil.equalObjects(oldCol.columnConstraints, newCol.columnConstraints);
+               if (!sameType && sameConstraints && DBUtil.canCast(oldCol.columnType.getDBColumnType(), newCol.columnType.getDBColumnType())) {
+                  if (alterDefs != null) {
+                     alterDefs.add(AlterColumn.createSetDataType(newCol.columnName, newCol.columnType));
+                  }
+               }
+               else {
+                  DBUtil.info("Warning - unable to alter column: " + oldCol.columnName + " - alter schema will drop/add the column instead.");
+                  if (toAddCols == null)
+                     toAddCols = new ArrayList<ColumnDef>();
+                  toAddCols.add(newCol); // This will drop and re-add the column
+               }
             }
          }
          else
@@ -70,20 +84,25 @@ public class CreateTable extends SQLCommand {
 
    public void alterTo(SQLFileModel resModel, SQLCommand newCmd) {
       CreateTable newTable = (CreateTable) newCmd;
-      List<ColumnDef> toAddCols = getColumnsAdded(this, newTable);
-      List<ColumnDef> toRemCols = getColumnsAdded(newTable, this);
-      if (toAddCols != null || toRemCols != null) {
+      List<AlterDef> alterDefs = new ArrayList<AlterDef>();
+      List<ColumnDef> toAddCols = getColumnsAdded(this, newTable, alterDefs);
+      List<ColumnDef> toRemCols = getColumnsAdded(newTable, this, null);
+      if (toAddCols != null || toRemCols != null || alterDefs.size() > 0) {
          // Create:  ALTER TABLE tableName ADD COLUMN colName colType, ADD COLUMN colName, colType;
          AlterTable alterTable = AlterTable.create(newTable.tableName);
+         if (toRemCols != null) {
+            for (ColumnDef colDef:toRemCols) {
+               alterTable.addAlterDef(DropColumn.create(colDef));
+            }
+         }
          if (toAddCols != null) {
             for (ColumnDef colDef:toAddCols) {
                alterTable.addAlterDef(AddColumn.create(colDef));
             }
          }
-         if (toRemCols != null) {
-            for (ColumnDef colDef:toRemCols) {
-               alterTable.addAlterDef(DropColumn.create(colDef));
-            }
+         if (alterDefs.size() > 0) {
+            for (AlterDef alterDef:alterDefs)
+               alterTable.addAlterDef(alterDef);
          }
          resModel.addCommand(alterTable);
       }

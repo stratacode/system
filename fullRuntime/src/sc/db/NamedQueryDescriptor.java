@@ -173,7 +173,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                      String colName = md.getColumnName(cix+1);
 
                      DBPropertyDescriptor resProp = resType.getPropertyForColumn(colName);
-                     if (resProp instanceof IdPropertyDescriptor || resProp == typeIdProp)
+                     if (resProp instanceof IdPropertyDescriptor || resProp.typeIdProperty)
                         continue;
 
                      if (logSB != null && !first)

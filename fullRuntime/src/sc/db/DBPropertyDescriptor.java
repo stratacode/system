@@ -127,7 +127,7 @@ public class DBPropertyDescriptor {
             if (this.refDBTypeDesc == null)
                System.out.println("*** Ref type: " + refTypeName + ": no DBTypeDescriptor for property: " + propertyName);
             else
-               this.refDBTypeDesc.init();
+               this.refDBTypeDesc.resolve();
          }
       }
       if (this.reverseProperty != null) {
@@ -155,6 +155,8 @@ public class DBPropertyDescriptor {
                   reversePropDesc.readOnly = true;
                }
             }
+
+            this.refDBTypeDesc.resolve();
          }
       }
    }
@@ -164,6 +166,9 @@ public class DBPropertyDescriptor {
          return;
 
       started = true;
+
+      if (refDBTypeDesc != null)
+         refDBTypeDesc.start();
 
       if (reversePropDesc != null) {
          dbTypeDesc.addReverseProperty(this);
@@ -238,9 +243,15 @@ public class DBPropertyDescriptor {
       return 1;
    }
 
-   public int getNumResultSetColumns() {
+   public boolean eagerJoinForTypeId(SelectTableDesc tableDesc) {
+      if (refDBTypeDesc != null && refDBTypeDesc.getTypeIdProperty() != null && !onDemand && tableDesc.hasJoinTableForRef(this))
+         return true;
+      return false;
+   }
+
+   public int getNumResultSetColumns(SelectTableDesc tableDesc) {
       int res = getNumColumns();
-      if (refDBTypeDesc != null && refDBTypeDesc.getTypeIdProperty() != null)
+      if (eagerJoinForTypeId(tableDesc))
          res++;
       return res;
    }
@@ -313,23 +324,28 @@ public class DBPropertyDescriptor {
       }
    }
 
-   public Object getValueFromResultSet(ResultSet rs, int rix) throws SQLException {
+   public Object getValueFromResultSet(ResultSet rs, int rix, SelectTableDesc selectTable) throws SQLException {
       Object val;
       int numCols = getNumColumns();
+      DBTypeDescriptor refColTypeDesc = getRefColTypeDesc();
       if (numCols == 1)  {
          val = DBUtil.getResultSetByIndex(rs, rix, this);
-         if (refDBTypeDesc != null && val != null) {
-            DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
-            int typeId = -1;
-            if (typeIdProperty != null) {
-               typeId = (int) DBUtil.getResultSetByIndex(rs, rix+1, typeIdProperty);
+         int typeId = -1;
+         if (refColTypeDesc != null) {
+            if (eagerJoinForTypeId(selectTable)) {
+               DBPropertyDescriptor typeIdProperty = refColTypeDesc.getTypeIdProperty();
+               Object res = DBUtil.getResultSetByIndex(rs, rix+1, typeIdProperty);
+               if (res == null)
+                  return null;
+               typeId = (int) res;
             }
-            val = refDBTypeDesc.lookupInstById(val, typeId, true, false);
+            if (val != null)
+               val = refColTypeDesc.lookupInstById(val, typeId, true, false);
          }
       }
       else {
-         if (refDBTypeDesc != null) {
-            List<IdPropertyDescriptor> refIdCols = refDBTypeDesc.primaryTable.getIdColumns();
+         if (refColTypeDesc != null) {
+            List<IdPropertyDescriptor> refIdCols = refColTypeDesc.primaryTable.getIdColumns();
             if (numCols != refIdCols.size())
                throw new UnsupportedOperationException();
             MultiColIdentity idVals = new MultiColIdentity(numCols);
@@ -341,13 +357,16 @@ public class DBPropertyDescriptor {
                   nullId = false;
                idVals.setVal(idVal, i);
             }
-            DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
+
             int typeId = -1;
-            if (typeIdProperty != null) {
-               typeId = (int) DBUtil.getResultSetByIndex(rs, rix, typeIdProperty);
+            if (eagerJoinForTypeId(selectTable)) {
+               DBPropertyDescriptor typeIdProperty = refColTypeDesc.getTypeIdProperty();
+               if (typeIdProperty != null) {
+                  typeId = (int) DBUtil.getResultSetByIndex(rs, rix, typeIdProperty);
+               }
             }
             if (!nullId)
-               val = refDBTypeDesc.lookupInstById(idVals, typeId, true, false);
+               val = refColTypeDesc.lookupInstById(idVals, typeId, true, false);
             else
                val = null;
          }
@@ -367,7 +386,7 @@ public class DBPropertyDescriptor {
          if (refDBObj.isPrototype()) {
             // Fill in the reverse property
             if (reversePropDesc != null) {
-               reversePropDesc.getPropertyMapper().setPropertyValue(propVal, inst);
+               reversePropDesc.updateReverseValue(propVal, inst);
             }
             // Because we have stored a reference and there's an integrity constraint, we're going to assume the
             // reference refers to a persistent object.
@@ -375,6 +394,15 @@ public class DBPropertyDescriptor {
             // different data store?
             refDBObj.setPrototype(false);
          }
+      }
+   }
+
+   private void updateReverseValue(Object propVal, Object inst) {
+      // TODO: is this necessary? shouldn't the data binding events take care of it
+      if (!reversePropDesc.multiRow && !multiRow)
+         reversePropDesc.getPropertyMapper().setPropertyValue(propVal, inst);
+      else {
+         // use code from ReversePropertyListener if we need to do this at all...
       }
    }
 
@@ -430,7 +458,11 @@ public class DBPropertyDescriptor {
       return dbTypeDesc.dataSourceName;
    }
 
-   public DBTypeDescriptor getColTypeDesc() {
+   /**
+    * If this is an id property, returns the type of that id.
+    * For a reference column, returns the type of the reference.
+    */
+   public DBTypeDescriptor getRefColTypeDesc() {
       return refDBTypeDesc;
    }
 
@@ -479,5 +511,9 @@ public class DBPropertyDescriptor {
       if (ownerTypeName == null || otherTypeDesc == dbTypeDesc)
          return false;
       return !DynUtil.isAssignableFrom(dbTypeDesc.typeDecl, otherTypeDesc.typeDecl);
+   }
+
+   public Object getPropertyType() {
+      return typeIdProperty ? int.class : getPropertyMapper().getPropertyType();
    }
 }

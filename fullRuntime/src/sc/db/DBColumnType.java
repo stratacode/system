@@ -50,6 +50,31 @@ public enum DBColumnType {
       }
       throw new UnsupportedOperationException("Missing value in getSQLType");
    }
+
+   public static DBColumnType fromColumnType(String columnType) {
+      if (columnType.equalsIgnoreCase("varchar") || columnType.equals("text") || columnType.equals("nvarchar") || columnType.equals("ntext"))
+         return String;
+      else if (columnType.equalsIgnoreCase("integer") || columnType.equals("serial"))
+         return Int;
+      else if (columnType.equalsIgnoreCase("bigint") || columnType.equals("bigserial"))
+         return Long;
+      else if (columnType.equalsIgnoreCase("tinyint"))
+         return Int;
+      else if (columnType.equalsIgnoreCase("smallint"))
+         return Int;
+      else if (columnType.equalsIgnoreCase("float"))
+         return Float;
+      else if (columnType.equalsIgnoreCase("real") || columnType.equals("numeric"))
+         return Double;
+      else if (columnType.equalsIgnoreCase("bit"))
+         return Boolean;
+      else if (columnType.equalsIgnoreCase("date") || columnType.equalsIgnoreCase("time") ||
+              columnType.equalsIgnoreCase("datetime") || columnType.equals("timestamp"))
+         return Date;
+      else if (columnType.equalsIgnoreCase("json") || columnType.equalsIgnoreCase("jsonb"))
+         return Json;
+      return null;
+   }
 }
 
 

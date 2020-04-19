@@ -26,7 +26,7 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
       return res;
    }
 
-   public DBTypeDescriptor getColTypeDesc() {
+   public DBTypeDescriptor getRefColTypeDesc() {
       return dbTypeDesc;
    }
 

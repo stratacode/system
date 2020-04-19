@@ -10,14 +10,18 @@ import java.sql.SQLException;
 import java.util.*;
 
 /** Corresponds to a single database query - either for a single row or multi-row but not both */
-public class SelectQuery {
+public class SelectQuery implements Cloneable {
    public String dataSourceName;
    public boolean multiRow;
    /** Does this query include the primary table - i.e. if the row does not exist, does it mean the parent item does not exist */
    public boolean includesPrimary;
 
-   List<SelectTableDesc> fetchTables = new ArrayList<SelectTableDesc>();
-   Map<String, SelectTableDesc> fetchTablesIndex = new TreeMap<String, SelectTableDesc>();
+   List<SelectTableDesc> selectTables = new ArrayList<SelectTableDesc>();
+   /**
+    * The list of references merged into this one query (onDemand=false) for 1-1. Eventually each property here turns into an extra
+    * SelectTableDesc in the selectTables list.
+    */
+   List<DBPropertyDescriptor> refProps = null;
 
    List<DBPropertyDescriptor> orderByProps = null;
    List<Boolean> orderByDirs = null;
@@ -38,23 +42,25 @@ public class SelectQuery {
    public int startIndex = 0;
    public int maxResults = 0; // unlimited
 
+   private boolean activated = false;
+
    public SelectQuery(String dataSourceName, boolean multiRow) {
       this.dataSourceName = dataSourceName;
       this.multiRow = multiRow;
    }
 
-   public void addProperty(TableDescriptor table, DBPropertyDescriptor prop) {
+   public void addProperty(DBPropertyDescriptor curRefProp, DBPropertyDescriptor prop) {
+      TableDescriptor table = prop.getTable();
       String tableName = table.tableName;
       SelectTableDesc ftd;
-      ftd = fetchTablesIndex.get(tableName);
+      ftd = getSelectTableForProperty(curRefProp, prop);
 
       if (ftd == null) {
          ftd = new SelectTableDesc();
          ftd.table = table;
          ftd.props = new ArrayList<DBPropertyDescriptor>();
 
-         fetchTables.add(ftd);
-         fetchTablesIndex.put(tableName, ftd);
+         addTableToSelectQuery(ftd, null);
 
          if (table.primary)
             includesPrimary = true;
@@ -75,32 +81,32 @@ public class SelectQuery {
             return;
          ftd.props.add(prop);
 
+         SelectTableDesc revTableDesc = null;
          // When the reference is not onDemand, add the primary+aux tables from the referenced type to the query for this property
          // so that we do one query to fetch the list of instances - rather than the 1 + N queries if we did them one-by-one
          DBTypeDescriptor refType = prop.refDBTypeDesc;
          if (!prop.onDemand && refType != null) {
             // For the read-only side of the reverse relationship, the property's table is the primary table of the other
             // side so add the additional properties to define the other side to the properties we fetch with this table
-            if (prop.reversePropDesc != null) {
+            if (prop.reversePropDesc != null && prop.readOnly) {
                TableDescriptor revTable = prop.reversePropDesc.dbTypeDesc.primaryTable;
                if (!revTable.tableName.equals(tableName)) {
-                  ftd = fetchTablesIndex.get(revTable.tableName);
-                  if (ftd == null) {
-                     ftd = new SelectTableDesc();
-                     ftd.table = revTable;
-                     ftd.props = Collections.emptyList();
-                     ftd.revProps = new ArrayList<DBPropertyDescriptor>();
-                     ftd.revColumns = new ArrayList<DBPropertyDescriptor>(revTable.columns);
+                  revTableDesc = getSelectTableForRevProperty(prop.reversePropDesc);
+                  if (revTableDesc == null) {
+                     revTableDesc = new SelectTableDesc();
+                     revTableDesc.table = revTable;
+                     revTableDesc.props = Collections.emptyList();
+                     revTableDesc.revProps = new ArrayList<DBPropertyDescriptor>();
+                     revTableDesc.revColumns = new ArrayList<DBPropertyDescriptor>(revTable.columns);
                      for (int i = 0; i < revTable.columns.size(); i++) {
-                        ftd.revProps.add(prop);
+                        revTableDesc.revProps.add(prop);
                      }
-                     fetchTables.add(ftd);
-                     fetchTablesIndex.put(tableName, ftd);
+                     addTableToSelectQuery(revTableDesc, ftd);
                   }
                   else // TODO: do we add to the column set here?
                      System.err.println("*** Table fetch table of reverse table already exists");
                }
-               else {
+               else { // TODO: Is this right? Isn't this a case where we need to join in a new instance of this table against itself?
                   for (DBPropertyDescriptor revCol:revTable.columns) {
                      if (table.hasColumn(revCol))
                         continue;
@@ -113,31 +119,138 @@ public class SelectQuery {
                   }
                }
             }
-            else { // TODO: is this right - a completely separate 1-1 query we just tack onto the current one by adding more join tables?
-               refType.initFetchGroups();
-               DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
-               for (SelectQuery defQuery:defaultRefQuery.queries) {
-                  if (defQuery == this)
-                     continue;
-                  if (!defQuery.multiRow) {
-                     for (SelectTableDesc defQueryFetch:defQuery.fetchTables) {
-                        // Skip any references back to the table of the property
-                        // TODO: should this be a comparison against the primary table of the type of the property?
-                        if (defQueryFetch.table.tableName.equalsIgnoreCase(table.tableName))
+            else {
+               if (refProps == null)
+                  refProps = new ArrayList<DBPropertyDescriptor>();
+               refProps.add(prop);
+            }
+         }
+      }
+   }
+
+   private SelectTableDesc getSelectTableForRevProperty(DBPropertyDescriptor revProp) {
+      for (SelectTableDesc selectTable:selectTables) {
+         if (selectTable.revProps != null)
+            if (selectTable.revProps.contains(revProp))
+               return selectTable;
+      }
+      return null;
+   }
+
+   public void activate() {
+      if (activated)
+         return;
+      activated = true;
+
+      if (refProps == null || refProps.size() == 0)
+         return;
+      List<DBPropertyDescriptor> curRefProps = refProps;
+      refProps = null;
+
+      SelectTableDesc mainTable = selectTables.get(0);
+
+      for (DBPropertyDescriptor refProp:curRefProps) {
+         DBTypeDescriptor refType = refProp.refDBTypeDesc;
+         // TODO: add a way to configure how we determine what to fetch for each the relationship - e.g. just get the id/db_type_id, just get the primary table,
+         // pull in a sub-graph some number of levels deep via a graph-style query.
+         DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
+         List<SelectTableDesc> toAddToThis = null;
+         if (defaultRefQuery != null && defaultRefQuery.queries != null) {
+            for (SelectQuery defQuery:defaultRefQuery.queries) {
+               if (!defQuery.multiRow) {
+                  if (getRefQueryForProperty(refProp) == null) {
+                     for (SelectTableDesc defQueryFetch:defQuery.selectTables) {
+                        if (defQueryFetch.refProp != null)
                            continue;
-                        SelectTableDesc refQueryFetch = defQueryFetch.copyForRef(prop);
-                        fetchTables.add(refQueryFetch);
-                        fetchTablesIndex.put(refQueryFetch.table.tableName, refQueryFetch);
+                        SelectTableDesc refQueryFetch = defQueryFetch.copyForRef(refProp);
+                        if (defQuery == this) {
+                           if (toAddToThis == null)
+                              toAddToThis = new ArrayList<SelectTableDesc>();
+                           toAddToThis.add(refQueryFetch);
+                        }
+                        else
+                           addTableToSelectQuery(refQueryFetch, mainTable);
                      }
                   }
+                  if (defQuery.refProps != null && !defQuery.activated) {
+                     for (DBPropertyDescriptor nestedRefProp:defQuery.refProps) {
+                        if (nestedRefProp == refProp)
+                           continue;
+                        if (getRefQueryForProperty(nestedRefProp) == null) {
+                           DBTypeDescriptor nestedRefType = nestedRefProp.refDBTypeDesc;
+                           DBFetchGroupQuery nestedRefGroupQuery = nestedRefType.getDefaultFetchQuery();
+                           for (SelectQuery nestedQuery:nestedRefGroupQuery.queries) {
+                              for (SelectTableDesc nestedDef:nestedQuery.selectTables) {
+                                 SelectTableDesc refQueryFetch = nestedDef.copyForRef(nestedRefProp);
+                                 if (nestedQuery == this) {
+                                    if (toAddToThis == null)
+                                       toAddToThis = new ArrayList<SelectTableDesc>();
+                                    toAddToThis.add(refQueryFetch);
+                                 }
+                                 else
+                                    addTableToSelectQuery(refQueryFetch, mainTable);
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+               if (toAddToThis != null) {
+                  for (SelectTableDesc nextToAdd:toAddToThis) {
+                     if (getRefQueryForProperty(nextToAdd.refProp) == null)
+                        addTableToSelectQuery(nextToAdd, mainTable);
+                  }
+                  toAddToThis = null;
                }
             }
          }
       }
    }
 
+   SelectTableDesc getSelectTableForProperty(DBPropertyDescriptor curRefProp, DBPropertyDescriptor prop) {
+      String tableName = prop.getTable().tableName;
+      return getSelectTable(curRefProp, tableName);
+   }
+
+   SelectTableDesc getSelectTable(DBPropertyDescriptor curRefProp, String tableName) {
+      for (SelectTableDesc selectQuery: selectTables) {
+         if (selectQuery.refProp == curRefProp && selectQuery.table.tableName.equals(tableName))
+            return selectQuery;
+      }
+      return null;
+   }
+
+   SelectTableDesc getRefQueryForProperty(DBPropertyDescriptor prop) {
+      for (SelectTableDesc selectQuery: selectTables)
+         if (selectQuery.refProp == prop)
+            return selectQuery;
+      return null;
+   }
+
+   void addTableToSelectQuery(SelectTableDesc newDesc, SelectTableDesc joinedFrom) {
+      if (newDesc.refProp != null) {
+         newDesc.alias = newDesc.table.tableName + "_" + newDesc.refProp.columnName;
+      }
+      else {
+         for (int i = 0; i < selectTables.size(); i++) {
+            SelectTableDesc selTable = selectTables.get(i);
+            if (selTable.table.tableName.equals(newDesc.table.tableName)) {
+               newDesc.alias = newDesc.table.tableName + "_" + i;
+               break;
+            }
+         }
+      }
+      if (joinedFrom != null) {
+         newDesc.joinedFrom = joinedFrom;
+         if (joinedFrom.joinedTo == null)
+            joinedFrom.joinedTo = new ArrayList<SelectTableDesc>();
+         joinedFrom.joinedTo.add(newDesc);
+      }
+      selectTables.add(newDesc);
+   }
+
    public boolean containsProperty(DBPropertyDescriptor pdesc) {
-      for (SelectTableDesc ftd:fetchTables) {
+      for (SelectTableDesc ftd: selectTables) {
          if (ftd.containsProperty(pdesc))
             return true;
       }
@@ -145,10 +258,11 @@ public class SelectQuery {
    }
 
    public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {
-      TableDescriptor mainTable = fetchTables.get(0).table;
-      StringBuilder qsb = buildTableFetchQuery(fetchTables);
+      TableDescriptor mainTable = selectTables.get(0).table;
+      StringBuilder qsb = buildTableFetchQuery(selectTables);
       ResultSet rs = null;
       List<IdPropertyDescriptor> idColumns = mainTable.getIdColumns();
+      StringBuilder logSB = null;
       try {
          String queryStr = qsb.toString();
          boolean res;
@@ -169,7 +283,7 @@ public class SelectQuery {
 
             rs = st.executeQuery();
 
-            StringBuilder logSB = logStr != null ? new StringBuilder(logStr) : null;
+            logSB = logStr != null ? new StringBuilder(logStr) : null;
 
             if (logSB != null)
                logSB.append(" -> ");
@@ -198,6 +312,9 @@ public class SelectQuery {
          return res;
       }
       catch (SQLException exc) {
+         if (logSB != null)
+            DBUtil.error("FetchProperties for " + dbObj + " failed: " + exc + " with query: " + logSB);
+         exc.printStackTrace();
          throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
       }
       finally {
@@ -208,8 +325,9 @@ public class SelectQuery {
    }
 
    public List<IDBObject> matchQuery(DBTransaction transaction, DBObject proto) {
-      TableDescriptor mainTable = fetchTables.get(0).table;
-      StringBuilder qsb = buildTableQueryBase(mainTable, fetchTables);
+      SelectTableDesc mainTableDesc = selectTables.get(0);
+      TableDescriptor mainTable = mainTableDesc.table;
+      StringBuilder qsb = buildTableQueryBase(mainTableDesc);
       ResultSet rs = null;
       StringBuilder logSB = DBUtil.verbose ? new StringBuilder(qsb) : null;
       DBUtil.append(qsb, logSB, " WHERE ");
@@ -319,31 +437,48 @@ public class SelectQuery {
          return null;
       }
 
-      DBPropertyDescriptor typeIdProp = dbObj.dbTypeDesc.getTypeIdProperty();
-
       int rix = 1;
-      for (SelectTableDesc ftd:fetchTables) {
+      for (SelectTableDesc ftd: selectTables) {
          // If this table is actually defined in another type, and represents a reference an instance of that type (a 1-1 relationship),
          // this row sets properties of that referenced instance. Otherwise, its a normal table setting properties on the main instance.
-         Object fetchInst = ftd.refProp == null ? inst : ftd.refProp.getPropertyMapper().getPropertyValue(inst, false, false);
-         for (DBPropertyDescriptor propDesc:ftd.props) {
+         DBPropertyDescriptor refProp = ftd.refProp;
+         Object fetchInst = refProp == null ? inst : refProp.getPropertyMapper().getPropertyValue(inst, false, false);
+         IDBObject fetchObj = fetchInst instanceof IDBObject ? (IDBObject) fetchInst : null;
+         for (int pix = 0; pix < ftd.props.size(); pix++) {
+            DBPropertyDescriptor propDesc = ftd.props.get(pix);
+            // If the id was the previous property, we already read in the typeId as part of that. If we have an existing id we are looking
+            // up then we need to get the type id to possibly specialize the return type
+            if (propDesc.typeIdProperty && pix > 0)
+               continue;
+
             if (logSB != null && rix != 1)
                logSB.append(", ");
-            IBeanMapper propMapper = propDesc.getPropertyMapper();
-
             if (logSB != null) {
-               logSB.append(propMapper.getPropertyName());
+               logSB.append(propDesc.propertyName);
                logSB.append("=");
             }
 
-            Object val = propDesc.getValueFromResultSet(rs, rix);
-            rix += propDesc.getNumColumns();
+            Object val = propDesc.getValueFromResultSet(rs, rix, ftd);
+            rix += propDesc.getNumResultSetColumns(ftd);
 
-            if (propDesc != typeIdProp) {
-               propDesc.updateReferenceForPropValue(inst, val);
+            if (!propDesc.typeIdProperty) {
+               if (fetchObj != null && propDesc.ownedByOtherType(fetchObj.getDBObject().dbTypeDesc))
+                  continue;
+               IBeanMapper propMapper = propDesc.getPropertyMapper();
+               if (propMapper == null) {
+                  System.out.println("*** Error - no mapper for property");
+                  continue;
+               }
+               // A null single-valued reference - just skip it
+               if (fetchInst == null && val == null && refProp != null)
+                  continue;
+               propDesc.updateReferenceForPropValue(fetchInst, val);
                propMapper.setPropertyValue(fetchInst, val);
             }
             else {
+               if (val == null)
+                  continue;
+
                int typeId = (int) val;
                DBTypeDescriptor newType = dbObj.dbTypeDesc.subTypesById.get(typeId);
                if (newType == null) {
@@ -352,8 +487,8 @@ public class SelectQuery {
                else {
                   if (newType != dbObj.dbTypeDesc) {
                      IDBObject newInst = dbObj.dbTypeDesc.createInstance();
-                     newInst.getDBObject().setDBId(inst.getDBId());
-                     inst = newInst;
+                     newInst.getDBObject().setDBId(((IDBObject) fetchInst).getDBId());
+                     fetchInst = newInst;
                   }
                }
             }
@@ -374,8 +509,8 @@ public class SelectQuery {
                   logSB.append("=");
                }
 
-               Object val = propDesc.getValueFromResultSet(rs, rix);
-               rix += propDesc.getNumResultSetColumns();
+               Object val = propDesc.getValueFromResultSet(rs, rix, ftd);
+               rix += propDesc.getNumResultSetColumns(ftd);
 
                Object revInst = ftd.revProps.get(ri).getPropertyMapper().getPropertyValue(fetchInst, false, false);
                if (revInst != null) {
@@ -396,7 +531,7 @@ public class SelectQuery {
    }
 
    /**
-    * Here the first fetchTable defines the list/array value - fetchTables.get(0).props.get(0).
+    * Here the first selectTable defines the list/array value - selectTables.get(0).props.get(0).
     * The second and subsequent fetch tables are only there for onDemand=false references in the referenced object
     */
    boolean processMultiResults(List<IDBObject> resList, DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
@@ -415,21 +550,22 @@ public class SelectQuery {
                logSB.append("\n   ");
          }
 
-         for (int fi = 0; fi < fetchTables.size(); fi++) {
-            SelectTableDesc fetchTable = fetchTables.get(fi);
+         for (int fi = 0; fi < selectTables.size(); fi++) {
+            SelectTableDesc selectTable = selectTables.get(fi);
 
             boolean rowValSet = false;
-            for (DBPropertyDescriptor propDesc:fetchTable.props) {
+            for (DBPropertyDescriptor propDesc:selectTable.props) {
                IBeanMapper propMapper = propDesc.getPropertyMapper();
                Object val;
                int numCols = propDesc.getNumColumns();
-               DBTypeDescriptor colTypeDesc = propDesc.getColTypeDesc();
+               DBTypeDescriptor colTypeDesc = propDesc.getRefColTypeDesc();
                if (numCols == 1)  {
                   val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
                   if (colTypeDesc != null) {
                      DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
                      int typeId = -1;
-                     if (colTypeIdProp != null)
+                     // If we are joining in a 1-1 relationship eagerly, we ensure the db_type_id is right after the id so we can create the object of the right type
+                     if (colTypeIdProp != null && !propDesc.onDemand && selectTable.hasJoinTableForRef(propDesc))
                         typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
                      val = colTypeDesc.lookupInstById(val, typeId, true, false);
 
@@ -495,7 +631,7 @@ public class SelectQuery {
                   rowCt++;
                }
                else {
-                  Object propInst = fetchTable.refProp == null || listProp != null ? currentRowVal : fetchTable.refProp.getPropertyMapper().getPropertyValue(currentRowVal, false, false);
+                  Object propInst = selectTable.refProp == null || listProp != null ? currentRowVal : selectTable.refProp.getPropertyMapper().getPropertyValue(currentRowVal, false, false);
                   if (currentRowVal == null)
                      throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
                   propMapper.setPropertyValue(propInst, val);
@@ -508,26 +644,29 @@ public class SelectQuery {
                   }
                }
             }
-            if (fetchTable.revColumns != null) {
-               DBPropertyDescriptor revProp = fetchTable.revProps.get(0);
-               int numToFetch = fetchTable.revColumns.size();
+            if (selectTable.revColumns != null) {
+               DBPropertyDescriptor revProp = selectTable.revProps.get(0);
+               int numToFetch = selectTable.revColumns.size();
                for (int rci = 0; rci < numToFetch; rci++) {
-                  DBPropertyDescriptor propDesc = fetchTable.revColumns.get(rci);
-                  IBeanMapper propMapper = propDesc.getPropertyMapper();
+                  DBPropertyDescriptor propDesc = selectTable.revColumns.get(rci);
+                  // should be preceded by the id which reads it
+                  if (propDesc.typeIdProperty)
+                     continue;
                   Object val;
                   int numCols = propDesc.getNumColumns();
 
-                  // If this is the first fetchTable and the first column in the revProps list is the id of the reverse property instance
-                  DBTypeDescriptor refTypeDesc = rci == 0 && fi == 0 ? revProp.refDBTypeDesc : propDesc.refDBTypeDesc;
+                  // If this is the first selectTable and the first column in the revProps list is the id of the reverse property instance
+                  DBPropertyDescriptor readProp = rci == 0 && fi == 0 ? revProp : propDesc;
+                  DBTypeDescriptor refTypeDesc = readProp.refDBTypeDesc;
                   if (numCols == 1)  {
                      val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
 
                      if (refTypeDesc != null) {
                         int typeId = -1;
                         DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
-                        if (refTypeIdProp != null)
+                        if (refTypeIdProp != null && readProp.eagerJoinForTypeId(selectTable))
                            typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, refTypeIdProp);
-                        val = refTypeDesc.lookupInstById(val, typeId, true, false);
+                        val = val == null ? null : refTypeDesc.lookupInstById(val, typeId, true, false);
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
@@ -547,16 +686,19 @@ public class SelectQuery {
                         if (numCols != refIdCols.size())
                            throw new UnsupportedOperationException();
                         MultiColIdentity idVals = new MultiColIdentity(numCols);
+                        boolean allNull = true;
                         for (int ci = 0; ci < numCols; ci++) {
                            IdPropertyDescriptor refIdCol = refIdCols.get(ci);
                            Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
+                           if (idVal != null)
+                              allNull = false;
                            idVals.setVal(idVal, ci);
                         }
                         int typeId = -1;
                         DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
-                        if (refTypeIdProp != null)
+                        if (refTypeIdProp != null && propDesc.eagerJoinForTypeId(selectTable))
                            typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, refTypeIdProp);
-                        val = refTypeDesc.lookupInstById(idVals, typeId, true, false);
+                        val = allNull ? null : refTypeDesc.lookupInstById(idVals, typeId, true, false);
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
@@ -592,12 +734,16 @@ public class SelectQuery {
                   else {
                      if (currentRowVal == null)
                         throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
-                     propMapper.setPropertyValue(currentRowVal, val);
+
+                     if (!propDesc.ownedByOtherType(currentRowVal.getDBObject().dbTypeDesc)) {
+                        IBeanMapper propMapper = propDesc.getPropertyMapper();
+                        propMapper.setPropertyValue(currentRowVal, val);
+                     }
 
                      if (logSB != null) {
                         if (rci > 1)
                            logSB.append(", ");
-                        logSB.append(propMapper.getPropertyName());
+                        logSB.append(propDesc.propertyName);
                         logSB.append("=");
                         DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
                      }
@@ -617,9 +763,10 @@ public class SelectQuery {
       return true;
    }
 
-   private static StringBuilder buildTableFetchQuery(List<SelectTableDesc> fetchTables) {
-      TableDescriptor mainTable = fetchTables.get(0).table;
-      StringBuilder qsb = buildTableQueryBase(mainTable, fetchTables);
+   private StringBuilder buildTableFetchQuery(List<SelectTableDesc> selectTables) {
+      SelectTableDesc mainTableDesc = selectTables.get(0);
+      TableDescriptor mainTable = mainTableDesc.table;
+      StringBuilder qsb = buildTableQueryBase(mainTableDesc);
       qsb.append(" WHERE ");
       List<IdPropertyDescriptor> idCols = mainTable.getIdColumns();
       int sz = idCols.size();
@@ -634,24 +781,25 @@ public class SelectQuery {
       return qsb;
    }
 
-   private static StringBuilder buildTableQueryBase(TableDescriptor mainTable, List<SelectTableDesc> fetchTables) {
+   private StringBuilder buildTableQueryBase(SelectTableDesc mainTableDesc) {
+      List<SelectTableDesc> selectTables = this.selectTables;
+      TableDescriptor mainTable = mainTableDesc.table;
       StringBuilder res = new StringBuilder();
-      boolean hasAuxTables = fetchTables.size() > 1;
       res.append("SELECT ");
-      for (int i = 0; i < fetchTables.size(); i++) {
+      for (int i = 0; i < selectTables.size(); i++) {
          if (i != 0)
             res.append(", ");
-         SelectTableDesc fetchTable = fetchTables.get(i);
-         appendTableSelect(res, fetchTable, hasAuxTables);
+         SelectTableDesc selectTable = selectTables.get(i);
+         appendTableSelect(res, selectTable);
       }
       res.append(" FROM ");
       DBUtil.appendIdent(res, null, mainTable.tableName);
-      for (int i = 1; i < fetchTables.size(); i++) {
+      for (int i = 1; i < selectTables.size(); i++) {
          res.append(" LEFT OUTER JOIN ");
-         TableDescriptor joinTable = fetchTables.get(i).table;
-         DBUtil.appendIdent(res, null, joinTable.tableName);
+         SelectTableDesc joinTableDesc = selectTables.get(i);
+         DBUtil.appendIdent(res, null, joinTableDesc.getTableDecl());
          res.append(" ON ");
-         appendJoinTable(res, mainTable, joinTable);
+         appendJoinTable(res, mainTableDesc, joinTableDesc);
       }
       return res;
    }
@@ -669,45 +817,98 @@ public class SelectQuery {
       throw new UnsupportedOperationException();
    }
 
-   private static void appendJoinTable(StringBuilder queryStr, TableDescriptor mainTable, TableDescriptor joinTable) {
-      List<? extends DBPropertyDescriptor> mainJoinCols = getJoinColumns(mainTable, joinTable);
+   private static void appendJoinTable(StringBuilder queryStr, SelectTableDesc mainTable, SelectTableDesc joinTable) {
+      List<? extends DBPropertyDescriptor> mainJoinCols;
+
+      if (joinTable.refProp == null) {
+         if (joinTable.revProps != null) {
+            DBPropertyDescriptor joinProp = joinTable.revProps.get(0);
+            mainJoinCols = Collections.singletonList(joinProp);
+         }
+         else {
+            if (joinTable.table.tableName.equals(mainTable.table.tableName))
+               mainJoinCols = joinTable.table.getIdColumns();
+            else {
+               System.err.println("*** Unrecognized join table pattern");
+               mainJoinCols = joinTable.table.getIdColumns();
+            }
+         }
+      }
+      else {
+         if (joinTable.refProp.tableName.equals(mainTable.table.tableName)) {
+            mainJoinCols = Collections.singletonList(joinTable.refProp);
+         }
+         else {
+            System.err.println("*** Unrecognized join table for ref");
+            return;
+         }
+      }
+
       int sz = mainJoinCols.size();
       for (int i = 0; i < sz; i++) {
          if (i != 0)
             queryStr.append(" AND ");
-         DBUtil.appendIdent(queryStr, null, mainTable.tableName);
+         DBUtil.appendIdent(queryStr, null, mainTable.getTableAlias());
          queryStr.append(".");
          //DBUtil.appendIdent(queryStr, null, mainIdCols.get(i).columnName);
          //DBUtil.appendIdent(queryStr, null, mainTable.columns.get(i).columnName);
          DBUtil.appendIdent(queryStr, null, mainJoinCols.get(i).columnName);
          queryStr.append(" = ");
-         DBUtil.appendIdent(queryStr, null, joinTable.tableName);
+         DBUtil.appendIdent(queryStr, null, joinTable.getTableAlias());
          queryStr.append(".");
-         DBUtil.appendIdent(queryStr, null, joinTable.idColumns.get(i).columnName);
+         DBUtil.appendIdent(queryStr, null, joinTable.table.idColumns.get(i).columnName);
       }
    }
 
-   private static void appendTableSelect(StringBuilder queryStr, SelectTableDesc fetchTable, boolean addTablePrefix) {
-      String prefix = addTablePrefix ? fetchTable.table.tableName + "." : null;
+   private void appendTableSelect(StringBuilder queryStr, SelectTableDesc selectTable) {
       boolean first = true;
-      for (DBPropertyDescriptor prop:fetchTable.props) {
+      for (DBPropertyDescriptor prop:selectTable.props) {
          if (first)
             first = false;
          else
             queryStr.append(", ");
-         if (prefix != null)
-            queryStr.append(prefix);
-         queryStr.append(prop.columnName);
+         appendColumnName(queryStr, selectTable, prop);
       }
-      if (fetchTable.revColumns != null) {
-         for (DBPropertyDescriptor prop:fetchTable.revColumns) {
+      if (selectTable.revColumns != null) {
+         for (DBPropertyDescriptor prop:selectTable.revColumns) {
             if (first)
                first = false;
             else
                queryStr.append(", ");
-            if (prefix != null)
-               queryStr.append(prefix);
-            queryStr.append(prop.columnName);
+            appendColumnName(queryStr, selectTable, prop);
+         }
+      }
+   }
+
+   public String getSelectTableAliasForRefProp(DBPropertyDescriptor refProp) {
+      if (selectTables.size() == 1)
+         return null; // No prefix needed
+      for (SelectTableDesc desc: selectTables) {
+         if (desc.refProp == refProp)
+            return desc.alias;
+      }
+      return null;
+   }
+
+   public void appendColumnName(StringBuilder queryStr, SelectTableDesc tableDesc, DBPropertyDescriptor prop) {
+      String alias = selectTables.size() == 1 ? null : tableDesc.getTableAlias();
+      if (alias != null) {
+         queryStr.append(alias);
+         queryStr.append(".");
+      }
+      queryStr.append(prop.columnName);
+
+      DBTypeDescriptor refTypeDesc = prop.refDBTypeDesc;
+      if (refTypeDesc != null && !prop.onDemand && tableDesc.hasJoinTableForRef(prop)) {
+         DBPropertyDescriptor typeIdProp = refTypeDesc.getTypeIdProperty();
+         if (typeIdProp != null) {
+            queryStr.append(", ");
+            String refTableAlias = getSelectTableAliasForRefProp(prop);
+            if (refTableAlias != null) {
+               queryStr.append(refTableAlias);
+               queryStr.append(".");
+            }
+            queryStr.append(typeIdProp.columnName);
          }
       }
    }
@@ -715,12 +916,12 @@ public class SelectQuery {
    public String toString() {
       StringBuilder sb = new StringBuilder();
       sb.append("select-query: ");
-      if (fetchTables != null) {
-         for (int i = 0; i < fetchTables.size(); i++) {
-            SelectTableDesc fetchTable = fetchTables.get(i);
+      if (selectTables != null) {
+         for (int i = 0; i < selectTables.size(); i++) {
+            SelectTableDesc selectTable = selectTables.get(i);
             if (i != 0)
                sb.append(", ");
-            sb.append(fetchTable);
+            sb.append(selectTable);
          }
       }
       if (whereSB != null) {
@@ -744,10 +945,11 @@ public class SelectQuery {
       SelectQuery res = new SelectQuery(dataSourceName, multiRow);
       res.includesPrimary = includesPrimary;
       res.propNames = propNames;
-      for (SelectTableDesc ftd:fetchTables) {
+      if (refProps != null)
+         res.refProps = new ArrayList<DBPropertyDescriptor>(refProps);
+      for (SelectTableDesc ftd: selectTables) {
          SelectTableDesc nftd = ftd.clone();
-         res.fetchTables.add(nftd);
-         res.fetchTablesIndex.put(ftd.table.tableName, ftd);
+         res.selectTables.add(nftd);
       }
       return res;
    }
@@ -755,7 +957,7 @@ public class SelectQuery {
    public void appendWhereColumn(String tableName, String colName) {
       initWhereQuery();
       numWhereColumns++;
-      if (fetchTables.size() > 1) {
+      if (selectTables.size() > 1) {
          whereAppendIdent(tableName);
          DBUtil.append(whereSB, null, ".");
       }
@@ -765,7 +967,7 @@ public class SelectQuery {
    public void appendJSONWhereColumn(String tableName, String colName, String propPath) {
       initWhereQuery();
       numWhereColumns++;
-      if (fetchTables.size() > 1) {
+      if (selectTables.size() > 1) {
          whereAppendIdent(tableName);
          DBUtil.append(whereSB, null, ".");
       }
@@ -778,7 +980,7 @@ public class SelectQuery {
 
    public void appendJSONLogWhereColumn(StringBuilder logSB, String tableName, String colName, String propPath) {
       initWhereQuery();
-      if (fetchTables.size() > 1) {
+      if (selectTables.size() > 1) {
          DBUtil.appendIdent(logSB, null, tableName);
          DBUtil.append(logSB, null, ".");
       }
@@ -793,7 +995,7 @@ public class SelectQuery {
       initWhereQuery();
       if (logSB == null)
          return;
-      if (fetchTables.size() > 1) {
+      if (selectTables.size() > 1) {
          DBUtil.appendIdent(logSB, null, tableName);
          logSB.append(".");
       }
@@ -827,14 +1029,14 @@ public class SelectQuery {
             orderBySB.append(", ");
          DBPropertyDescriptor prop = props.get(i);
          Boolean dir = orderByDirs.get(i);
-         orderBySB.append(prop.getColTypeDesc());
+         orderBySB.append(prop.getRefColTypeDesc());
          if (!dir)
             orderBySB.append(" DESC");
       }
    }
 
    public void insertIdProperty() {
-      SelectTableDesc mainTableFetch = fetchTables.get(0);
+      SelectTableDesc mainTableFetch = selectTables.get(0);
       TableDescriptor mainTable = mainTableFetch.table;
       List<DBPropertyDescriptor> fetchProps = mainTableFetch.props;
       List<IdPropertyDescriptor> idCols = mainTable.getIdColumns();

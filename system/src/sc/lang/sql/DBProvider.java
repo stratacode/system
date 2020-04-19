@@ -35,6 +35,7 @@ public class DBProvider {
          String propName = ModelUtil.getPropertyName(propObj);
          if (typeDesc != null) {
             typeDesc.init();
+            typeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
             return typeDesc.getPropertyDescriptor(propName);
          }
       }
@@ -668,7 +669,14 @@ public class DBProvider {
                boolean isArrayProperty = ModelUtil.isAssignableFrom(List.class, propType);
                if (isArrayProperty) {
                   if (ModelUtil.hasTypeParameters(propType)) {
-                     propType = ModelUtil.getTypeParameter(propType, 0);
+                     Object componentType = ModelUtil.getTypeParameter(propType, 0);
+                     if (!DBUtil.isDefaultJSONComponentType(componentType)) {
+                        propType = componentType;
+                     }
+                     else {
+                        propColumnType = "jsonb";
+                        isArrayProperty = false;
+                     }
                   }
                   else
                      propType = Object.class;

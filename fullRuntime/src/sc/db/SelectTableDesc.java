@@ -20,17 +20,36 @@ class SelectTableDesc {
    // Only set if this table corresponds to a reference property of the parent type
    DBPropertyDescriptor refProp;
 
+   /** The table or refProperty that joinsTo this table */
+   SelectTableDesc joinedFrom;
+
+   /** The list of tables or refProperties from this part of the query that are joined for this value (i.e. eagerly fetched 1-1 relationships) */
+   List<SelectTableDesc> joinedTo;
+
+   // Only set if this table is used more than once
+   String alias;
+
    SelectTableDesc copyForRef(DBPropertyDescriptor refProp) {
       SelectTableDesc res = new SelectTableDesc();
       res.table = table;
-      res.props = new ArrayList<DBPropertyDescriptor>(props);
+      // Always put the id and typeId property for references in the select list for references even if they are not there for
+      // the normal 'fetch property' query when you have the id already
+      DBTypeDescriptor refType = refProp.dbTypeDesc;
+      /*
+      res.props = new ArrayList<DBPropertyDescriptor>(table.idColumns);
+      DBPropertyDescriptor typeIdProp = table.dbTypeDesc.getTypeIdProperty();
+      if (typeIdProp != null)
+         res.props.add(typeIdProp);
+      */
+      res.props = new ArrayList<DBPropertyDescriptor>();
+      res.props.addAll(props);
       res.refProp = refProp;
       return res;
    }
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(table == null ? "<null-fetch-table>" : table.tableName);
+      sb.append(table == null ? "<null-fetch-table>" : alias == null ? table.tableName : alias);
       if (props != null) {
          sb.append(" (");
          for (int i = 0; i < props.size(); i++) {
@@ -59,12 +78,33 @@ class SelectTableDesc {
       return res;
    }
 
+   public String getTableAlias() {
+      if (alias != null)
+         return alias;
+      return table.tableName;
+   }
+
+   public String getTableDecl() {
+      if (alias == null)
+         return table.tableName;
+      return table.tableName + " " + alias;
+   }
+
    public boolean containsProperty(DBPropertyDescriptor pdesc) {
       if (props.contains(pdesc))
          return true;
       if (revProps != null && revProps.contains(pdesc))
          return true;
       if (refProp != null && refProp.equals(pdesc))
+         return true;
+      return false;
+   }
+
+   // TODO: For this property reference, are we eagerly fetching the referenced value? Right now, this only happens
+   // from the main select query - we don't also eagerly fetch references from a reference (though theoretically we could
+   // fetch some fixed small-number of levels of a graph)
+   public boolean hasJoinTableForRef(DBPropertyDescriptor refPropDesc) {
+      if (joinedFrom == null)
          return true;
       return false;
    }

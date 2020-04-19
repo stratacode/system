@@ -60,6 +60,8 @@ public class DBTypeDescriptor {
       if (res != null) {
          if (start && !res.started)
             res.start();
+         if (start && !res.activated)
+            res.activate();
          return res;
       }
       Object superType = DynUtil.getExtendsType(type);
@@ -81,9 +83,10 @@ public class DBTypeDescriptor {
          }
       }
       if (res != null) {
-         if (start && !res.started) {
+         if (start && !res.started)
             res.start();
-         }
+         if (start && !res.activated)
+            res.activate();
       }
       return res;
    }
@@ -124,7 +127,7 @@ public class DBTypeDescriptor {
 
    public ConcurrentHashMap<Object,IDBObject> typeInstances = null;
 
-   private boolean initialized = false, started = false;
+   private boolean initialized = false, resolved = false, started = false, activated = false;
 
    public boolean tablesInitialized = false;
 
@@ -139,7 +142,7 @@ public class DBTypeDescriptor {
 
    public Map<Integer,DBTypeDescriptor> subTypesById = null;
    public int typeId = -1;
-   private DBPropertyDescriptor typeIdProperty = null;
+   DBPropertyDescriptor typeIdProperty = null;
 
    public DBTypeDescriptor findSubType(String subTypeName) {
       // During code-processing time, this is not set yet
@@ -279,25 +282,21 @@ public class DBTypeDescriptor {
                allDBProps.addAll(mtd.columns);
          }
       }
-      /** Initialize the property descriptor's backpointer to its owner type */
-      for (DBPropertyDescriptor prop:allDBProps) {
-         if (runtimeMode && prop.ownerTypeName != null && !prop.ownerTypeName.equals(getTypeName())) {
-            prop.dbTypeDesc = DBTypeDescriptor.getByName(prop.ownerTypeName, false);
-         }
-         else
-            prop.dbTypeDesc = this;
-      }
    }
 
    void addMultiTable(TableDescriptor table) {
       if (multiTables == null)
          multiTables = new ArrayList<TableDescriptor>();
+      else if (!(multiTables instanceof ArrayList))
+         multiTables = new ArrayList<TableDescriptor>(multiTables);
       multiTables.add(table);
    }
 
    void addAuxTable(TableDescriptor table) {
       if (auxTables == null)
          auxTables = new ArrayList<TableDescriptor>();
+      else if (!(auxTables instanceof ArrayList))
+         auxTables = new ArrayList<TableDescriptor>(auxTables);
       auxTables.add(table);
    }
 
@@ -319,9 +318,18 @@ public class DBTypeDescriptor {
    }
 
    void initFetchGroups() {
+      if (!runtimeMode)
+         return;
       if (defaultFetchGroup != null)
          return;
-      defaultFetchGroup = primaryTable.getJavaName();
+      defaultFetchGroup = getPrimaryTable().getJavaName();
+
+      if (baseType != null) {
+         baseType.initFetchGroups();
+         // Start out with a complete copy of the queries
+         copyQueriesFrom(baseType);
+      }
+
       String firstFetchGroup = null;
       // Build up the set of 'fetchGroups' - the queries to fetch properties for a given item
       for (DBPropertyDescriptor prop:allDBProps) {
@@ -369,11 +377,12 @@ public class DBTypeDescriptor {
          return false;
       DBFetchGroupQuery query = fetchGroups.get(fetchGroup);
       if (query == null) {
-         query = new DBFetchGroupQuery(this, null);
+         query = new DBFetchGroupQuery(this, null, fetchGroup);
+         query.fetchGroup = fetchGroup;
          fetchGroups.put(fetchGroup, query);
          addFetchQuery(query);
       }
-      query.addProperty(prop, false);
+      query.addProperty(null, prop, false);
       propQueriesIndex.put(prop.propertyName, query);
       return true;
    }
@@ -425,8 +434,9 @@ public class DBTypeDescriptor {
       TableDescriptor newTable = new TableDescriptor(tableName);
       newTable.multiRow = true;
       newTable.addColumnProperty(mvProp);
-      multiTables.add(newTable);
-      return null;
+      newTable.dbTypeDesc = this;
+      addMultiTable(newTable);
+      return newTable;
    }
 
    // Data structures for queries that fetch property values. We can look up the query for a given property,
@@ -435,6 +445,25 @@ public class DBTypeDescriptor {
    Map<String, DBFetchGroupQuery> propQueriesIndex = new HashMap<String, DBFetchGroupQuery>();
    Map<String,DBQuery> fetchQueriesIndex = new HashMap<String,DBQuery>();
    ArrayList<DBQuery> fetchQueriesList = new ArrayList<DBQuery>();
+
+   public void copyQueriesFrom(DBTypeDescriptor fromType) {
+      for (DBQuery fromQuery:fromType.fetchQueriesList) {
+         DBQuery toQuery = fromQuery.clone();
+         toQuery.dbTypeDesc = this;
+         fetchQueriesList.add(toQuery);
+         fetchQueriesIndex.put(toQuery.queryName, toQuery);
+         if (toQuery instanceof DBFetchGroupQuery) {
+            DBFetchGroupQuery toGroupQuery = (DBFetchGroupQuery) toQuery;
+            fetchGroups.put(toGroupQuery.fetchGroup, toGroupQuery);
+         }
+      }
+      for (String baseProp:fromType.propQueriesIndex.keySet()) {
+         DBQuery fromQuery = fromType.propQueriesIndex.get(baseProp);
+         DBQuery toQuery = fetchQueriesIndex.get(fromQuery.queryName);
+         if (toQuery instanceof DBFetchGroupQuery)
+            propQueriesIndex.put(baseProp, (DBFetchGroupQuery) toQuery);
+      }
+   }
 
    public DBFetchGroupQuery getDefaultFetchQuery() {
       return fetchGroups.get(defaultFetchGroup);
@@ -471,6 +500,9 @@ public class DBTypeDescriptor {
          if (curType.primaryTable != null) {
             res = curType.primaryTable.getPropertyDescriptor(propName);
          }
+         if (res == null && curType.baseType != null) {
+            res = curType.baseType.getPropertyDescriptor(propName);
+         }
          if (res == null && curType.auxTables != null) {
             for (TableDescriptor tableDesc:curType.auxTables) {
                res = tableDesc.getPropertyDescriptor(propName);
@@ -479,6 +511,8 @@ public class DBTypeDescriptor {
          if (res == null && curType.multiTables != null) {
             for (TableDescriptor tableDesc:curType.multiTables) {
                res = tableDesc.getPropertyDescriptor(propName);
+               if (res != null)
+                  break;
             }
          }
          if (res == null) {
@@ -693,20 +727,6 @@ public class DBTypeDescriptor {
       if (baseType != null)
          baseType.init();
 
-      for (DBPropertyDescriptor prop:allDBProps) {
-         prop.resolve();
-      }
-      if (multiTables != null) {
-         for (TableDescriptor multiTable:multiTables) {
-            DBPropertyDescriptor revProp = multiTable.reverseProperty;
-            if (multiTable.reverseProperty != null) {
-
-               for (DBPropertyDescriptor revPropCol:multiTable.columns) {
-                  revPropCol.dbTypeDesc = revProp.refDBTypeDesc;
-               }
-            }
-         }
-      }
       if (queries != null) {
          for (BaseQueryDescriptor fbDesc: queries)
             if (!fbDesc.typesInited())
@@ -714,12 +734,47 @@ public class DBTypeDescriptor {
       }
    }
 
+   public void resolve() {
+      if (resolved)
+         return;
+      if (!initialized)
+         init();
+      resolved = true;
+      if (baseType != null)
+         baseType.resolve();
+
+      /* Resolve the property descriptor's owner type and reference types, reverse properties now that all types have been initialized */
+      for (DBPropertyDescriptor prop:allDBProps) {
+         if (runtimeMode && prop.ownerTypeName != null && !prop.ownerTypeName.equals(getTypeName())) {
+            prop.dbTypeDesc = DBTypeDescriptor.getByName(prop.ownerTypeName, false);
+         }
+         else
+            prop.dbTypeDesc = this;
+         prop.resolve();
+      }
+   }
+
    public void start() {
       if (started)
          return;
+      if (!resolved)
+         resolve();
       started = true;
       if (baseType != null)
          baseType.start();
+
+      if (multiTables != null) {
+         for (TableDescriptor multiTable:multiTables) {
+            DBPropertyDescriptor revProp = multiTable.reverseProperty;
+            if (multiTable.reverseProperty != null) {
+
+               for (DBPropertyDescriptor revPropCol:multiTable.columns) {
+                  if (revPropCol.dbTypeDesc == null)
+                     revPropCol.dbTypeDesc = revProp.refDBTypeDesc;
+               }
+            }
+         }
+      }
 
       if (dataSource == null) {
          dataSource = DataSourceManager.getDBDataSource(dataSourceName);
@@ -741,6 +796,16 @@ public class DBTypeDescriptor {
       initFetchGroups();
    }
 
+   public void activate() {
+      if (activated)
+         return;
+      activated = true;
+      if (baseType != null)
+         baseType.activate();
+      for (DBQuery query:fetchQueriesList)
+         query.activate();
+   }
+
    public void addReverseProperty(DBPropertyDescriptor reverseProp) {
       if (reverseProps == null)
          reverseProps = new ArrayList<DBPropertyDescriptor>();
@@ -748,6 +813,8 @@ public class DBTypeDescriptor {
    }
 
    public void initDBObject(DBObject obj) {
+      if (baseType != null)
+         baseType.initDBObject(obj);
       // These are properties in this type that have bi-directional relationships to properties in other types
       // We need to listen to change in this object on these properties in order to keep those other properties in sync
       // with those changes.
@@ -763,9 +830,9 @@ public class DBTypeDescriptor {
    }
 
    private DBFetchGroupQuery initQuery(DBObject proto, String fetchGroup, List<String> props, boolean multiRow) {
-      DBFetchGroupQuery groupQuery =  new DBFetchGroupQuery(this, props);
       if (fetchGroup == null)
          fetchGroup = defaultFetchGroup;
+      DBFetchGroupQuery groupQuery =  new DBFetchGroupQuery(this, props, fetchGroup);
       // Add the tables to fetch all of the properties requested in this query - the 'fetchGroup' but turn it into a 'multiRow' query
       groupQuery.addFetchGroup(fetchGroup, multiRow);
       // Because this is a query, need to be sure we fetch the id property first in the main query
@@ -1116,7 +1183,11 @@ public class DBTypeDescriptor {
    private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath) {
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
-         SelectQuery newQuery = groupQuery.addProperty(dbProp, true);
+         DBPropertyDescriptor parentProp = null;
+         String parentPropName = CTypeUtil.getPackageName(propNamePath);
+         if (parentPropName != null)
+            parentProp = curTypeDesc.getPropertyDescriptor(parentPropName);
+         SelectQuery newQuery = groupQuery.addProperty(parentProp, dbProp, true);
          if (newQuery != groupQuery.curQuery) {
             if (groupQuery.curQuery != null) {
                throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1132,7 +1203,7 @@ public class DBTypeDescriptor {
             String propName = propNames[i];
             DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(propName);
             if (pathProp != null) {
-               SelectQuery newQuery = groupQuery.addProperty(pathProp, true);
+               SelectQuery newQuery = groupQuery.addProperty(null, pathProp, true);
                if (newQuery != groupQuery.curQuery) {
                   if (groupQuery.curQuery != null) {
                      throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1204,6 +1275,7 @@ public class DBTypeDescriptor {
          int numInChain = varBind.getNumInChain();
          DBTypeDescriptor curTypeDesc = startTypeDesc;
          DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
+         DBPropertyDescriptor lastPropDesc = null;
          // Does this a.b.c map to a column for the entire path including 'c'?  If so, add joins for each of the intermediate
          // property tables
          if (queryProp != null) {
@@ -1212,7 +1284,7 @@ public class DBTypeDescriptor {
                if (chainProp instanceof String || chainProp instanceof IBeanMapper) {
                   String nextPropName = getPathPropertyName(varBind, i);
                   DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(nextPropName);
-                  SelectQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
+                  SelectQuery newQuery = groupQuery.addProperty(lastPropDesc, nextPropDesc, true);
                   if (newQuery != groupQuery.curQuery) {
                      if (groupQuery.curQuery != null) {
                         throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1221,6 +1293,7 @@ public class DBTypeDescriptor {
                         groupQuery.curQuery = newQuery;
                      }
                   }
+                  lastPropDesc = nextPropDesc;
                   curTypeDesc = nextPropDesc.refDBTypeDesc;
                }
                else if (chainProp instanceof IBinding) {
@@ -1244,6 +1317,7 @@ public class DBTypeDescriptor {
                }
             }
             else {
+               DBPropertyDescriptor lastProp = null;
                for (int i = 0; i < numInChain; i++) {
                   Object chainProp = varBind.getChainElement(i);
                   if (chainProp instanceof IBeanMapper) {
@@ -1251,7 +1325,7 @@ public class DBTypeDescriptor {
                      String propName = nextProp.getPropertyName();
                      DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(propName);
                      if (nextPropDesc != null && nextPropDesc.getDBColumnType() == DBColumnType.Json) {
-                        SelectQuery newQuery = groupQuery.addProperty(nextPropDesc, true);
+                        SelectQuery newQuery = groupQuery.addProperty(lastProp, nextPropDesc, true);
                         if (newQuery != groupQuery.curQuery) {
                            if (groupQuery.curQuery != null) {
                               throw new UnsupportedOperationException("Add code to do join for different data sources here!");
@@ -1262,6 +1336,7 @@ public class DBTypeDescriptor {
                         }
                         return; // No more tables in this expression
                      }
+                     lastPropDesc = nextPropDesc;
                   }
                   else if (chainProp instanceof IBinding)
                      appendBindingTables(groupQuery, curTypeDesc, curObj, (IBinding) chainProp);

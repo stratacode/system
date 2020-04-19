@@ -16,6 +16,7 @@ import java.sql.Statement;
 import java.sql.ResultSet;
 import java.sql.Types;
 
+import sc.type.Type;
 import sc.util.IMessageHandler;
 import sc.util.JSON;
 import sc.util.MessageHandler;
@@ -197,15 +198,13 @@ public class DBUtil {
    }
 
    public static Object getResultSetByIndex(ResultSet rs, int index, DBPropertyDescriptor dbProp) throws SQLException {
-      IBeanMapper mapper = dbProp.getPropertyMapper();
-      Object propertyType = mapper.getPropertyType();
+      Object propertyType = dbProp.getPropertyType();
       DBColumnType colType = dbProp.getDBColumnType();
       return getResultSetByIndex(rs, index, propertyType, colType, dbProp.refDBTypeDesc);
    }
 
    public static Object getResultSetByName(ResultSet rs, String colName, DBPropertyDescriptor dbProp) throws SQLException {
-      IBeanMapper mapper = dbProp.getPropertyMapper();
-      Object propertyType = mapper.getPropertyType();
+      Object propertyType = dbProp.getPropertyType();
       DBColumnType colType = dbProp.getDBColumnType();
       return getResultSetByName(rs, colName, propertyType, colType, dbProp.refDBTypeDesc);
    }
@@ -298,9 +297,13 @@ public class DBUtil {
                return null;
             return sres;
          case Long:
-            Long lres = rs.getLong(index);
-            if (rs.wasNull())
+            Object lres = rs.getObject(index);
+            if (lres == null || rs.wasNull())
                return null;
+            if (lres instanceof Long)
+               return lres;
+            else
+               System.err.println("*** Unrecognized result type for long property");
             return lres;
          case Boolean:
             Boolean bres = rs.getBoolean(index);
@@ -491,4 +494,18 @@ public class DBUtil {
       return "Object";
    }
 
+   public static boolean isDefaultJSONComponentType(Object componentType) {
+      if (componentType instanceof Class) {
+         Type type = Type.get((Class)componentType);
+         return type != Type.Object;
+      }
+      return false;
+   }
+
+   public static boolean canCast(DBColumnType fromType, DBColumnType toType) {
+      if (fromType == toType)
+         return true;
+      // TODO: others we should add here?
+      return false;
+   }
 }

@@ -661,7 +661,6 @@ public class DBObject implements IDBObject {
             idProp.getPropertyMapper().setPropertyValue(getInst(), id.vals[i]);
          }
       }
-
    }
 
    public void stop() {

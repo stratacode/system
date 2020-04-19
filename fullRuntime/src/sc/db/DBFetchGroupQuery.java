@@ -3,18 +3,24 @@ package sc.db;
 import java.util.ArrayList;
 import java.util.List;
 
+// TODO: rename DBSelectGroupQuery, fetchGroup to selectGroup
 public class DBFetchGroupQuery extends DBQuery {
-   DBTypeDescriptor dbTypeDesc;
    List<SelectQuery> queries = new ArrayList<SelectQuery>();
    List<String> propNames;
    List<String> orderByProps;
    int startIx, maxResults;
 
+   // Used when building the FetchGroupQuery - to point to the current SelectQuery
    SelectQuery curQuery;
 
-   public DBFetchGroupQuery(DBTypeDescriptor dbTypeDesc, List<String> propNames) {
+   String fetchGroup;
+
+   private boolean activated;
+
+   public DBFetchGroupQuery(DBTypeDescriptor dbTypeDesc, List<String> propNames, String fetchGroup) {
       this.dbTypeDesc = dbTypeDesc;
       this.propNames = propNames;
+      this.fetchGroup = fetchGroup;
    }
 
    public void addFetchGroup(String fetchGroup, boolean multiRow) {
@@ -29,12 +35,12 @@ public class DBFetchGroupQuery extends DBQuery {
       }
    }
 
-   public SelectQuery addProperty(DBPropertyDescriptor prop, boolean multiRowFetch) {
+   public SelectQuery addProperty(DBPropertyDescriptor curRefProp, DBPropertyDescriptor prop, boolean multiRowFetch) {
       TableDescriptor table = prop.getTable();
       String dataSourceName = table.getDataSourceName();
 
       SelectQuery query = getSelectQuery(dataSourceName, multiRowFetch || prop.multiRow);
-      query.addProperty(table, prop);
+      query.addProperty(curRefProp, prop);
       return query;
    }
 
@@ -67,7 +73,7 @@ public class DBFetchGroupQuery extends DBQuery {
    }
 
    public DBFetchGroupQuery clone() {
-      DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc, propNames);
+      DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc, propNames, fetchGroup);
       res.queryNumber = queryNumber;
       res.queryName = queryName;
       for (SelectQuery ftq:queries)
@@ -131,6 +137,16 @@ public class DBFetchGroupQuery extends DBQuery {
       if (queries != null) {
          for (SelectQuery query:queries)
             query.maxResults = max;
+      }
+   }
+
+   public void activate() {
+      if (activated)
+         return;
+      activated = true;
+      if (queries != null) {
+         for (SelectQuery query:queries)
+            query.activate();
       }
    }
 }

@@ -1,5 +1,6 @@
 package sc.lang.sql;
 
+import sc.db.DBColumnType;
 import sc.db.DBTypeDescriptor;
 import sc.lang.SQLLanguage;
 import sc.lang.SemanticNode;
@@ -146,5 +147,9 @@ public class SQLDataType extends SQLParamType {
          default:
             return "<missing-name-for-type:" + colType + ">";
       }
+   }
+
+   public DBColumnType getDBColumnType() {
+      return DBColumnType.fromColumnType(getIdentifier());
    }
 }

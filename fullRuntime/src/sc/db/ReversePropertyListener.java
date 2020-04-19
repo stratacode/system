@@ -170,13 +170,20 @@ class ReversePropertyListener extends AbstractListener {
             if (newVal != null) {
                int ix = newList.indexOf(inst);
                if (ix == -1) {
-                  newList.add(newVal);
+                  newList.add(inst);
                   numUpdated++;
                }
             }
 
-            if (listNeedsSet && newList.size() > 0)
+            if (listNeedsSet && newList.size() > 0) {
+               // Update the cached value in the reverse direction so that the sendEvent does not
+               // try to apply this change again for this listener.
+               ReversePropertyListener oListener = getReverseListener(newVal, omapper);
+               if (oListener != null)
+                  oListener.lastValue = newList;
+
                omapper.setPropertyValue(newVal, newList);
+            }
          }
          else {
             relationType = "one-to-one";
