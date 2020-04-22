@@ -2,7 +2,7 @@ package sc.db;
 
 import java.util.List;
 
-abstract class DBQuery implements Cloneable {
+abstract class DBQuery {
    DBTypeDescriptor dbTypeDesc;
    int queryNumber;
    String queryName;
@@ -21,16 +21,7 @@ abstract class DBQuery implements Cloneable {
    List<Object> argTypes;
     */
 
-   public DBQuery clone() {
-      try {
-         Object res = super.clone();
-         return (DBQuery) res;
-      }
-      catch (CloneNotSupportedException exc) {
-         System.err.println("*** Failed to clone query: " + exc);
-      }
-      return null;
-   }
+   public abstract DBQuery cloneForSubType(DBTypeDescriptor subType);
 
    public void activate() {}
 }

@@ -334,10 +334,9 @@ public class DBPropertyDescriptor {
          if (refColTypeDesc != null) {
             if (eagerJoinForTypeId(selectTable)) {
                DBPropertyDescriptor typeIdProperty = refColTypeDesc.getTypeIdProperty();
-               Object res = DBUtil.getResultSetByIndex(rs, rix+1, typeIdProperty);
-               if (res == null)
-                  return null;
-               typeId = (int) res;
+               Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix+1, typeIdProperty);
+               if (typeIdRes != null)
+                  typeId = (int) typeIdRes;
             }
             if (val != null)
                val = refColTypeDesc.lookupInstById(val, typeId, true, false);
@@ -362,7 +361,9 @@ public class DBPropertyDescriptor {
             if (eagerJoinForTypeId(selectTable)) {
                DBPropertyDescriptor typeIdProperty = refColTypeDesc.getTypeIdProperty();
                if (typeIdProperty != null) {
-                  typeId = (int) DBUtil.getResultSetByIndex(rs, rix, typeIdProperty);
+                  Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix, typeIdProperty);
+                  if (typeIdRes != null)
+                     typeId = (int) typeIdRes;
                }
             }
             if (!nullId)

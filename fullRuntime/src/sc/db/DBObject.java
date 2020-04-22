@@ -667,7 +667,7 @@ public class DBObject implements IDBObject {
       if (isTransient())
          return;
       if (!dbTypeDesc.removeInstance(this, false))
-         DBUtil.error("Stopping instance not found in index!");
+         DBUtil.error("DBObject.stop: instance not found: " + this);
    }
 
    public String getStateString() {

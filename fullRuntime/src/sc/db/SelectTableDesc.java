@@ -44,12 +44,16 @@ class SelectTableDesc {
       res.props = new ArrayList<DBPropertyDescriptor>();
       res.props.addAll(props);
       res.refProp = refProp;
+      res.alias = alias;
+      res.joinedFrom = joinedFrom;
+      if (joinedTo != null)
+         res.joinedTo = new ArrayList<SelectTableDesc>(joinedTo);
       return res;
    }
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(table == null ? "<null-fetch-table>" : alias == null ? table.tableName : alias);
+      sb.append(table == null ? "<null-fetch-table>" : alias == null ? table.tableName : table.tableName + " AS " + alias);
       if (props != null) {
          sb.append(" (");
          for (int i = 0; i < props.size(); i++) {
@@ -75,6 +79,10 @@ class SelectTableDesc {
       if (res.revColumns != null)
          res.revColumns = new ArrayList<DBPropertyDescriptor>(revColumns);
       res.refProp = refProp;
+      res.alias = alias;
+      res.joinedFrom = joinedFrom;
+      if (joinedTo != null)
+         res.joinedTo = new ArrayList<SelectTableDesc>(joinedTo);
       return res;
    }
 

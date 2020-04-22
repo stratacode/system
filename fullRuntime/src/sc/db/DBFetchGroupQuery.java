@@ -28,7 +28,7 @@ public class DBFetchGroupQuery extends DBQuery {
       if (fgQuery == null)
          throw new IllegalArgumentException("No fetch group query: " + fetchGroup + " for type: " + dbTypeDesc);
       for (SelectQuery ftq:fgQuery.queries) {
-         SelectQuery newFtq = ftq.clone();
+         SelectQuery newFtq = ftq.cloneForSubType(null);
          newFtq.multiRow = multiRow;
          newFtq.propNames = propNames;
          queries.add(newFtq);
@@ -48,7 +48,7 @@ public class DBFetchGroupQuery extends DBQuery {
       for (SelectQuery query:queries)
          if (query.dataSourceName.equals(dataSourceName) && query.multiRow == multiRow)
             return query;
-      SelectQuery ftq = new SelectQuery(dataSourceName, multiRow);
+      SelectQuery ftq = new SelectQuery(dataSourceName, dbTypeDesc, multiRow);
       ftq.propNames = propNames;
       queries.add(ftq);
       return ftq;
@@ -72,12 +72,12 @@ public class DBFetchGroupQuery extends DBQuery {
       return res;
    }
 
-   public DBFetchGroupQuery clone() {
+   public DBFetchGroupQuery cloneForSubType(DBTypeDescriptor subType) {
       DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc, propNames, fetchGroup);
       res.queryNumber = queryNumber;
       res.queryName = queryName;
       for (SelectQuery ftq:queries)
-         res.queries.add(ftq.clone());
+         res.queries.add(ftq.cloneForSubType(subType));
       return res;
    }
 
@@ -88,6 +88,8 @@ public class DBFetchGroupQuery extends DBQuery {
       // to remove it from the list.
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");
+      if (curQuery == null)
+         curQuery = queries.get(0);
       return curQuery.matchQuery(transaction, proto);
    }
 
@@ -114,7 +116,7 @@ public class DBFetchGroupQuery extends DBQuery {
          if (propDesc.multiRow)
             throw new IllegalArgumentException("Multi valued property: " + orderByProp + " used in orderBy: " + dbTypeDesc);
          String dataSourceName = propDesc.getDataSourceForProp();
-         SelectQuery query = getSelectQuery(dataSourceName, false);
+         SelectQuery query = getSelectQuery(dataSourceName, true);
          if (query.orderByProps == null) {
             query.orderByProps = new ArrayList<DBPropertyDescriptor>(orderByProps.size());
             query.orderByDirs = new ArrayList<Boolean>(orderByProps.size());

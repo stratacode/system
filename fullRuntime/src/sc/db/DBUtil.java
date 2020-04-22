@@ -173,8 +173,9 @@ public class DBUtil {
             break;
          case Date:
             java.util.Date update = (java.util.Date) val;
-            java.sql.Date sqlDate = update instanceof java.sql.Date ? (java.sql.Date) update : new java.sql.Date(update.getTime());
-            st.setDate(index, sqlDate);
+            //java.sql.Date sqlDate = update instanceof java.sql.Date ? (java.sql.Date) update : new java.sql.Date(update.getTime());
+            java.sql.Timestamp ts = update instanceof java.sql.Timestamp ? (java.sql.Timestamp) update : new java.sql.Timestamp(update.getTime());
+            st.setTimestamp(index, ts);
             break;
          case Reference:
             throw new IllegalArgumentException("type should be the id column type");
