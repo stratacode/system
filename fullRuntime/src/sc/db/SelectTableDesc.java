@@ -5,14 +5,14 @@ import java.util.List;
 
 /**
  * A given database SelectQuery is composed of one SelectTableDesc for each table in the query. The SelectTableDesc stores
- * info about the properties/columns to fetch from this table. If the table is an association table, it stores the reference property
- * being fetched.
+ * info about the properties/columns to select from this table. If the table is an association table, it stores the reference property
+ * being selected.
  */
 class SelectTableDesc {
    TableDescriptor table;
    List<DBPropertyDescriptor> props;
 
-   /** List of columns fetched with the columns in this table but that refer to reverse relationships to the current type */
+   /** List of columns selected with the columns in this table but that refer to reverse relationships to the current type */
    List<DBPropertyDescriptor> revColumns;
    /** For each revColumn, the property reference in the parent object that points to that column value */
    List<DBPropertyDescriptor> revProps;
@@ -23,7 +23,7 @@ class SelectTableDesc {
    /** The table or refProperty that joinsTo this table */
    SelectTableDesc joinedFrom;
 
-   /** The list of tables or refProperties from this part of the query that are joined for this value (i.e. eagerly fetched 1-1 relationships) */
+   /** The list of tables or refProperties from this part of the query that are joined for this value (i.e. eagerly selected 1-1 relationships) */
    List<SelectTableDesc> joinedTo;
 
    // Only set if this table is used more than once
@@ -33,7 +33,7 @@ class SelectTableDesc {
       SelectTableDesc res = new SelectTableDesc();
       res.table = table;
       // Always put the id and typeId property for references in the select list for references even if they are not there for
-      // the normal 'fetch property' query when you have the id already
+      // the normal 'select property' query when you have the id already
       DBTypeDescriptor refType = refProp.dbTypeDesc;
       /*
       res.props = new ArrayList<DBPropertyDescriptor>(table.idColumns);
@@ -53,7 +53,7 @@ class SelectTableDesc {
 
    public String toString() {
       StringBuilder sb = new StringBuilder();
-      sb.append(table == null ? "<null-fetch-table>" : alias == null ? table.tableName : table.tableName + " AS " + alias);
+      sb.append(table == null ? "<null-select-table>" : alias == null ? table.tableName : table.tableName + " AS " + alias);
       if (props != null) {
          sb.append(" (");
          for (int i = 0; i < props.size(); i++) {
@@ -108,9 +108,9 @@ class SelectTableDesc {
       return false;
    }
 
-   // TODO: For this property reference, are we eagerly fetching the referenced value? Right now, this only happens
-   // from the main select query - we don't also eagerly fetch references from a reference (though theoretically we could
-   // fetch some fixed small-number of levels of a graph)
+   // TODO: For this property reference, are we eagerly selecting the referenced value? Right now, this only happens
+   // from the main select query - we don't also eagerly select references from a reference (though theoretically we could
+   // select some fixed small-number of levels of a graph)
    public boolean hasJoinTableForRef(DBPropertyDescriptor refPropDesc) {
       if (joinedFrom == null)
          return true;

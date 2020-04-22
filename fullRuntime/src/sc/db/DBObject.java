@@ -215,16 +215,16 @@ public class DBObject implements IDBObject {
       if (curTransaction.applyingDBChanges)
          return null;
 
-      DBFetchGroupQuery fetchQuery = dbTypeDesc.getFetchQueryForProperty(property);
-      if (fetchQuery == null)
+      SelectGroupQuery selectQuery = dbTypeDesc.getFetchQueryForProperty(property);
+      if (selectQuery == null)
          throw new IllegalArgumentException("Missing propQueries entry for property: " + property);
-      int lockCt = fetchQuery.queryNumber;
+      int lockCt = selectQuery.queryNumber;
       if (lockCt >= 31) // TODO: add an optional array to handle more?
          throw new IllegalArgumentException("Query limit exceeded: " + lockCt + " queries for: " + dbTypeDesc);
       // two bits for each lock - 3 states 0,1,2
       int shift = lockCt << 1;
       while (((fstate >> shift) & FETCHED) == 0) {
-         runQueryOnce(curTransaction, fetchQuery);
+         runQueryOnce(curTransaction, selectQuery);
       }
       return null;
    }
@@ -239,24 +239,24 @@ public class DBObject implements IDBObject {
       if ((flags & (REMOVED | STOPPED)) != 0)
          throw new IllegalStateException("GetDefaultProperties on: " + getStateString() + " dbObject: " + this);
 
-      DBFetchGroupQuery fetchQuery = dbTypeDesc.getDefaultFetchQuery();
-      if (fetchQuery == null)
-         throw new IllegalArgumentException("Missing default fetch query");
-      int lockCt = fetchQuery.queryNumber;
+      SelectGroupQuery selectQuery = dbTypeDesc.getDefaultFetchQuery();
+      if (selectQuery == null)
+         throw new IllegalArgumentException("Missing default select query");
+      int lockCt = selectQuery.queryNumber;
       if (lockCt >= 31) // TODO: add an optional array to handle more?
          throw new IllegalArgumentException("Query limit exceeded: " + lockCt + " queries for: " + dbTypeDesc);
       // two bits for each lock - 3 states 0,1,2
       int shift = lockCt << 1;
       DBTransaction curTransaction = DBTransaction.getOrCreate();
       while (((fstate >> shift) & FETCHED) == 0) {
-         if (!runQueryOnce(curTransaction, fetchQuery))
+         if (!runQueryOnce(curTransaction, selectQuery))
             return false;
       }
       return true;
    }
 
-   private boolean runQueryOnce(DBTransaction curTransaction, DBFetchGroupQuery fetchQuery) {
-      int shift = fetchQuery.queryNumber << 1;
+   private boolean runQueryOnce(DBTransaction curTransaction, SelectGroupQuery selectQuery) {
+      int shift = selectQuery.queryNumber << 1;
       boolean doFetch = false;
       int errorCount = 0;
       boolean res = false;
@@ -276,14 +276,14 @@ public class DBObject implements IDBObject {
       }
 
       if (doFetch) {
-         boolean fetched = false;
+         boolean selected = false;
          try {
             // TODO: do we want to flush before we query? It's possible the query results will be different for this transaction, and so the global
             // cache could show changes made in the transaction to others prematurely. One fix would be to cache queries made on modified transactions in the local
             // per-transaction cache until the transaction is committed. Then move them over to the shared cache.
             //curr.flush(); // Flush out any updates before running the query
-            if (fetchQuery.fetchProperties(curTransaction, this)) {
-               fetched = true;
+            if (selectQuery.selectProperties(curTransaction, this)) {
+               selected = true;
                res = true;
                if ((flags & PROTOTYPE) != 0)
                   flags &= ~PROTOTYPE;
@@ -302,7 +302,7 @@ public class DBObject implements IDBObject {
                throw exc;
          }
          synchronized(this) {
-            if (fetched)
+            if (selected)
                fstate = (fstate & ~(PENDING << shift)) | (FETCHED << shift);
             notify();
          }
@@ -343,12 +343,12 @@ public class DBObject implements IDBObject {
       if (curr.commitInProgress) {
          return null;
       }
-      DBFetchGroupQuery fetchQuery = dbTypeDesc.getFetchQueryForProperty(propertyName);
-      if (fetchQuery == null)
+      SelectGroupQuery selectQuery = dbTypeDesc.getFetchQueryForProperty(propertyName);
+      if (selectQuery == null)
          throw new IllegalArgumentException("Missing propQueries entry for property: " + propertyName);
-      int lockCt = fetchQuery.queryNumber;
+      int lockCt = selectQuery.queryNumber;
 
-      // For the case where we are populating a newly fetched instance, mark the property as fetched and update the field
+      // For the case where we are populating a newly selected instance, mark the property as selected and update the field
       if (curr.applyingDBChanges || (flags & PROTOTYPE) != 0) {
          synchronized (this) {
             fstate |= FETCHED << (lockCt *2);
@@ -356,7 +356,7 @@ public class DBObject implements IDBObject {
          return null;
       }
 
-      // Setting a property that has not been fetched from the DB - possibly being fetched from a query
+      // Setting a property that has not been selected from the DB - possibly being selected from a query
       if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
          return null;
 
@@ -446,21 +446,21 @@ public class DBObject implements IDBObject {
          return (flags & PROTOTYPE) == 0;
       }
 
-      long fetchState = fstate;
+      long selectState = fstate;
       fstate = 0;
       int queryNum = 0;
       DBTransaction curTransaction = DBTransaction.getOrCreate();
-      while (fetchState != 0) {
-         if ((fetchState & (FETCHED | PENDING)) != 0) {
+      while (selectState != 0) {
+         if ((selectState & (FETCHED | PENDING)) != 0) {
             DBQuery query = dbTypeDesc.getFetchQueryForNum(queryNum);
-            if (query instanceof DBFetchGroupQuery) {
-               if (!runQueryOnce(curTransaction, (DBFetchGroupQuery) query))
+            if (query instanceof SelectGroupQuery) {
+               if (!runQueryOnce(curTransaction, (SelectGroupQuery) query))
                   System.out.println("*** DBrefresh of query: " + query + " returned no rows");
             }
             else
-               System.out.println("*** DBrefresh - warning - not refreshing non fetch query");
+               System.out.println("*** DBrefresh - warning - not refreshing non select query");
          }
-         fetchState = fetchState >> 2;
+         selectState = selectState >> 2;
          queryNum++;
       }
       return flags == 0;
@@ -546,7 +546,7 @@ public class DBObject implements IDBObject {
          // else - this instance has already been registered so don't do anything
          return;
       }
-      // Mark all of the property queries in this type as fetched so we don't re-query them until the cache is invalidated
+      // Mark all of the property queries in this type as selected so we don't re-query them until the cache is invalidated
       int numFetchQueries = dbTypeDesc.getNumFetchPropQueries();
       synchronized (this) {
          setTransient(false);
@@ -684,7 +684,7 @@ public class DBObject implements IDBObject {
       return "persistent";
    }
 
-   public static PropUpdate fetch(DBObject obj, String prop) {
+   public static PropUpdate select(DBObject obj, String prop) {
       if (obj != null)
          return obj.dbFetch(prop);
       return null;

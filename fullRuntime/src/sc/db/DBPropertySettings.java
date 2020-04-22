@@ -7,7 +7,7 @@ public @interface DBPropertySettings {
    boolean unique() default false;
    boolean onDemand() default false;
    boolean indexed() default true;
-   String fetchGroup() default "";
+   String selectGroup() default "";
    String tableName() default "";
    String dataSourceName() default "";
    String reverseProperty() default "";

@@ -39,8 +39,8 @@ public @interface FindBy {
     */
    String name() default "";
 
-   /** Specifies the name of the group of properties to fetch when running the query */
-   String fetchGroup() default "";
+   /** Specifies the name of the group of properties to select when running the query */
+   String selectGroup() default "";
 
    /**
     * Specifies a comma separated list of properties to use to sort the results of this query.

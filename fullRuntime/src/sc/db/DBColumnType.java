@@ -3,7 +3,7 @@ package sc.db;
 import java.sql.Types;
 
 public enum DBColumnType {
-   Int, Long, String, Float, Double, Boolean, Json, Reference, Date;
+   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId;
 
    public static DBColumnType fromJavaType(Object propertyType) {
       if (propertyType == Integer.class || propertyType == Integer.TYPE) {
@@ -33,6 +33,7 @@ public enum DBColumnType {
          case Int:
             return Types.INTEGER;
          case Long:
+         case LongId:
             return Types.BIGINT;
          case String:
             return Types.VARCHAR;

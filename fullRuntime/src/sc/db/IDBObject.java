@@ -10,7 +10,7 @@ public interface IDBObject extends IObjectId {
    int dbUpdate();
 
    /**
-    * Used to either fetch a 'protototype instance' or refresh all previously fetched groups on a persistent instance.
+    * Used to either select a 'protototype instance' or refresh all previously selected groups on a persistent instance.
     * Returns false if the prototype instance does not exist, or the persistent instance does not exist
     */
    boolean dbRefresh();

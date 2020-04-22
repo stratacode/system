@@ -44,6 +44,9 @@ public abstract class TxOperation {
       ArrayList<String> columnNames = new ArrayList<String>();
       ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
       ArrayList<Object> columnValues = new ArrayList<Object>();
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder() : null;
+
+      ArrayList<Boolean> columnIsReference = logSB != null ? new ArrayList<Boolean>() : null;
 
       ArrayList<DBPropertyDescriptor> dbIdCols = null;
 
@@ -75,7 +78,7 @@ public abstract class TxOperation {
          throw new IllegalArgumentException("Null id properties for DBObject in insert: " + nullProps);
 
       int idSize = columnNames.size();
-      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols);
+      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols, columnIsReference);
 
       int numCols = columnNames.size();
 
@@ -95,7 +98,8 @@ public abstract class TxOperation {
       }
       sb.append(") VALUES (");
 
-      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(sb) : null;
+      if (logSB != null)
+         logSB.append(sb);
 
       for (int i = 0; i < numCols; i++) {
          if (i != 0) {
@@ -105,7 +109,7 @@ public abstract class TxOperation {
          }
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i)));
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnIsReference.get(i) ? DBColumnType.LongId : columnTypes.get(i)));
       }
 
       StringBuilder rest = new StringBuilder();
@@ -400,7 +404,7 @@ public abstract class TxOperation {
                      if (logSB != null) {
                         if (idx != 0)
                            logSB.append(", ");
-                        logSB.append(id);
+                        DBUtil.appendVal(logSB, id, DBColumnType.LongId);
                      }
                   }
                   numInserted++;
@@ -464,7 +468,7 @@ public abstract class TxOperation {
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
                                     ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
-                                    List<DBPropertyDescriptor> dbReturnCols) {
+                                    List<DBPropertyDescriptor> dbReturnCols, List<Boolean> columnIsReference) {
       Object inst = dbObject.getInst();
 
       for (DBPropertyDescriptor col:cols) {
@@ -494,6 +498,8 @@ public abstract class TxOperation {
                columnNames.add(col.columnName);
                columnTypes.add(colType);
                columnValues.add(val);
+               if (columnIsReference != null)
+                  columnIsReference.add(col.refDBTypeDesc != null);
             }
 
             if (col.dbDefault != null && col.dbDefault.length() > 0) {
@@ -506,6 +512,8 @@ public abstract class TxOperation {
                   columnNames.add(col.getColumnName(ci));
                   columnTypes.add(col.refDBTypeDesc.getIdDBColumnType(ci));
                   columnValues.add(col.refDBTypeDesc.getIdColumnValue(val, ci));
+                  if (columnIsReference != null)
+                     columnIsReference.add(Boolean.TRUE);
                }
             }
             else

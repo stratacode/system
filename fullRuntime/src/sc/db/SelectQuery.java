@@ -86,11 +86,11 @@ public class SelectQuery implements Cloneable {
 
          SelectTableDesc revTableDesc = null;
          // When the reference is not onDemand, add the primary+aux tables from the referenced type to the query for this property
-         // so that we do one query to fetch the list of instances - rather than the 1 + N queries if we did them one-by-one
+         // so that we do one query to select the list of instances - rather than the 1 + N queries if we did them one-by-one
          DBTypeDescriptor refType = prop.refDBTypeDesc;
          if (!prop.onDemand && refType != null) {
             // For the read-only side of the reverse relationship, the property's table is the primary table of the other
-            // side so add the additional properties to define the other side to the properties we fetch with this table
+            // side so add the additional properties to define the other side to the properties we select with this table
             if (prop.reversePropDesc != null && prop.readOnly) {
                TableDescriptor revTable = prop.reversePropDesc.dbTypeDesc.primaryTable;
                if (!revTable.tableName.equals(tableName)) {
@@ -107,7 +107,7 @@ public class SelectQuery implements Cloneable {
                      addTableToSelectQuery(revTableDesc, ftd);
                   }
                   else // TODO: do we add to the column set here?
-                     System.err.println("*** Table fetch table of reverse table already exists");
+                     System.err.println("*** Table select table of reverse table already exists");
                }
                else { // TODO: Is this right? Isn't this a case where we need to join in a new instance of this table against itself?
                   for (DBPropertyDescriptor revCol:revTable.columns) {
@@ -154,9 +154,9 @@ public class SelectQuery implements Cloneable {
 
       for (DBPropertyDescriptor refProp:curRefProps) {
          DBTypeDescriptor refType = refProp.refDBTypeDesc;
-         // TODO: add a way to configure how we determine what to fetch for each the relationship - e.g. just get the id/db_type_id, just get the primary table,
+         // TODO: add a way to configure how we determine what to select for each the relationship - e.g. just get the id/db_type_id, just get the primary table,
          // pull in a sub-graph some number of levels deep via a graph-style query.
-         DBFetchGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
+         SelectGroupQuery defaultRefQuery = refType.getDefaultFetchQuery();
          List<SelectTableDesc> toAddToThis = null;
          if (defaultRefQuery != null && defaultRefQuery.queries != null) {
             for (SelectQuery defQuery:defaultRefQuery.queries) {
@@ -181,7 +181,7 @@ public class SelectQuery implements Cloneable {
                            continue;
                         if (getRefQueryForProperty(nestedRefProp) == null) {
                            DBTypeDescriptor nestedRefType = nestedRefProp.refDBTypeDesc;
-                           DBFetchGroupQuery nestedRefGroupQuery = nestedRefType.getDefaultFetchQuery();
+                           SelectGroupQuery nestedRefGroupQuery = nestedRefType.getDefaultFetchQuery();
                            for (SelectQuery nestedQuery:nestedRefGroupQuery.queries) {
                               for (SelectTableDesc nestedDef:nestedQuery.selectTables) {
                                  SelectTableDesc refQueryFetch = nestedDef.copyForRef(nestedRefProp);
@@ -260,7 +260,7 @@ public class SelectQuery implements Cloneable {
       return false;
    }
 
-   public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {
+   public boolean selectProperties(DBTransaction transaction, DBObject dbObj) {
       TableDescriptor mainTable = selectTables.get(0).table;
       StringBuilder qsb = buildTableFetchQuery(selectTables);
       ResultSet rs = null;
@@ -281,7 +281,7 @@ public class SelectQuery implements Cloneable {
                DBColumnType colType = propDesc.getDBColumnType();
                DBUtil.setStatementValue(st, i+1, colType, colVal);
                if (logStr != null)
-                  logStr = DBUtil.replaceNextParam(logStr, colVal, colType);
+                  logStr = DBUtil.replaceNextParam(logStr, colVal, DBColumnType.LongId);
             }
 
             rs = st.executeQuery();
@@ -298,12 +298,12 @@ public class SelectQuery implements Cloneable {
                IDBObject newInst = processOneRowQueryResults(dbObj, inst, rs, logSB);
                res = newInst != null;
                if (res && newInst != inst) {
-                  DBUtil.error("fetchProperties detected type change");
-                  // TODO: do we set replacedBy here because somehow we ended up fetching a typeId that conflicts with
+                  DBUtil.error("selectProperties detected type change");
+                  // TODO: do we set replacedBy here because somehow we ended up selecting a typeId that conflicts with
                   // the concrete type of the old instance.
                }
             }
-            else // fetch a multi-valued property
+            else // select a multi-valued property
                res = processMultiResults(null, dbObj, inst, rs, logSB);
 
             if (logSB != null) {
@@ -318,7 +318,7 @@ public class SelectQuery implements Cloneable {
          if (logSB != null)
             DBUtil.error("FetchProperties for " + dbObj + " failed: " + exc + " with query: " + logSB);
          exc.printStackTrace();
-         throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
+         throw new IllegalArgumentException("*** selectProperties failed with SQL error: " + exc);
       }
       finally {
          transaction.applyingDBChanges = false;
@@ -335,7 +335,7 @@ public class SelectQuery implements Cloneable {
       StringBuilder logSB = DBUtil.verbose ? new StringBuilder(qsb) : null;
       if (whereSB != null) {
          DBUtil.append(qsb, logSB, " WHERE ");
-         DBUtil.append(qsb, logSB, whereSB);
+         qsb.append(whereSB);
       }
       if (logSB != null)
          logSB.append(this.logSB);
@@ -426,7 +426,7 @@ public class SelectQuery implements Cloneable {
          return dbTypeDesc.mergeResultLists(cacheRes, res);
       }
       catch (SQLException exc) {
-         throw new IllegalArgumentException("*** fetchProperties failed with SQL error: " + exc);
+         throw new IllegalArgumentException("*** selectProperties failed with SQL error: " + exc);
       }
       finally {
          transaction.applyingDBChanges = false;
@@ -458,8 +458,8 @@ public class SelectQuery implements Cloneable {
          // If this table is actually defined in another type, and represents a reference an instance of that type (a 1-1 relationship),
          // this row sets properties of that referenced instance. Otherwise, its a normal table setting properties on the main instance.
          DBPropertyDescriptor refProp = ftd.refProp;
-         Object fetchInst = refProp == null ? inst : refProp.getPropertyMapper().getPropertyValue(inst, false, false);
-         IDBObject fetchObj = fetchInst instanceof IDBObject ? (IDBObject) fetchInst : null;
+         Object selectInst = refProp == null ? inst : refProp.getPropertyMapper().getPropertyValue(inst, false, false);
+         IDBObject selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
          for (int pix = 0; pix < ftd.props.size(); pix++) {
             DBPropertyDescriptor propDesc = ftd.props.get(pix);
             // If the id was the previous property, we already read in the typeId as part of that. If we have an existing id we are looking
@@ -478,7 +478,7 @@ public class SelectQuery implements Cloneable {
             rix += propDesc.getNumResultSetColumns(ftd);
 
             if (!propDesc.typeIdProperty) {
-               if (fetchObj != null && propDesc.ownedByOtherType(fetchObj.getDBObject().dbTypeDesc))
+               if (selectObj != null && propDesc.ownedByOtherType(selectObj.getDBObject().dbTypeDesc))
                   continue;
                IBeanMapper propMapper = propDesc.getPropertyMapper();
                if (propMapper == null) {
@@ -486,10 +486,10 @@ public class SelectQuery implements Cloneable {
                   continue;
                }
                // A null single-valued reference - just skip it
-               if (fetchInst == null && val == null && refProp != null)
+               if (selectInst == null && val == null && refProp != null)
                   continue;
-               propDesc.updateReferenceForPropValue(fetchInst, val);
-               propMapper.setPropertyValue(fetchInst, val);
+               propDesc.updateReferenceForPropValue(selectInst, val);
+               propMapper.setPropertyValue(selectInst, val);
             }
             else {
                if (val == null)
@@ -503,25 +503,25 @@ public class SelectQuery implements Cloneable {
                else if (refProp == null) {
                   if (newType != dbObj.dbTypeDesc) {
                      IDBObject newInst = dbObj.dbTypeDesc.createInstance();
-                     newInst.getDBObject().setDBId(((IDBObject) fetchInst).getDBId());
-                     fetchInst = newInst;
-                     fetchObj = fetchInst instanceof IDBObject ? (IDBObject) fetchInst : null;
+                     newInst.getDBObject().setDBId(((IDBObject) selectInst).getDBId());
+                     selectInst = newInst;
+                     selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
                   }
                }
                else {
                   if (newType != refProp.refDBTypeDesc) {
                      System.out.println("*** Warning - polymorphic join result");
                   }
-                  if (fetchInst == null) {
+                  if (selectInst == null) {
                      System.out.println("*** Warning - no instance for polymorphic join");
                   }
-                  else if (!DynUtil.instanceOf(fetchInst, refProp.refDBTypeDesc.typeDecl))
+                  else if (!DynUtil.instanceOf(selectInst, refProp.refDBTypeDesc.typeDecl))
                      System.out.println("*** Error - need to update the instance type here?");
                }
             }
 
             if (logSB != null) {
-               DBUtil.appendVal(logSB, val, null);
+               DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
             }
          }
          if (ftd.revColumns != null) {
@@ -539,7 +539,7 @@ public class SelectQuery implements Cloneable {
                Object val = propDesc.getValueFromResultSet(rs, rix, ftd);
                rix += propDesc.getNumResultSetColumns(ftd);
 
-               Object revInst = ftd.revProps.get(ri).getPropertyMapper().getPropertyValue(fetchInst, false, false);
+               Object revInst = ftd.revProps.get(ri).getPropertyMapper().getPropertyValue(selectInst, false, false);
                if (revInst != null) {
                   propDesc.getPropertyMapper().setPropertyValue(revInst, val);
                }
@@ -559,7 +559,7 @@ public class SelectQuery implements Cloneable {
 
    /**
     * Here the first selectTable defines the list/array value - selectTables.get(0).props.get(0).
-    * The second and subsequent fetch tables are only there for onDemand=false references in the referenced object
+    * The second and subsequent select tables are only there for onDemand=false references in the referenced object
     */
    boolean processMultiResults(List<IDBObject> resList, DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       DBPropertyDescriptor listProp = null;
@@ -631,9 +631,9 @@ public class SelectQuery implements Cloneable {
                         System.out.println("***");
                         if (newType != dbObj.dbTypeDesc) {
                            IDBObject newInst = dbObj.dbTypeDesc.createInstance();
-                           newInst.getDBObject().setDBId(((IDBObject) fetchInst).getDBId());
-                           fetchInst = newInst;
-                           fetchObj = fetchInst instanceof IDBObject ? (IDBObject) fetchInst : null;
+                           newInst.getDBObject().setDBId(((IDBObject) selectInst).getDBId());
+                           selectInst = newInst;
+                           selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
                         }
                      }
                      else {
@@ -700,7 +700,7 @@ public class SelectQuery implements Cloneable {
                else {
                   Object propInst = selectTable.refProp == null || listProp != null ? currentRowVal : selectTable.refProp.getPropertyMapper().getPropertyValue(currentRowVal, false, false);
                   if (currentRowVal == null)
-                     throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
+                     throw new UnsupportedOperationException("Multi value select tables - not attached to reference");
 
                   IDBObject propDBObj = propInst instanceof IDBObject ? (IDBObject) propInst : null;
                   if (propDBObj != null && !propDesc.ownedByOtherType(propDBObj.getDBObject().dbTypeDesc)) {
@@ -820,7 +820,7 @@ public class SelectQuery implements Cloneable {
                   }
                   else {
                      if (currentRowVal == null)
-                        throw new UnsupportedOperationException("Multi value fetch tables - not attached to reference");
+                        throw new UnsupportedOperationException("Multi value select tables - not attached to reference");
 
                      boolean skipped = false;
                      if (!propDesc.ownedByOtherType(currentRowVal.getDBObject().dbTypeDesc)) {
@@ -1151,19 +1151,19 @@ public class SelectQuery implements Cloneable {
    public void insertIdProperty() {
       SelectTableDesc mainTableFetch = selectTables.get(0);
       TableDescriptor mainTable = mainTableFetch.table;
-      List<DBPropertyDescriptor> fetchProps = mainTableFetch.props;
+      List<DBPropertyDescriptor> selectProps = mainTableFetch.props;
       List<IdPropertyDescriptor> idCols = mainTable.getIdColumns();
       int idSz = idCols.size();
       for (int i = idSz - 1; i >= 0; i--) {
          IdPropertyDescriptor idCol = idCols.get(i);
-         if (!fetchProps.contains(idCol))
-            fetchProps.add(0, idCol);
+         if (!selectProps.contains(idCol))
+            selectProps.add(0, idCol);
       }
       // Add the typeId right after the id properties in the select list
       DBPropertyDescriptor typeIdProp = mainTable.getTypeIdProperty();
       if (typeIdProp != null) {
          if (!mainTableFetch.props.contains(typeIdProp)) {
-            if (fetchProps.size() == idSz)
+            if (selectProps.size() == idSz)
                mainTableFetch.props.add(typeIdProp);
             else
                mainTableFetch.props.add(idSz, typeIdProp);

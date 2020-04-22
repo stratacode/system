@@ -117,7 +117,7 @@ public class TxUpdate extends VersionedOperation {
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(idVals.get(i), idCols.get(i).getDBColumnType()));
+            logSB.append(DBUtil.formatValue(idVals.get(i), DBColumnType.LongId));
       }
       if (versProp != null) {
          long opVersion = version;
@@ -149,8 +149,8 @@ public class TxUpdate extends VersionedOperation {
             }
 
             int ct = st.executeUpdate();
-            // TODO: for auxTables we should track whether we fetched the row or not to avoid the extra statement and instead do an 'upsert' - insert with an update on conflict since
-            // in the case we are setting properties which were not fetched, it's much more likely the row does not exist.
+            // TODO: for auxTables we should track whether we selected the row or not to avoid the extra statement and instead do an 'upsert' - insert with an update on conflict since
+            // in the case we are setting properties which were not selected, it's much more likely the row does not exist.
             if (ct == 0) {
                if (versProp != null || isPrimary) {
                   throw new StaleDataException(dbObject, version);

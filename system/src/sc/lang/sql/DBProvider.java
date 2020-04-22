@@ -203,7 +203,7 @@ public class DBProvider {
                      fbProps.add(propName);
                      boolean multiRowQuery = initFindByPropertyList(sys, typeDecl, fbProps, "with", findByProp, propName, properties, typeName);
 
-                     String fetchGroup = (String) ModelUtil.getAnnotationValue(findByProp, "fetchGroup");
+                     String selectGroup = (String) ModelUtil.getAnnotationValue(findByProp, "selectGroup");
                      Boolean paged = (Boolean) ModelUtil.getAnnotationValue(findByProp, "paged");
 
                      String orderByStr = (String) ModelUtil.getAnnotationValue(findByProp, "orderBy");
@@ -231,15 +231,15 @@ public class DBProvider {
                         if (tmpUnique != null && tmpUnique) {
                            multiRowQuery = false;
                         }
-                        if (fetchGroup == null) {
-                           String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
+                        if (selectGroup == null) {
+                           String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "selectGroup");
                            if (tmpFetchGroup != null) {
-                              fetchGroup = tmpFetchGroup;
+                              selectGroup = tmpFetchGroup;
                            }
                         }
                      }
 
-                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, fetchGroup, paged != null && paged);
+                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, selectGroup, paged != null && paged);
                      if (queries == null)
                         queries = new ArrayList<BaseQueryDescriptor>();
                      queries.add(fbDesc);
@@ -314,7 +314,7 @@ public class DBProvider {
                   if (fbOptions.size() == 0)
                      fbOptions = null;
 
-                  String fetchGroup = (String) ModelUtil.getAnnotationValue(findByCl, "fetchGroup");
+                  String selectGroup = (String) ModelUtil.getAnnotationValue(findByCl, "selectGroup");
                   Boolean paged = (Boolean) ModelUtil.getAnnotationValue(findByCl, "paged");
                   String orderByStr = (String) ModelUtil.getAnnotationValue(findByCl, "orderBy");
 
@@ -328,7 +328,7 @@ public class DBProvider {
                      }
                   }
 
-                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, fetchGroup, paged != null && paged);
+                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, selectGroup, paged != null && paged);
                   if (queries == null)
                      queries = new ArrayList<BaseQueryDescriptor>();
                   queries.add(fbDesc);
@@ -622,7 +622,7 @@ public class DBProvider {
                      propDataSourceName = tmpDataSourceName;
                   }
 
-                  String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "fetchGroup");
+                  String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "selectGroup");
                   if (tmpFetchGroup != null) {
                      propFetchGroup = tmpFetchGroup;
                   }
@@ -803,7 +803,7 @@ public class DBProvider {
          return true;
    }
 
-   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.fetch(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
+   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.select(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
    private static String UPDATE_PROP_TEMPLATE = "\n      if (<%= dbObjPrefix%><%= dbSetPropMethod %>(\"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";

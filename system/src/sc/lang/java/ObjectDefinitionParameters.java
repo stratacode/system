@@ -615,7 +615,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             else
                sb.append("matchOne(");
             sb.append("proto.getDBObject(),");
-            appendString(sb, fbDesc.fetchGroup, false);
+            appendString(sb, fbDesc.selectGroup, false);
             sb.append(", propList");
             if (fbDesc.multiRow) {
                if (fbDesc.orderByOption || fbDesc.orderByProps != null)
@@ -769,7 +769,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             sb.append(fbDesc.orderByOption);
             sb.append(", ");
             sb.append(fbDesc.multiRow);
-            appendString(sb, fbDesc.fetchGroup, true);
+            appendString(sb, fbDesc.selectGroup, true);
             sb.append(", ");
             sb.append(fbDesc.paged);
             sb.append(")");
@@ -890,7 +890,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(", ");
          sb.append(propDesc.indexed);
          appendString(sb, propDesc.dataSourceName, true);
-         appendString(sb, propDesc.fetchGroup, true);
+         appendString(sb, propDesc.selectGroup, true);
          appendString(sb, propDesc.refTypeName, true);
          sb.append(", ");
          sb.append(propDesc.multiRow);

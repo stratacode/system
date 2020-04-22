@@ -128,7 +128,7 @@ public class TableDescriptor {
       return DBUtil.getJavaName(tableName);
    }
 
-   // TODO: support a per-table data source name. We'd break up separate tables into different fetch queries, inserts
+   // TODO: support a per-table data source name. We'd break up separate tables into different select queries, inserts
    public String getDataSourceName() {
       return dbTypeDesc.dataSourceName;
    }

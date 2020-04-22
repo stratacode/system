@@ -24,7 +24,7 @@ public class DBPropertyDescriptor {
    public boolean required;
    // If unique gets a 'UNIQUE' constraint
    public boolean unique;
-   /** For relationships, should the referenced value be fetched in-line, or should we wait till the properties of the referenced object are access to fetch them */
+   /** For relationships, should the referenced value be selected in-line, or should we wait till the properties of the referenced object are access to select them */
    public boolean onDemand;
 
    /** Set to true for a property that should be indexed in the database for faster searches */
@@ -34,11 +34,11 @@ public class DBPropertyDescriptor {
    public String dataSourceName;
 
    /**
-    * Override the default fetching behavior for the property and instead fetch it with a group created with this name.
-    * All properties using the same fetchGroup are populated at the same time
-    * By default, a property's fetchGroup is the Java style-name for the table the property is defined in
+    * Override the default selecting behavior for the property and instead select it with a group created with this name.
+    * All properties using the same selectGroup are populated at the same time
+    * By default, a property's selectGroup is the Java style-name for the table the property is defined in
     */
-   public String fetchGroup;
+   public String selectGroup;
 
    /** For both single and multi-valued properties that refer to other DBObject's persisted, specifies the type name for this reference */
    public String refTypeName;
@@ -89,7 +89,7 @@ public class DBPropertyDescriptor {
 
    // TODO - restructure as (propertyName, colName, colType).withTable(tableName).withFlags(required, unique, onDemand, indexed).withDataSource(...), etc.
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
-                               boolean required, boolean unique, boolean onDemand, boolean indexed, String dataSourceName, String fetchGroup,
+                               boolean required, boolean unique, boolean onDemand, boolean indexed, String dataSourceName, String selectGroup,
                                String refTypeName, boolean multiRow, String reverseProperty, String dbDefault, String ownerTypeName) {
       this.propertyName = propertyName;
       this.columnName = columnName;
@@ -100,7 +100,7 @@ public class DBPropertyDescriptor {
       this.onDemand = onDemand;
       this.indexed = indexed;
       this.dataSourceName = dataSourceName;
-      this.fetchGroup = fetchGroup;
+      this.selectGroup = selectGroup;
       this.refTypeName = refTypeName;
       this.multiRow = multiRow;
       this.reverseProperty = reverseProperty;
@@ -308,16 +308,16 @@ public class DBPropertyDescriptor {
                else {
                   tableDesc.reverseProperty = this;
                   tableDesc.idColumns.get(0).columnName = reversePropDesc.columnName;
-                  // First fetch the reverse props id as part of the reference so we can create the instance
-                  ArrayList<DBPropertyDescriptor> fetchCols = new ArrayList<DBPropertyDescriptor>(mainPropTable.idColumns);
-                  // Then fetch all of the properties in the default table for the reverse side of the reference
+                  // First select the reverse props id as part of the reference so we can create the instance
+                  ArrayList<DBPropertyDescriptor> selectCols = new ArrayList<DBPropertyDescriptor>(mainPropTable.idColumns);
+                  // Then select all of the properties in the default table for the reverse side of the reference
                   for (int i = 0; i < mainPropTable.columns.size(); i++) {
                      DBPropertyDescriptor mainProp = mainPropTable.columns.get(i);
                      if (mainProp == reversePropDesc)
                         continue;
-                     fetchCols.add(mainProp);
+                     selectCols.add(mainProp);
                   }
-                  tableDesc.columns = fetchCols;
+                  tableDesc.columns = selectCols;
                }
             }
          }

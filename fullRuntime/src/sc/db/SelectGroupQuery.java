@@ -3,30 +3,30 @@ package sc.db;
 import java.util.ArrayList;
 import java.util.List;
 
-// TODO: rename DBSelectGroupQuery, fetchGroup to selectGroup
-public class DBFetchGroupQuery extends DBQuery {
+/** Managed a list of SelectQuery instances - each one against a separate dataSource */
+public class SelectGroupQuery extends DBQuery {
    List<SelectQuery> queries = new ArrayList<SelectQuery>();
    List<String> propNames;
    List<String> orderByProps;
    int startIx, maxResults;
 
-   // Used when building the FetchGroupQuery - to point to the current SelectQuery
+   // Used when building the SelectGroupQuery - to point to the current SelectQuery
    SelectQuery curQuery;
 
-   String fetchGroup;
+   String selectGroup;
 
    private boolean activated;
 
-   public DBFetchGroupQuery(DBTypeDescriptor dbTypeDesc, List<String> propNames, String fetchGroup) {
+   public SelectGroupQuery(DBTypeDescriptor dbTypeDesc, List<String> propNames, String selectGroup) {
       this.dbTypeDesc = dbTypeDesc;
       this.propNames = propNames;
-      this.fetchGroup = fetchGroup;
+      this.selectGroup = selectGroup;
    }
 
-   public void addFetchGroup(String fetchGroup, boolean multiRow) {
-      DBFetchGroupQuery fgQuery = dbTypeDesc.getFetchGroupQuery(fetchGroup);
+   public void addSelectGroup(String selectGroup, boolean multiRow) {
+      SelectGroupQuery fgQuery = dbTypeDesc.getSelectGroupQuery(selectGroup);
       if (fgQuery == null)
-         throw new IllegalArgumentException("No fetch group query: " + fetchGroup + " for type: " + dbTypeDesc);
+         throw new IllegalArgumentException("No select group query: " + selectGroup + " for type: " + dbTypeDesc);
       for (SelectQuery ftq:fgQuery.queries) {
          SelectQuery newFtq = ftq.cloneForSubType(null);
          newFtq.multiRow = multiRow;
@@ -35,11 +35,11 @@ public class DBFetchGroupQuery extends DBQuery {
       }
    }
 
-   public SelectQuery addProperty(DBPropertyDescriptor curRefProp, DBPropertyDescriptor prop, boolean multiRowFetch) {
+   public SelectQuery addProperty(DBPropertyDescriptor curRefProp, DBPropertyDescriptor prop, boolean multiRowSelect) {
       TableDescriptor table = prop.getTable();
       String dataSourceName = table.getDataSourceName();
 
-      SelectQuery query = getSelectQuery(dataSourceName, multiRowFetch || prop.multiRow);
+      SelectQuery query = getSelectQuery(dataSourceName, multiRowSelect || prop.multiRow);
       query.addProperty(curRefProp, prop);
       return query;
    }
@@ -62,18 +62,18 @@ public class DBFetchGroupQuery extends DBQuery {
       return null;
    }
 
-   public boolean fetchProperties(DBTransaction transaction, DBObject dbObj) {
+   public boolean selectProperties(DBTransaction transaction, DBObject dbObj) {
       boolean res = true;
       for (SelectQuery query:queries) {
-         boolean any = query.fetchProperties(transaction, dbObj);
+         boolean any = query.selectProperties(transaction, dbObj);
          if (!any && query.includesPrimary)
             res = false;
       }
       return res;
    }
 
-   public DBFetchGroupQuery cloneForSubType(DBTypeDescriptor subType) {
-      DBFetchGroupQuery res = new DBFetchGroupQuery(dbTypeDesc, propNames, fetchGroup);
+   public SelectGroupQuery cloneForSubType(DBTypeDescriptor subType) {
+      SelectGroupQuery res = new SelectGroupQuery(dbTypeDesc, propNames, selectGroup);
       res.queryNumber = queryNumber;
       res.queryName = queryName;
       for (SelectQuery ftq:queries)
@@ -82,9 +82,9 @@ public class DBFetchGroupQuery extends DBQuery {
    }
 
    public List<IDBObject> matchQuery(DBTransaction transaction, DBObject proto) {
-      // Here we pick the main query, run it first, look for queries that just fetch additional properties (i.e. without a 'where clause') and do
-      // fetchProperties on them.
-      // For any additional queries with 'where' clauses, I think we need to just make sure we fetch those properties, then do the test against each item
+      // Here we pick the main query, run it first, look for queries that just select additional properties (i.e. without a 'where clause') and do
+      // selectProperties on them.
+      // For any additional queries with 'where' clauses, I think we need to just make sure we select those properties, then do the test against each item
       // to remove it from the list.
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");
@@ -94,9 +94,9 @@ public class DBFetchGroupQuery extends DBQuery {
    }
 
    public IDBObject matchOne(DBTransaction transaction, DBObject proto) {
-      // Here we pick the main query, run it first, look for queries that just fetch additional properties (i.e. without a 'where clause') and do
-      // fetchProperties on them.
-      // For any additional queries with 'where' clauses, I think we need to just make sure we fetch those properties, then do the test against each item
+      // Here we pick the main query, run it first, look for queries that just select additional properties (i.e. without a 'where clause') and do
+      // selectProperties on them.
+      // For any additional queries with 'where' clauses, I think we need to just make sure we select those properties, then do the test against each item
       // to remove it from the list.
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");

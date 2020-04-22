@@ -15,16 +15,32 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.ResultSet;
 import java.sql.Types;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import sc.type.Type;
 import sc.util.IMessageHandler;
 import sc.util.JSON;
 import sc.util.MessageHandler;
 
+import static sc.type.PTypeUtil.testMode;
+
 public class DBUtil {
    public static boolean verbose = false;
 
+   public static Map<Long,String> testIdNameMap = null;
+
    public static IMessageHandler msgHandler;
+
+   public static void addTestId(long id, String idName) {
+      if (testMode) {
+         if (testIdNameMap == null) {
+            testIdNameMap = new HashMap<Long,String>();
+         }
+         testIdNameMap.put(id, idName);
+      }
+   }
 
    public static Connection createConnection(String dataSourceName) {
       try {
@@ -138,6 +154,23 @@ public class DBUtil {
       switch (type) {
          case String:
             return "\"" + val + "\"";
+         case Date:
+            // We want to record dates that are in the past to catch logic errors but recent dates in the
+            // test are last-modified or created-on dates that change from run to run so we return a code instead
+            if (testMode) {
+               Date dateVal = (Date) val;
+               long dateDiff = System.currentTimeMillis() - dateVal.getTime();
+               if (dateDiff >= 0 && dateDiff < 60*60*1000)
+                  return "<recent-date>";
+            }
+            return val.toString();
+         case LongId:
+            if (testMode && val instanceof Long) {
+               String idName = testIdNameMap == null ? null : testIdNameMap.get((Long) val);
+               if (idName != null)
+                  return "<id-" + idName + ">";
+            }
+            break;
          case Json:
             StringBuilder jsonSB = JSON.toJSON(val);
             return jsonSB.toString();
@@ -160,6 +193,7 @@ public class DBUtil {
             st.setString(index, (String) val);
             break;
          case Long:
+         case LongId:
             st.setLong(index, (Long) val);
             break;
          case Boolean:
@@ -228,6 +262,7 @@ public class DBUtil {
                return null;
             return sres;
          case Long:
+         case LongId:
             Long lres = rs.getLong(colName);
             if (rs.wasNull())
                return null;
@@ -298,6 +333,7 @@ public class DBUtil {
                return null;
             return sres;
          case Long:
+         case LongId:
             Object lres = rs.getObject(index);
             if (lres == null || rs.wasNull())
                return null;

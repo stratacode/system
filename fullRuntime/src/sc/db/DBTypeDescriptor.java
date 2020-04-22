@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * There's a primary table, that will have one row per object instance. Auxiliary tables store alternate properties
  * and can be optionally created.  Multi-tables store multi-valued properties stored with 'multiRow' mode.
  *
- * A fetchGroup allows collections of properties to be loaded at the same time. By default, a fetch group is
+ * A selectGroup allows collections of properties to be loaded at the same time. By default, a select group is
  * created for each table.
  */
 public class DBTypeDescriptor {
@@ -339,40 +339,40 @@ public class DBTypeDescriptor {
       }
 
       String firstFetchGroup = null;
-      // Build up the set of 'fetchGroups' - the queries to fetch properties for a given item
+      // Build up the set of 'selectGroups' - the queries to select properties for a given item
       for (DBPropertyDescriptor prop:allDBProps) {
-         String fetchGroup = prop.fetchGroup;
-         boolean fetchable = false;
+         String selectGroup = prop.selectGroup;
+         boolean selectable = false;
          if (prop.multiRow) {
             TableDescriptor mvTable = getMultiTableByName(prop.getTableName(), prop);
             if (mvTable == null)
                System.err.println("*** No multi-value table for property: " + prop.propertyName);
             else
-               fetchable = addToFetchGroup(mvTable.getJavaName(), prop);
+               selectable = addToFetchGroup(mvTable.getJavaName(), prop);
          }
          else {
-            if (fetchGroup == null) {
+            if (selectGroup == null) {
                if (prop.onDemand) {
-                  fetchGroup = prop.propertyName;
+                  selectGroup = prop.propertyName;
                }
                else {
                   TableDescriptor table = getTableByName(prop.tableName);
-                  fetchGroup = table.getJavaName();
+                  selectGroup = table.getJavaName();
                }
             }
-            fetchable = addToFetchGroup(fetchGroup, prop);
+            selectable = addToFetchGroup(selectGroup, prop);
          }
-         if (firstFetchGroup == null && fetchable) {
-            firstFetchGroup = fetchGroup;
+         if (firstFetchGroup == null && selectable) {
+            firstFetchGroup = selectGroup;
          }
       }
-      // All properties are on-demand or in some other fetch group. Pick the first one to use as the default so that
+      // All properties are on-demand or in some other select group. Pick the first one to use as the default so that
       // we have some property to load to validate that the item exists.
-      if (fetchGroups.get(defaultFetchGroup) == null) {
+      if (selectGroups.get(defaultFetchGroup) == null) {
          if (firstFetchGroup == null)
             DBUtil.error("No main table properties for persistent type: " + this);
          else
-            fetchGroups.put(defaultFetchGroup, fetchGroups.get(firstFetchGroup));
+            selectGroups.put(defaultFetchGroup, selectGroups.get(firstFetchGroup));
       }
    }
 
@@ -380,14 +380,14 @@ public class DBTypeDescriptor {
       return DynUtil.getTypeName(typeDecl, false);
    }
 
-   private boolean addToFetchGroup(String fetchGroup, DBPropertyDescriptor prop) {
-      if (prop.isId()) // Don't fetch ids since they don't change
+   private boolean addToFetchGroup(String selectGroup, DBPropertyDescriptor prop) {
+      if (prop.isId()) // Don't get the in a select when the id is known
          return false;
-      DBFetchGroupQuery query = fetchGroups.get(fetchGroup);
+      SelectGroupQuery query = selectGroups.get(selectGroup);
       if (query == null) {
-         query = new DBFetchGroupQuery(this, null, fetchGroup);
-         query.fetchGroup = fetchGroup;
-         fetchGroups.put(fetchGroup, query);
+         query = new SelectGroupQuery(this, null, selectGroup);
+         query.selectGroup = selectGroup;
+         selectGroups.put(selectGroup, query);
          addFetchQuery(query);
       }
       query.addProperty(null, prop, false);
@@ -408,7 +408,7 @@ public class DBTypeDescriptor {
 
    public List<DBPropertyDescriptor> reverseProps = null;
 
-   public LinkedHashMap<String,DBFetchGroupQuery> fetchGroups = new LinkedHashMap<String,DBFetchGroupQuery>();
+   public LinkedHashMap<String, SelectGroupQuery> selectGroups = new LinkedHashMap<String, SelectGroupQuery>();
 
    // TODO: check property level database annotation and lazily add a chained list of other types to this one. Treat them like aux-tables that can't be joined in to queries
    //List<DBTypeDescriptor> auxDatabases;
@@ -447,54 +447,54 @@ public class DBTypeDescriptor {
       return newTable;
    }
 
-   // Data structures for queries that fetch property values. We can look up the query for a given property,
+   // Data structures for queries that select property values. We can look up the query for a given property,
    // and ensure we only queue a single query at a time for that property group, even if requested by more than
    // one thread.
-   Map<String, DBFetchGroupQuery> propQueriesIndex = new HashMap<String, DBFetchGroupQuery>();
-   Map<String,DBQuery> fetchQueriesIndex = new HashMap<String,DBQuery>();
-   ArrayList<DBQuery> fetchQueriesList = new ArrayList<DBQuery>();
+   Map<String, SelectGroupQuery> propQueriesIndex = new HashMap<String, SelectGroupQuery>();
+   Map<String,DBQuery> selectQueriesIndex = new HashMap<String,DBQuery>();
+   ArrayList<DBQuery> selectQueriesList = new ArrayList<DBQuery>();
 
    public void copyQueriesFrom(DBTypeDescriptor fromType) {
-      for (DBQuery fromQuery:fromType.fetchQueriesList) {
+      for (DBQuery fromQuery:fromType.selectQueriesList) {
          DBQuery toQuery = fromQuery.cloneForSubType(this);
          toQuery.dbTypeDesc = this;
-         fetchQueriesList.add(toQuery);
-         fetchQueriesIndex.put(toQuery.queryName, toQuery);
-         if (toQuery instanceof DBFetchGroupQuery) {
-            DBFetchGroupQuery toGroupQuery = (DBFetchGroupQuery) toQuery;
-            fetchGroups.put(toGroupQuery.fetchGroup, toGroupQuery);
+         selectQueriesList.add(toQuery);
+         selectQueriesIndex.put(toQuery.queryName, toQuery);
+         if (toQuery instanceof SelectGroupQuery) {
+            SelectGroupQuery toGroupQuery = (SelectGroupQuery) toQuery;
+            selectGroups.put(toGroupQuery.selectGroup, toGroupQuery);
          }
       }
       for (String baseProp:fromType.propQueriesIndex.keySet()) {
          DBQuery fromQuery = fromType.propQueriesIndex.get(baseProp);
-         DBQuery toQuery = fetchQueriesIndex.get(fromQuery.queryName);
-         if (toQuery instanceof DBFetchGroupQuery)
-            propQueriesIndex.put(baseProp, (DBFetchGroupQuery) toQuery);
+         DBQuery toQuery = selectQueriesIndex.get(fromQuery.queryName);
+         if (toQuery instanceof SelectGroupQuery)
+            propQueriesIndex.put(baseProp, (SelectGroupQuery) toQuery);
       }
    }
 
-   public DBFetchGroupQuery getDefaultFetchQuery() {
-      return fetchGroups.get(defaultFetchGroup);
+   public SelectGroupQuery getDefaultFetchQuery() {
+      return selectGroups.get(defaultFetchGroup);
    }
 
-   public DBFetchGroupQuery getFetchGroupQuery(String fetchGroup) {
-      return fetchGroups.get(fetchGroup);
+   public SelectGroupQuery getSelectGroupQuery(String selectGroup) {
+      return selectGroups.get(selectGroup);
    }
 
-   public DBFetchGroupQuery getFetchQueryForProperty(String propName) {
-      DBFetchGroupQuery query = propQueriesIndex.get(propName);
+   public SelectGroupQuery getFetchQueryForProperty(String propName) {
+      SelectGroupQuery query = propQueriesIndex.get(propName);
       if (query == null) {
-         System.err.println("*** No fetch query for property: " + propName);
+         System.err.println("*** No select query for property: " + propName);
       }
       return query;
    }
 
    public DBQuery getFetchQueryForNum(int queryNum) {
-      return fetchQueriesList.get(queryNum);
+      return selectQueriesList.get(queryNum);
    }
 
    public int getNumFetchPropQueries() {
-      return fetchQueriesList.size();
+      return selectQueriesList.size();
    }
 
    public DBPropertyDescriptor getPropertyDescriptor(String propNamePath) {
@@ -567,9 +567,9 @@ public class DBTypeDescriptor {
    }
 
    public void addFetchQuery(DBQuery query) {
-      query.queryNumber = fetchQueriesList.size();
-      fetchQueriesList.add(query);
-      fetchQueriesIndex.put(query.queryName, query);
+      query.queryNumber = selectQueriesList.size();
+      selectQueriesList.add(query);
+      selectQueriesIndex.put(query.queryName, query);
    }
 
    public String toString() {
@@ -593,7 +593,7 @@ public class DBTypeDescriptor {
       return findBy(null, null, null, orderByNames, startIx, maxResults);
    }
 
-   public List<? extends IDBObject> findBy(List<Object> paramValues, String fetchGroup, List<String> paramNames, List<String> orderByNames, int startIx, int maxResults) {
+   public List<? extends IDBObject> findBy(List<Object> paramValues, String selectGroup, List<String> paramNames, List<String> orderByNames, int startIx, int maxResults) {
       int numVals = paramValues == null ? 0 : paramValues.size();
       int numParams = paramNames == null ? 0 : paramNames.size();
       if (numVals != numParams)
@@ -604,7 +604,7 @@ public class DBTypeDescriptor {
       for (int i = 0; i < numVals; i++) {
          protoDB.setPropertyInPath(paramNames.get(i), paramValues.get(i));
       }
-      return matchQuery(proto.getDBObject(), fetchGroup, paramNames, orderByNames, startIx, maxResults);
+      return matchQuery(proto.getDBObject(), selectGroup, paramNames, orderByNames, startIx, maxResults);
    }
 
    private void initTypeInstances() {
@@ -619,13 +619,13 @@ public class DBTypeDescriptor {
     * there's only one instance of an object with the same id to prevent aliasing, simplify code and caching and provide a 'transactional view'
     * of objects with persistent state.
     *
-    * If createProto is true, and the instance is not in the cache, a prototype is created with that and returned. If fetchDefault
+    * If createProto is true, and the instance is not in the cache, a prototype is created with that and returned. If selectDefault
     * is true, that prototype is populated with the default property group if the row exists and returned. If the row does not exist
     * null is returned in that case.
     */
-   public IDBObject lookupInstById(Object id, int typeId, boolean createProto, boolean fetchDefault) {
+   public IDBObject lookupInstById(Object id, int typeId, boolean createProto, boolean selectDefault) {
      if (baseType != null) {
-         return baseType.lookupInstById(id, typeId == -1 ? this.typeId : typeId, createProto, fetchDefault);
+         return baseType.lookupInstById(id, typeId == -1 ? this.typeId : typeId, createProto, selectDefault);
       }
 
       if (typeInstances == null) {
@@ -652,8 +652,8 @@ public class DBTypeDescriptor {
          typeInstances.put(id, inst);
       }
 
-      // If requested, fetch the default (primary table) property group - if the row does not exist, the object does not exist
-      if (fetchDefault) {
+      // If requested, select the default (primary table) property group - if the row does not exist, the object does not exist
+      if (selectDefault) {
          if (!dbObj.dbFetchDefault())
             return null;
       }
@@ -841,7 +841,7 @@ public class DBTypeDescriptor {
       activated = true;
       if (baseType != null)
          baseType.activate();
-      for (DBQuery query:fetchQueriesList)
+      for (DBQuery query:selectQueriesList)
          query.activate();
    }
 
@@ -868,13 +868,13 @@ public class DBTypeDescriptor {
       }
    }
 
-   private DBFetchGroupQuery initQuery(DBObject proto, String fetchGroup, List<String> props, boolean multiRow) {
-      if (fetchGroup == null)
-         fetchGroup = defaultFetchGroup;
-      DBFetchGroupQuery groupQuery =  new DBFetchGroupQuery(this, props, fetchGroup);
-      // Add the tables to fetch all of the properties requested in this query - the 'fetchGroup' but turn it into a 'multiRow' query
-      groupQuery.addFetchGroup(fetchGroup, multiRow);
-      // Because this is a query, need to be sure we fetch the id property first in the main query
+   private SelectGroupQuery initQuery(DBObject proto, String selectGroup, List<String> props, boolean multiRow) {
+      if (selectGroup == null)
+         selectGroup = defaultFetchGroup;
+      SelectGroupQuery groupQuery =  new SelectGroupQuery(this, props, selectGroup);
+      // Add the tables to select all of the properties requested in this query - the 'selectGroup' but turn it into a 'multiRow' query
+      groupQuery.addSelectGroup(selectGroup, multiRow);
+      // Because this is a query, need to be sure we select the id property first in the main query
       groupQuery.queries.get(0).insertIdProperty();
 
       int numProps = props == null ? 0 : props.size();
@@ -918,7 +918,7 @@ public class DBTypeDescriptor {
       return groupQuery;
    }
 
-   private void addParamValues(DBFetchGroupQuery groupQuery, DBObject proto, List<String> props) {
+   private void addParamValues(SelectGroupQuery groupQuery, DBObject proto, List<String> props) {
       int numProps = props == null ? 0 : props.size();
       // Third pass - for each execution of the query, get the paramValues
       for (int i = 0; i < numProps; i++) {
@@ -936,8 +936,8 @@ public class DBTypeDescriptor {
     * for the list of properties used in sorting the result. Use "-propName" for a descending order sort on that property and
     * start and max properties for limit/offset in the result list.
     */
-   public List<? extends IDBObject> matchQuery(DBObject proto, String fetchGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
-      DBFetchGroupQuery groupQuery = initQuery(proto, fetchGroup, protoProps, true);
+   public List<? extends IDBObject> matchQuery(DBObject proto, String selectGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
+      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, protoProps, true);
       addParamValues(groupQuery, proto, protoProps);
       if (orderByProps != null) {
          groupQuery.setOrderBy(orderByProps);
@@ -951,8 +951,8 @@ public class DBTypeDescriptor {
       return groupQuery.matchQuery(curTx, proto.getDBObject());
    }
 
-   public IDBObject matchOne(DBObject proto, String fetchGroup, List<String> props) {
-      DBFetchGroupQuery groupQuery = initQuery(proto, fetchGroup, props, true);
+   public IDBObject matchOne(DBObject proto, String selectGroup, List<String> props) {
+      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, props, true);
       addParamValues(groupQuery, proto, props);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
@@ -1061,7 +1061,7 @@ public class DBTypeDescriptor {
       }
    }
 
-   private void appendPropParamValues(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, boolean compareVal) {
+   private void appendPropParamValues(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, boolean compareVal) {
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       Object propValue = curObj.getPropertyInPath(propNamePath);
       SelectQuery curQuery = groupQuery.curQuery;
@@ -1137,7 +1137,7 @@ public class DBTypeDescriptor {
       }
    }
 
-   private void appendParamValues(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, IBinding binding) {
+   private void appendParamValues(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, IBinding binding) {
       if (binding instanceof IBeanMapper) {
          IBeanMapper propMapper = (IBeanMapper) binding;
          String propName = propMapper.getPropertyName();
@@ -1246,7 +1246,7 @@ public class DBTypeDescriptor {
          throw new IllegalArgumentException("Unsupported binding type for appendParams");
    }
 
-   private void appendPropBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath) {
+   private void appendPropBindingTables(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath) {
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
          DBPropertyDescriptor parentProp = null;
@@ -1351,7 +1351,7 @@ public class DBTypeDescriptor {
       return null;
    }
 
-   private void appendBindingTables(DBFetchGroupQuery groupQuery, DBTypeDescriptor startTypeDesc, DBObject curObj, IBinding binding) {
+   private void appendBindingTables(SelectGroupQuery groupQuery, DBTypeDescriptor startTypeDesc, DBObject curObj, IBinding binding) {
       if (binding instanceof IBeanMapper) {
          appendPropBindingTables(groupQuery, startTypeDesc, curObj, ((IBeanMapper) binding).getPropertyName());
       }
@@ -1439,7 +1439,7 @@ public class DBTypeDescriptor {
       }
    }
 
-   private void appendBindingToWhereClause(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, IBinding binding) {
+   private void appendBindingToWhereClause(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, IBinding binding) {
       if (binding instanceof IBeanMapper) {
          IBeanMapper propMapper = (IBeanMapper) binding;
          String propName = propMapper.getPropertyName();
@@ -1552,7 +1552,7 @@ public class DBTypeDescriptor {
       return propPath;
    }
 
-   private void appendPropToWhereClause(DBFetchGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String parentPropPath, String propNamePath, boolean needsParens, boolean compareVal) {
+   private void appendPropToWhereClause(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String parentPropPath, String propNamePath, boolean needsParens, boolean compareVal) {
       SelectQuery curQuery = groupQuery.curQuery;
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
