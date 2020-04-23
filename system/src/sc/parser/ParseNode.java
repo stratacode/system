@@ -148,7 +148,7 @@ public class ParseNode extends AbstractParseNode {
          return ((value).toString()).charAt(ix);
    }
 
-   public void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parentParseNode, int chidlIx) {
+   public void styleNode(IStyleAdapter adapter, Object parSemVal, ParentParseNode parentParseNode, int childIx) {
       CharSequence res;
       if (value instanceof IParseNode) {
          IParseNode childParseNode = (IParseNode) value;
@@ -160,13 +160,19 @@ public class ParseNode extends AbstractParseNode {
                ParseUtil.styleString(adapter, childSV, childParseNode.getParselet().styleName, null, false);
                return;
             }
-            // TODO: This only handles 1-level of parseNode wrapped in parseNode.  We might need more than one for some grammars?
+
             else if (childParseNode instanceof ParseNode) {
                Object childValue = ((ParseNode) childParseNode).value;
                if (childSVParseNode == childValue && childValue instanceof IParseNode) {
                   ParseUtil.styleString(adapter, childSV, ((IParseNode) childValue).getParselet().styleName, null, false);
                   return;
                }
+            }
+            else if (childParseNode instanceof ParentParseNode) {
+               ParentParseNode childPP = (ParentParseNode) childParseNode;
+               // Note: passing the parentParseNode on down here even though it's not entirely accurate, it's only used if this is a generated node
+               childPP.styleNode(adapter, childSV, parentParseNode, childIx);
+               return;
             }
          }
          res = childParseNode.toString();
