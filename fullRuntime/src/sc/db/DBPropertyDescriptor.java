@@ -11,8 +11,10 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Represents the metadata used for storing a property of a DBObject. It lives in a TableDescriptor and as part of a DBTypeDescriptor that corresponds to
- * the mapping for a single class or dynamic type in the system.
+ * Represents the metadata used for storing a property of a DBObject. It lives in a TableDescriptor that is part of an enclosing
+ * DBTypeDescriptor. This instance is used to define the first column in the mapping. See the subclass MultiColPropertyDescriptor
+ * for when there's more than one column used to refer to a single property in the model.
+ * The DBPropertyDescriptor is built from the DBPropertySettings annotation, along with defaults inherited from DBTypeSettings.
  */
 public class DBPropertyDescriptor {
    public String propertyName;
@@ -26,6 +28,9 @@ public class DBPropertyDescriptor {
    public boolean unique;
    /** For relationships, should the referenced value be selected in-line, or should we wait till the properties of the referenced object are access to select them */
    public boolean onDemand;
+
+   /** Set to true for properties to be stored in a single JSON column - not part of the normalized schema for the type */
+   public boolean dynColumn;
 
    /** Set to true for a property that should be indexed in the database for faster searches */
    public boolean indexed;
@@ -89,7 +94,7 @@ public class DBPropertyDescriptor {
 
    // TODO - restructure as (propertyName, colName, colType).withTable(tableName).withFlags(required, unique, onDemand, indexed).withDataSource(...), etc.
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
-                               boolean required, boolean unique, boolean onDemand, boolean indexed, String dataSourceName, String selectGroup,
+                               boolean required, boolean unique, boolean onDemand, boolean indexed, boolean dynColumn, String dataSourceName, String selectGroup,
                                String refTypeName, boolean multiRow, String reverseProperty, String dbDefault, String ownerTypeName) {
       this.propertyName = propertyName;
       this.columnName = columnName;
@@ -99,6 +104,7 @@ public class DBPropertyDescriptor {
       this.unique = unique;
       this.onDemand = onDemand;
       this.indexed = indexed;
+      this.dynColumn = dynColumn;
       this.dataSourceName = dataSourceName;
       this.selectGroup = selectGroup;
       this.refTypeName = refTypeName;

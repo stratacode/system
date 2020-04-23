@@ -5,7 +5,7 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
    public boolean definedByDB;
 
    public IdPropertyDescriptor(String propertyName, String columnName, String columnType, boolean definedByDB) {
-      super(propertyName, columnName, columnType, null, false, true, false, true, null, null, null, false, null, null, null);
+      super(propertyName, columnName, columnType, null, false, true, false, true, false, null, null, null, false, null, null, null);
       this.definedByDB = definedByDB;
    }
 

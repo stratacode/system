@@ -14,9 +14,19 @@ import java.util.Map;
 /** Lightweight JSON formatter and parser built on the sc framework, supporting dynamic properties and types. */
 public class JSON {
 
-   public static Object toObject(Object propertyType, String jsonStr) {
+   public static Object parseJSON(String jsonStr) {
       JSONParser parser = new JSONParser(jsonStr, null);
-      Object value = parser.parseJSONValue();
+      return parser.parseJSONValue();
+   }
+
+   public static Object toObject(Object propertyType, String jsonStr) {
+      Object value = parseJSON(jsonStr);
+      if (propertyType == null)
+         return value;
+      return convertTo(propertyType, value);
+   }
+
+   public static Object convertTo(Object propertyType, Object value) {
       if (value instanceof List) {
          List listVal = (List) value;
          if (propertyType instanceof Class) {
@@ -47,6 +57,10 @@ public class JSON {
       else if (value instanceof CharSequence) {
          return value.toString();
       }
+      else if (value instanceof Number)
+         return value;
+      else if (value instanceof Boolean)
+         return value;
       else
          throw new UnsupportedOperationException("Unrecognized JSON value type");
    }
@@ -114,6 +128,7 @@ public class JSON {
       else if (val instanceof Map) {
          Map<Object,Object> valMap = (Map<Object,Object>) val;
          boolean any = false;
+         sb.append("{");
          for (Map.Entry<Object,Object> ent:valMap.entrySet()) {
             Object key = ent.getKey();
             if (!(key instanceof CharSequence))
@@ -124,10 +139,11 @@ public class JSON {
                   sb.append(", ");
                appendString(sb, key.toString());
                sb.append(":");
-               appendValue(ctx, sb, val);
+               appendValue(ctx, sb, entVal);
                any = true;
             }
          }
+         sb.append("}");
       }
       else {
          appendObject(ctx, sb, val);

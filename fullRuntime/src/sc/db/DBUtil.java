@@ -42,11 +42,14 @@ public class DBUtil {
       }
    }
 
-   public static Connection createConnection(String dataSourceName) {
+   public static Connection createConnection(String dataSourceName, boolean autoCommit) {
       try {
          DBDataSource dbDS = DataSourceManager.getDBDataSource(dataSourceName);
          DataSource javaDS = dbDS.getDataSource();
-         return javaDS.getConnection();
+         Connection res = javaDS.getConnection();
+         if (!autoCommit)
+            res.setAutoCommit(false);
+         return res;
       }
       catch (SQLException exc) {
          System.err.println("*** SQL error getting DB connection: " + exc);
@@ -544,5 +547,29 @@ public class DBUtil {
          return true;
       // TODO: others we should add here?
       return false;
+   }
+
+   public static String getJSONCastType(DBColumnType dbColumnType) {
+      switch (dbColumnType) {
+         case Int:
+            return "integer";
+         case Long:
+         case LongId:
+            return "bigint";
+         case Boolean:
+            return "boolean";
+         case Float:
+            return "real";
+         case Double:
+            return "double";
+         case Date:
+            return "timestamp";
+         case String:
+            return null;
+         default:
+            System.err.println("*** Unrecognized type for JSON cast");
+            break;
+      }
+      return null;
    }
 }

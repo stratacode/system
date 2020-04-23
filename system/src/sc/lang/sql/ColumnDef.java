@@ -88,6 +88,13 @@ public class ColumnDef extends TableDef {
       return info;
    }
 
+   public static ColumnDef create(String columnName, String columnType) {
+      ColumnDef colDef = new ColumnDef();
+      colDef.setProperty("columnName", SQLIdentifier.create(columnName));
+      colDef.setProperty("columnType", SQLDataType.create(columnType));
+      return colDef;
+   }
+
    public ColumnInfo getMissingColumnInfo(ColumnInfo dbColInfo) {
       if (!dbColInfo.colName.equalsIgnoreCase(columnName.getIdentifier()))
          throw new UnsupportedOperationException();

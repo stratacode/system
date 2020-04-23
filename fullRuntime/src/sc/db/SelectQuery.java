@@ -2,6 +2,7 @@ package sc.db;
 
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
+import sc.util.JSON;
 import sc.util.StringUtil;
 
 import java.sql.Connection;
@@ -82,6 +83,8 @@ public class SelectQuery implements Cloneable {
       else {
          if (ftd.props.contains(prop))
             return;
+         if (prop.dynColumn)
+            ftd.selectDynColumn = true;
          ftd.props.add(prop);
 
          SelectTableDesc revTableDesc = null;
@@ -102,6 +105,8 @@ public class SelectQuery implements Cloneable {
                      revTableDesc.revProps = new ArrayList<DBPropertyDescriptor>();
                      revTableDesc.revColumns = new ArrayList<DBPropertyDescriptor>(revTable.columns);
                      for (int i = 0; i < revTable.columns.size(); i++) {
+                        if (prop.dynColumn)
+                           revTableDesc.selectDynColumn = true;
                         revTableDesc.revProps.add(prop);
                      }
                      addTableToSelectQuery(revTableDesc, ftd);
@@ -460,6 +465,14 @@ public class SelectQuery implements Cloneable {
          DBPropertyDescriptor refProp = ftd.refProp;
          Object selectInst = refProp == null ? inst : refProp.getPropertyMapper().getPropertyValue(inst, false, false);
          IDBObject selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
+
+         Map<String,Object> tableDynProps = null;
+
+         if (ftd.selectDynColumn) {
+             tableDynProps = (Map<String,Object>) DBUtil.getResultSetByIndex(rs, rix,null, DBColumnType.Json, null);
+             rix++;
+         }
+
          for (int pix = 0; pix < ftd.props.size(); pix++) {
             DBPropertyDescriptor propDesc = ftd.props.get(pix);
             // If the id was the previous property, we already read in the typeId as part of that. If we have an existing id we are looking
@@ -474,8 +487,15 @@ public class SelectQuery implements Cloneable {
                logSB.append("=");
             }
 
-            Object val = propDesc.getValueFromResultSet(rs, rix, ftd);
-            rix += propDesc.getNumResultSetColumns(ftd);
+            Object val;
+            if (propDesc.dynColumn) {
+               Object jsonVal = tableDynProps == null ? null : tableDynProps.get(propDesc.propertyName);
+               val = JSON.convertTo(propDesc.getPropertyType(), jsonVal);
+            }
+            else {
+               val = propDesc.getValueFromResultSet(rs, rix, ftd);
+               rix += propDesc.getNumResultSetColumns(ftd);
+            }
 
             if (!propDesc.typeIdProperty) {
                if (selectObj != null && propDesc.ownedByOtherType(selectObj.getDBObject().dbTypeDesc))
@@ -581,6 +601,12 @@ public class SelectQuery implements Cloneable {
             SelectTableDesc selectTable = selectTables.get(fi);
 
             DBPropertyDescriptor refProp = selectTable.refProp;
+            Map<String,Object> tableDynProps = null;
+
+            if (selectTable.selectDynColumn) {
+               tableDynProps = (Map<String,Object>) DBUtil.getResultSetByIndex(rs, rix,null, DBColumnType.Json, null);
+               rix++;
+            }
 
             boolean rowValSet = false;
             int numProps = selectTable.props.size();
@@ -589,98 +615,106 @@ public class SelectQuery implements Cloneable {
                if (propDesc.typeIdProperty && pix > 0)
                   continue;
                Object val;
-               int numCols = propDesc.getNumColumns();
-               DBTypeDescriptor colTypeDesc = propDesc.getRefColTypeDesc();
-               if (numCols == 1)  {
-                  val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
-                  if (colTypeDesc != null) {
-                     DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
-                     int typeId = -1;
-                     // If we are joining in a 1-1 relationship eagerly, we ensure the db_type_id is right after the id so we can create the object of the right type
-                     if (colTypeIdProp != null && !propDesc.onDemand && selectTable.hasJoinTableForRef(propDesc)) {
-                        Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
-                        if (typeIdRes != null)
-                           typeId = (int) typeIdRes;
-                     }
-                     val = val == null ? null : colTypeDesc.lookupInstById(val, typeId, true, false);
 
-                     if (val != null) {
-                        IDBObject valObj = (IDBObject) val;
-                        DBObject valDBObj = valObj.getDBObject();
-                        if (valDBObj.isPrototype()) {
-                           // TODO: if this has a reverse property, do we want to update the other side - in this case, add it to the reverseProperty which is a list here
-                           //if (propDesc.reversePropDesc != null)  {
-                           //}
-                           valDBObj.setPrototype(false);
-                        }
-                     }
-                  }
-                  else if (propDesc.typeIdProperty) {
-                     if (val == null)
-                        continue;
-
-                     int typeId = (int) val;
-
-                     continue; // TODO: do we need this to help define the type?  Or should we eliminate it from the select list?
-                     /*
-                     DBTypeDescriptor newType = dbObj.dbTypeDesc.subTypesById.get(typeId);
-                     if (newType == null) {
-                        DBUtil.error("No sub-type of: " + dbObj.dbTypeDesc + " with typeId: " + typeId);
-                     }
-                     else if (refProp == null) {
-                        System.out.println("***");
-                        if (newType != dbObj.dbTypeDesc) {
-                           IDBObject newInst = dbObj.dbTypeDesc.createInstance();
-                           newInst.getDBObject().setDBId(((IDBObject) selectInst).getDBId());
-                           selectInst = newInst;
-                           selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
-                        }
-                     }
-                     else {
-                        System.out.println("***");
-                        if (newType != refProp.refDBTypeDesc) {
-                           System.out.println("*** Warning - polymorphic join result");
-                        }
-                     }
-                        */
-                  }
+               if (propDesc.dynColumn) {
+                  Object jsonVal = tableDynProps == null ? null : tableDynProps.get(propDesc.propertyName);
+                  val = JSON.convertTo(propDesc.getPropertyType(), jsonVal);
                }
                else {
-                  if (colTypeDesc != null) {
-                     List<IdPropertyDescriptor> refIdCols = colTypeDesc.primaryTable.getIdColumns();
-                     if (numCols != refIdCols.size())
-                        throw new UnsupportedOperationException();
-                     MultiColIdentity idVals = new MultiColIdentity(numCols);
-                     for (int ci = 0; ci < numCols; ci++) {
-                        IdPropertyDescriptor refIdCol = refIdCols.get(ci);
-                        Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
-                        idVals.setVal(idVal, ci);
-                     }
-                     DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
-                     int typeId = -1;
-                     if (colTypeIdProp != null) {
-                        Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
-                        if (typeIdRes != null)
-                           typeId = (int) typeIdRes;
-                     }
-                     val = colTypeDesc.lookupInstById(idVals, typeId, true, false);
+                  int numCols = propDesc.getNumColumns();
+                  DBTypeDescriptor colTypeDesc = propDesc.getRefColTypeDesc();
+                  if (numCols == 1)  {
+                     val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
+                     if (colTypeDesc != null) {
+                        DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
+                        int typeId = -1;
+                        // If we are joining in a 1-1 relationship eagerly, we ensure the db_type_id is right after the id so we can create the object of the right type
+                        if (colTypeIdProp != null && !propDesc.onDemand && selectTable.hasJoinTableForRef(propDesc)) {
+                           Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
+                           if (typeIdRes != null)
+                              typeId = (int) typeIdRes;
+                        }
+                        val = val == null ? null : colTypeDesc.lookupInstById(val, typeId, true, false);
 
-                     if (val != null) {
-                        IDBObject valObj = (IDBObject) val;
-                        DBObject valDBObj = valObj.getDBObject();
-                        if (valDBObj.isPrototype()) {
-                           // TODO: update the reverse property (a list at this point)?
-                           //if (propDesc.reversePropDesc != null)
-                           //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
-                           valDBObj.setPrototype(false);
+                        if (val != null) {
+                           IDBObject valObj = (IDBObject) val;
+                           DBObject valDBObj = valObj.getDBObject();
+                           if (valDBObj.isPrototype()) {
+                              // TODO: if this has a reverse property, do we want to update the other side - in this case, add it to the reverseProperty which is a list here
+                              //if (propDesc.reversePropDesc != null)  {
+                              //}
+                              valDBObj.setPrototype(false);
+                           }
                         }
                      }
+                     else if (propDesc.typeIdProperty) {
+                        if (val == null)
+                           continue;
+
+                        int typeId = (int) val;
+
+                        continue; // TODO: do we need this to help define the type?  Or should we eliminate it from the select list?
+                        /*
+                        DBTypeDescriptor newType = dbObj.dbTypeDesc.subTypesById.get(typeId);
+                        if (newType == null) {
+                           DBUtil.error("No sub-type of: " + dbObj.dbTypeDesc + " with typeId: " + typeId);
+                        }
+                        else if (refProp == null) {
+                           System.out.println("***");
+                           if (newType != dbObj.dbTypeDesc) {
+                              IDBObject newInst = dbObj.dbTypeDesc.createInstance();
+                              newInst.getDBObject().setDBId(((IDBObject) selectInst).getDBId());
+                              selectInst = newInst;
+                              selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
+                           }
+                        }
+                        else {
+                           System.out.println("***");
+                           if (newType != refProp.refDBTypeDesc) {
+                              System.out.println("*** Warning - polymorphic join result");
+                           }
+                        }
+                           */
+                     }
                   }
-                  else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
-                     System.err.println("*** Unsupported case - multiCol property that's not a reference");
-                     val = null;
+                  else {
+                     if (colTypeDesc != null) {
+                        List<IdPropertyDescriptor> refIdCols = colTypeDesc.primaryTable.getIdColumns();
+                        if (numCols != refIdCols.size())
+                           throw new UnsupportedOperationException();
+                        MultiColIdentity idVals = new MultiColIdentity(numCols);
+                        for (int ci = 0; ci < numCols; ci++) {
+                           IdPropertyDescriptor refIdCol = refIdCols.get(ci);
+                           Object idVal = DBUtil.getResultSetByIndex(rs, rix++, refIdCol);
+                           idVals.setVal(idVal, ci);
+                        }
+                        DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
+                        int typeId = -1;
+                        if (colTypeIdProp != null) {
+                           Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix++, colTypeIdProp);
+                           if (typeIdRes != null)
+                              typeId = (int) typeIdRes;
+                        }
+                        val = colTypeDesc.lookupInstById(idVals, typeId, true, false);
+
+                        if (val != null) {
+                           IDBObject valObj = (IDBObject) val;
+                           DBObject valDBObj = valObj.getDBObject();
+                           if (valDBObj.isPrototype()) {
+                              // TODO: update the reverse property (a list at this point)?
+                              //if (propDesc.reversePropDesc != null)
+                              //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
+                              valDBObj.setPrototype(false);
+                           }
+                        }
+                     }
+                     else {// TODO: is this a useful case? need some way here to create whatever value we have from the list of result set values
+                        System.err.println("*** Unsupported case - multiCol property that's not a reference");
+                        val = null;
+                     }
                   }
                }
+
                if (fi == 0 && !rowValSet) {
                   currentRowVal = (IDBObject) val;
                   rowValSet = true;
@@ -961,7 +995,13 @@ public class SelectQuery implements Cloneable {
 
    private void appendTableSelect(StringBuilder queryStr, SelectTableDesc selectTable) {
       boolean first = true;
+      if (selectTable.selectDynColumn) {
+         first = false;
+         appendColumnSelect(queryStr, selectTable, DBTypeDescriptor.DBDynPropsColumnName);
+      }
       for (DBPropertyDescriptor prop:selectTable.props) {
+         if (prop.dynColumn)
+            continue;
          if (first)
             first = false;
          else
@@ -970,6 +1010,8 @@ public class SelectQuery implements Cloneable {
       }
       if (selectTable.revColumns != null) {
          for (DBPropertyDescriptor prop:selectTable.revColumns) {
+            if (prop.dynColumn)
+               continue;
             if (first)
                first = false;
             else
@@ -989,13 +1031,17 @@ public class SelectQuery implements Cloneable {
       return null;
    }
 
-   public void appendColumnName(StringBuilder queryStr, SelectTableDesc tableDesc, DBPropertyDescriptor prop) {
+   public void appendColumnSelect(StringBuilder queryStr, SelectTableDesc tableDesc, String colName) {
       String alias = selectTables.size() == 1 ? null : tableDesc.getTableAlias();
       if (alias != null) {
          queryStr.append(alias);
          queryStr.append(".");
       }
-      queryStr.append(prop.columnName);
+      queryStr.append(colName);
+   }
+
+   public void appendColumnName(StringBuilder queryStr, SelectTableDesc tableDesc, DBPropertyDescriptor prop) {
+      appendColumnSelect(queryStr, tableDesc, prop.columnName);
 
       DBTypeDescriptor refTypeDesc = prop.refDBTypeDesc;
       if (refTypeDesc != null && !prop.onDemand && tableDesc.hasJoinTableForRef(prop)) {
@@ -1069,7 +1115,50 @@ public class SelectQuery implements Cloneable {
          whereAppendIdent(selectTable.getTableAlias());
          DBUtil.append(whereSB, null, ".");
       }
-      DBUtil.appendIdent(whereSB, null, prop.columnName);
+      if (!prop.dynColumn) {
+         DBUtil.appendIdent(whereSB, null, prop.columnName);
+      }
+      else {
+         String castType = DBUtil.getJSONCastType(prop.getDBColumnType());
+         if (castType != null)
+            whereSB.append("CAST(");
+         DBUtil.appendIdent(whereSB, null, DBTypeDescriptor.DBDynPropsColumnName);
+         whereSB.append(" ->> '");
+         whereSB.append(prop.propertyName);
+         whereSB.append("'");
+         if (castType != null) {
+            whereSB.append(" AS ");
+            whereSB.append(castType);
+            whereSB.append(")");
+         }
+      }
+   }
+
+   public void appendDynWhereColumn(String tableName, DBPropertyDescriptor prop, String subPropPath) {
+      initWhereQuery();
+      numWhereColumns++;
+      if (selectTables.size() > 1) {
+         whereAppendIdent(tableName);
+         DBUtil.append(whereSB, null, ".");
+      }
+      DBUtil.appendIdent(whereSB, null, DBTypeDescriptor.DBDynPropsColumnName);
+      if (subPropPath == null)
+         whereSB.append(" ->> '");
+      else
+         whereSB.append(" -> '");
+      whereSB.append(prop.propertyName);
+      whereSB.append("'");
+      if (subPropPath != null) {
+         if (subPropPath.indexOf('.') != -1)
+            System.err.println("*** TODO: Need to add -> for the intermediate paths");
+         whereSB.append(" ->> '");
+         whereSB.append(subPropPath);
+         whereSB.append("'");
+      }
+   }
+
+   public void appendDynLogWhereColumn(StringBuilder logSB, String tableName, DBPropertyDescriptor prop, String subPropPath) {
+      logSB.append("TODO: dynColumn property");
    }
 
    public void appendJSONWhereColumn(String tableName, String colName, String propPath) {

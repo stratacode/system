@@ -29,6 +29,8 @@ class SelectTableDesc {
    // Only set if this table is used more than once
    String alias;
 
+   boolean selectDynColumn = false;
+
    SelectTableDesc copyForRef(DBPropertyDescriptor refProp) {
       SelectTableDesc res = new SelectTableDesc();
       res.table = table;
@@ -46,6 +48,7 @@ class SelectTableDesc {
       res.refProp = refProp;
       res.alias = alias;
       res.joinedFrom = joinedFrom;
+      res.selectDynColumn = selectDynColumn;
       if (joinedTo != null)
          res.joinedTo = new ArrayList<SelectTableDesc>(joinedTo);
       return res;
@@ -57,9 +60,11 @@ class SelectTableDesc {
       if (props != null) {
          sb.append(" (");
          for (int i = 0; i < props.size(); i++) {
-            Object prop = props.get(i);
+            DBPropertyDescriptor prop = props.get(i);
             if (i != 0)
                sb.append(", ");
+            if (prop.dynColumn)
+               sb.append("dyn:");
             sb.append(prop);
          }
          sb.append(") ");
@@ -81,6 +86,7 @@ class SelectTableDesc {
       res.refProp = refProp;
       res.alias = alias;
       res.joinedFrom = joinedFrom;
+      res.selectDynColumn = selectDynColumn;
       if (joinedTo != null)
          res.joinedTo = new ArrayList<SelectTableDesc>(joinedTo);
       return res;

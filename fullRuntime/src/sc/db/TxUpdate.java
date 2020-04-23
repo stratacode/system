@@ -5,10 +5,7 @@ import sc.type.IBeanMapper;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.TreeMap;
+import java.util.*;
 
 public class TxUpdate extends VersionedOperation {
    public ArrayList<PropUpdate> updateList = new ArrayList<PropUpdate>();
@@ -69,23 +66,26 @@ public class TxUpdate extends VersionedOperation {
          idVals.add(val);
       }
 
-      ArrayList<DBPropertyDescriptor> columnProps = new ArrayList<DBPropertyDescriptor>();
+      ArrayList<String> columnNames = new ArrayList<String>();
       ArrayList<Object> columnValues = new ArrayList<Object>();
+      ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
 
-      addColumnsAndValues(updateTable, columnProps, columnValues);
+      addColumnsAndValues(updateTable, columnNames, columnTypes, columnValues);
 
       // No changes for this table
-      if (columnProps.size() == 0)
+      if (columnNames.size() == 0)
          return 0;
 
       long newVersion = -1;
-      if (versProp != null && !columnProps.contains(versProp)) {
-         columnProps.add(versProp);
+      if (versProp != null && !columnNames.contains(versProp.columnName)) {
+         columnNames.add(versProp.columnName);
+         columnTypes.add(versProp.getDBColumnType());
          newVersion = version + 1;
          columnValues.add(newVersion);
       }
-      if (lmtProp != null && !columnProps.contains(lmtProp)) {
-         columnProps.add(lmtProp);
+      if (lmtProp != null && !columnNames.contains(lmtProp.columnName)) {
+         columnNames.add(lmtProp.columnName);
+         columnTypes.add(lmtProp.getDBColumnType());
          columnValues.add(lmtValue = new Date());
       }
 
@@ -93,7 +93,7 @@ public class TxUpdate extends VersionedOperation {
       sb.append("UPDATE ");
       DBUtil.appendIdent(sb, null, updateTable.tableName);
       sb.append(" SET ");
-      int numCols = columnProps.size();
+      int numCols = columnNames.size();
 
       StringBuilder logSB = DBUtil.verbose ? new StringBuilder(sb.toString()) : null;
 
@@ -101,11 +101,11 @@ public class TxUpdate extends VersionedOperation {
          if (i != 0) {
             DBUtil.append(sb, logSB, ", ");
          }
-         DBUtil.appendIdent(sb, logSB, columnProps.get(i).columnName);
+         DBUtil.appendIdent(sb, logSB, columnNames.get(i));
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(columnValues.get(i), columnProps.get(i).getDBColumnType()));
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i)));
       }
       DBUtil.append(sb, logSB, " WHERE ");
 
@@ -136,8 +136,7 @@ public class TxUpdate extends VersionedOperation {
             PreparedStatement st = conn.prepareStatement(updateStr);
             int pos = 1;
             for (int i = 0; i < numCols; i++) {
-               DBPropertyDescriptor colProp = columnProps.get(i);
-               DBColumnType colType = colProp.refDBTypeDesc == null ? colProp.getDBColumnType() : colProp.refDBTypeDesc.getIdDBColumnType(0);
+               DBColumnType colType = columnTypes.get(i);
                DBUtil.setStatementValue(st,  pos++, colType, columnValues.get(i));
             }
             for (int i = 0; i < numIdCols; i++) {
@@ -189,17 +188,41 @@ public class TxUpdate extends VersionedOperation {
       return 1;
    }
 
-   private void addColumnsAndValues(TableDescriptor tableDesc, ArrayList<DBPropertyDescriptor> columnProps, ArrayList<Object> columnValues) {
+   private void addColumnsAndValues(TableDescriptor tableDesc, ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues) {
+      Map<String,Object> tableDynProps = null;
+
       for (PropUpdate propUpdate:updateList) {
          DBPropertyDescriptor prop = propUpdate.prop;
          if (prop.tableDesc == tableDesc) {
-            columnProps.add(prop);
-            Object value = propUpdate.value;
-            if (prop.refDBTypeDesc != null && value != null) {
-               value = ((IDBObject) value).getDBId();
+            if (prop.dynColumn) {
+               if (tableDynProps == null)
+                  tableDynProps = new HashMap<String,Object>();
+               tableDynProps.put(prop.propertyName, propUpdate.value);
             }
-            columnValues.add(value);
+            else {
+               columnNames.add(prop.columnName);
+               Object value = propUpdate.value;
+               if (prop.refDBTypeDesc != null) {
+                  columnTypes.add(prop.refDBTypeDesc.getIdDBColumnType(0));
+                  if (value != null)
+                     value = ((IDBObject) value).getDBId();
+               }
+               else
+                  columnTypes.add(prop.getDBColumnType());
+               columnValues.add(value);
+            }
          }
+      }
+      if (tableDynProps != null) {
+         for (int i = 0; i < tableDesc.columns.size(); i++) {
+            DBPropertyDescriptor col = tableDesc.columns.get(i);
+            if (col.dynColumn && tableDynProps.get(col.propertyName) == null) {
+               tableDynProps.put(col.propertyName, dbObject.getProperty(col.propertyName));
+            }
+         }
+         columnNames.add(DBTypeDescriptor.DBDynPropsColumnName);
+         columnTypes.add(DBColumnType.Json);
+         columnValues.add(tableDynProps);
       }
    }
 

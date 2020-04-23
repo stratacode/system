@@ -513,6 +513,8 @@ public class DBProvider {
 
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
 
+      boolean defaultDynColumn = false;
+
       if (typeSettings != null) {
          for (Object annot:typeSettings) {
             String tmpVersionProp = (String) ModelUtil.getAnnotationValue(annot, "versionProp");
@@ -526,6 +528,10 @@ public class DBProvider {
             Boolean tmpInheritProperties = (Boolean) ModelUtil.getAnnotationValue(annot, "inheritProperties");
             if (tmpInheritProperties != null)
                inheritProperties = tmpInheritProperties;
+            Boolean tmpDefaultDynColumn = (Boolean) ModelUtil.getAnnotationValue(annot, "defaultDynColumn");
+            if (tmpDefaultDynColumn != null) {
+               defaultDynColumn = tmpDefaultDynColumn;
+            }
          }
 
          ArrayList<TableDescriptor> auxTables = new ArrayList<TableDescriptor>();
@@ -570,6 +576,7 @@ public class DBProvider {
                boolean propRequired = false;
                boolean propUnique = false;
                boolean propIndexed = false;
+               boolean propDynColumn = defaultDynColumn;
                String propDataSourceName = null;
                String propFetchGroup = null;
                String propReverseProperty = null;
@@ -634,6 +641,11 @@ public class DBProvider {
                   String tmpDBDefault = (String) ModelUtil.getAnnotationValue(propSettings, "dbDefault");
                   if (tmpDBDefault != null) {
                      propDBDefault = tmpDBDefault;
+                  }
+
+                  Boolean tmpDynColumn = (Boolean) ModelUtil.getAnnotationValue(propSettings, "dynColumn");
+                  if (tmpDynColumn != null) {
+                     propDynColumn = tmpDynColumn;
                   }
                }
                else {
@@ -732,7 +744,7 @@ public class DBProvider {
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
-                          propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
+                          propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed, propDynColumn,
                           propDataSourceName, propFetchGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault, fullTypeName);
@@ -766,6 +778,10 @@ public class DBProvider {
                propTable.addColumnProperty(propDesc);
             }
          }
+         // Need to add the db_dyn_props column even for a table with no dyn properties so that we can add the
+         // first one. Use the defaultDynColumn flag to signal this.
+         if (defaultDynColumn && !primaryTable.hasDynColumns)
+            primaryTable.hasDynColumns = true;
          dbTypeDesc.initTables(auxTables, multiTables, versionProp, false);
          initTableProperties(sys, refLayer, dbTypeDesc);
 

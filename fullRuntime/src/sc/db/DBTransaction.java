@@ -31,6 +31,8 @@ public class DBTransaction {
 
    public boolean applyingDBChanges = false;
 
+   public boolean autoCommit = true;
+
    public String lastThreadName;
 
    public DBTransaction() {
@@ -100,7 +102,7 @@ public class DBTransaction {
          if (conn != null)
             return conn;
       }
-      conn = DBUtil.createConnection(dataSource);
+      conn = DBUtil.createConnection(dataSource, autoCommit);
       connections.put(dataSource, conn);
       return conn;
    }

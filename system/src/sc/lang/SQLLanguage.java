@@ -40,7 +40,7 @@ public class SQLLanguage extends SCLanguage {
       addToSemanticValueClassPath("sc.lang.sql");
       addToSemanticValueClassPath("sc.lang.sql.seqOpt");
       addToSemanticValueClassPath("sc.lang.sql.funcOpt");
-      languageName = "SC SQL";
+      languageName = "SCSQL";
       defaultExtension = "scsql";
       if (INSTANCE == null)
          INSTANCE = this;
@@ -64,6 +64,15 @@ public class SQLLanguage extends SCLanguage {
          super(s, IGNORE_CASE);
       }
       ICSymbolSpace(String s, int opts) {
+         super(s, opts | IGNORE_CASE);
+      }
+   }
+
+   class ICKeywordSpace extends KeywordSpace {
+      ICKeywordSpace(String s) {
+         super(s, IGNORE_CASE);
+      }
+      ICKeywordSpace(String s, int opts) {
          super(s, opts | IGNORE_CASE);
       }
    }
@@ -128,32 +137,31 @@ public class SQLLanguage extends SCLanguage {
       Start, End
    }
 
-   ICSymbolSpace noKeyword = new ICSymbolSpace("no");
-   ICSymbolSpace notKeyword = new ICSymbolSpace("not");
-   ICSymbolSpace nullKeyword = new ICSymbolSpace("null");
-   ICSymbolSpace trueKeyword = new ICSymbolSpace("true");
-   ICSymbolSpace falseKeyword = new ICSymbolSpace("false");
-   ICSymbolSpace withKeyword = new ICSymbolSpace("with");
-   ICSymbolSpace optionsKeyword = new ICSymbolSpace("options");
-   ICSymbolSpace whereKeyword = new ICSymbolSpace("where");
-   ICSymbolSpace matchKeyword = new ICSymbolSpace("match");
-   ICSymbolSpace onKeyword = new ICSymbolSpace("on");
-   ICSymbolSpace actionKeyword = new ICSymbolSpace("action");
-   ICSymbolSpace setKeyword = new ICSymbolSpace("set");
-   ICSymbolSpace defaultKeyword = new ICSymbolSpace("default");
-   ICSymbolSpace primaryKeyword = new ICSymbolSpace("primary");
-   ICSymbolSpace keyKeyword = new ICSymbolSpace("key");
-   ICSymbolSpace referencesKeyword = new ICSymbolSpace("references");
-   ICSymbolSpace likeKeyword = new ICSymbolSpace("like");
-   ICSymbolSpace ifKeyword = new ICSymbolSpace("if");
-   ICSymbolSpace ofKeyword = new ICSymbolSpace("of");
-   ICSymbolSpace asKeyword = new ICSymbolSpace("as");
-   ICSymbolSpace tableKeyword = new ICSymbolSpace("table");
-   ICSymbolSpace typeKeyword = new ICSymbolSpace("type");
-   ICSymbolSpace existsKeyword = new ICSymbolSpace("exists");
-   ICSymbolSpace dollarKeyword = new ICSymbolSpace("$");
-   ICSymbolSpace byKeyword = new ICSymbolSpace("by");
-   ICSymbolSpace optByKeyword = new ICSymbolSpace("by", OPTIONAL);
+   ICKeywordSpace noKeyword = new ICKeywordSpace("no");
+   ICKeywordSpace notKeyword = new ICKeywordSpace("not");
+   ICKeywordSpace nullKeyword = new ICKeywordSpace("null");
+   ICKeywordSpace trueKeyword = new ICKeywordSpace("true");
+   ICKeywordSpace falseKeyword = new ICKeywordSpace("false");
+   ICKeywordSpace withKeyword = new ICKeywordSpace("with");
+   ICKeywordSpace optionsKeyword = new ICKeywordSpace("options");
+   ICKeywordSpace whereKeyword = new ICKeywordSpace("where");
+   ICKeywordSpace matchKeyword = new ICKeywordSpace("match");
+   ICKeywordSpace onKeyword = new ICKeywordSpace("on");
+   ICKeywordSpace actionKeyword = new ICKeywordSpace("action");
+   ICKeywordSpace setKeyword = new ICKeywordSpace("set");
+   ICKeywordSpace defaultKeyword = new ICKeywordSpace("default");
+   ICKeywordSpace primaryKeyword = new ICKeywordSpace("primary");
+   ICKeywordSpace keyKeyword = new ICKeywordSpace("key");
+   ICKeywordSpace referencesKeyword = new ICKeywordSpace("references");
+   ICKeywordSpace likeKeyword = new ICKeywordSpace("like");
+   ICKeywordSpace ifKeyword = new ICKeywordSpace("if");
+   ICKeywordSpace ofKeyword = new ICKeywordSpace("of");
+   ICKeywordSpace asKeyword = new ICKeywordSpace("as");
+   ICKeywordSpace tableKeyword = new ICKeywordSpace("table");
+   ICKeywordSpace typeKeyword = new ICKeywordSpace("type");
+   ICKeywordSpace existsKeyword = new ICKeywordSpace("exists");
+   ICKeywordSpace byKeyword = new ICKeywordSpace("by");
+   ICKeywordSpace optByKeyword = new ICKeywordSpace("by", OPTIONAL);
 
    ICSymbol dollarSymbol = new ICSymbol("$");
 
@@ -480,7 +488,7 @@ public class SQLLanguage extends SCLanguage {
                                           sqlIdentifier, funcArgList, funcReturn, funcOptions);
 
    OrderedChoice createChoice = new OrderedChoice("(.,.,.,.,.)", createTable, createType, createIndex, createSequence, createFunction);
-   Sequence createCommand = new Sequence("(,.,)", new ICSymbolSpace("create"), createChoice, semicolonEOL2);
+   Sequence createCommand = new Sequence("(,.,)", new ICKeywordSpace("create"), createChoice, semicolonEOL2);
 
    ICSymbolChoiceSpace dropOptions = new ICSymbolChoiceSpace(OPTIONAL, "cascade", "restrict");
 
@@ -493,7 +501,7 @@ public class SQLLanguage extends SCLanguage {
    Sequence dropSequence = new Sequence("DropSequence(,ifExists,seqNames,dropOptions)", sequenceKeyword, ifExists,
                                      sqlIdentifierCommaList, dropOptions);
 
-   ICSymbolSpace dropKeyword = new ICSymbolSpace("drop");
+   ICKeywordSpace dropKeyword = new ICKeywordSpace("drop");
 
    OrderedChoice dropChoice = new OrderedChoice("(.,.,.,.,.)", dropTable, dropType, dropIndex, dropFunction, dropSequence);
 
@@ -527,7 +535,7 @@ public class SQLLanguage extends SCLanguage {
    Sequence alterDefs = new Sequence("([],[])", alterDef, new Sequence("(,[])", REPEAT | OPTIONAL, commaEOL, alterDef));
 
    Sequence alterTable = new Sequence("AlterTable(,ifExists,only,tableName,alterDefs)",
-           new ICSymbolSpace("table"), ifExists, new ICSymbolSpace("only", OPTIONAL), sqlIdentifier, alterDefs);
+           tableKeyword, ifExists, new ICSymbolSpace("only", OPTIONAL), sqlIdentifier, alterDefs);
 
    OrderedChoice alterChoice = new OrderedChoice("(.)", alterTable);
    Sequence alterCommand = new Sequence("(,.,)", new ICSymbolSpace("alter"), alterChoice, semicolonEOL);

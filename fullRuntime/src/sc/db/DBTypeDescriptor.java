@@ -23,6 +23,9 @@ public class DBTypeDescriptor {
    public final static String DBTypeIdColumnName = "db_type_id";
    public final static String LastModifiedPropertyName = "lastModified";
 
+   public final static String DBDynPropsColumnName = "db_dyn_props";
+   public final static String DBDynPropsColumnType = "jsonb";
+
    /** Two reserved type ids - either not specified or it's an abstract type so it's not created */
    public final static int DBUnsetTypeId = -1;
    public final static int DBAbstractTypeId = -2;
@@ -126,6 +129,9 @@ public class DBTypeDescriptor {
    public String defaultFetchGroup;
 
    /** The cache of instances for this type but only if baseType = null - otherwise, we use the baseType's typeInstances cache */
+   // TODO: need a way to expire the cache. I'm thinking framework hooks installed by type to control the behavior:
+   // LRU cache, flush at the end of a transaction for all objects touched in that transaction, or for objects cached
+   // in a ScopeContext, they will get removed when the scope context is disposed (e.g. per session).
    public ConcurrentHashMap<Object,IDBObject> typeInstances = null;
 
    private boolean initialized = false, resolved = false, started = false, activated = false;
@@ -218,7 +224,7 @@ public class DBTypeDescriptor {
          subTypesById = new HashMap<Integer,DBTypeDescriptor>();
          if (!runtimeMode) {
             typeIdProperty = new DBPropertyDescriptor("dbTypeId", "db_type_id", "integer", null,
-                    true, false, false, false, null, null,
+                    true, false, false, false, false, null, null,
                     null, false,  null, null, getTypeName());
             typeIdProperty.typeIdProperty = true;
             primaryTable.addTypeIdProperty(typeIdProperty);
@@ -1196,12 +1202,22 @@ public class DBTypeDescriptor {
                   if (nextInChain instanceof IBeanMapper) {
                      IBeanMapper nextMapper = (IBeanMapper) nextInChain;
                      DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(nextMapper.getPropertyName());
-                     if (pathProp != null && pathProp.getDBColumnType() == DBColumnType.Json) {
-                        StringBuilder logSB = curQuery.logSB;
-                        if (logSB != null) {
-                           StringBuilder propPath = getVarBindPropPath(varBind, i + 1);
-                           curQuery.appendJSONLogWhereColumn(logSB, pathProp.getTableName(), pathProp.columnName, propPath.toString());
+                     if (pathProp != null) {
+                        if (pathProp.dynColumn) {
+                           StringBuilder logSB = curQuery.logSB;
+                           if (logSB != null) {
+                              StringBuilder subPath = getVarBindPropPath(varBind, i + 1);
+                              curQuery.appendDynLogWhereColumn(logSB, pathProp.getTableName(), pathProp, subPath.toString());
+                           }
                         }
+                        else if (pathProp.getDBColumnType() == DBColumnType.Json) {
+                           StringBuilder logSB = curQuery.logSB;
+                           if (logSB != null) {
+                              StringBuilder propPath = getVarBindPropPath(varBind, i + 1);
+                              curQuery.appendJSONLogWhereColumn(logSB, pathProp.getTableName(), pathProp.columnName, propPath.toString());
+                           }
+                        }
+
                      }
                      return;
                   }
@@ -1281,6 +1297,8 @@ public class DBTypeDescriptor {
                if (pathProp.getDBColumnType() == DBColumnType.Json) {
                   return;
                }
+               if (pathProp.dynColumn)
+                  return;
                throw new UnsupportedOperationException("Unhandled query property");
             }
             if (i == 0) {
@@ -1496,10 +1514,17 @@ public class DBTypeDescriptor {
                   IBeanMapper nextProp = (IBeanMapper) chainProp;
                   String propName = nextProp.getPropertyName();
                   DBPropertyDescriptor nextPropDesc = curTypeDesc.getPropertyDescriptor(propName);
-                  if (nextPropDesc != null && nextPropDesc.getDBColumnType() == DBColumnType.Json) {
-                     StringBuilder propPath = getVarBindPropPath(varBind, i + 1);
-                     curQuery.appendJSONWhereColumn(nextPropDesc.getTableName(), nextPropDesc.columnName, propPath.toString());
-                     return;
+                  if (nextPropDesc != null) {
+                     // This is a property that's stored in the db_dyn_props JSON column of this table
+                     if (nextPropDesc.dynColumn) {
+                        StringBuilder subPropPath = getVarBindPropPath(varBind, i + 1);
+                        curQuery.appendDynWhereColumn(nextPropDesc.getTableName(), nextPropDesc, subPropPath.toString());
+                     }
+                     else if (nextPropDesc.getDBColumnType() == DBColumnType.Json) {
+                        StringBuilder propPath = getVarBindPropPath(varBind, i + 1);
+                        curQuery.appendJSONWhereColumn(nextPropDesc.getTableName(), nextPropDesc.columnName, propPath.toString());
+                        return;
+                     }
                   }
                }
                else if (chainProp instanceof IBinding)

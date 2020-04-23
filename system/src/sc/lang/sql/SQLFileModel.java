@@ -279,8 +279,8 @@ public class SQLFileModel extends SCModel {
          newTable = true;
       }
       SemanticNodeList<TableDef> tableDefs = new SemanticNodeList<TableDef>();
-      appendColumnDefs(createTable, tableDefs, tableDesc.getIdColumns(), true, tableDesc.multiRow);
-      appendColumnDefs(createTable, tableDefs, tableDesc.columns, false, tableDesc.multiRow);
+      appendColumnDefs(createTable, tableDefs, tableDesc.getIdColumns(), true, tableDesc.multiRow, false);
+      appendColumnDefs(createTable, tableDefs, tableDesc.columns, false, tableDesc.multiRow, tableDesc.hasDynColumns);
       if (createTable.tableDefs == null)
          createTable.setProperty("tableDefs", tableDefs);
       else {
@@ -297,8 +297,14 @@ public class SQLFileModel extends SCModel {
       createTable.setComment("/* " + (tableDesc.primary ? "Primary" : (tableDesc.multiRow ? "Multi for: " + tableDesc.columns.get(0) : "Auxiliary")) + " */");
    }
 
-   private void appendColumnDefs(CreateTable createTable, List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList, boolean isId, boolean multiRow) {
+   private void appendColumnDefs(CreateTable createTable, List<TableDef> tableDefs, List<? extends DBPropertyDescriptor> propDescList,
+                                  boolean isId, boolean multiRow, boolean initHasDynColumns) {
+      boolean hasDynCols = initHasDynColumns;
       for (DBPropertyDescriptor propDesc:propDescList) {
+         if (propDesc.dynColumn) {
+            hasDynCols = true;
+            continue;
+         }
          String colName = propDesc.columnName;
          String colType = propDesc.columnType;
          ColumnDef colDef = createTable == null ? null : createTable.findColumn(colName);
@@ -310,9 +316,7 @@ public class SQLFileModel extends SCModel {
             continue;
          }
 
-         colDef = new ColumnDef();
-         colDef.setProperty("columnName", SQLIdentifier.create(propDesc.columnName));
-         colDef.setProperty("columnType", SQLDataType.create(propDesc.columnType));
+         colDef = ColumnDef.create(propDesc.columnName, propDesc.columnType);
          // If it's a single column primary key, add it here - otherwise, it's a new constraint at the table level
          if (isId && propDescList.size() == 1) {
             SemanticNodeList<SQLConstraint> constraints = new SemanticNodeList<SQLConstraint>();
@@ -369,6 +373,9 @@ public class SQLFileModel extends SCModel {
          if (setProp)
             colDef.setProperty("columnConstraints", constraints);
          tableDefs.add(colDef);
+      }
+      if (hasDynCols) {
+         tableDefs.add(ColumnDef.create(DBTypeDescriptor.DBDynPropsColumnName, DBTypeDescriptor.DBDynPropsColumnType));
       }
    }
 

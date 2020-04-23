@@ -360,7 +360,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
          styleName = "keyword";
       }
       public KeywordSpace(String symbol, int options) {
-         this("<keyword_" + symbol + ">" + "('',,)", options, symbol);
+         this("<" + ((options & OPTIONAL) != 0 ? "opt_" : "") + ((options & IGNORE_CASE) != 0 ? "ic_" : "") + "keyword_" +  symbol + ">" + "('',,)", options, symbol);
       }
       public KeywordSpace(String symbol) {
          this(symbol, 0);

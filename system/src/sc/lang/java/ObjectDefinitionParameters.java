@@ -846,6 +846,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append("null");
       else
          appendProperty(sb, tableDesc.reverseProperty, false, "sc.db.DBPropertyDescriptor");
+      sb.append(", ");
+      sb.append(tableDesc.hasDynColumns);
 
       sb.append(")");
    }
@@ -889,6 +891,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append(propDesc.onDemand);
          sb.append(", ");
          sb.append(propDesc.indexed);
+         if (!(propDesc instanceof MultiColPropertyDescriptor)) {
+            sb.append(", ");
+            sb.append(propDesc.dynColumn);
+         }
          appendString(sb, propDesc.dataSourceName, true);
          appendString(sb, propDesc.selectGroup, true);
          appendString(sb, propDesc.refTypeName, true);

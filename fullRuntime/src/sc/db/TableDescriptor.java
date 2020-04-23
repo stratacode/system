@@ -28,6 +28,8 @@ public class TableDescriptor {
    /** Set to true for descriptors that refer to tables defined elsewhere - so no schema is generated */
    public boolean reference = false;
 
+   public boolean hasDynColumns = false;
+
    /**
     * Set for the 'many' side of a 1-many case where the id column here is used for the 'value' of the reverse property, so
     * there is no reverse property descriptor in the columns list. We still need to look up this property descriptor from
@@ -41,18 +43,22 @@ public class TableDescriptor {
    }
 
    public TableDescriptor(String tableName, List<IdPropertyDescriptor> idColumns, List<DBPropertyDescriptor> columns,
-                          DBPropertyDescriptor reverseProp) {
+                          DBPropertyDescriptor reverseProp, boolean hasDynColumns) {
       this.tableName = tableName;
       this.idColumns = idColumns;
       this.columns = columns;
       this.reverseProperty = reverseProp;
+      this.hasDynColumns = hasDynColumns;
       if (idColumns != null) {
          for (IdPropertyDescriptor idCol:idColumns)
             idCol.tableName = tableName;
       }
       if (columns != null) {
-         for (DBPropertyDescriptor col:columns)
+         for (DBPropertyDescriptor col:columns) {
             col.tableName = tableName;
+            if (col.dynColumn)
+               this.hasDynColumns = true;
+         }
       }
       if (reverseProp != null)
          reverseProp.tableName = tableName;
@@ -67,10 +73,16 @@ public class TableDescriptor {
       else {
          for (DBPropertyDescriptor col:columns) {
             col.init(dbTypeDesc, this);
-            // TODO: this gets put into the runtime version as a normal column so identifying here by name but maybe
+            // TODO: this gets put into the runtime version as a normal column so identifying here by name
             if (col.columnName.equals(DBTypeDescriptor.DBTypeIdColumnName)) {
                col.typeIdProperty = true;
                dbTypeDesc.typeIdProperty = col;
+            }
+            if (col.dynColumn) {
+               if (multiRow)
+                  System.err.println("*** multiRow table has dynColumn property - not yet supported");
+               else
+                  hasDynColumns = true;
             }
          }
       }

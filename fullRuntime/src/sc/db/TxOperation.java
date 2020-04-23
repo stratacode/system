@@ -1,13 +1,16 @@
 package sc.db;
 
 import sc.type.IBeanMapper;
+import sc.util.JSON;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public abstract class TxOperation {
    DBTransaction transaction;
@@ -471,8 +474,9 @@ public abstract class TxOperation {
                                     List<DBPropertyDescriptor> dbReturnCols, List<Boolean> columnIsReference) {
       Object inst = dbObject.getInst();
 
+      Map<String,Object> tableDynProps = null;
+
       for (DBPropertyDescriptor col:cols) {
-         int numCols = col.getNumColumns();
          Object val;
          if (col.typeIdProperty) {
             int typeId = dbTypeDesc.typeId;
@@ -486,39 +490,56 @@ public abstract class TxOperation {
             IBeanMapper mapper = col.getPropertyMapper();
             val = mapper.getPropertyValue(inst, false, false);
          }
-         if (numCols == 1) {
+         if (col.dynColumn) {
             if (val != null) {
-               DBColumnType colType;
-               if (col.refDBTypeDesc != null) {
-                  val = col.refDBTypeDesc.getIdColumnValue(val, 0);
-                  colType = col.refDBTypeDesc.getIdDBColumnType(0);
-               }
-               else
-                  colType = col.getDBColumnType();
-               columnNames.add(col.columnName);
-               columnTypes.add(colType);
-               columnValues.add(val);
-               if (columnIsReference != null)
-                  columnIsReference.add(col.refDBTypeDesc != null);
-            }
-
-            if (col.dbDefault != null && col.dbDefault.length() > 0) {
-               dbReturnCols.add(col);
+               if (tableDynProps == null)
+                  tableDynProps = new HashMap<String,Object>();
+               tableDynProps.put(col.propertyName, val);
             }
          }
          else {
-            if (col.refDBTypeDesc != null) {
-               for (int ci = 0; ci < numCols; ci++) {
-                  columnNames.add(col.getColumnName(ci));
-                  columnTypes.add(col.refDBTypeDesc.getIdDBColumnType(ci));
-                  columnValues.add(col.refDBTypeDesc.getIdColumnValue(val, ci));
+            int numCols = col.getNumColumns();
+            if (numCols == 1) {
+               if (val != null) {
+                  DBColumnType colType;
+                  if (col.refDBTypeDesc != null) {
+                     val = col.refDBTypeDesc.getIdColumnValue(val, 0);
+                     colType = col.refDBTypeDesc.getIdDBColumnType(0);
+                  }
+                  else
+                     colType = col.getDBColumnType();
+                  columnNames.add(col.columnName);
+                  columnTypes.add(colType);
+                  columnValues.add(val);
                   if (columnIsReference != null)
-                     columnIsReference.add(Boolean.TRUE);
+                     columnIsReference.add(col.refDBTypeDesc != null);
+               }
+
+               if (col.dbDefault != null && col.dbDefault.length() > 0) {
+                  dbReturnCols.add(col);
                }
             }
-            else
-               System.err.println("*** Multi column key with no way to map columns");
+            else {
+               if (col.refDBTypeDesc != null) {
+                  for (int ci = 0; ci < numCols; ci++) {
+                     columnNames.add(col.getColumnName(ci));
+                     columnTypes.add(col.refDBTypeDesc.getIdDBColumnType(ci));
+                     columnValues.add(col.refDBTypeDesc.getIdColumnValue(val, ci));
+                     if (columnIsReference != null)
+                        columnIsReference.add(Boolean.TRUE);
+                  }
+               }
+               else
+                  System.err.println("*** Multi column key with no way to map columns");
+            }
          }
+      }
+      if (tableDynProps != null) {
+         columnNames.add(DBTypeDescriptor.DBDynPropsColumnName);
+         columnValues.add(tableDynProps);
+         columnTypes.add(DBColumnType.Json);
+         if (columnIsReference != null)
+            columnIsReference.add(Boolean.FALSE);
       }
    }
 
