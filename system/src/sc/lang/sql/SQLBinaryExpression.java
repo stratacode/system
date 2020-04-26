@@ -1,5 +1,7 @@
 package sc.lang.sql;
 
+import sc.lang.SemanticNodeList;
+
 import java.util.List;
 
 public class SQLBinaryExpression extends SQLExpression {
@@ -18,6 +20,18 @@ public class SQLBinaryExpression extends SQLExpression {
          return sb.toString();
       }
       return super.toSafeLanguageString();
+   }
+
+   public static SQLBinaryExpression create(SQLExpression first, String op, SQLExpression second) {
+      SQLBinaryExpression res = new SQLBinaryExpression();
+      res.setProperty("firstExpr", first);
+      SQLBinaryOperand operand = new SQLBinaryOperand();
+      operand.operator = op;
+      operand.setProperty("rhs", second);
+      List<SQLBinaryOperand> ops = new SemanticNodeList<SQLBinaryOperand>();
+      ops.add(operand);
+      res.setProperty("operands", ops);
+      return res;
    }
 
 }

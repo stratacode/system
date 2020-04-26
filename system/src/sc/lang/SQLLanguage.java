@@ -182,8 +182,11 @@ public class SQLLanguage extends SCLanguage {
       spacing.put("--", EOLComment);
    }
 
-   public ICSymbolChoiceSpace binaryOperators = new ICSymbolChoiceSpace("and", "or", "<>", "=", "!=", "<", ">", "<=", ">=",
-           "between", "is", "+", "-", "*", "/", "%", "^", "&", "|", "<<", ">>", "like", "&&", "||", "@>", "<@", "from");
+   public ICSymbolChoiceSpace binaryOperators = new ICSymbolChoiceSpace("and", "or", "<>", "=", "!=", "<", ">", "<=", ">=", "->>", "->",
+           "between", "is", "+", "-", "*", "/", "%", "^", "&", "|", "<<", ">>", "like", "&&", "||", "@>", "<@", "from",
+           // TODO: Treating 'as' as a binary operator even though it shows up only in the 'cast' function. Also :: is a binary operator even though the RHS is
+           // always a sqlDataType, not an expression.
+           "as", "::");
 
    public Sequence quotedIdentifier = new Sequence("QuotedIdentifier(,value,)", doubleQuote, sqlEscapedStringBody, endDoubleQuote);
 
@@ -248,8 +251,6 @@ public class SQLLanguage extends SCLanguage {
 
    Sequence sqlIdentifierExpression = new Sequence("SQLIdentifierExpression(identifier)", sqlIdentifier);
 
-   // TODO :: casting
-
    {
       sqlPrimary.put("(", sqlParenExpression);
       sqlPrimary.put("'", sqlQuotedStringLiteral);
@@ -265,7 +266,7 @@ public class SQLLanguage extends SCLanguage {
       sqlPrimary.put("f", falseLiteral);
       sqlPrimary.put("F", falseLiteral);
       sqlPrimary.put("X", hexStringLiteral);
-      // TODO
+      // TODO - unicode string literals
       //sqlExpression.put("U&", ucStringLiteral);
       sqlPrimary.put("E", escapedStringLiteral);
       sqlPrimary.put("e", escapedStringLiteral);

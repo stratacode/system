@@ -1045,7 +1045,10 @@ public class DBTypeDescriptor {
             DBUtil.appendVal(logSB, propValue, null);
             logSB.append(" = ");
          }
-         curQuery.appendLogWhereColumn(logSB, parentProp, dbProp);
+         if (dbProp.dynColumn)
+            curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), DBTypeDescriptor.DBDynPropsColumnName, dbProp.propertyName);
+         else
+            curQuery.appendLogWhereColumn(logSB, parentProp, dbProp);
       }
       if (compareVal) {
          curQuery.paramValues.add(propValue);

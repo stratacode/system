@@ -9,4 +9,10 @@ public class SQLIdentifierExpression extends SQLExpression {
       }
       return super.toSafeLanguageString();
    }
+
+   public static SQLIdentifierExpression create(String ident) {
+      SQLIdentifierExpression res = new SQLIdentifierExpression();
+      res.setProperty("identifier", SQLIdentifier.create(ident));
+      return res;
+   }
 }

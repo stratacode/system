@@ -11,4 +11,10 @@ public class QuotedStringLiteral extends SQLExpression {
       }
       return super.toSafeLanguageString();
    }
+
+   public static QuotedStringLiteral create(String str) {
+      QuotedStringLiteral res = new QuotedStringLiteral();
+      res.value = str;
+      return res;
+   }
 }

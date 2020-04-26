@@ -1121,15 +1121,14 @@ public class SelectQuery implements Cloneable {
       else {
          String castType = DBUtil.getJSONCastType(prop.getDBColumnType());
          if (castType != null)
-            whereSB.append("CAST(");
+            whereSB.append("(");
          DBUtil.appendIdent(whereSB, null, DBTypeDescriptor.DBDynPropsColumnName);
          whereSB.append(" ->> '");
          whereSB.append(prop.propertyName);
          whereSB.append("'");
          if (castType != null) {
-            whereSB.append(" AS ");
+            whereSB.append(")::");
             whereSB.append(castType);
-            whereSB.append(")");
          }
       }
    }

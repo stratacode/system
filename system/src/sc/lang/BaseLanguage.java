@@ -356,7 +356,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public class KeywordSpace extends Sequence {
       public KeywordSpace(String name, int options, String symbol) {
          super(name, options | NOERROR);
-         add(new Symbol(symbol), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar), spacing);
+         int symbolOpts = options & IGNORE_CASE;
+         add(new Symbol(symbolOpts, symbol), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar), spacing);
          styleName = "keyword";
       }
       public KeywordSpace(String symbol, int options) {

@@ -17,4 +17,10 @@ public class SQLParenExpression extends SQLExpression {
       }
       return super.toSafeLanguageString();
    }
+
+   public static SQLParenExpression create(SQLExpression expr) {
+      SQLParenExpression pe = new SQLParenExpression();
+      pe.setProperty("expression", expr);
+      return pe;
+   }
 }

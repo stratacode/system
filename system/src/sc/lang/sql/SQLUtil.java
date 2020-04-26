@@ -78,10 +78,27 @@ public class SQLUtil {
 
             if (prop.indexed) {
                CreateIndex propIndex = new CreateIndex();
-               propIndex.indexName = SQLIdentifier.create(prop.getTableName() + "_" + prop.columnName + "_index");
-               propIndex.tableName = SQLIdentifier.create(prop.getTableName());
-               propIndex.indexColumns = new SemanticNodeList<BaseIndexColumn>();
-               propIndex.indexColumns.add(IndexColumn.create(prop.columnName));
+               propIndex.setProperty("indexName",SQLIdentifier.create(prop.getTableName() + "_" + prop.columnName + "_index"));
+               propIndex.setProperty("tableName", SQLIdentifier.create(prop.getTableName()));
+               propIndex.setProperty("indexColumns", new SemanticNodeList<BaseIndexColumn>());
+               if (prop.dynColumn) {
+                  String castType = DBUtil.getJSONCastType(DBColumnType.fromColumnType(prop.columnType));
+                  IndexColumnExpr ice;
+                  if (castType != null) {
+                     ice = IndexColumnExpr.create(SQLParenExpression.create(SQLBinaryExpression.create(SQLParenExpression.create(
+                         SQLBinaryExpression.create(
+                             SQLIdentifierExpression.create(DBTypeDescriptor.DBDynPropsColumnName), "->>",
+                                QuotedStringLiteral.create(prop.propertyName))), "::", SQLIdentifierExpression.create(castType))));
+                  }
+                  else {
+                     ice = IndexColumnExpr.create(SQLParenExpression.create(
+                         SQLBinaryExpression.create(SQLIdentifierExpression.create(DBTypeDescriptor.DBDynPropsColumnName),
+                                                "->>", QuotedStringLiteral.create(prop.propertyName))));
+                  }
+                  propIndex.indexColumns.add(ice);
+               }
+               else
+                  propIndex.indexColumns.add(IndexColumn.create(prop.columnName));
 
                // If we've already added an index with this name, it overrides this version
                if (res.findMatchingCommand(propIndex) == null)
