@@ -286,7 +286,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
          if (needsOutputMethod)
             temp.generateOutputMethod = true;
 
-         // We need some type of base-type whih implements the invalidate method to be a stateful page.
+         // Stateful pages need to have a base class to implement the 'invalidate' methods so if there's no extendsType, it's not a stateful page.
          Object defaultExtendsClass;
          if (defaultExtendsType == null || statefulPages == false)
             temp.statefulPage = false;

@@ -11,7 +11,6 @@ import sc.dyn.IObjChildren;
 import sc.dyn.IScheduler;
 import sc.js.ServerTag;
 import sc.js.ServerTagContext;
-import sc.js.URLPath;
 import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.js.JSRuntimeProcessor;
@@ -183,7 +182,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient String cachedObjectName = null;
 
-   public final static boolean nestedTagsInStatements = false;
+   /**
+    * For an schtml page with a behavior tag like input or submit that's used in the context where the code expects
+    * a String, an error is generated unless this global flag is set to true. We need this option set to true for
+    * documenting snippets of schtml, and it's possible in code you'd want to use schtml to generate these tags.
+    * There's not much harm to set this to true so it's a global flag. It does mean these behavior tags won't work
+    * when there are in this context - you'll just see the HTML string generated.
+    */
+   public static boolean allowBehaviorTagsInContent = false;
+
    private static final boolean oldExecTag = false;
 
    // During code-generation, one element may be generated from another, e.g. for templates we clone statements that are children of a template declaration.  This
@@ -694,12 +701,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // TODO: Do we need to do anything to tags nested inside of TemplateStatements?  I.e. those that would be theoretically created/destroyed in the outputBody method.  We could do it perhaps
       // with inner types and an inline-destroy method?
       if (!getContextSupportsObjects()) {
-         if (!nestedTagsInStatements) {
+         if (!allowBehaviorTagsInContent) {
             if (needsObject) {
-               displayError("Tag object is inside of a statement or expression - this case is not yet supported: ");
+               displayTypeError("Tag object is inside of a statement or expression - this case is not yet supported: ");
+               boolean res = getContextSupportsObjects();
             }
-            return false;
          }
+         return false;
       }
 
       boolean res = needsObject || getSpecifiedExtendsTypeDeclaration() != null;
@@ -853,7 +861,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                Element child = (Element) obj;
                res = addElementChild(child, res, name);
             }
-            else if (nestedTagsInStatements && obj instanceof TemplateStatement) {
+            else if (allowBehaviorTagsInContent && obj instanceof TemplateStatement) {
                TemplateStatement ts = (TemplateStatement) obj;
                ArrayList<Object> subTags = new ArrayList<Object>();
                ts.addChildBodyStatements(subTags);
@@ -3705,6 +3713,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("tr", "element", emptyArgs, null);
       addTagAttributes("td", "element", emptyArgs, null);
       addTagAttributes("th", "element", emptyArgs, null);
+      addTagAttributes("hr", "element", emptyArgs, null);
       addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit"}, new String[] {"action"});
       addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex", "download", "target", "hreflang", "media", "rel", "type", "referrerpolicy"}, new String[] {"href"});
       addTagAttributes("script", "element", new String[] {"type", "src"}, new String[] {"src"});

@@ -697,6 +697,18 @@ public class DynUtil {
          throw new UnsupportedOperationException();
    }
 
+   /** Use this method to create an instance that might be an @Component class - so that we call the init and start methods */
+   public static Object newInnerComponent(Object typeObj, Object outerObj, String constrSig, Object...params) {
+      Object res = newInnerInstance(typeObj, outerObj, constrSig, params);
+      if (res == null)
+         return res;
+      if (isComponentType(typeObj)) {
+         DynUtil.initComponent(res);
+         DynUtil.startComponent(res);
+      }
+      return res;
+   }
+
    public static void addDynObject(String typeName, Object instObj) {
       if (dynamicSystem != null)
          dynamicSystem.addDynObject(typeName, instObj);

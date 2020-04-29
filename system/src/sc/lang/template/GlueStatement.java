@@ -158,7 +158,7 @@ public class GlueStatement extends Statement implements ITemplateDeclWrapper {
          for (Object d:declarations) {
             if (d instanceof Element)
                statements.add(d);
-            else if (d instanceof TemplateStatement && Element.nestedTagsInStatements) {
+            else if (d instanceof TemplateStatement && Element.allowBehaviorTagsInContent) {
                ((TemplateStatement) d).addChildBodyStatements(statements);
             }
          }

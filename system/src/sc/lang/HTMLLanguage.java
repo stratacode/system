@@ -345,6 +345,7 @@ public class HTMLLanguage extends TemplateLanguage {
       anyTag.reparseable = false;
       unescapedTemplateString.cacheResults = true;
 
+      // In HTML, these characters should not be part of the template body since they are the start of a tag name
       templateString.add("<");
       templateString.add(">");
 

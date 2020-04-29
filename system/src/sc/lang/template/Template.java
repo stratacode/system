@@ -808,7 +808,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                }
             }
             else if (decl instanceof TemplateStatement) {
-               if (Element.nestedTagsInStatements) {
+               if (Element.allowBehaviorTagsInContent) {
                   ArrayList<Object> childStatements = new ArrayList<Object>();
                   TemplateStatement templSt = (TemplateStatement) decl;
                   templSt.addChildBodyStatements(childStatements);
