@@ -114,24 +114,43 @@ public class DBProvider {
          String schemaSQL = null;
          SQLFileModel schemaSQLModel = null;
 
+         boolean storeInExtendsTable = true;
+
          List<BaseQueryDescriptor> queries = null;
          int typeId = ModelUtil.hasModifier(typeDecl, "abstract") ? DBTypeDescriptor.DBAbstractTypeId : DBTypeDescriptor.DBUnsetTypeId;
 
+         Boolean tmpPersist = null;
+         String tmpDataSourceName = null, tmpPrimaryTableName = null;
+         Integer tmpTypeId = null;
+
          for (Object annot:typeSettings) {
-            Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
-            if (tmpPersist != null)
-               persist = tmpPersist;
-            String tmpDataSourceName  = (String) ModelUtil.getAnnotationValue(annot, "dataSourceName");
-            if (tmpDataSourceName != null)
-               dataSourceName = tmpDataSourceName;
-            String tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "tableName");
-            if (tmpPrimaryTableName != null) {
-               primaryTableName = tmpPrimaryTableName;
+            if (tmpPersist == null) {
+               tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(annot, "persist");
+               if (tmpPersist != null)
+                  persist = tmpPersist;
             }
-            Integer tmpTypeId  = (Integer) ModelUtil.getAnnotationValue(annot, "typeId");
-            if (tmpTypeId != null)
-               typeId = tmpTypeId;
+            if (tmpDataSourceName == null) {
+               tmpDataSourceName  = (String) ModelUtil.getAnnotationValue(annot, "dataSourceName");
+               if (tmpDataSourceName != null)
+                  dataSourceName = tmpDataSourceName;
+            }
+            if (tmpPrimaryTableName == null) {
+               tmpPrimaryTableName = (String) ModelUtil.getAnnotationValue(annot, "tableName");
+               if (tmpPrimaryTableName != null) {
+                  primaryTableName = tmpPrimaryTableName;
+               }
+            }
+            if (tmpTypeId == null) {
+               tmpTypeId  = (Integer) ModelUtil.getAnnotationValue(annot, "typeId");
+               if (tmpTypeId != null)
+                  typeId = tmpTypeId;
+            }
          }
+
+         // Look for this annotation only on this specific class - don't want inherit the sub-types value by putting in the loop above.
+         Boolean tmpStoreInExtendsTable = (Boolean) ModelUtil.getAnnotationValue(typeDecl, "sc.db.DBTypeSettings", "storeInExtendsTable");
+         if (tmpStoreInExtendsTable != null)
+            storeInExtendsTable = tmpStoreInExtendsTable;
 
          String tmpSchemaSQL = (String) ModelUtil.getAnnotationValue(typeDecl, "sc.db.SchemaSQL", "value");
          if (tmpSchemaSQL != null) {
@@ -160,13 +179,18 @@ public class DBProvider {
 
          if (persist) {
             if (dataSourceName == null) {
-               DBDataSource def = sys.defaultDataSource;
+               DBDataSource def = refLayer.getDefaultDataSource();
                dataSourceName = def == null ? null : def.jndiName;
                if (dataSourceName == null)
                   return null;
             }
             Object baseType = ModelUtil.getExtendsClass(typeDecl);
             DBTypeDescriptor baseTD = baseType != null && baseType != Object.class ? getDBTypeDescriptor(sys, refLayer, baseType, false) : null;
+
+            // Ignore the baseTD and just build up a new DBTypeDescriptor from our properties as though
+            // this is a new type
+            if (baseTD != null && !storeInExtendsTable)
+               baseTD = null;
 
             String fullTypeName = ModelUtil.getTypeName(typeDecl);
 
@@ -502,8 +526,6 @@ public class DBProvider {
       ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
       dbTypeDesc.tablesInitialized = true;
 
-      Object baseType = ModelUtil.getExtendsClass(typeDecl);
-
       DBTypeDescriptor baseTD = dbTypeDesc.baseType;
 
       String versionProp = null;
@@ -515,22 +537,33 @@ public class DBProvider {
 
       boolean defaultDynColumn = false;
 
+      String tmpVersionProp = null, tmpAuxTableNames = null;
+      Boolean tmpInheritProperties = null, tmpDefaultDynColumn = null;
+
       if (typeSettings != null) {
          for (Object annot:typeSettings) {
-            String tmpVersionProp = (String) ModelUtil.getAnnotationValue(annot, "versionProp");
-            if (tmpVersionProp != null) {
-               versionProp = tmpVersionProp;
+            if (tmpVersionProp == null) {
+               tmpVersionProp = (String) ModelUtil.getAnnotationValue(annot, "versionProp");
+               if (tmpVersionProp != null) {
+                  versionProp = tmpVersionProp;
+               }
             }
-            String tmpAuxTableNames = (String) ModelUtil.getAnnotationValue(annot, "auxTables");
-            if (tmpAuxTableNames != null) {
-               auxTableNames = new ArrayList<String>(Arrays.asList(StringUtil.split(tmpAuxTableNames, ',')));
+            if (tmpAuxTableNames == null) {
+               tmpAuxTableNames = (String) ModelUtil.getAnnotationValue(annot, "auxTables");
+               if (tmpAuxTableNames != null) {
+                  auxTableNames = new ArrayList<String>(Arrays.asList(StringUtil.split(tmpAuxTableNames, ',')));
+               }
             }
-            Boolean tmpInheritProperties = (Boolean) ModelUtil.getAnnotationValue(annot, "inheritProperties");
-            if (tmpInheritProperties != null)
-               inheritProperties = tmpInheritProperties;
-            Boolean tmpDefaultDynColumn = (Boolean) ModelUtil.getAnnotationValue(annot, "defaultDynColumn");
-            if (tmpDefaultDynColumn != null) {
-               defaultDynColumn = tmpDefaultDynColumn;
+            if (tmpInheritProperties == null) {
+               tmpInheritProperties = (Boolean) ModelUtil.getAnnotationValue(annot, "inheritProperties");
+               if (tmpInheritProperties != null)
+                  inheritProperties = tmpInheritProperties;
+            }
+            if (tmpDefaultDynColumn == null) {
+               tmpDefaultDynColumn = (Boolean) ModelUtil.getAnnotationValue(annot, "defaultDynColumn");
+               if (tmpDefaultDynColumn != null) {
+                  defaultDynColumn = tmpDefaultDynColumn;
+               }
             }
          }
 
@@ -572,7 +605,7 @@ public class DBProvider {
                String propTableName = null;
                String propColumnName = null;
                String propColumnType = null;
-               boolean propOnDemand = false;
+               Boolean setPropOnDemand = null;
                boolean propRequired = false;
                boolean propUnique = false;
                boolean propIndexed = false;
@@ -609,7 +642,7 @@ public class DBProvider {
 
                   Boolean tmpOnDemand  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "onDemand");
                   if (tmpOnDemand != null) {
-                     propOnDemand = tmpOnDemand;
+                     setPropOnDemand = tmpOnDemand;
                   }
                   Boolean tmpRequired  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "required");
                   if (tmpRequired != null) {
@@ -682,6 +715,9 @@ public class DBProvider {
                if (isArrayProperty) {
                   if (ModelUtil.hasTypeParameters(propType)) {
                      Object componentType = ModelUtil.getTypeParameter(propType, 0);
+                     if (ModelUtil.isTypeVariable(componentType)) {
+                        componentType = Object.class; // Might be an unresolved type reference
+                     }
                      if (!DBUtil.isDefaultJSONComponentType(componentType)) {
                         propType = componentType;
                      }
@@ -734,6 +770,17 @@ public class DBProvider {
 
                DBPropertyDescriptor propDesc;
                String fullTypeName = ModelUtil.getTypeName(typeDecl);
+
+               boolean propOnDemand;
+               if (setPropOnDemand != null)
+                  propOnDemand = setPropOnDemand;
+               // For associations, the default propOnDemand should be 'true' - don't load the associated property
+               // For other properties, onDemand puts the property into it's own select group - so that property
+               // gets loaded the first time it's accessed.
+               // TODO: should we have a separate flag for association onDemand? It's probably common that we want to load the id
+               // with the parent table but don't want to load associated item - so it's a mix of onDemand and eager.
+               else
+                  propOnDemand = refDBTypeDesc != null;
 
                if (isMultiCol) {
                   propDesc = new MultiColPropertyDescriptor(propName, propColumnName,

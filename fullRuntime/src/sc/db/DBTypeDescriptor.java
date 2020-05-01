@@ -217,7 +217,7 @@ public class DBTypeDescriptor {
    public void addSubType(DBTypeDescriptor subType) {
       int typeId = subType.typeId;
       if (typeId == -1) {
-         DBUtil.error("Sub type: " + subType.getTypeName() + " missing typeId: " + typeId);
+         DBUtil.error("Sub type: " + subType.getTypeName() + " extends DB type: " + getTypeName() + " - must have @DBTypeSettings(typeId) to register instances in the DB: ");
          return;
       }
       if (subTypesById == null) {
@@ -1730,5 +1730,40 @@ public class DBTypeDescriptor {
          return res;
       }
       return null;
+   }
+
+   public StringBuilder getMetadataString() {
+      StringBuilder res = new StringBuilder();
+      if (typeId != -1) {
+         if (typeId == DBAbstractTypeId)
+            res.append(" (abstract)");
+         else {
+            res.append(" typeId: ");
+            res.append(typeId);
+         }
+      }
+      if (baseType != null) {
+         res.append("\n      extends type: ");
+         res.append(baseType.getTypeName());
+      }
+      if (subTypes != null && subTypes.size() > 0) {
+         res.append("\n      sub-types: ");
+         for (DBTypeDescriptor subTypeDesc:subTypes) {
+            res.append("\n         ");
+            res.append(subTypeDesc.getTypeName());
+            if (subTypeDesc.typeId == DBAbstractTypeId)
+               res.append(" (abstract)");
+            else {
+               res.append(" - typeId: ");
+               res.append(subTypeDesc.typeId);
+            }
+         }
+      }
+      if (res.length() > 0) {
+         res.append("\n");
+         return res;
+      }
+      else
+         return null;
    }
 }

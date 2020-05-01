@@ -40,6 +40,9 @@ public @interface DBTypeSettings {
 
    /** Set to false on a type, or a base-type so that properties in the base-type are not persisted */
    boolean inheritProperties() default true;
+
+   /** Set to false so we store this type in it's own primary table even if the base-type is stored in a table. */
+   boolean storeInExtendsTable() default true;
    /**
     * Set to true to make all properties in this type part of the dynamic part of the schema - i.e. add/remove properties
     * without schema changes. If the type has no dyn columns yet, setting this to true will on the type will allow it

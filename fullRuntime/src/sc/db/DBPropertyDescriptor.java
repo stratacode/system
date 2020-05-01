@@ -142,7 +142,7 @@ public class DBPropertyDescriptor {
          if (this.refDBTypeDesc != null) {
             reversePropDesc = refDBTypeDesc.getPropertyDescriptor(reverseProperty);
             if (reversePropDesc == null)
-               System.err.println("*** reverseProperty: " + reverseProperty + " not found in type: " + refDBTypeDesc + " referenced by: " + dbTypeDesc + "." + propertyName);
+               DBUtil.error("reverseProperty: " + reverseProperty + " not found in type: " + refDBTypeDesc + " referenced by: " + dbTypeDesc + "." + propertyName);
             else {
                // Make sure that only one side has 'reverseProperty' set - we'll use that to determine the table owning side. It should always be the 'one' side in a
                // one-to-many or many-to-many relationship

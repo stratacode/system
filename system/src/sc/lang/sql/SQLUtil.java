@@ -6,6 +6,7 @@ import sc.lang.SQLLanguage;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.JavaModel;
 import sc.lang.java.ModelUtil;
+import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.parser.PString;
 import sc.parser.ParseError;
@@ -19,14 +20,18 @@ public class SQLUtil {
       String typeName = ModelUtil.getTypeName(dbTypeDesc.typeDecl);
       LayeredSystem sys = fromModel.layeredSystem;
 
+      Layer fromLayer = fromModel.getLayer();
+
       String dataSourceName = dbTypeDesc.dataSourceName;
-      if (dataSourceName == null)
-         dataSourceName = sys.defaultDataSource == null ? null : sys.defaultDataSource.jndiName;
+      if (dataSourceName == null) {
+         DBDataSource defaultDataSource = fromLayer.getDefaultDataSource();
+         dataSourceName = defaultDataSource == null ? null : defaultDataSource.jndiName;
+      }
 
       SQLFileModel old = null;
       DBProvider provider = null;
       if (dataSourceName != null) {
-         provider = DBProvider.getDBProviderForType(sys, fromModel.getLayer(), dbTypeDesc.typeDecl);
+         provider = DBProvider.getDBProviderForType(sys, fromLayer, dbTypeDesc.typeDecl);
          if (provider != null)
             old = provider.getSchemaForType(dataSourceName, typeName);
       }
@@ -35,11 +40,12 @@ public class SQLUtil {
       // Do this to create the parseNode so that we can insert comments for the commands before we generate
       res.setParselet(SQLLanguage.getSQLLanguage().sqlFileModel);
       if (!dbTypeDesc.tablesInitialized)
-         DBProvider.completeDBTypeDescriptor(dbTypeDesc, sys, fromModel.layer, dbTypeDesc);
+         DBProvider.completeDBTypeDescriptor(dbTypeDesc, sys, fromLayer, dbTypeDesc);
       dbTypeDesc.init();
       dbTypeDesc.start();
       res.layeredSystem = sys;
-      res.layer = fromModel.layer;
+      res.layer = fromLayer;
+      res.typeMetadata = dbTypeDesc.getMetadataString();
       // The base type will have defined the primaryTable for this type
       if (dbTypeDesc.baseType == null || dbTypeDesc.primaryTable != dbTypeDesc.baseType.primaryTable)
          res.addCreateTable(dbTypeDesc.primaryTable);

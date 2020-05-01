@@ -11,6 +11,12 @@ public class DBDataSource {
    public String jndiName, dbName, userName, password, serverName;
    public int port;
    public boolean readOnly, dbDisabled;
+   /**
+    * A layer will by default use the first data source it defines as it's defaultDataSource. Types that don't specify
+    * an explicit dataSource name use the default for the layer they are defined in.
+    * Set this to false for data sources that have a specific use and are only used by types that refer to them explicitly.
+    */
+   public boolean makeDefaultDataSource = true;
    private boolean schemaReady = true;
    public javax.sql.DataSource dataSource;
 

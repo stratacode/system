@@ -20,6 +20,8 @@ public class SQLFileModel extends SCModel {
 
    public transient BodyTypeDeclaration srcType;
 
+   public transient StringBuilder typeMetadata = null;
+
    public void init() {
       if (initialized) return;
 
@@ -38,7 +40,8 @@ public class SQLFileModel extends SCModel {
 
       LayeredSystem sys = getLayeredSystem();
 
-      DBDataSource dataSource = sys.defaultDataSource;
+      Layer layer = getLayer();
+      DBDataSource dataSource = layer == null ? sys.defaultDataSource : layer.getDefaultDataSource();
       if (dataSource == null) {
          displayWarning("No default data source: skipping scsql file: ");
          return;
@@ -404,7 +407,7 @@ public class SQLFileModel extends SCModel {
 
    public boolean hasTableReference(SQLFileModel other) {
       TreeSet<String> tableRefs = new TreeSet<String>();
-      if (sqlCommands != null) {
+      if (sqlCommands != null && other.sqlCommands != null) {
          for (SQLCommand cmd:sqlCommands)
             cmd.addTableReferences(tableRefs);
          for (SQLCommand cmd:other.sqlCommands) {

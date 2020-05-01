@@ -110,7 +110,7 @@ public class SchemaUpdateWizard extends CommandWizard {
       }
 
       if (mgr.dbMissingMetadata != null && (mgr.noCurrentSchema || mgr.initFromDBFailed)) {
-         print("- Database missing items:" + mgr.dbMissingMetadata + "\n---");
+         print("- Warning: current database is missing:" + mgr.dbMissingMetadata + "\n---");
       }
    }
 

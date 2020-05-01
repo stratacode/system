@@ -353,7 +353,15 @@ public class SchemaManager {
       StringBuilder schemaSB = new StringBuilder();
       schemaSB.append("/*** " + message + " for dataSource: " + dataSourceName + " built from layer: " + buildLayer.getLayerName() + " */\n");
       for (SQLFileModel sqlFileModel:sqlFileModels) {
-         schemaSB.append("\n/* Type: " + sqlFileModel.srcType.getFullTypeName() + " */\n");
+         // If there's metadata, use a multi-line comment
+         if (sqlFileModel.typeMetadata != null)
+            schemaSB.append("\n/*\n   Type: ");
+         else
+            schemaSB.append("\n/* Type: ");
+         schemaSB.append(sqlFileModel.srcType.getFullTypeName());
+         if (sqlFileModel.typeMetadata != null)
+            schemaSB.append(sqlFileModel.typeMetadata);
+         schemaSB.append(" */\n");
          schemaSB.append(sqlFileModel.toLanguageString());
       }
       return schemaSB;
@@ -416,8 +424,11 @@ public class SchemaManager {
       StringBuilder dropSB = new StringBuilder();
       dropSB.append("/* " + "Drop schema - dataSource: " + dataSourceName + " */\n\n");
       for (SQLFileModel sqlFileModel:currentSchema) {
+         SQLFileModel dropModel = sqlFileModel.createDropSQLModel();
+         if (dropModel == null)
+            continue;
          dropSB.append("/* Drop type: " + sqlFileModel.srcType.getFullTypeName() + " */\n");
-         dropSB.append(sqlFileModel.createDropSQLModel().toLanguageString());
+         dropSB.append(dropModel.toLanguageString());
       }
       return dropSB;
    }

@@ -10,11 +10,11 @@ public @interface DBPropertySettings {
    boolean required() default false;
    /** True if this column should have a unique constraint */
    boolean unique() default false;
-   /** For associations, onDemand=true will lazily load the referenced value the first time it's accessed. For single-valued associations
-    * an eager join can load the property value in the first query. For multi-valued, an onDemand=false will run a separate query to load
-    * the multi-valued property right after the query to load the object.
+   /**
+    * For associations, onDemand=false will eagerly load the referenced value the first time it's accessed. For single-valued associations
+    * an eager join can load the property value in the first query.
     */
-   boolean onDemand() default false;
+   boolean onDemand() default true;
    /**
     * True if this property should have a basic index. For more complex indexes, use the @SchemaSQL annotation to specify
     * the create index statement, or switch to the schema-first approach to defining the schema altogether.

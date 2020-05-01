@@ -5,6 +5,7 @@
 package sc.layer;
 
 import sc.classfile.CFClass;
+import sc.db.DBDataSource;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
@@ -273,6 +274,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
    public boolean hasDefinedProcess = false;
    public IProcessDefinition definedProcess = null;
    String definedProcessName;
+
+   public DBDataSource defaultDataSource;
 
    /**
     * Set this to true for the layer to be included in the 'initialization runtime' - the server runtime when using client/server or the only runtime
@@ -2114,6 +2117,26 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       initReplacedTypes();
 
       layeredSystem.initSysClassLoader(this, LayeredSystem.ClassLoaderMode.LIBS);
+
+      // If there are layer component children that have not initialized themselves, we can do it here.
+      if (children != null) {
+         for (int i = 0; i < children.size(); i++) {
+            Object child = children.get(i);
+
+            // These types don't implement the layer component because they are part of the 'full runtime' - to keep the
+            // DB runtime libraries separate from the parser, and dynamic runtime. But we still want to add them to the layered
+            // systen at build time so special casing the logic here.
+            if (child instanceof DBDataSource) {
+               DBDataSource childDS = (DBDataSource) child;
+               layeredSystem.addDataSource(childDS, this);
+               if (childDS.makeDefaultDataSource) {
+                  defaultDataSource = childDS;
+                  if (layeredSystem.defaultDataSource == null)
+                     layeredSystem.defaultDataSource = childDS;
+               }
+            }
+         }
+      }
    }
 
    private void initReplacedTypes() {
@@ -5057,5 +5080,18 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       else if (filePathType == null)
          return IFileProcessor.FileEnabledState.Enabled;
       return IFileProcessor.FileEnabledState.NotEnabled;
+   }
+
+   public DBDataSource getDefaultDataSource() {
+      if (defaultDataSource != null)
+         return defaultDataSource;
+      if (baseLayers != null) {
+         for (int i = 0; i < baseLayers.size(); i++) {
+            DBDataSource res = baseLayers.get(i).getDefaultDataSource();
+            if (res != null)
+               return res;
+         }
+      }
+      return layeredSystem.defaultDataSource;
    }
 }

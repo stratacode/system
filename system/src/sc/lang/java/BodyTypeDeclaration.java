@@ -1174,28 +1174,31 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
 
       Object superType = getDerivedTypeDeclaration();
-      if (superType == this) {
-         System.err.println("*** Derived type loop!");
-         return res;
-      }
-      JavaModel model = getJavaModel();
-      if (model == null) {
-         System.err.println("*** No model for getInheritedAnnotation");
-         return res;
-      }
+      if (superType != null) {
+         if (superType == this) {
+            System.err.println("*** Derived type loop!");
+            return res;
+         }
+         JavaModel model = getJavaModel();
+         if (model == null) {
+            System.err.println("*** No model for getInheritedAnnotation");
+            return res;
+         }
 
-      ArrayList<Object> superRes = !skipCompiled || superType instanceof BodyTypeDeclaration ? ModelUtil.getAllInheritedAnnotations(model.layeredSystem, superType, annotationName, skipCompiled, refLayer, layerResolve) : null;
-      if (superRes != null) {
-         res = ModelUtil.appendLists(res, superRes);
+         ArrayList<Object> superRes = !skipCompiled || superType instanceof BodyTypeDeclaration ? ModelUtil.getAllInheritedAnnotations(model.layeredSystem, superType, annotationName, skipCompiled, refLayer, layerResolve) : null;
+         if (superRes != null) {
+            res = ModelUtil.appendLists(res, superRes);
+         }
       }
 
       Object[] scopeTypes = getScopeInterfaces();
+      ArrayList<Object> scopeRes;
       // Check any interfaces appended on by annotations for for their own annotation.   This way, you can use
       // a meta layer to attach annotations onto a type which is automatically added via an annotation, e.g. GWT's EntryPoint
       // added by the GWTModule annotation.
       for (Object scopeType : scopeTypes) {
-         if ((superRes = ModelUtil.getAllInheritedAnnotations(getJavaModel().layeredSystem, scopeType, annotationName, false, refLayer, layerResolve)) != null) {
-            res = ModelUtil.appendLists(res, superRes);
+         if ((scopeRes = ModelUtil.getAllInheritedAnnotations(getJavaModel().layeredSystem, scopeType, annotationName, false, refLayer, layerResolve)) != null) {
+            res = ModelUtil.appendLists(res, scopeRes);
          }
       }
       return res;

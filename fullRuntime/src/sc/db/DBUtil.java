@@ -572,4 +572,8 @@ public class DBUtil {
       }
       return null;
    }
+
+   public static boolean isAssociationType(Object propType) {
+      return getDefaultSQLType(propType, false) == null;
+   }
 }
