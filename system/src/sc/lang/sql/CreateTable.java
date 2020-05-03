@@ -33,8 +33,10 @@ public class CreateTable extends SQLCommand {
 
    public boolean hasReferenceTo(SQLCommand cmd) {
       if (tableDefs != null) {
-         for (TableDef def:tableDefs)
-            def.hasReferenceTo(cmd);
+         for (TableDef def:tableDefs) {
+            if (def.hasReferenceTo(cmd))
+               return true;
+         }
       }
       return false;
    }
@@ -149,5 +151,9 @@ public class CreateTable extends SQLCommand {
          }
       }
       return null;
+   }
+
+   public String toString() {
+      return "CREATE TABLE " + tableName + "()";
    }
 }

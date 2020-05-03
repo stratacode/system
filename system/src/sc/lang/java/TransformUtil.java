@@ -5,8 +5,10 @@
 package sc.lang.java;
 
 import sc.bind.IBindable;
+import sc.db.DBPropertyDescriptor;
 import sc.dyn.IObjChildren;
 import sc.lang.sc.PropertyAssignment;
+import sc.lang.sql.DBProvider;
 import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -924,6 +926,12 @@ public class TransformUtil {
       return m;
    }
 
+   /**
+    * The main method to transform a VariableDefinition into getX/setX methods.
+    *
+    * See makePropertyBindable for a variant of this method that works for when there's an existing property in the base
+    * class that needs a wrapping setX/getX definitions.
+    */
    public static void convertFieldToGetSetMethods(VariableDefinition variableDefinition, boolean bindable, boolean toInterface, ILanguageModel.RuntimeType runtime) {
       String convertedPropName = variableDefinition.getRealVariableName();
       String origPropName = variableDefinition.variableName;
@@ -998,7 +1006,9 @@ public class TransformUtil {
          params.initializer = ParseUtil.toLanguageString(SCLanguage.INSTANCE.variableInitializer, varInit);
       }
 
-      params.initForVarDef(sys, variableDefinition);
+
+      Object enclType = ModelUtil.getEnclosingType(variableDefinition);
+      params.initForProperty(sys, enclType, variableDefinition);
 
       makePropertyBindableInType(field, typeDeclaration, convertedPropName, params, true, bindable);
 
@@ -1160,6 +1170,8 @@ public class TransformUtil {
       boolean isPropertyIs = getMethod != null && ModelUtil.isPropertyIs(getMethod);
       params.getOrIs = isPropertyIs ? "is" : "get";
 
+      boolean convertGetSet = variableDef instanceof VariableDefinition && ((VariableDefinition) variableDef).convertGetSet;
+
       // If getMethod and setMethod are defined in this type, we need to rename them here.
       if (getMethod instanceof MethodDefinition && ((MethodDefinition) getMethod).getEnclosingType() == typeDeclaration) {
          MethodDefinition getMethDef = (MethodDefinition) getMethod;
@@ -1168,7 +1180,7 @@ public class TransformUtil {
          params.superGetName = params.superGetName + "()";
       }
       else {
-         if (getMethod != null)
+         if (getMethod != null || convertGetSet)
             params.superGetName = "super." + (isPropertyIs ? "is" : "get") + params.upperPropertyName + "()";
             // No get method - just use the field
          else
@@ -1204,13 +1216,19 @@ public class TransformUtil {
       if (rootType == null)
          rootType = typeDeclaration;
       params.enclosingOuterTypeName = rootType.getTypeName();
-      params.overrideGetSet = setMethod != null;
+      params.overrideGetSet = setMethod != null || convertGetSet;
       params.isStatic = ModelUtil.hasModifier(definition, "static");
       params.bindable = bindable;
       setPropertyMappingName(params, typeDeclaration);
       params.innerName = typeDeclaration.getDynamicStubParameters().getInnerName();
    }
 
+   /**
+    * This method makes a property that already exists in the base-class bindable in the typeDeclaration given.
+    * It will call super.getX and super.setX to get and set the base-type's variable.
+    *
+    * This is related to convertFieldToGetSetMethods - that methods converts a field into getX/setX methods.
+    */
    public static void makePropertyBindable(TypeDeclaration typeDeclaration, String propertyName, ILanguageModel.RuntimeType runtime) {
       PropertyDefinitionParameters params = PropertyDefinitionParameters.create(propertyName);
       TypeContext tctx = new TypeContext();
@@ -1219,6 +1237,8 @@ public class TransformUtil {
       // Skipping interfaces here.  We want to only find implementation methods that we have to rename or contend with if we are converting a field and there are already get/set methods in the same type.
       Object getMethod = params.getMethod = typeDeclaration.definesMember(propertyName, JavaSemanticNode.MemberType.GetMethodSet, null, tctx);
       Object setMethod = params.setMethod = typeDeclaration.definesMember(propertyName, JavaSemanticNode.MemberType.SetMethodSet, null, tctx);
+
+      LayeredSystem sys = typeDeclaration.getLayeredSystem();
 
       if (variableDef == null) {
          if (setMethod == null) {
@@ -1249,6 +1269,11 @@ public class TransformUtil {
       params.initializer = "";
 
       int ix = typeDeclaration.body.size();
+
+      Layer refLayer = typeDeclaration.getLayer();
+      DBPropertyDescriptor propDesc = DBProvider.getDBPropertyDescriptor(sys, refLayer, typeDeclaration, propertyName);
+      if (propDesc != null)
+         params.initForPropertyDesc(sys, refLayer, typeDeclaration, propDesc);
 
       makePropertyBindableInType(variableDef, typeDeclaration, propertyName, params, false, true);
 

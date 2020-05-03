@@ -29,4 +29,14 @@ public class ReferencesConstraint extends SQLConstraint {
       }
       return false;
    }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(" REFERENCES ");
+      sb.append(refTable);
+      sb.append("(");
+      sb.append(columnRef);
+      sb.append(")");
+      return sb.toString();
+   }
 }

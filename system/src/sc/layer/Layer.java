@@ -4565,6 +4565,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       layerTypesStarted = false;
    }
 
+   /** Called from within a layer definition file to associate a SrcPathType (e.g. web, or resource) with a given layer directory. */
    public void addSrcPath(String srcPath, String srcPathType) {
       addSrcPath(srcPath, srcPathType, null, null);
    }

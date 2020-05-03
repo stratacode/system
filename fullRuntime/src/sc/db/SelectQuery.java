@@ -516,7 +516,7 @@ public class SelectQuery implements Cloneable {
                   continue;
 
                int typeId = (int) val;
-               DBTypeDescriptor newType = dbObj.dbTypeDesc.subTypesById.get(typeId);
+               DBTypeDescriptor newType = dbObj.dbTypeDesc.getSubTypeByTypeId(typeId);
                if (newType == null) {
                   DBUtil.error("No sub-type of: " + dbObj.dbTypeDesc + " with typeId: " + typeId);
                }

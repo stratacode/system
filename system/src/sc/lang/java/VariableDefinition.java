@@ -55,6 +55,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
    public transient int modifierFlags = 0;
    public transient String enclosingTypeName = null;
 
+   public transient DBPropertyDescriptor dbPropDesc = null;
+
    private static boolean wasBound = false;
 
    // Used for serializing only
@@ -161,17 +163,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       if (!convertGetSet && !bindable) {
          LayeredSystem sys = getLayeredSystem();
          Layer refLayer = getLayer();
-         DBPropertyDescriptor dbPropDesc = DBProvider.getDBPropertyDescriptor(sys, refLayer, this);
-         // The private check prevents a double conversion... TODO: some better way to note that db properties as already transformed?
-         if (dbPropDesc != null && !getDefinition().hasModifier("private")) {
-            DBProvider dbProvider = DBProvider.getDBProviderForPropertyDesc(sys, refLayer, dbPropDesc);
-            if (dbProvider != null && dbProvider.getNeedsGetSet()) {
-               convertGetSet = true;
-               // Need to be able to listen to events on the property to keep the reverse side in sync
-               if (dbPropDesc.reversePropDesc != null)
-                  bindable = true;
-            }
-         }
+         DBPropertyDescriptor dbPropDesc = this.dbPropDesc == null ? DBProvider.getDBPropertyDescriptor(sys, refLayer, this, true) : this.dbPropDesc;
+         addDBPropertyDescriptor(dbPropDesc, sys, refLayer);
       }
 
       if (bindingDirection != null && (bindingDirection.doReverse() || bindable)) {
@@ -204,6 +197,24 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          }
       }
    }
+
+   public void addDBPropertyDescriptor(DBPropertyDescriptor prop, LayeredSystem sys, Layer refLayer) {
+      if (bindable)
+         return;
+      // The private check prevents a double conversion... TODO: some better way to note that db properties as already transformed?
+      if (prop != null && !getDefinition().hasModifier("private")) {
+         DBProvider dbProvider = DBProvider.getDBProviderForPropertyDesc(sys, refLayer, prop);
+         if (dbProvider != null && dbProvider.getNeedsGetSet()) {
+            convertGetSet = true;
+            // Need to be able to listen to events on the property to keep the reverse side in sync
+            if (prop.reversePropDesc != null)
+               bindable = true;
+         }
+         if (dbPropDesc == null)
+            dbPropDesc = prop;
+      }
+   }
+
 
    /** Can be an AnnotatedElementTypeDeclaration or a TypedDefinition of some kind */
    public Statement getDefinition() {
@@ -536,6 +547,8 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          newVarDef.needsCastOnConvert = needsCastOnConvert;
          newVarDef.shadowedByMethod = shadowedByMethod;
       }
+
+      newVarDef.dbPropDesc = dbPropDesc;
 
       if ((options & CopyInitLevels) != 0) {
          newVarDef.needsDynAccess = needsDynAccess;

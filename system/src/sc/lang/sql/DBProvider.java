@@ -1,8 +1,10 @@
 package sc.lang.sql;
 
+import com.sun.org.apache.xpath.internal.operations.Variable;
 import sc.db.*;
 import sc.lang.SQLLanguage;
 import sc.lang.java.*;
+import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -28,7 +30,24 @@ public class DBProvider {
       this.providerName = providerName;
    }
 
-   public static DBPropertyDescriptor getDBPropertyDescriptor(LayeredSystem sys, Layer refLayer, Object propObj) {
+   /**
+    * Returns the DBPropertyDescriptor for a given property. Pass in includeSubTypeProps=true to return a property
+    * descriptor used as a DB property in a sub-type but not in this type. We do need to force these properties
+    * to have convertGetSet and binding events but do not define a type descriptor so don't do db specific convert
+    * get/set code.  Instead, the sub-type will add them as getX/setX methods wrapping the base-types methods.
+    */
+   public static DBPropertyDescriptor getDBPropertyDescriptor(LayeredSystem sys, Layer refLayer, Object propObj,
+                                                              boolean includeSubTypeProps) {
+      if (includeSubTypeProps) {
+         if (propObj instanceof PropertyAssignment) {
+            propObj = ((PropertyAssignment) propObj).getAssignedProperty();
+         }
+         if (propObj instanceof VariableDefinition) {
+            VariableDefinition varDef = (VariableDefinition) propObj;
+            if (varDef.dbPropDesc != null)
+               return varDef.dbPropDesc;
+         }
+      }
       Object enclType = ModelUtil.getEnclosingType(propObj);
       if (enclType != null) {
          DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType, true);
@@ -38,6 +57,16 @@ public class DBProvider {
             typeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
             return typeDesc.getPropertyDescriptor(propName);
          }
+      }
+      return null;
+   }
+
+   public static DBPropertyDescriptor getDBPropertyDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, String propName) {
+      DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, typeDecl, true);
+      if (typeDesc != null) {
+         typeDesc.init();
+         typeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
+         return typeDesc.getPropertyDescriptor(propName);
       }
       return null;
    }
@@ -68,6 +97,17 @@ public class DBProvider {
    }
 
    public static DBProvider getDBProviderForProperty(LayeredSystem sys, Layer refLayer, Object propObj) {
+      /*
+      if (propObj instanceof PropertyAssignment) {
+         propObj = ((PropertyAssignment) propObj).getAssignedProperty();
+      }
+      if (propObj instanceof VariableDefinition) {
+         VariableDefinition varDef = (VariableDefinition) propObj;
+         if (varDef.dbPropDesc != null) {
+            return getDBProviderForPropertyDesc(sys, refLayer, varDef.dbPropDesc);
+         }
+      }
+      */
       Object enclType = ModelUtil.getEnclosingType(propObj);
       String propName = ModelUtil.getPropertyName(propObj);
       DBTypeDescriptor typeDesc = enclType == null ? null : getDBTypeDescriptor(sys, ModelUtil.getLayerForMember(sys, propObj), enclType, true);
@@ -249,16 +289,24 @@ public class DBProvider {
                      if (fbOptions.size() == 0)
                         fbOptions = null;
 
-                     Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
+                     List<Object> propSettings = ModelUtil.getAllInheritedAnnotations(sys, property, "sc.db.DBPropertySettings", false, refLayer, false);
                      if (propSettings != null) {
-                        Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
-                        if (tmpUnique != null && tmpUnique) {
-                           multiRowQuery = false;
-                        }
-                        if (selectGroup == null) {
-                           String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "selectGroup");
-                           if (tmpFetchGroup != null) {
-                              selectGroup = tmpFetchGroup;
+                        Boolean tmpUnique = null;
+                        String tmpSelectGroup = null;
+                        for (Object propSetting:propSettings) {
+                           if (tmpUnique == null) {
+                              tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSetting, "unique");
+                              if (tmpUnique != null && tmpUnique) {
+                                 multiRowQuery = false;
+                              }
+                           }
+                           if (selectGroup == null) {
+                              if (tmpSelectGroup == null) {
+                                 tmpSelectGroup = (String) ModelUtil.getAnnotationValue(propSetting, "selectGroup");
+                                 if (tmpSelectGroup != null) {
+                                    selectGroup = tmpSelectGroup;
+                                 }
+                              }
                            }
                         }
                      }
@@ -519,6 +567,15 @@ public class DBProvider {
       }
    }
 
+   static class DBRegisteredProperty {
+      DBPropertyDescriptor propDesc;
+      Object property;
+      DBRegisteredProperty(DBPropertyDescriptor pd, Object p) {
+         this.propDesc = pd;
+         this.property = p;
+      }
+   }
+
    public static void completeDBTypeDescriptor(DBTypeDescriptor dbTypeDesc, LayeredSystem sys, Layer refLayer, Object typeDecl) {
       if (dbTypeDesc == null)
          return;
@@ -576,8 +633,10 @@ public class DBProvider {
          }
 
          Object[] properties = !inheritProperties ?
-                 ModelUtil.getDeclaredProperties(typeDecl, null, false, true, false) :
-                 ModelUtil.getProperties(typeDecl, null, false);
+                 ModelUtil.getDeclaredProperties(typeDecl, null, true, true, false) :
+                 ModelUtil.getProperties(typeDecl, null, true);
+
+         ArrayList<DBRegisteredProperty> newProps = new ArrayList<DBRegisteredProperty>();
 
          if (properties != null) {
             for (Object property:properties) {
@@ -601,7 +660,8 @@ public class DBProvider {
                if (!ModelUtil.isWritableProperty(property))
                   continue;
 
-               Object propSettings = ModelUtil.getAnnotation(property, "sc.db.DBPropertySettings");
+               List<Object> propSettings = ModelUtil.getAllInheritedAnnotations(sys, property, "sc.db.DBPropertySettings", false, refLayer, false);
+
                String propTableName = null;
                String propColumnName = null;
                String propColumnType = null;
@@ -611,75 +671,123 @@ public class DBProvider {
                boolean propIndexed = false;
                boolean propDynColumn = defaultDynColumn;
                String propDataSourceName = null;
-               String propFetchGroup = null;
+               String propSelectGroup = null;
                String propReverseProperty = null;
                String propDBDefault = null;
                boolean explicitPersist = false;
+               Boolean tmpPersist = null;
+               String tmpTableName = null;
+               String tmpColumnName = null;
+               String tmpColumnType = null;
+               Boolean tmpOnDemand  = null;
+               Boolean tmpRequired  = null;
+               Boolean tmpUnique  = null;
+               Boolean tmpIndexed = null;
+               String tmpDataSourceName = null;
+               String tmpSelectGroup = null;
+               String tmpReverseProperty = null;
+               String tmpDBDefault = null;
+               Boolean tmpDynColumn = null;
                if (propSettings != null) {
-                  Boolean tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "persist");
-                  if (tmpPersist != null) {
-                     if (!tmpPersist)
-                        continue;
-                     else
-                        explicitPersist = true;
-                  }
+                  boolean persistProperty = true;
 
-                  String tmpTableName = (String) ModelUtil.getAnnotationValue(propSettings, "tableName");
-                  if (tmpTableName != null) {
-                     propTableName = tmpTableName;
-                  }
+                  // Might have inherited multiple annotations for this property - we want to pick the first one we
+                  // find in this list since it's sorted with this most specific annotation first.
+                  for (Object propSetting:propSettings) {
+                     if (tmpPersist == null) {
+                        tmpPersist  = (Boolean) ModelUtil.getAnnotationValue(propSetting, "persist");
+                        if (tmpPersist != null) {
+                           if (!tmpPersist) {
+                              persistProperty = false;
+                           }
+                           else
+                              explicitPersist = true;
+                        }
+                     }
 
-                  // TODO: should we specify columnNames and Types here as comma separated lists to deal with multi-column primary key properties (and possibly others that need more than one column?)
-                  String tmpColumnName = (String) ModelUtil.getAnnotationValue(propSettings, "columnName");
-                  if (tmpColumnName != null) {
-                     propColumnName = tmpColumnName;
-                  }
+                     if (tmpTableName == null) {
+                        tmpTableName = (String) ModelUtil.getAnnotationValue(propSetting, "tableName");
+                        if (tmpTableName != null) {
+                           propTableName = tmpTableName;
+                        }
+                     }
 
-                  String tmpColumnType = (String) ModelUtil.getAnnotationValue(propSettings, "columnType");
-                  if (tmpColumnType != null) {
-                     propColumnType = tmpColumnType;
-                  }
+                     // TODO: should we specify columnNames and Types here as comma separated lists to deal with multi-column primary key properties (and possibly others that need more than one column?)
+                     if (tmpColumnName == null) {
+                        tmpColumnName = (String) ModelUtil.getAnnotationValue(propSetting, "columnName");
+                        if (tmpColumnName != null) {
+                           propColumnName = tmpColumnName;
+                        }
+                     }
 
-                  Boolean tmpOnDemand  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "onDemand");
-                  if (tmpOnDemand != null) {
-                     setPropOnDemand = tmpOnDemand;
-                  }
-                  Boolean tmpRequired  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "required");
-                  if (tmpRequired != null) {
-                     propRequired = tmpRequired;
-                  }
-                  Boolean tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "unique");
-                  if (tmpUnique != null) {
-                     propUnique = tmpUnique;
-                  }
-                  Boolean tmpIndexed  = (Boolean) ModelUtil.getAnnotationValue(propSettings, "indexed");
-                  if (tmpIndexed != null) {
-                     propIndexed = tmpIndexed;
-                  }
+                     if (tmpColumnType == null) {
+                        tmpColumnType = (String) ModelUtil.getAnnotationValue(propSetting, "columnType");
+                        if (tmpColumnType != null) {
+                           propColumnType = tmpColumnType;
+                        }
+                     }
 
-                  String tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSettings, "dataSourceName");
-                  if (tmpDataSourceName != null) {
-                     propDataSourceName = tmpDataSourceName;
-                  }
+                     if (tmpOnDemand == null) {
+                        tmpOnDemand  = (Boolean) ModelUtil.getAnnotationValue(propSetting, "onDemand");
+                        if (tmpOnDemand != null) {
+                           setPropOnDemand = tmpOnDemand;
+                        }
+                     }
+                     if (tmpRequired == null) {
+                        tmpRequired  = (Boolean) ModelUtil.getAnnotationValue(propSetting, "required");
+                        if (tmpRequired != null) {
+                           propRequired = tmpRequired;
+                        }
+                     }
+                     if (tmpUnique == null) {
+                        tmpUnique  = (Boolean) ModelUtil.getAnnotationValue(propSetting, "unique");
+                        if (tmpUnique != null) {
+                           propUnique = tmpUnique;
+                        }
+                     }
+                     if (tmpIndexed == null) {
+                        tmpIndexed  = (Boolean) ModelUtil.getAnnotationValue(propSetting, "indexed");
+                        if (tmpIndexed != null) {
+                           propIndexed = tmpIndexed;
+                        }
+                     }
 
-                  String tmpFetchGroup = (String) ModelUtil.getAnnotationValue(propSettings, "selectGroup");
-                  if (tmpFetchGroup != null) {
-                     propFetchGroup = tmpFetchGroup;
-                  }
+                     if (tmpDataSourceName == null) {
+                        tmpDataSourceName = (String) ModelUtil.getAnnotationValue(propSetting, "dataSourceName");
+                        if (tmpDataSourceName != null) {
+                           propDataSourceName = tmpDataSourceName;
+                        }
+                     }
 
-                  String tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSettings, "reverseProperty");
-                  if (tmpReverseProperty != null) {
-                     propReverseProperty = tmpReverseProperty;
-                  }
-                  String tmpDBDefault = (String) ModelUtil.getAnnotationValue(propSettings, "dbDefault");
-                  if (tmpDBDefault != null) {
-                     propDBDefault = tmpDBDefault;
-                  }
+                     if (tmpSelectGroup == null) {
+                        tmpSelectGroup = (String) ModelUtil.getAnnotationValue(propSetting, "selectGroup");
+                        if (tmpSelectGroup != null) {
+                           propSelectGroup = tmpSelectGroup;
+                        }
+                     }
 
-                  Boolean tmpDynColumn = (Boolean) ModelUtil.getAnnotationValue(propSettings, "dynColumn");
-                  if (tmpDynColumn != null) {
-                     propDynColumn = tmpDynColumn;
+                     if (tmpReverseProperty == null) {
+                        tmpReverseProperty = (String) ModelUtil.getAnnotationValue(propSetting, "reverseProperty");
+                        if (tmpReverseProperty != null) {
+                           propReverseProperty = tmpReverseProperty;
+                        }
+                     }
+                     if (tmpDBDefault == null) {
+                        tmpDBDefault = (String) ModelUtil.getAnnotationValue(propSetting, "dbDefault");
+                        if (tmpDBDefault != null) {
+                           propDBDefault = tmpDBDefault;
+                        }
+                     }
+
+                     if (tmpDynColumn == null) {
+                        tmpDynColumn = (Boolean) ModelUtil.getAnnotationValue(propSetting, "dynColumn");
+                        if (tmpDynColumn != null) {
+                           propDynColumn = tmpDynColumn;
+                        }
+                     }
                   }
+                  if (!persistProperty)
+                     continue;
                }
                else {
                   // By default if there's a forward binding the value is derived and so usually does not have to be stored
@@ -785,14 +893,14 @@ public class DBProvider {
                if (isMultiCol) {
                   propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
-                          propDataSourceName, propFetchGroup,
+                          propDataSourceName, propSelectGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault, fullTypeName);
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed, propDynColumn,
-                          propDataSourceName, propFetchGroup,
+                          propDataSourceName, propSelectGroup,
                           refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault, fullTypeName);
                }
@@ -823,6 +931,8 @@ public class DBProvider {
                   }
                }
                propTable.addColumnProperty(propDesc);
+
+               newProps.add(new DBRegisteredProperty(propDesc, property));
             }
          }
          // Need to add the db_dyn_props column even for a table with no dyn properties so that we can add the
@@ -835,6 +945,40 @@ public class DBProvider {
          if (dbTypeDesc.queries != null) {
             for (BaseQueryDescriptor query:dbTypeDesc.queries)
                initQueryParamTypes(sys, refLayer, typeDecl, query, true);
+         }
+
+         // Now go through the new properties we just added and see if there are additional getX/setX conversions
+         // that need to be done.
+         for (DBRegisteredProperty newProp:newProps) {
+            Object property = newProp.property;
+            DBPropertyDescriptor propDesc = newProp.propDesc;
+            if (property instanceof PropertyAssignment)
+               property = ((PropertyAssignment) property).getAssignedProperty();
+            if (property instanceof VariableDefinition) {
+               VariableDefinition varDef = (VariableDefinition) property;
+               if (propDesc == null)
+                  continue;
+               if (varDef.isStarted()) {
+                  varDef.addDBPropertyDescriptor(propDesc, sys, refLayer);
+               }
+               else
+                  varDef.dbPropDesc = propDesc;
+            }
+            Object enclType = ModelUtil.getEnclosingType(property);
+            if (enclType == null)
+               continue;
+            if (!ModelUtil.sameTypes(typeDecl, enclType)) {
+               DBPropertyDescriptor enclPropDesc = getDBPropertyDescriptor(sys, refLayer, property, false);
+               if (enclPropDesc == null) {
+                  if (typeDecl instanceof TypeDeclaration) {
+                     TypeDeclaration td = (TypeDeclaration) typeDecl;
+                     td.addPropertyToMakeBindable(ModelUtil.getPropertyName(property), property, null, false, null);
+                  }
+                  else {
+                     DBUtil.error("Unable to add persistence for property: " + ModelUtil.getPropertyName(property) + " of compiled type: " + ModelUtil.getTypeName(typeDecl));
+                  }
+               }
+            }
          }
       }
    }

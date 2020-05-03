@@ -1,7 +1,10 @@
 package sc.lang.sql;
 
+import com.sun.corba.se.impl.orbutil.graph.Graph;
 import sc.db.*;
+import sc.dyn.DynUtil;
 import sc.lang.SQLLanguage;
+import sc.lang.SemanticNodeList;
 import sc.layer.*;
 import sc.parser.ParseError;
 import sc.parser.ParseUtil;
@@ -168,7 +171,7 @@ public class SchemaManager {
                   }
 
                   // This model already matches what's in the database schema so it's not actually a new model
-                  if (dbModel.sqlCommands.equals(newSchema.sqlCommands)) {
+                  if (DynUtil.equalObjects(dbModel.sqlCommands, newSchema.sqlCommands)) {
                      newModels.remove(newSchema);
                      removeChangedType(typeName);
                      recordDeployedSchema(typeName, newSchema, buildLayer);
@@ -245,6 +248,145 @@ public class SchemaManager {
    private void recordDeployedSchema(String typeName, SQLFileModel sqlModel, Layer buildLayer) {
       String deployedSchemasFile = getDeployedSchemaFile(getDeployedSchemasDir(buildLayer), typeName);
       FileUtil.saveStringAsFile(deployedSchemasFile, sqlModel.toLanguageString(), true);
+   }
+
+   static class GraphSortNode {
+      SQLCommand cmd;
+      List<GraphSortNode> refsFrom = new ArrayList<GraphSortNode>();
+      List<GraphSortNode> refsTo = new ArrayList<GraphSortNode>();
+      int depth;
+      boolean depthAssigned;
+
+      public String toString() {
+         StringBuilder sb = new StringBuilder();
+         sb.append(cmd);
+
+         if (depthAssigned)
+            sb.append(" (depth: " + depth + ")");
+         if (refsFrom.size() > 0) {
+            sb.append(" refsFrom[0]: " + refsFrom.get(0).cmd);
+         }
+         if (refsTo.size() > 0) {
+            sb.append(" refsTo[0]: " + refsTo.get(0).cmd);
+         }
+         return sb.toString();
+      }
+   }
+
+   /**
+    * Sort the SQLFileModels based on table references. This assumes that the SQLCommands
+    * inside of each model have the same dependencies - i.e. we don't have to interleave
+    * commands for different types.  Because the file models form a 'directed acyclic graph'
+    * we need to first build the graph, then do a breadth first search on that graph to
+    * sort the commands.
+    * TODO: this could be made more efficient - start with an index for finding the
+    * references?
+    */
+   public ArrayList<SQLFileModel> sortSQLModels(List<SQLFileModel> inList) {
+      List<GraphSortNode> graphNodes = new ArrayList<GraphSortNode>();
+      StringBuilder metadata = new StringBuilder();
+      for (SQLFileModel in:inList) {
+         metadata.append("   Type: ");
+         metadata.append(in.srcType.getFullTypeName());
+         if (in.typeMetadata != null) {
+            metadata.append(in.typeMetadata);
+         }
+         metadata.append("\n");
+
+         List<SQLCommand> cmds = in.sqlCommands;
+         if (cmds != null) {
+            for (SQLCommand cmd:cmds) {
+               GraphSortNode node = new GraphSortNode();
+               node.cmd = cmd;
+               graphNodes.add(node);
+            }
+         }
+      }
+
+      int num = graphNodes.size();
+
+      for (int i = 0; i < num; i++) {
+         GraphSortNode outer = graphNodes.get(i);
+         for (int j = i+1; j < num; j++) {
+            GraphSortNode inner = graphNodes.get(j);
+            boolean hasTo = false;
+            if (outer.cmd.hasReferenceTo(inner.cmd)) {
+               // outer has a reference to inner
+               outer.refsFrom.add(inner);
+               inner.refsTo.add(outer);
+               hasTo = true;
+            }
+            if (inner.cmd.hasReferenceTo(outer.cmd)) {
+               if (hasTo) {
+                  System.err.println("*** Error - cycle detected in dependencies");
+               }
+               else {
+                  inner.refsFrom.add(outer);
+                  outer.refsTo.add(inner);
+               }
+            }
+         }
+      }
+
+      int assignedCt = 0;
+
+      /** First pass is to just find all of the independent nodes */
+      boolean remaining = false;
+      for (int i = 0; i < num; i++) {
+         GraphSortNode node = graphNodes.get(i);
+         if (node.refsFrom.size() == 0) {
+            node.depthAssigned = true;
+            node.depth = 0;
+            assignedCt++;
+         }
+         else
+            remaining = true;
+      }
+
+      while (remaining) {
+         remaining = false;
+         for (int i = 0; i < num; i++) {
+            GraphSortNode assignNode = graphNodes.get(i);
+            if (!assignNode.depthAssigned) {
+               boolean fromDepthAssigned = true;
+               int maxFromDepth = -1;
+               for (int j = 0; j < assignNode.refsFrom.size(); j++) {
+                  GraphSortNode fromNode = assignNode.refsFrom.get(j);
+                  if (fromNode.depthAssigned) {
+                     if (maxFromDepth == -1 || maxFromDepth < fromNode.depth)
+                        maxFromDepth = fromNode.depth;
+                  }
+                  else {
+                     fromDepthAssigned = false;
+                     break;
+                  }
+               }
+               if (fromDepthAssigned) {
+                  assignNode.depth = maxFromDepth + 1;
+                  assignNode.depthAssigned = true;
+               }
+               else // There is a node in our refFrom that still has not been assigned a depth
+                  remaining = true;
+            }
+         }
+      }
+      SemanticNodeList<SQLCommand> resCmds = new SemanticNodeList<SQLCommand>(inList.size());
+      int currentDepth = 0;
+      while (resCmds.size() < num) {
+         for (int i = 0; i < num; i++) {
+            GraphSortNode node = graphNodes.get(i);
+            if (node.depthAssigned && node.depth == currentDepth)
+               resCmds.add(node.cmd);
+         }
+         currentDepth++;
+      }
+
+      ArrayList<SQLFileModel> res = new ArrayList<SQLFileModel>(1);
+      SQLFileModel mergedModel = new SQLFileModel();
+      mergedModel.typeMetadata = metadata;
+      mergedModel.setProperty("sqlCommands", resCmds);
+      res.add(mergedModel);
+      return res;
    }
 
    public boolean generateAlterSchema(Layer buildLayer) {
@@ -346,22 +488,32 @@ public class SchemaManager {
       }
    }
 
-   StringBuilder convertSQLModelsToString(List<SQLFileModel> sqlFileModels, String message, Layer buildLayer) {
-      if (sqlFileModels == null || sqlFileModels.size() == 0)
+   StringBuilder convertSQLModelsToString(List<SQLFileModel> unsortedList, String message, Layer buildLayer) {
+      if (unsortedList == null || unsortedList.size() == 0)
          return null;
 
+      List<SQLFileModel> sqlFileModels = sortSQLModels(unsortedList);
+
       StringBuilder schemaSB = new StringBuilder();
-      schemaSB.append("/*** " + message + " for dataSource: " + dataSourceName + " built from layer: " + buildLayer.getLayerName() + " */\n");
+      schemaSB.append("/*** " + message + " for dataSource: " + dataSourceName + " build layer: " + buildLayer.getLayerName() + " */\n");
       for (SQLFileModel sqlFileModel:sqlFileModels) {
-         // If there's metadata, use a multi-line comment
-         if (sqlFileModel.typeMetadata != null)
-            schemaSB.append("\n/*\n   Type: ");
-         else
-            schemaSB.append("\n/* Type: ");
-         schemaSB.append(sqlFileModel.srcType.getFullTypeName());
-         if (sqlFileModel.typeMetadata != null)
+         if (sqlFileModel.srcType != null) {
+            if (sqlFileModel.typeMetadata != null)
+               schemaSB.append("\n/*\n   Type: ");
+            else
+               schemaSB.append("\n/* Type: ");
+            schemaSB.append(sqlFileModel.srcType.getFullTypeName());
+            if (sqlFileModel.typeMetadata != null)
+               schemaSB.append(sqlFileModel.typeMetadata);
+            schemaSB.append(" */\n");
+         }
+         // When we sort the commands they all get merged into one SQLFileModel so there's a comment
+         // at the top for the type metadata for all of the types
+         else if (sqlFileModel.typeMetadata != null) {
+            schemaSB.append("/*\n");
             schemaSB.append(sqlFileModel.typeMetadata);
-         schemaSB.append(" */\n");
+            schemaSB.append(" */\n\n");
+         }
          schemaSB.append(sqlFileModel.toLanguageString());
       }
       return schemaSB;
@@ -421,13 +573,18 @@ public class SchemaManager {
       if (currentSchema == null || currentSchema.size() == 0)
          return null;
 
+      ArrayList<SQLFileModel> sortedSchema = sortSQLModels(currentSchema);
+
       StringBuilder dropSB = new StringBuilder();
       dropSB.append("/* " + "Drop schema - dataSource: " + dataSourceName + " */\n\n");
-      for (SQLFileModel sqlFileModel:currentSchema) {
+      for (SQLFileModel sqlFileModel:sortedSchema) {
          SQLFileModel dropModel = sqlFileModel.createDropSQLModel();
          if (dropModel == null)
             continue;
-         dropSB.append("/* Drop type: " + sqlFileModel.srcType.getFullTypeName() + " */\n");
+         if (sqlFileModel.srcType != null)
+            dropSB.append("/* Drop type: " + sqlFileModel.srcType.getFullTypeName() + " */\n");
+         else if (sqlFileModel.typeMetadata != null)
+            dropSB.append("/* Drop schema for: " + sqlFileModel.typeMetadata + "\n */\n");
          dropSB.append(dropModel.toLanguageString());
       }
       return dropSB;
@@ -521,8 +678,28 @@ public class SchemaManager {
       if (updater == null) {
          throw new IllegalArgumentException("No schema updater configured");
       }
-      // TODO: need to sort this list
       int nsz = newModels.size();
+      int nchanges = changedTypes.size();
+
+      if (doAlter) {
+         ArrayList<SQLFileModel> modelsToSort = new ArrayList<SQLFileModel>(nsz + nchanges);
+         for (int i = 0; i < nsz; i++) {
+            modelsToSort.add(newModels.get(i));
+         }
+         for (int i = 0; i < nchanges; i++) {
+            modelsToSort.add(changedTypes.get(i).alterModel);
+         }
+         ArrayList<SQLFileModel> sortedModels = sortSQLModels(modelsToSort);
+         try {
+            for (SQLFileModel sortedModel:sortedModels)
+               updater.applyAlterCommands(dataSourceName, sortedModel.getCommandList());
+         }
+         catch (IllegalArgumentException exc) {
+            DBUtil.error("Update schema failed: " + exc.getMessage() + exc.getCause());
+            return false;
+         }
+      }
+
       for (int i = 0; i < nsz; i++) {
          SQLFileModel newModel = newModels.get(i);
          DBSchemaType info = new DBSchemaType();
@@ -532,17 +709,10 @@ public class SchemaManager {
          String schemaSQL = newModel.toLanguageString();
          curVersion.setSchemaSQL(schemaSQL);
          curVersion.setDateApplied(new Date());
-         try {
-            if (doAlter)
-               updater.applyAlterCommands(dataSourceName, newModel.getCommandList());
-         }
-         catch (IllegalArgumentException exc) {
-            DBUtil.error("Update schema failed: " + exc.getMessage() + exc.getCause());
-            return false;
-         }
          updateDBSchema(updater, typeName, info, newModel, buildLayer);
       }
-      for (int i = 0; i < changedTypes.size(); i++) {
+
+      for (int i = 0; i < nchanges; i++) {
          SchemaTypeChange change = changedTypes.get(i);
          SQLFileModel newModel = change.toModel;
          DBSchemaType info = new DBSchemaType();
@@ -557,14 +727,6 @@ public class SchemaManager {
          }
          String alterSQL = change.alterModel.toLanguageString();
          curVersion.setAlterSQL(alterSQL);
-         try {
-            if (doAlter)
-               updater.applyAlterCommands(dataSourceName, change.alterModel.getCommandList());
-         }
-         catch (IllegalArgumentException exc) {
-            DBUtil.error("Applying alter SQL for type: " + typeName + ": " + exc.getMessage() + exc.getCause());
-            return false;
-         }
          updateDBSchema(updater, typeName, info, newModel, buildLayer);
       }
       return true;

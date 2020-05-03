@@ -637,7 +637,7 @@ public class DBTypeDescriptor {
       if (typeInstances == null) {
          initTypeInstances();
       }
-      DBTypeDescriptor resTypeDesc = typeId == DBUnsetTypeId ? this : subTypesById.get(typeId);
+      DBTypeDescriptor resTypeDesc = getSubTypeByTypeId(typeId);
       if (resTypeDesc == null) {
          throw new IllegalArgumentException("Attempt to lookup instance of abstract type: " + this);
       }
@@ -1759,11 +1759,43 @@ public class DBTypeDescriptor {
             }
          }
       }
+      if (allDBProps != null) {
+         boolean first = true;
+         for (DBPropertyDescriptor prop:allDBProps) {
+            if (prop.refDBTypeDesc != null) {
+               if (first) {
+                  res.append("\n      associations: ");
+                  first = false;
+               }
+               res.append("\n         ");
+               res.append(CTypeUtil.getClassName(prop.refDBTypeDesc.getTypeName()));
+               if (prop.multiRow)
+                  res.append("[]");
+               res.append(" ");
+               res.append(prop.propertyName);
+
+               DBPropertyDescriptor revProp = prop.reversePropDesc;
+               if (revProp != null) {
+                  res.append(" reverse: " + CTypeUtil.getClassName(revProp.dbTypeDesc.getTypeName()) + "." + revProp.propertyName);
+               }
+            }
+         }
+      }
       if (res.length() > 0) {
          res.append("\n");
          return res;
       }
       else
          return null;
+   }
+
+   public DBTypeDescriptor getSubTypeByTypeId(int typeId) {
+      if (typeId == this.typeId)
+         return this;
+      if (typeId == DBUnsetTypeId)
+         return this;
+      if (subTypesById != null)
+         return subTypesById.get(typeId);
+      return null;
    }
 }

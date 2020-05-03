@@ -98,15 +98,32 @@ public class PropertyDefinitionParameters {
          setIndexedModifiers = TransformUtil.removeModifiers(ModelUtil.modifiersToString(fieldObj, false, true, false, false, true, JavaSemanticNode.MemberType.SetIndexed), TransformUtil.fieldOnlyModifiers);
    }
 
-   public void initForVarDef(LayeredSystem sys, Object varDef) {
-      Object enclType = ModelUtil.getEnclosingType(varDef);
+   public void initForProperty(LayeredSystem sys, Object enclType, Object varDef) {
       Layer propLayer = ModelUtil.getLayerForMember(sys, varDef);
       DBProvider dbProvider = DBProvider.getDBProviderForProperty(sys, propLayer, varDef);
       if (dbProvider != null && dbProvider.getNeedsGetSet()) {
          persist = true;
          dbObjVarName = "_dbObject";
          dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
-         dbPropDesc = DBProvider.getDBPropertyDescriptor(sys, propLayer, varDef);
+         // Only include properties that are defined in this type or a base-type. If the property is used
+         // as a DB property in a sub-type we wrap the getX/setX methods in the sub-type.
+         dbPropDesc = DBProvider.getDBPropertyDescriptor(sys, propLayer, varDef, false);
+         dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
+
+         dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
+         dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
+      }
+   }
+
+   public void initForPropertyDesc(LayeredSystem sys, Layer propLayer, Object enclType, DBPropertyDescriptor propDesc) {
+      DBProvider dbProvider = DBProvider.getDBProviderForPropertyDesc(sys, propLayer, propDesc);
+      if (dbProvider != null && dbProvider.getNeedsGetSet()) {
+         persist = true;
+         dbObjVarName = "_dbObject";
+         dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
+         // Only include properties that are defined in this type or a base-type. If the property is used
+         // as a DB property in a sub-type we wrap the getX/setX methods in the sub-type.
+         dbPropDesc = propDesc;
          dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
 
          dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
