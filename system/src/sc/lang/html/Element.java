@@ -704,7 +704,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          if (!allowBehaviorTagsInContent) {
             if (needsObject) {
                displayTypeError("Tag object is inside of a statement or expression - this case is not yet supported: ");
-               boolean res = getContextSupportsObjects();
             }
          }
          return false;
@@ -719,6 +718,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          needsBody = false;
       */
       return res;
+   }
+
+   public boolean displayTypeError(String...args) {
+      if (fromElement != null && fromElement != this)
+         return fromElement.displayTypeError(args);
+      else
+         return super.displayTypeError(args);
    }
 
    public boolean selfClosed() {

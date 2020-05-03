@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import com.sun.org.apache.xpath.internal.operations.Variable;
 import sc.bind.IBindable;
 import sc.db.DBPropertyDescriptor;
 import sc.dyn.IObjChildren;
@@ -1170,7 +1171,12 @@ public class TransformUtil {
       boolean isPropertyIs = getMethod != null && ModelUtil.isPropertyIs(getMethod);
       params.getOrIs = isPropertyIs ? "is" : "get";
 
-      boolean convertGetSet = variableDef instanceof VariableDefinition && ((VariableDefinition) variableDef).convertGetSet;
+      boolean convertGetSet = false;
+      if (variableDef instanceof VariableDefinition) {
+         VariableDefinition varDef = (VariableDefinition) variableDef;
+         if (varDef.convertGetSet && !ModelUtil.sameTypes(varDef.getEnclosingType(), typeDeclaration))
+            convertGetSet = true;
+      }
 
       // If getMethod and setMethod are defined in this type, we need to rename them here.
       if (getMethod instanceof MethodDefinition && ((MethodDefinition) getMethod).getEnclosingType() == typeDeclaration) {
