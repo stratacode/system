@@ -4,9 +4,8 @@
 
 package sc.lang.java;
 
-import sc.lang.DynEnumConstant;
-import sc.lang.ISemanticNode;
-import sc.lang.SemanticNodeList;
+import sc.lang.*;
+import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
 import sc.parser.ParseUtil;
 
@@ -179,11 +178,15 @@ public class EnumDeclaration extends TypeDeclaration {
       return ix;
    }
 
+   public void ensureEmptyStatement() {
+      int ix = getEmptyIndex();
+      if (ix == -1)
+         super.addBodyStatement(new EmptyStatement());
+   }
+
    public void addBodyStatement(Statement s) {
       if (!(s instanceof EmptyStatement || s instanceof EnumConstant)) {
-         int ix = getEmptyIndex();
-         if (ix == -1)
-            super.addBodyStatement(new EmptyStatement());
+         ensureEmptyStatement();
       }
       super.addBodyStatement(s);
    }
@@ -408,4 +411,99 @@ public class EnumDeclaration extends TypeDeclaration {
       valueOfMethod = null;
       valuesMethod = null;
    }
+
+   public List<Object> getEnumConstants() {
+      ArrayList<Object> res = new ArrayList<Object>();
+      addEnumConstants(body, res);
+      addEnumConstants(hiddenBody, res);
+      return res;
+   }
+
+   private static void addEnumConstants(SemanticNodeList<Statement> theBody, ArrayList<Object> res) {
+      if (theBody == null)
+         return;
+      for (Statement st:theBody) {
+         if (st instanceof BodyTypeDeclaration && ((BodyTypeDeclaration) st).isEnumConstant())
+            res.add(st);
+      }
+   }
+
+   public boolean transform(ILanguageModel.RuntimeType runtime) {
+      boolean any = super.transform(runtime);
+      JavaModel model = getJavaModel();
+
+      if (!model.mergeDeclaration)
+         return any;
+
+      List<Template> staticMixinTemplates = null;
+      List<Template> defineTypesMixinTemplates = null;
+
+      LayeredSystem lsys = model.getLayeredSystem();
+
+      // First we process the set of inherited compiler settings
+      List<Object> compilerSettingsList = getCompilerSettingsList();
+
+      if (compilerSettingsList != null && compilerSettingsList.size() > 0) {
+         Template defineTypesMixinTemplate = findTemplate(compilerSettingsList, "defineTypesMixinTemplate", ObjectDefinitionParameters.class);
+         if (defineTypesMixinTemplate != null) {
+            staticMixinTemplates = new ArrayList<Template>();
+            staticMixinTemplates.add(defineTypesMixinTemplate);
+         }
+
+         Template staticMixinTemplate = findTemplate(compilerSettingsList, "staticMixinTemplate", ObjectDefinitionParameters.class);
+         if (staticMixinTemplate != null) {
+            staticMixinTemplates = new ArrayList<Template>();
+            staticMixinTemplates.add(staticMixinTemplate);
+         }
+      }
+
+      ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors(false);
+
+      if (defProcs != null) {
+         for (IDefinitionProcessor proc:defProcs) {
+            String defineTypesMixin = proc.getDefineTypesMixinTemplate();
+            if (defineTypesMixin != null) {
+               if (defineTypesMixinTemplates == null)
+                  defineTypesMixinTemplates = new ArrayList<Template>();
+               defineTypesMixinTemplates.add(findTemplatePath(defineTypesMixin, "defineTypesMixinTemplate", ObjectDefinitionParameters.class));
+            }
+
+            String procStaticMixin = proc.getStaticMixinTemplate();
+            if (procStaticMixin != null) {
+               if (staticMixinTemplates == null)
+                  staticMixinTemplates = new ArrayList<Template>();
+               staticMixinTemplates.add(findTemplatePath(procStaticMixin, "staticMixinTemplate", ObjectDefinitionParameters.class));
+            }
+         }
+      }
+
+      if (staticMixinTemplates != null || defineTypesMixinTemplates != null) {
+         Object compiledClass = getClassDeclarationForType();
+         String objectClassName = ModelUtil.getTypeName(compiledClass, false, true);
+         String variableTypeName = objectClassName;
+         String newModifiers = modifiersToString(false, true, false, false, false, null);
+
+         StringBuilder empty = new StringBuilder();
+
+         ObjectDefinitionParameters params = new ObjectDefinitionParameters(compiledClass, objectClassName, variableTypeName, this, newModifiers,
+                 empty, 0, null, empty, false,
+                 false, false, false, false, null, null, null, null, "", "", this,
+                 false, null, null, null, null, false, null, null, null);
+
+         if (defineTypesMixinTemplates != null) {
+            for (Template defineTypesMixinTemplate:defineTypesMixinTemplates) {
+               TransformUtil.addObjectDefinition(this, this, params, null, defineTypesMixinTemplate, false, false, false, false);
+            }
+         }
+         if (staticMixinTemplates != null) {
+            for (Template staticMixinTemplate:staticMixinTemplates) {
+               // Make sure to put the static mix template code into the root type of the type hierarchy since Java does not like static code in inner classes.
+               TransformUtil.addObjectDefinition(this.getEnclosingType() == null ? this : this.getRootType(), this, params, null, staticMixinTemplate, false, false, false, false);
+            }
+         }
+      }
+
+      return any;
+   }
+
 }

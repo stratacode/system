@@ -1,6 +1,5 @@
 package sc.lang.sql;
 
-import com.sun.corba.se.impl.orbutil.graph.Graph;
 import sc.db.*;
 import sc.dyn.DynUtil;
 import sc.lang.SQLLanguage;
@@ -116,6 +115,8 @@ public class SchemaManager {
       String typeName;
       SQLFileModel fromModel, toModel;
       SQLFileModel alterModel;
+      List<SchemaChangeDetail> notUpgradeable;
+
       SchemaTypeChange(String typeName, SQLFileModel from, SQLFileModel to) {
          this.typeName = typeName;
          fromModel = from;
@@ -460,11 +461,13 @@ public class SchemaManager {
    }
 
    void updateAlterModel(SchemaTypeChange change) {
+      ArrayList<SchemaChangeDetail> notUpgradeable = new ArrayList<SchemaChangeDetail>();
       // Get the list of alter commands to convert a DDL defined by fromModel.sqlCommands to one defined by toModel.sqlCommands
-      SQLFileModel updateModel = change.fromModel.alterTo(change.toModel);
+      SQLFileModel updateModel = change.fromModel.alterTo(change.toModel, notUpgradeable);
       if (updateModel != null)
          addToSchemaList(alterSchema, updateModel);
       change.alterModel = updateModel;
+      change.notUpgradeable = notUpgradeable;
    }
 
    void updateAlterSchema(Layer buildLayer) {

@@ -1401,7 +1401,7 @@ public class Sequence extends NestedParselet  {
          sn = oldNode;
 
       if (pn instanceof ErrorParseNode)
-         System.out.println("*** Error parse node during save parse!");
+         throw new IllegalArgumentException("Failed to save parse tree due to parse error");
       ParentParseNode ppn = (ParentParseNode) pn;
 
       boolean arrElement;

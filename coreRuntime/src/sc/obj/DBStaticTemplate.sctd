@@ -3,4 +3,6 @@
    static {
       <%= formatDBTypeDescriptorDefinition() %>
    }
+   <% } else if (dbEnumDescriptor != null) { %>
+   <%= formatDBEnumDescriptorDefinition() %>
    <% } %>

@@ -260,7 +260,14 @@ public class LayerUtil implements LayerConstants {
       ParseUtil.serializeModel((ISemanticNode) model, serFileName, srcEnt.absFileName, lang);
 
       String parseFileName = FileUtil.concat(cacheBaseDir, FileUtil.addExtension(baseName, BinfConstants.ParseStreamSuffix));
-      ParseUtil.serializeParseNode(model.getParseNode(), parseFileName, srcEnt.absFileName, lang);
+      try {
+         ParseUtil.serializeParseNode(model.getParseNode(), parseFileName, srcEnt.absFileName, lang);
+      }
+      catch (Exception exc) {
+         System.err.println("*** Error trying to save parse node tree - removing model and parse files: " + serFileName + " and " + parseFileName);
+         new File(serFileName).delete();
+         new File(parseFileName).delete();
+      }
    }
 
    public static void cleanModelCache() {

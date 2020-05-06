@@ -50,7 +50,7 @@ public class CreateTable extends SQLCommand {
       return null;
    }
 
-   private static List<ColumnDef> getColumnsAdded(CreateTable oldTable, CreateTable newTable, List<AlterDef> alterDefs) {
+   private static List<ColumnDef> getColumnsAdded(CreateTable oldTable, CreateTable newTable, List<AlterDef> alterDefs, List<SchemaChangeDetail> notUpgradeable) {
       List<ColumnDef> toAddCols = null;
       for (TableDef newTableDef:newTable.tableDefs) {
          if (newTableDef instanceof ColumnDef) {
@@ -71,6 +71,20 @@ public class CreateTable extends SQLCommand {
                   }
                }
                else {
+                  SchemaChangeDetail scd = new SchemaChangeDetail();
+                  scd.oldDef = oldCol;
+                  scd.newDef = newCol;
+                  if (!sameType) {
+                     scd.message = " column type changed - from: " + oldCol.columnType + " to: " + newCol.columnType;
+                     if (!sameConstraints)
+                        scd.message += " and ";
+                  }
+                  else
+                     scd.message = "";
+                  if (!sameConstraints)
+                     scd.message += "constraints changed";
+
+                  notUpgradeable.add(scd);
                   DBUtil.info("Warning - unable to alter column: " + oldCol.columnName + " - alter schema will drop/add the column instead.");
                   if (toAddCols == null)
                      toAddCols = new ArrayList<ColumnDef>();
@@ -84,11 +98,11 @@ public class CreateTable extends SQLCommand {
       return toAddCols;
    }
 
-   public void alterTo(SQLFileModel resModel, SQLCommand newCmd) {
+   public void alterTo(SQLFileModel resModel, SQLCommand newCmd, List<SchemaChangeDetail> notUpgradeable) {
       CreateTable newTable = (CreateTable) newCmd;
       List<AlterDef> alterDefs = new ArrayList<AlterDef>();
-      List<ColumnDef> toAddCols = getColumnsAdded(this, newTable, alterDefs);
-      List<ColumnDef> toRemCols = getColumnsAdded(newTable, this, null);
+      List<ColumnDef> toAddCols = getColumnsAdded(this, newTable, alterDefs, notUpgradeable);
+      List<ColumnDef> toRemCols = getColumnsAdded(newTable, this, null, notUpgradeable);
       if (toAddCols != null || toRemCols != null || alterDefs.size() > 0) {
          // Create:  ALTER TABLE tableName ADD COLUMN colName colType, ADD COLUMN colName, colType;
          AlterTable alterTable = AlterTable.create(newTable.tableName);

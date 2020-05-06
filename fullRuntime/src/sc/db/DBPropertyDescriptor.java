@@ -82,6 +82,8 @@ public class DBPropertyDescriptor {
    /** When this property references one or more other properties, this is the type descriptor for that reference */
    public DBTypeDescriptor refDBTypeDesc;
 
+   public DBEnumDescriptor refEnumTypeDesc;
+
    private IBeanMapper propertyMapper;
 
    /**
@@ -124,14 +126,18 @@ public class DBPropertyDescriptor {
    }
 
    void resolve() {
-      if (this.refTypeName != null && refDBTypeDesc == null) {
+      if (this.refTypeName != null && refDBTypeDesc == null && refEnumTypeDesc == null) {
          Object refType = DynUtil.findType(this.refTypeName);
          if (refType == null)
             System.out.println("*** Ref type: " + refTypeName + " not found for property: " + propertyName);
          else {
             this.refDBTypeDesc = DBTypeDescriptor.getByType(refType, false);
-            if (this.refDBTypeDesc == null)
-               System.out.println("*** Ref type: " + refTypeName + ": no DBTypeDescriptor for property: " + propertyName);
+            if (this.refDBTypeDesc == null) {
+               if (DynUtil.isEnumType(refType))
+                  this.refEnumTypeDesc = DBEnumDescriptor.getByType(refType, false);
+               else
+                  System.out.println("*** Ref type: " + refTypeName + ": no DBTypeDescriptor for property: " + propertyName);
+            }
             else
                this.refDBTypeDesc.resolve();
          }

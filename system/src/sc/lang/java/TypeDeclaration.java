@@ -29,9 +29,10 @@ import java.util.*;
 /**
  * TypeDeclaration is the base class for all types except for EnumConstants.  EnumConstants extend BodyTypeDeclaration,
  * the base class for TypeDeclaration.  Together BodyTypeDeclaration and TypeDeclaration contain the core features necessary
- * to implemented classes, objects, enums, enum constants, and modify declarations.  These classes are generated automatically by parsing
- * the language grammar.  When you make updates to the non-transient, semantic properties of this instance, those changes are put back into
- * the parsed description.
+ * to implemented classes, objects, enums, enum constants, and modify declarations.  Instances of these classes are create by parsing
+ * grammars based on the JavaLanguage, or classes can be programmatically defined and converted to source code using the grammar.
+ * The non-transient properties are considered semantic properties - defined in both directions with the grammar. When those properties
+ * change, any code associated with the instance is invalidated and can be regenerated to update a type declaration.
  */
 public abstract class TypeDeclaration extends BodyTypeDeclaration {
    public List<JavaType> implementsTypes;
@@ -2077,6 +2078,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             return new ParseRange(startIx, startIx + typeName.length());
          }
       }
+      return null;
+   }
+
+   public List<Object> getEnumConstants() {
       return null;
    }
 

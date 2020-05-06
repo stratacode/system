@@ -5,6 +5,7 @@
 package sc.lang.template;
 
 import sc.bind.Bindable;
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.lang.*;
 import sc.lang.html.ControlTag;
@@ -443,7 +444,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       setLastAccessTime(time);
    }
 
-   public DBTypeDescriptor getDBTypeDescriptor() {
+   public BaseTypeDescriptor getDBTypeDescriptor() {
       if (rootType != null)
          return DBProvider.getDBTypeDescriptor(getLayeredSystem(), getLayer(), rootType, false);
       return null;

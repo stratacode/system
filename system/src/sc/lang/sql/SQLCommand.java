@@ -6,6 +6,7 @@ import sc.lang.java.JavaModel;
 import sc.lang.java.JavaSemanticNode;
 import sc.parser.ParseUtil;
 
+import java.util.List;
 import java.util.Set;
 
 public abstract class SQLCommand extends JavaSemanticNode {
@@ -33,7 +34,7 @@ public abstract class SQLCommand extends JavaSemanticNode {
 
    public abstract boolean hasReferenceTo(SQLCommand other);
 
-   public void alterTo(SQLFileModel resModel, SQLCommand newCmd) {
+   public void alterTo(SQLFileModel resModel, SQLCommand newCmd, List<SchemaChangeDetail> notUpgradeable) {
       SQLCommand dropCmd = getDropCommand();
       if (dropCmd != null) {
          resModel.addCommand(dropCmd);

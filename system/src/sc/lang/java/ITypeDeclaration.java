@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -176,5 +177,5 @@ public interface ITypeDeclaration {
    /** Mark the lastAccessTime for all of the models that define this type only (not the code inside of the type like the ForRefs version)  */
    void setAccessTime(long time);
 
-   DBTypeDescriptor getDBTypeDescriptor();
+   BaseTypeDescriptor getDBTypeDescriptor();
 }

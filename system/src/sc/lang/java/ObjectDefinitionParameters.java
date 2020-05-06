@@ -81,6 +81,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
    protected String constrModifiers;
 
+   DBEnumDescriptor dbEnumDescriptor;
    DBTypeDescriptor dbTypeDescriptor;
 
    public ObjectDefinitionParameters() {
@@ -176,7 +177,11 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          dbType = objType.resolve(true);
       else
          dbType = objType;
-      dbTypeDescriptor = DBProvider.getDBTypeDescriptor(dbType.getLayeredSystem(), dbType.getLayer(), dbType, false);
+      BaseTypeDescriptor baseTypeDesc = DBProvider.getDBTypeDescriptor(dbType.getLayeredSystem(), dbType.getLayer(), dbType, false);
+      if (baseTypeDesc instanceof DBTypeDescriptor)
+         dbTypeDescriptor = (DBTypeDescriptor) baseTypeDesc;
+      else
+         dbEnumDescriptor = (DBEnumDescriptor) baseTypeDesc;
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -680,6 +685,35 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return typeName;
    }
 
+   public String formatDBEnumDescriptorDefinition() {
+      if (dbEnumDescriptor == null)
+         return "";
+      dbEnumDescriptor.init();
+      dbEnumDescriptor.start();
+      StringBuilder sb = new StringBuilder();
+      sb.append("\n\n   static sc.db.DBEnumDescriptor dbEnumDesc = sc.db.DBEnumDescriptor.create(");
+      appendTypeDecl(sb);
+      appendString(sb, dbEnumDescriptor.sqlTypeName, true);
+      appendString(sb, dbEnumDescriptor.dataSourceName, true);
+      sb.append(", ");
+      sb.append("java.util.Arrays.asList(");
+      List<String> enumConsts = dbEnumDescriptor.enumConstants;
+      for (int i = 0; i < enumConsts.size(); i++) {
+         appendString(sb, enumConsts.get(i), i != 0);
+      }
+      sb.append("));\n\n");
+      return sb.toString();
+   }
+
+   private void appendTypeDecl(StringBuilder sb) {
+      if (typeIsDynamic)
+         sb.append("sc.dyn.DynUtil.findType(\"" + typeName + "\")");
+      else {
+         sb.append(objType.getTypeName());
+         sb.append(".class");
+      }
+   }
+
    public String formatDBTypeDescriptorDefinition() {
       if (dbTypeDescriptor == null)
          return "";
@@ -695,12 +729,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       StringBuilder sb = new StringBuilder();
       sb.append("dbTypeDesc = sc.db.DBTypeDescriptor.create(");
 
-      if (typeIsDynamic)
-         sb.append("sc.dyn.DynUtil.findType(\\\"\" + typeName + \"\\\")\"");
-      else {
-         sb.append(objType.getTypeName());
-         sb.append(".class");
-      }
+      appendTypeDecl(sb);
 
       sb.append(", ");
 

@@ -1,9 +1,11 @@
 package sc.db;
 
+import sc.dyn.DynUtil;
+
 import java.sql.Types;
 
 public enum DBColumnType {
-   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId;
+   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId, Numeric, EnumInt, EnumDB;
 
    public static DBColumnType fromJavaType(Object propertyType) {
       if (propertyType == Integer.class || propertyType == Integer.TYPE) {
@@ -24,6 +26,14 @@ public enum DBColumnType {
          return DBColumnType.Double;
       else if (propertyType == java.util.Date.class)
          return DBColumnType.Date;
+      else if (propertyType == java.math.BigDecimal.class)
+         return DBColumnType.Numeric;
+      else if (DynUtil.isEnumType(propertyType)) {
+         DBEnumDescriptor enumDesc = DBEnumDescriptor.getByType(propertyType, false);
+         if (enumDesc != null)
+            return EnumDB;
+         return EnumInt;
+      }
       else
          return null;
    }
@@ -48,6 +58,12 @@ public enum DBColumnType {
             return Types.OTHER;
          case Date:
             return Types.TIMESTAMP;
+         case Numeric:
+            return Types.NUMERIC;
+         case EnumInt:
+            return Types.INTEGER;
+         case EnumDB:
+            return Types.VARCHAR;
       }
       throw new UnsupportedOperationException("Missing value in getSQLType");
    }
@@ -63,10 +79,12 @@ public enum DBColumnType {
          return Int;
       else if (columnType.equalsIgnoreCase("smallint"))
          return Int;
-      else if (columnType.equalsIgnoreCase("float"))
+      else if (columnType.equalsIgnoreCase("float") || columnType.equalsIgnoreCase("real"))
          return Float;
-      else if (columnType.equalsIgnoreCase("real") || columnType.equals("numeric"))
+      else if (columnType.equals("double precision"))
          return Double;
+      else if (columnType.equals("numeric"))
+         return Numeric;
       else if (columnType.equalsIgnoreCase("bit"))
          return Boolean;
       else if (columnType.equalsIgnoreCase("date") || columnType.equalsIgnoreCase("time") ||

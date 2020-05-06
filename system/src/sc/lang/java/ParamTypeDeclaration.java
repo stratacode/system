@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
@@ -659,7 +660,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
          ((ITypeDeclaration) baseType).setAccessTime(time);
    }
 
-   public DBTypeDescriptor getDBTypeDescriptor() {
+   public BaseTypeDescriptor getDBTypeDescriptor() {
       return DBProvider.getDBTypeDescriptor(system, getRefLayer(), baseType, false);
    }
 

@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * A selectGroup allows collections of properties to be loaded at the same time. By default, a select group is
  * created for each table.
  */
-public class DBTypeDescriptor {
+public class DBTypeDescriptor extends BaseTypeDescriptor {
    public final static String DBTypeIdPropertyName = "dbTypeId";
    public final static String DBTypeIdColumnName = "db_type_id";
    public final static String LastModifiedPropertyName = "lastModified";
@@ -30,12 +30,12 @@ public class DBTypeDescriptor {
    public final static int DBUnsetTypeId = -1;
    public final static int DBAbstractTypeId = -2;
 
-   static Map<Object,DBTypeDescriptor> typeDescriptorsByType = new HashMap<Object,DBTypeDescriptor>();
-   static Map<String,DBTypeDescriptor> typeDescriptorsByName = new HashMap<String,DBTypeDescriptor>();
+   boolean resolved = false;
 
    public static void clearAllCaches() {
-      for (DBTypeDescriptor dbTypeDesc:typeDescriptorsByName.values()) {
-         dbTypeDesc.clearTypeCache();
+      for (BaseTypeDescriptor dbTypeDesc:typeDescriptorsByName.values()) {
+         if (dbTypeDesc instanceof DBTypeDescriptor)
+            ((DBTypeDescriptor) dbTypeDesc).clearTypeCache();
       }
    }
 
@@ -44,9 +44,9 @@ public class DBTypeDescriptor {
 
       DBTypeDescriptor dbTypeDesc = new DBTypeDescriptor(typeDecl, baseType, typeId, dataSourceName, primary, auxTables, multiTables, queries, versionPropName, schemaSQL);
 
-      DBTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, dbTypeDesc);
+      BaseTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, dbTypeDesc);
       String typeName = DynUtil.getTypeName(typeDecl, false);
-      DBTypeDescriptor oldName = typeDescriptorsByName.put(typeName, dbTypeDesc);
+      BaseTypeDescriptor oldName = typeDescriptorsByName.put(typeName, dbTypeDesc);
 
       dbTypeDesc.initTables(auxTables, multiTables, versionPropName, true);
 
@@ -59,7 +59,14 @@ public class DBTypeDescriptor {
    }
 
    public static DBTypeDescriptor getByType(Object type, boolean start) {
-      DBTypeDescriptor res = typeDescriptorsByType.get(type);
+      BaseTypeDescriptor base = getBaseByType(type, start);
+      if (base instanceof DBTypeDescriptor)
+         return (DBTypeDescriptor) base;
+      return null;
+   }
+
+   public static BaseTypeDescriptor getBaseByType(Object type, boolean start) {
+      BaseTypeDescriptor res = typeDescriptorsByType.get(type);
       if (res != null) {
          if (start && !res.started)
             res.start();
@@ -74,7 +81,7 @@ public class DBTypeDescriptor {
    }
 
    public static DBTypeDescriptor getByName(String typeName, boolean start) {
-      DBTypeDescriptor res = typeDescriptorsByName.get(typeName);
+      BaseTypeDescriptor res = typeDescriptorsByName.get(typeName);
       if (res == null) {
          Object findType = DynUtil.findType(typeName);
          if (findType == null) {
@@ -85,33 +92,24 @@ public class DBTypeDescriptor {
 
          }
       }
-      if (res != null) {
-         if (start && !res.started)
-            res.start();
-         if (start && !res.activated)
-            res.activate();
-      }
-      return res;
+      if (!(res instanceof DBTypeDescriptor))
+         return null;
+      if (start && !res.started)
+         res.start();
+      if (start && !res.activated)
+         res.activate();
+      return (DBTypeDescriptor) res;
    }
 
    public static DBTypeDescriptor getByTableName(String tableName) {
-      for (DBTypeDescriptor dbTypeDesc:typeDescriptorsByName.values()) {
-         if (dbTypeDesc.getTableByName(tableName) != null)
-            return dbTypeDesc;
+      for (BaseTypeDescriptor dbTypeDesc:typeDescriptorsByName.values()) {
+         if (dbTypeDesc instanceof DBTypeDescriptor && ((DBTypeDescriptor) dbTypeDesc).getTableByName(tableName) != null)
+            return (DBTypeDescriptor) dbTypeDesc;
       }
       return null;
    }
 
-   // Class or ITypeDeclaration for dynamic types
-   public Object typeDecl;
-
    public DBTypeDescriptor baseType;
-
-   // Configured name for the primary data source
-   public String dataSourceName;
-
-   /** Reference, populated on the first request to the database connection or configuration */
-   public DBDataSource dataSource;
 
    public boolean queueInserts = false;
    public boolean queueDeletes = false;
@@ -133,10 +131,6 @@ public class DBTypeDescriptor {
    // LRU cache, flush at the end of a transaction for all objects touched in that transaction, or for objects cached
    // in a ScopeContext, they will get removed when the scope context is disposed (e.g. per session).
    public ConcurrentHashMap<Object,IDBObject> typeInstances = null;
-
-   private boolean initialized = false, resolved = false, started = false, activated = false;
-
-   public boolean tablesInitialized = false;
 
    public List<BaseQueryDescriptor> queries = null;
    private Map<String,NamedQueryDescriptor> namedQueryIndex = null;
@@ -172,10 +166,9 @@ public class DBTypeDescriptor {
     */
    public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
                            List<BaseQueryDescriptor> queries, String schemaSQL) {
-      this.typeDecl = typeDecl;
+      super(typeDecl, dataSourceName);
       this.baseType = baseType;
       this.typeId = typeId;
-      this.dataSourceName = dataSourceName;
       if (baseType != null) {
          this.primaryTable = baseType.primaryTable;
          if (primary != null && primaryTable != primary)
@@ -382,10 +375,6 @@ public class DBTypeDescriptor {
       }
    }
 
-   public String getTypeName() {
-      return DynUtil.getTypeName(typeDecl, false);
-   }
-
    private boolean addToFetchGroup(String selectGroup, DBPropertyDescriptor prop) {
       if (prop.isId()) // Don't get the in a select when the id is known
          return false;
@@ -578,13 +567,6 @@ public class DBTypeDescriptor {
       selectQueriesIndex.put(query.queryName, query);
    }
 
-   public String toString() {
-      StringBuilder sb = new StringBuilder();
-      if (typeDecl != null)
-         sb.append(CTypeUtil.getClassName(DynUtil.getTypeName(typeDecl, false)));
-      return sb.toString();
-   }
-
    public IDBObject findById(Object... idArgs) {
       Object id;
       if (idArgs.length == 1)
@@ -767,8 +749,7 @@ public class DBTypeDescriptor {
       if (initialized)
          return;
 
-      initialized = true;
-
+      super.init();
       if (baseType != null)
          baseType.init();
 
@@ -791,7 +772,7 @@ public class DBTypeDescriptor {
       /* Resolve the property descriptor's owner type and reference types, reverse properties now that all types have been initialized */
       for (DBPropertyDescriptor prop:allDBProps) {
          if (runtimeMode && prop.ownerTypeName != null && !prop.ownerTypeName.equals(getTypeName())) {
-            prop.dbTypeDesc = DBTypeDescriptor.getByName(prop.ownerTypeName, false);
+            prop.dbTypeDesc = (DBTypeDescriptor) DBTypeDescriptor.getByName(prop.ownerTypeName, false);
          }
          else
             prop.dbTypeDesc = this;

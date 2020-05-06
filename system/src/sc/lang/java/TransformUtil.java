@@ -4,7 +4,6 @@
 
 package sc.lang.java;
 
-import com.sun.org.apache.xpath.internal.operations.Variable;
 import sc.bind.IBindable;
 import sc.db.DBPropertyDescriptor;
 import sc.dyn.IObjChildren;
@@ -412,6 +411,11 @@ public class TransformUtil {
          // Sometimes the template does not actually add anything, like abstract classes
          if (list != null) {
             if (!applyToHiddenBody) {
+               // If we have just enum constants and no ; the model is not valid so need to add the EmptyStatement before adding our list
+               if (accessClass instanceof EnumDeclaration) {
+                  ((EnumDeclaration) accessClass).ensureEmptyStatement();
+               }
+
                accessClass.initBody();
                if (insertPos == -1)
                   accessClass.body.addAll(list);

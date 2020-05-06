@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.lang.SemanticNode;
 import sc.lang.sc.ModifyDeclaration;
@@ -149,7 +150,7 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
    public void setAccessTime(long time) {
    }
 
-   public DBTypeDescriptor getDBTypeDescriptor() {
+   public BaseTypeDescriptor getDBTypeDescriptor() {
       return null;
    }
 

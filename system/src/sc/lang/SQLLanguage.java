@@ -158,6 +158,7 @@ public class SQLLanguage extends SCLanguage {
    ICKeywordSpace ofKeyword = new ICKeywordSpace("of");
    ICKeywordSpace asKeyword = new ICKeywordSpace("as");
    ICKeywordSpace tableKeyword = new ICKeywordSpace("table");
+   ICKeywordSpace enumKeyword = new ICKeywordSpace("enum");
    ICKeywordSpace typeKeyword = new ICKeywordSpace("type");
    ICKeywordSpace existsKeyword = new ICKeywordSpace("exists");
    ICKeywordSpace byKeyword = new ICKeywordSpace("by");
@@ -386,6 +387,8 @@ public class SQLLanguage extends SCLanguage {
    }
    public Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
 
+   Sequence stringLiteralList = new Sequence("([],[])", escapedStringLiteral, new Sequence("(,[])", REPEAT | OPTIONAL, comma, escapedStringLiteral));
+
    public OrderedChoice sqlParamType = new OrderedChoice("(.,.)", sqlIdentifier, sqlDataType);
 
    Sequence columnDef = new Sequence("ColumnDef(columnName,columnType,collation,constraintName,columnConstraints)",
@@ -426,8 +429,12 @@ public class SQLLanguage extends SCLanguage {
                    tableKeyword, ifNotExists, sqlIdentifier, ofType, openParenEOL, tableDefList, closeParen,
                    tableInherits, tablePartition, storageParameters, tableSpace);
 
+
    // TODO: create type 'as enum' and 'as range' and with input/output params
-   Sequence createType = new Sequence("CreateType(,typeName,,,tableDefs,)", typeKeyword, sqlIdentifier, asKeyword, openParenEOL, tableDefList, closeParen);
+   Sequence createTableType = new Sequence("CreateType(,tableDefs,)", openParenEOL, tableDefList, closeParen);
+   Sequence createEnumType = new Sequence("CreateEnum(,,enumDefs,)", enumKeyword, openParen, stringLiteralList, closeParen);
+   OrderedChoice createTypeChoice = new OrderedChoice(createTableType, createEnumType);
+   Sequence createType = new Sequence("(,typeName,,.)", typeKeyword, sqlIdentifier, asKeyword, createTypeChoice);
 
    ICSymbolSpace indexKeyword = new ICSymbolSpace("index");
 

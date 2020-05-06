@@ -9,6 +9,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
@@ -208,11 +209,22 @@ public class DBUtil {
          case Double:
             st.setDouble(index, (Double) val);
             break;
+         case Numeric:
+            st.setBigDecimal(index, (BigDecimal) val);
+            break;
          case Date:
             java.util.Date update = (java.util.Date) val;
             //java.sql.Date sqlDate = update instanceof java.sql.Date ? (java.sql.Date) update : new java.sql.Date(update.getTime());
             java.sql.Timestamp ts = update instanceof java.sql.Timestamp ? (java.sql.Timestamp) update : new java.sql.Timestamp(update.getTime());
             st.setTimestamp(index, ts);
+            break;
+         case EnumInt:
+            java.lang.Enum enumVal = (Enum) val;
+            st.setInt(index, enumVal.ordinal());
+            break;
+         case EnumDB:
+            enumVal = (Enum) val;
+            st.setObject(index, enumVal.name(), Types.OTHER);
             break;
          case Reference:
             throw new IllegalArgumentException("type should be the id column type");
@@ -285,11 +297,37 @@ public class DBUtil {
             if (rs.wasNull())
                return null;
             return dres;
+         case Numeric:
+            BigDecimal bdres = rs.getBigDecimal(colName);
+            if (rs.wasNull())
+               return null;
+            return bdres;
          case Date:
             java.sql.Timestamp sqlDate = rs.getTimestamp(colName);
             if (rs.wasNull())
                return null;
             return sqlDate;
+         case EnumInt:
+            res = rs.getObject(colName);
+            if (res == null || rs.wasNull())
+               return res;
+            if (res instanceof Integer) {
+               int ival = (Integer) res;
+               Object[] enumConsts = DynUtil.getEnumConstants(propertyType);
+               if (ival >= 0 && ival < enumConsts.length)
+                  return enumConsts[ival];
+               else
+                  error("Invalid integer value: " + ival + " for enum type: " + propertyType);
+            }
+            else {
+               System.err.println("*** Unrecognized result for code based Enum property");
+            }
+            return null;
+         case EnumDB:
+            sres = rs.getString(colName);
+            if (rs.wasNull())
+               return null;
+            return DynUtil.getEnumConstant(propertyType, sres);
          case Json:
             Object ores = rs.getObject(colName);
             if (ores == null)
@@ -360,11 +398,37 @@ public class DBUtil {
             if (rs.wasNull())
                return null;
             return dres;
+         case Numeric:
+            BigDecimal bdres = rs.getBigDecimal(index);
+            if (rs.wasNull())
+               return null;
+            return bdres;
          case Date:
             java.sql.Timestamp sqlDate = rs.getTimestamp(index);
             if (rs.wasNull())
                return null;
             return sqlDate;
+         case EnumInt:
+            res = rs.getObject(index);
+            if (res == null || rs.wasNull())
+               return res;
+            if (res instanceof Integer) {
+               int ival = (Integer) res;
+               Object[] enumConsts = DynUtil.getEnumConstants(propertyType);
+               if (ival >= 0 && ival < enumConsts.length)
+                  return enumConsts[ival];
+               else
+                  error("Invalid integer value: " + ival + " for enum type: " + propertyType);
+            }
+            else {
+               System.err.println("*** Unrecognized result for code based Enum property");
+            }
+            return null;
+         case EnumDB:
+            sres = rs.getString(index);
+            if (rs.wasNull())
+               return null;
+            return DynUtil.getEnumConstant(propertyType, sres);
          case Json:
             Object ores = rs.getObject(index);
             if (ores == null)
@@ -398,9 +462,11 @@ public class DBUtil {
       else if (propertyType == Float.class || propertyType == Float.TYPE)
          return "real";
       else if (propertyType == Double.class || propertyType == Double.TYPE)
-         return "double";
+         return "double precision"; // Should we use numeric here?
       else if (propertyType == java.util.Date.class || propertyType == java.sql.Date.class)
          return "timestamp";
+      else if (propertyType == java.math.BigDecimal.class)
+         return "numeric";
       else // TODO: BigDecimal, byte array, char, Character - size limit for strings through an annotation
          return null;
    }
@@ -416,10 +482,12 @@ public class DBUtil {
          return "boolean";
       else if (type.equalsIgnoreCase("real"))
          return "float";
-      else if (type.equalsIgnoreCase("double"))
+      else if (type.equalsIgnoreCase("double precision"))
          return "double";
       else if (type.equalsIgnoreCase("timestamp"))
          return "java.util.Date";
+      else if (type.equalsIgnoreCase("numeric"))
+         return "java.math.BigDecimal";
       return null;
    }
 
@@ -561,7 +629,9 @@ public class DBUtil {
          case Float:
             return "real";
          case Double:
-            return "double";
+            return "double precision";
+         case Numeric:
+            return "numeric";
          case Date:
             return "timestamp";
          case String:

@@ -4,6 +4,7 @@
 
 package sc.classfile;
 
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.lang.sql.DBProvider;
 import sc.util.*;
@@ -977,7 +978,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return classFile.fileChanged();
    }
 
-   public DBTypeDescriptor getDBTypeDescriptor() {
+   public BaseTypeDescriptor getDBTypeDescriptor() {
       return DBProvider.initDBTypeDescriptor(system, layer, this);
    }
 }

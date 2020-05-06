@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.dyn.*;
 import sc.lang.*;
@@ -269,7 +270,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    transient protected boolean syncPropertiesInited = false;
    transient protected boolean dbTypeDescriptorInited = false;
 
-   transient public DBTypeDescriptor dbTypeDescriptor;
+   transient public BaseTypeDescriptor dbTypeDescriptor;
 
    // Debug flag - keep track of whether this model has ever been stopped
    public transient boolean hasBeenStopped = false;
@@ -8568,7 +8569,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             bi.addTypeGroupMember(getFullTypeName(),  getTemplatePathName(), BuildInfo.AllowEditorCreateGroupName);
          }
 
-         DBTypeDescriptor typeDesc = getDBTypeDescriptor();
+         BaseTypeDescriptor typeDesc = getDBTypeDescriptor();
          // Only generate the schema for the most specific type
          if (typeDesc != null && !isModifiedBySameType()) {
             DBProvider dbProvider = DBProvider.getDBProviderForType(getLayeredSystem(), getLayer(), this);
@@ -9084,7 +9085,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       dbTypeDescriptorInited = true;
   }
 
-  public DBTypeDescriptor getDBTypeDescriptor() {
+  public BaseTypeDescriptor getDBTypeDescriptor() {
       if (!dbTypeDescriptorInited)
          initDBTypeDescriptor();
       return dbTypeDescriptor;

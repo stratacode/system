@@ -337,15 +337,17 @@ public class SQLFileModel extends SCModel {
                System.err.println("*** Failed to find refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
             }
             else {
-               DBTypeDescriptor refTypeDesc = DBProvider.getDBTypeDescriptor(layeredSystem, getLayer(), refType, true);
+               BaseTypeDescriptor refTypeDesc = DBProvider.getDBTypeDescriptor(layeredSystem, getLayer(), refType, true);
                if (refTypeDesc == null) {
                   System.err.println("*** Failed to find DBTypeDescriptor for refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);
                }
-               else {
+               else if (refTypeDesc instanceof DBTypeDescriptor) {
+                  DBTypeDescriptor refDBTypeDesc = (DBTypeDescriptor) refTypeDesc;
                   SemanticNodeList<SQLConstraint> constraints = new SemanticNodeList<SQLConstraint>();
-                  constraints.add(ReferencesConstraint.create(refTypeDesc.primaryTable.tableName, refTypeDesc.primaryTable.idColumns.get(0).columnName));
+                  constraints.add(ReferencesConstraint.create(refDBTypeDesc.primaryTable.tableName, refDBTypeDesc.primaryTable.idColumns.get(0).columnName));
                   colDef.setProperty("columnConstraints", constraints);
                }
+               // else - an enum reference does not have a constraint
             }
          }
          List<SQLConstraint> constraints = colDef.columnConstraints;
@@ -463,7 +465,7 @@ public class SQLFileModel extends SCModel {
     * This is the old SQL model that needs to be altered to convert a database schema to the one defined in the new toModel.
     * We'll return a new model with the differences
     */
-   public SQLFileModel alterTo(SQLFileModel newModel) {
+   public SQLFileModel alterTo(SQLFileModel newModel, ArrayList<SchemaChangeDetail> notUpgradeable) {
       if (sqlCommands == null || sqlCommands.size() == 0)
          return newModel;
 
@@ -481,7 +483,7 @@ public class SQLFileModel extends SCModel {
             resModel.addCommand((SQLCommand) newCmd.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null));
          }
          else {
-            oldCmd.alterTo(resModel, newCmd);
+            oldCmd.alterTo(resModel, newCmd, notUpgradeable);
          }
       }
 
@@ -551,7 +553,7 @@ public class SQLFileModel extends SCModel {
 
    public String getCommandSummary() {
       if (sqlCommands == null)
-         return "<null commands>";
+         return "(no commands)";
       StringBuilder sb = new StringBuilder();
       boolean first = true;
       for (SQLCommand cmd:sqlCommands) {

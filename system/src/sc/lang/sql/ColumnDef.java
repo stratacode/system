@@ -42,6 +42,9 @@ public class ColumnDef extends TableDef {
             if (c.hasReferenceTo(cmd))
                return true;
       }
+      if (cmd instanceof CreateEnum && columnType != null &&
+              ((CreateEnum) cmd).typeName.getIdentifier().equals(columnType.typeName))
+         return true;
       return false;
    }
 

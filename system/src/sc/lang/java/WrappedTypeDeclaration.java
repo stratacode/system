@@ -4,6 +4,7 @@
 
 package sc.lang.java;
 
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
@@ -377,7 +378,7 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
          ((ITypeDeclaration) baseType).setAccessTime(time);
    }
 
-   public DBTypeDescriptor getDBTypeDescriptor() {
+   public BaseTypeDescriptor getDBTypeDescriptor() {
       return DBProvider.getDBTypeDescriptor(getLayeredSystem(), getLayer(), baseType, false);
    }
 

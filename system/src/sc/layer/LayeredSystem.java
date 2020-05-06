@@ -8,6 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.db.DBDataSource;
 import sc.db.DataSourceManager;
@@ -407,15 +408,22 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private List<Layer> layersToRemove;
 
    /** When building, stores the current mapping of type-name to DBTypeDescriptor, so that we can assemble the reference graph as it's being built for source and compiled classes */
-   public Map<String, DBTypeDescriptor> dbTypeDescriptors = null;
+   public Map<String, BaseTypeDescriptor> dbTypeDescriptors = null;
 
-   public void addDBTypeDescriptor(String typeName, DBTypeDescriptor dtd) {
+   public void addDBTypeDescriptor(String typeName, BaseTypeDescriptor dtd) {
       if (dbTypeDescriptors == null)
-         dbTypeDescriptors = new HashMap<String,DBTypeDescriptor>();
+         dbTypeDescriptors = new HashMap<String,BaseTypeDescriptor>();
       dbTypeDescriptors.put(typeName, dtd);
    }
 
    public DBTypeDescriptor getDBTypeDescriptor(String typeName) {
+      BaseTypeDescriptor base = getBaseTypeDescriptor(typeName);
+      if (base instanceof DBTypeDescriptor)
+         return (DBTypeDescriptor) base;
+      return null;
+   }
+
+   public BaseTypeDescriptor getBaseTypeDescriptor(String typeName) {
       if (dbTypeDescriptors == null)
          return null;
       return dbTypeDescriptors.get(typeName);
@@ -424,9 +432,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public DBTypeDescriptor getDBTypeDescriptorFromTableName(String tableName) {
       if (dbTypeDescriptors == null)
          return null;
-      for (DBTypeDescriptor dbTypeDesc:dbTypeDescriptors.values())
-         if (dbTypeDesc.getTableByName(tableName) != null)
-            return dbTypeDesc;
+      for (BaseTypeDescriptor dbTypeDesc:dbTypeDescriptors.values())
+         if (dbTypeDesc instanceof DBTypeDescriptor && ((DBTypeDescriptor)dbTypeDesc).getTableByName(tableName) != null)
+            return (DBTypeDescriptor) dbTypeDesc;
       return null;
    }
 

@@ -1,6 +1,5 @@
 package sc.lang.sql;
 
-import com.sun.org.apache.xpath.internal.operations.Variable;
 import sc.db.*;
 import sc.lang.SQLLanguage;
 import sc.lang.java.*;
@@ -50,23 +49,25 @@ public class DBProvider {
       }
       Object enclType = ModelUtil.getEnclosingType(propObj);
       if (enclType != null) {
-         DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType, true);
+         BaseTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, enclType, true);
          String propName = ModelUtil.getPropertyName(propObj);
-         if (typeDesc != null) {
-            typeDesc.init();
-            typeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
-            return typeDesc.getPropertyDescriptor(propName);
+         if (typeDesc instanceof DBTypeDescriptor) {
+            DBTypeDescriptor dbTypeDesc = (DBTypeDescriptor) typeDesc;
+            dbTypeDesc.init();
+            dbTypeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
+            return dbTypeDesc.getPropertyDescriptor(propName);
          }
       }
       return null;
    }
 
    public static DBPropertyDescriptor getDBPropertyDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, String propName) {
-      DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, typeDecl, true);
-      if (typeDesc != null) {
-         typeDesc.init();
-         typeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
-         return typeDesc.getPropertyDescriptor(propName);
+      BaseTypeDescriptor typeDesc = getDBTypeDescriptor(sys, refLayer, typeDecl, true);
+      if (typeDesc instanceof DBTypeDescriptor) {
+         DBTypeDescriptor dbTypeDesc = (DBTypeDescriptor) typeDesc;
+         dbTypeDesc.init();
+         dbTypeDesc.resolve(); // Must be resolved so we know about all 'reverse property' references at this point to determine whether or not this property is bindable
+         return dbTypeDesc.getPropertyDescriptor(propName);
       }
       return null;
    }
@@ -80,7 +81,7 @@ public class DBProvider {
    }
 
    public static DBProvider getDBProviderForType(LayeredSystem sys, Layer refLayer, Object typeObj) {
-      DBTypeDescriptor typeDesc = getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj, false);
+      BaseTypeDescriptor typeDesc = getDBTypeDescriptor(sys, ModelUtil.getLayerForType(sys, typeObj), typeObj, false);
       if (typeDesc != null) {
          return getDBProviderForDataSource(sys, refLayer, typeDesc.dataSourceName);
       }
@@ -110,9 +111,9 @@ public class DBProvider {
       */
       Object enclType = ModelUtil.getEnclosingType(propObj);
       String propName = ModelUtil.getPropertyName(propObj);
-      DBTypeDescriptor typeDesc = enclType == null ? null : getDBTypeDescriptor(sys, ModelUtil.getLayerForMember(sys, propObj), enclType, true);
-      if (typeDesc != null) {
-         DBPropertyDescriptor propDesc = typeDesc.getPropertyDescriptor(propName);
+      BaseTypeDescriptor typeDesc = enclType == null ? null : getDBTypeDescriptor(sys, ModelUtil.getLayerForMember(sys, propObj), enclType, true);
+      if (typeDesc instanceof DBTypeDescriptor) {
+         DBPropertyDescriptor propDesc = ((DBTypeDescriptor) typeDesc).getPropertyDescriptor(propName);
          if (propDesc != null) {
             String dataSourceName = propDesc.getDataSourceForProp();
             DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
@@ -124,15 +125,15 @@ public class DBProvider {
       return null;
    }
 
-   public static DBTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, boolean initTables) {
+   public static BaseTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, boolean initTables) {
       if (typeDecl instanceof ITypeDeclaration) {
-         DBTypeDescriptor res = ((ITypeDeclaration) typeDecl).getDBTypeDescriptor();
+         BaseTypeDescriptor res = ((ITypeDeclaration) typeDecl).getDBTypeDescriptor();
          if (res != null && initTables && !res.tablesInitialized)
             completeDBTypeDescriptor(res, sys, refLayer, typeDecl);
          return res;
       }
       else {
-         DBTypeDescriptor res = initDBTypeDescriptor(sys, refLayer, typeDecl);
+         BaseTypeDescriptor res = initDBTypeDescriptor(sys, refLayer, typeDecl);
          if (res != null && initTables && !res.tablesInitialized)
             completeDBTypeDescriptor(res, sys, refLayer, typeDecl);
          return res;
@@ -143,7 +144,11 @@ public class DBProvider {
     * Defines the part of the DBTypeDescriptor that includes the primaryTable and idColumns - but does not try to resolve
     * other DBTypeDescriptors for references. This part only can be used to define new interface methods in the DBDefinesTypeTemplate
     */
-   public static DBTypeDescriptor initDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
+   public static BaseTypeDescriptor initDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl) {
+      // These end up inheriting the DBTypeSettings annotation of the parent and we don't need them as separate types
+      if (typeDecl instanceof EnumConstant)
+         return null;
+
       ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
       // TODO: should check for annotations on the Layer of all types in the type tree. For each attribute, check the layer annotation if it's not set at the type level
       // TODO: need getAllLayerAnnotations(typeDecl, annotName)
@@ -224,15 +229,40 @@ public class DBProvider {
                if (dataSourceName == null)
                   return null;
             }
+            String fullTypeName = ModelUtil.getTypeName(typeDecl);
+            String typeName = CTypeUtil.getClassName(fullTypeName);
+            if (primaryTableName == null)
+               primaryTableName = SQLUtil.getSQLName(typeName);
+
+            boolean isEnum = ModelUtil.isEnumType(typeDecl);
+            if (isEnum) {
+               List<Object> enumConstants;
+               if (typeDecl instanceof TypeDeclaration) {
+                  enumConstants = ((TypeDeclaration) typeDecl).getEnumConstants();
+               }
+               else {
+                  Object[] ecArray = ModelUtil.getEnumConstants(typeDecl);
+                  enumConstants = ecArray == null ? null : Arrays.asList(ecArray);
+               }
+               ArrayList<String> enumConstNames = new ArrayList<String>();
+               if (enumConstants != null) {
+                  for (Object ec:enumConstants) {
+                     enumConstNames.add(ModelUtil.getEnumConstantName(ec));
+                  }
+               }
+               DBEnumDescriptor enumDesc = new DBEnumDescriptor(typeDecl, primaryTableName, dataSourceName, enumConstNames);
+               sys.addDBTypeDescriptor(fullTypeName, enumDesc);
+               return enumDesc;
+            }
+
             Object baseType = ModelUtil.getExtendsClass(typeDecl);
-            DBTypeDescriptor baseTD = baseType != null && baseType != Object.class ? getDBTypeDescriptor(sys, refLayer, baseType, false) : null;
+            BaseTypeDescriptor baseTypeDesc = baseType != null && baseType != Object.class ? getDBTypeDescriptor(sys, refLayer, baseType, false) : null;
+            DBTypeDescriptor baseTD = baseTypeDesc instanceof DBTypeDescriptor ? (DBTypeDescriptor) baseTypeDesc : null;
 
             // Ignore the baseTD and just build up a new DBTypeDescriptor from our properties as though
             // this is a new type
             if (baseTD != null && !storeInExtendsTable)
                baseTD = null;
-
-            String fullTypeName = ModelUtil.getTypeName(typeDecl);
 
             // For ModifyDeclaration don't use the cached type descriptor since it might need to be refined
             DBTypeDescriptor dbTypeDesc = null;
@@ -242,9 +272,6 @@ public class DBProvider {
                   return dbTypeDesc;
             }
 
-            String typeName = CTypeUtil.getClassName(fullTypeName);
-            if (primaryTableName == null)
-               primaryTableName = SQLUtil.getSQLName(typeName);
 
             // We reuse the primary table here - by default adding subclass properties into the same table unless they set their own table.
             TableDescriptor primaryTable = baseTD == null ? new TableDescriptor(primaryTableName) : baseTD.primaryTable;
@@ -576,13 +603,17 @@ public class DBProvider {
       }
    }
 
-   public static void completeDBTypeDescriptor(DBTypeDescriptor dbTypeDesc, LayeredSystem sys, Layer refLayer, Object typeDecl) {
-      if (dbTypeDesc == null)
+   public static void completeDBTypeDescriptor(BaseTypeDescriptor baseTypeDesc, LayeredSystem sys, Layer refLayer, Object typeDecl) {
+      if (baseTypeDesc == null)
          return;
 
       ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
-      dbTypeDesc.tablesInitialized = true;
+      baseTypeDesc.tablesInitialized = true;
 
+      if (baseTypeDesc instanceof DBEnumDescriptor)
+         return;
+
+      DBTypeDescriptor dbTypeDesc = (DBTypeDescriptor) baseTypeDesc;
       DBTypeDescriptor baseTD = dbTypeDesc.baseType;
 
       String versionProp = null;
@@ -814,6 +845,7 @@ public class DBProvider {
 
                if (propColumnName == null)
                   propColumnName = SQLUtil.getSQLName(propName);
+               BaseTypeDescriptor refBaseTypeDesc = null;
                DBTypeDescriptor refDBTypeDesc = null;
 
                boolean isMultiCol = false;
@@ -841,11 +873,18 @@ public class DBProvider {
                if (propColumnType == null) {
                   propColumnType = DBUtil.getDefaultSQLType(propType, false);
                   if (propColumnType == null) {
-                     refDBTypeDesc = getDBTypeDescriptor(sys, refLayer, propType, true);
-                     if (refDBTypeDesc == null) {
-                        propColumnType = "jsonb";
+                     refBaseTypeDesc = getDBTypeDescriptor(sys, refLayer, propType, true);
+                     if (refBaseTypeDesc == null) {
+                        if (ModelUtil.isEnumType(propType))
+                           propColumnType = "integer";
+                        else
+                           propColumnType = "jsonb";
+                     }
+                     else if (refBaseTypeDesc instanceof DBEnumDescriptor) {
+                        propColumnType = ((DBEnumDescriptor) refBaseTypeDesc).sqlTypeName;
                      }
                      else {
+                        refDBTypeDesc = (DBTypeDescriptor) refBaseTypeDesc;
                         TableDescriptor refTable = refDBTypeDesc.primaryTable;
                         if (refTable.idColumns.size() == 1)
                            propColumnType = DBUtil.getKeyIdColumnType(refTable.getIdColumns().get(0).columnType);
@@ -873,7 +912,7 @@ public class DBProvider {
 
                boolean multiRow = false;
                // TODO: should we allow scalar arrays - arrays of strings and stuff like that?
-               if (isArrayProperty && refDBTypeDesc != null)
+               if (isArrayProperty && refBaseTypeDesc != null)
                   multiRow = true;
 
                DBPropertyDescriptor propDesc;
@@ -894,18 +933,20 @@ public class DBProvider {
                   propDesc = new MultiColPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed,
                           propDataSourceName, propSelectGroup,
-                          refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
+                          refBaseTypeDesc == null ? null : refBaseTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault, fullTypeName);
                }
                else {
                   propDesc = new DBPropertyDescriptor(propName, propColumnName,
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed, propDynColumn,
                           propDataSourceName, propSelectGroup,
-                          refDBTypeDesc == null ? null : refDBTypeDesc.getTypeName(),
+                          refBaseTypeDesc == null ? null : refBaseTypeDesc.getTypeName(),
                           multiRow, propReverseProperty, propDBDefault, fullTypeName);
                }
 
                propDesc.refDBTypeDesc = refDBTypeDesc;
+               if (refBaseTypeDesc instanceof DBEnumDescriptor)
+                  propDesc.refEnumTypeDesc = (DBEnumDescriptor) refBaseTypeDesc;
 
                TableDescriptor propTable = primaryTable;
 
@@ -1042,7 +1083,7 @@ public class DBProvider {
       return TransformUtil.evalTemplate(params, getUpdatePropertyTemplate());
    }
 
-   public void processGeneratedFiles(BodyTypeDeclaration type, DBTypeDescriptor typeDesc) {
+   public void processGeneratedFiles(BodyTypeDeclaration type, BaseTypeDescriptor typeDesc) {
       JavaModel model = type.getJavaModel();
 
       SQLFileModel sqlModel = SQLUtil.convertTypeToSQLFileModel(model, typeDesc);

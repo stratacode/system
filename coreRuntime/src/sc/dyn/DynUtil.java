@@ -1508,8 +1508,15 @@ public class DynUtil {
    }
 
    public static boolean isEnumType(Object type) {
-      if (type instanceof Class)
-         return ((Class<?>) type).isAssignableFrom(Enum.class);
+      if (type instanceof Class) {
+         Class cl = (Class) type;
+         if (cl.isEnum())
+            return true;
+         boolean res = ((Class<?>) type).isAssignableFrom(Enum.class);
+         if (res)
+            System.out.println("*** weird return for isEnumType");
+         return res;
+      }
       if (dynamicSystem != null)
          return dynamicSystem.isEnumType(type);
       return false;
@@ -1526,7 +1533,19 @@ public class DynUtil {
       if (dynamicSystem != null)
          return dynamicSystem.getEnumConstant(typeObj, enumConstName);
       else {
-         return null;
+         if (typeObj instanceof Class) {
+            Class cl = (Class) typeObj;
+            if (cl.isEnum()) {
+               Object[] enumConsts = cl.getEnumConstants();
+               for (Object econst:enumConsts) {
+                  Enum e = (Enum) econst;
+                  if (e.name().equals(enumConstName))
+                     return e;
+               }
+               throw new IllegalArgumentException("*** Missing enumConstant: " + enumConstName + " for getEnumConstant on type: " + typeObj);
+            }
+         }
+         throw new IllegalArgumentException("*** Invalid type for getEnumConstant");
       }
    }
 

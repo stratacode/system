@@ -4,6 +4,7 @@
 
 package sc.lang.sc;
 
+import sc.db.BaseTypeDescriptor;
 import sc.db.DBTypeDescriptor;
 import sc.lang.*;
 import sc.lang.java.*;
@@ -256,7 +257,7 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
    public void setAccessTime(long time) {
    }
 
-   public DBTypeDescriptor getDBTypeDescriptor() {
+   public BaseTypeDescriptor getDBTypeDescriptor() {
       return null;
    }
 

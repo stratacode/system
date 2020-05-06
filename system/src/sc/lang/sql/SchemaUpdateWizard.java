@@ -110,7 +110,7 @@ public class SchemaUpdateWizard extends CommandWizard {
       }
 
       if (mgr.dbMissingMetadata != null && (mgr.noCurrentSchema || mgr.initFromDBFailed)) {
-         print("- Warning: current database is missing:" + mgr.dbMissingMetadata + "\n---");
+         print("- Warning: current database is missing these items:" + mgr.dbMissingMetadata + "\n---");
       }
    }
 
@@ -130,11 +130,22 @@ public class SchemaUpdateWizard extends CommandWizard {
          SchemaManager.SchemaTypeChange change = changes.get(i);
          int ix = i + nsz;
          print((ix == currentTypeIx ? "*": "") + "[" + ix + "] changed: " + change.fromModel.srcType.typeName);
+         printUpgradeWarning(change);
+      }
+   }
+
+   private void printUpgradeWarning(SchemaManager.SchemaTypeChange change) {
+      if (change.notUpgradeable.size() > 0) {
+         print("   Warning - tables for type cannot be upgraded without losing data:");
+         for (int i = 0; i < change.notUpgradeable.size(); i++) {
+            print("      " + change.notUpgradeable.get(i));
+         }
       }
    }
 
    private void printChange(SchemaManager.SchemaTypeChange change) {
       print("Change to schema for type: " + change.fromModel.srcType.typeName);
+      printUpgradeWarning(change);
       print("--- alterSQL:\n" + change.alterModel.toLanguageString());
    }
 
@@ -261,6 +272,7 @@ public class SchemaUpdateWizard extends CommandWizard {
       else {
          SchemaManager.SchemaTypeChange change = mgr.changedTypes.get(currentTypeIx - newSize);
          print("Schema change for type: " + change.fromModel.srcType.typeName);
+         printUpgradeWarning(change);
          print("   --- old schema:");
          print(change.fromModel.toLanguageString());
          print("   --- new schema:");
