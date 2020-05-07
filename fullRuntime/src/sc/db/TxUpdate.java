@@ -70,7 +70,8 @@ public class TxUpdate extends VersionedOperation {
       ArrayList<Object> columnValues = new ArrayList<Object>();
       ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
 
-      addColumnsAndValues(updateTable, columnNames, columnTypes, columnValues);
+      // Goes through the updateList property for this update adding the names and values of changed columns
+      addUpdatedColumns(updateTable, columnNames, columnTypes, columnValues);
 
       // No changes for this table
       if (columnNames.size() == 0)
@@ -188,7 +189,7 @@ public class TxUpdate extends VersionedOperation {
       return 1;
    }
 
-   private void addColumnsAndValues(TableDescriptor tableDesc, ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues) {
+   private void addUpdatedColumns(TableDescriptor tableDesc, ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues) {
       Map<String,Object> tableDynProps = null;
 
       for (PropUpdate propUpdate:updateList) {
@@ -204,8 +205,13 @@ public class TxUpdate extends VersionedOperation {
                Object value = propUpdate.value;
                if (prop.refDBTypeDesc != null) {
                   columnTypes.add(prop.refDBTypeDesc.getIdDBColumnType(0));
-                  if (value != null)
-                     value = ((IDBObject) value).getDBId();
+                  if (value != null) {
+                     IDBObject refObj = ((IDBObject) value);
+                     // If we are asked to update a property that refers to a transient value, insert it first.
+                     if (refObj.getDBObject().isTransient() && !prop.readOnly)
+                        refObj.dbInsert();
+                     value = refObj.getDBId();
+                  }
                }
                else
                   columnTypes.add(prop.getDBColumnType());
