@@ -1154,11 +1154,15 @@ public class DBProvider {
             switch (schemaMode) {
                case Update:
                   DBUtil.info("Updating schema for: " + schemaMgr.dataSourceName);
-                  schemaMgr.updateSchema(buildLayer, true);
+                  if (schemaMgr.updateSchema(buildLayer, true)) {
+                     schemaMgr.initFromDB(buildLayer, true);
+                  }
                   break;
                case Accept:
                   DBUtil.info("Accepting current schema for: " + schemaMgr.dataSourceName);
-                  schemaMgr.updateSchema(buildLayer, false);
+                  if (schemaMgr.updateSchema(buildLayer, false)) {
+                     schemaMgr.initFromDB(buildLayer, true);
+                  }
                   break;
                default:
                   System.err.println("*** Unrecognized schema apply mode");

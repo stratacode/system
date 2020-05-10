@@ -1,8 +1,6 @@
 package sc.lang.sql;
 
 import sc.db.ColumnInfo;
-import sc.db.DBUtil;
-import sc.lang.SemanticNode;
 import sc.util.StringUtil;
 
 import java.sql.Types;
@@ -13,7 +11,7 @@ public class ColumnDef extends TableDef {
    public SQLIdentifier columnName;
    public SQLDataType columnType;
    public Collation collation;
-   public NamedConstraint constraintName;
+   public NamedConstraint namedConstraint;
    public List<SQLConstraint> columnConstraints;
 
    public boolean isPrimaryKey() {
@@ -26,7 +24,7 @@ public class ColumnDef extends TableDef {
    }
 
    public String toString() {
-      return columnName + " " + columnType + (collation == null ? "" : collation) + (constraintName == null ? "" : constraintName) + (columnConstraints == null ? "" : " " + StringUtil.argsToString(columnConstraints));
+      return columnName + " " + columnType + (collation == null ? "" : collation) + (namedConstraint == null ? "" : namedConstraint) + (columnConstraints == null ? "" : " " + StringUtil.argsToString(columnConstraints));
    }
 
    public void addTableReferences(Set<String> refTableNames) {

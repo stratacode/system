@@ -5,7 +5,6 @@ import sc.db.DBUtil;
 import sc.db.TableInfo;
 import sc.dyn.DynUtil;
 import sc.lang.ISemanticNode;
-import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.parser.IString;
 
@@ -63,34 +62,97 @@ public class CreateTable extends SQLCommand {
             }
             else if (!oldCol.equals(newCol)) {
                boolean sameType = oldCol.columnType.equals(newCol.columnType);
-               boolean sameConstraints = DynUtil.equalObjects(oldCol.constraintName, newCol.constraintName) &&
+               boolean sameConstraints = DynUtil.equalObjects(oldCol.namedConstraint, newCol.namedConstraint) &&
                        DynUtil.equalObjects(oldCol.columnConstraints, newCol.columnConstraints);
-               if (!sameType && sameConstraints && DBUtil.canCast(oldCol.columnType.getDBColumnType(), newCol.columnType.getDBColumnType())) {
-                  if (alterDefs != null) {
-                     alterDefs.add(AlterColumn.createSetDataType(newCol.columnName, newCol.columnType));
-                  }
-               }
-               else {
-                  SchemaChangeDetail scd = new SchemaChangeDetail();
-                  scd.oldDef = oldCol;
-                  scd.newDef = newCol;
-                  if (!sameType) {
-                     scd.message = " column type changed - from: " + oldCol.columnType + " to: " + newCol.columnType;
-                     if (!sameConstraints)
-                        scd.message += " and ";
-                  }
-                  else
-                     scd.message = "";
-                  if (!sameConstraints)
-                     scd.message += "constraints changed";
 
-                  notUpgradeable.add(scd);
-                  DBUtil.info("Warning - unable to alter column: " + oldCol.columnName + " - alter schema will drop/add the column instead.");
+               List<AlterDef> localAlterDefs = new ArrayList<AlterDef>();
+               if (!sameType && DBUtil.canCast(oldCol.columnType.getDBColumnType(), newCol.columnType.getDBColumnType())) {
+                  if (alterDefs != null) {
+                     localAlterDefs = new ArrayList<AlterDef>();
+                     localAlterDefs.add(AlterColumn.createSetDataType(newCol.columnName, newCol.columnType));
+                  }
+                  // else - handled in the reverse direction
+                  sameType = true;
+               }
+
+               if (!sameConstraints) {
+                  boolean upgraded = true;
+                  if (alterDefs != null) {
+                     ArrayList<SQLConstraint> toAddConstraints = new ArrayList<SQLConstraint>();
+                     if (newCol.columnConstraints != null)
+                        toAddConstraints.addAll(newCol.columnConstraints);
+                     if (oldCol.namedConstraint != null) {
+                        AlterDef ad = DropConstraint.create(newTable.tableName.getIdentifier(),
+                                        newCol.columnName.getIdentifier(), oldCol.namedConstraint);
+                        if (ad == null)
+                           upgraded = false;
+                        else
+                           localAlterDefs.add(ad);
+                     }
+                     if (oldCol.columnConstraints != null) {
+                        for (SQLConstraint oldC:oldCol.columnConstraints) {
+                           int newIx = toAddConstraints.indexOf(oldC);
+                           if (newIx != -1) {
+                              toAddConstraints.remove(newIx);
+                           }
+                           else {
+                              AlterDef ad = DropConstraint.create(newTable.tableName.getIdentifier(),
+                                              newCol.columnName.getIdentifier(), oldC);
+                              if (ad == null)
+                                 upgraded = false;
+                              else
+                                 localAlterDefs.add(ad);
+                           }
+                        }
+                     }
+                     if (toAddConstraints.size() > 0) {
+                        for (SQLConstraint toAddC:toAddConstraints) {
+                           AlterDef ad = AddConstraint.create(newCol.columnName, toAddC);
+                           if (ad == null) {
+                              upgraded = false;
+                              break;
+                           }
+                           else
+                              localAlterDefs.add(ad);
+                        }
+                     }
+                  }
+                  if (upgraded)
+                     sameConstraints = true;
+               }
+
+               // Unsupported type change or constraint change - need to re-add
+               if (!sameType || !sameConstraints) {
+                  if (alterDefs != null) {
+                     SchemaChangeDetail scd = new SchemaChangeDetail();
+                     scd.dataLoss = true;
+                     scd.oldDef = oldCol;
+                     scd.newDef = newCol;
+                     if (!sameType) {
+                        scd.message = " column type changed - from: " + oldCol.columnType + " to: " + newCol.columnType;
+                        if (!sameConstraints)
+                           scd.message += " and ";
+                     }
+                     else
+                        scd.message = "";
+                     if (!sameConstraints)
+                        scd.message += "constraints changed";
+
+                     notUpgradeable.add(scd);
+                     DBUtil.info("Warning - unable to alter column: " + oldCol.columnName + " - alter schema will drop/add the column instead.");
+                  }
+                  // else - handled in the reverse direction
+
                   if (toAddCols == null)
                      toAddCols = new ArrayList<ColumnDef>();
                   toAddCols.add(newCol); // This will drop and re-add the column
                }
+               else if (alterDefs != null && localAlterDefs.size() > 0) {
+                  // Since we did not drop/re-add the column add the alter defs to update it
+                  alterDefs.addAll(localAlterDefs);
+               }
             }
+
          }
          else
             oldTable.displayError("Unhandled table definition for migration: ");

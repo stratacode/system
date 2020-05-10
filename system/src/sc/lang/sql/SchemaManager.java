@@ -128,7 +128,7 @@ public class SchemaManager {
     * Connect to the database and populate the schema manager with two types of metadata about the schema. Use the db_schema_
     * tables to retrieve our record of the schema along with (optionally) the database table/column metadata to see what's actually there.
     */
-   public void initFromDB(Layer buildLayer) {
+   public void initFromDB(Layer buildLayer, boolean changeReadyState) {
       if (!needsInitFromDB)
          return;
       ISchemaUpdater schemaUpdater = provider.getSchemaUpdater();
@@ -139,6 +139,7 @@ public class SchemaManager {
 
             dbMetadata = schemaUpdater.getDBMetadata(dataSourceName);
             dbMetadataFailed = dbMetadata == null;
+            dbMissingMetadata = null;
          }
 
          if (!initFromDBFailed) {
@@ -215,19 +216,25 @@ public class SchemaManager {
             }
          }
 
-         // The deployed schema does not match and we are running interactively so tell apps to wait till we fix
-         // the DB schema before running
-         if ((initFromDBFailed || schemaChanged || dbMissingMetadata != null) && system.options.startInterpreter) {
-            schemaUpdater.setSchemaReady(dataSourceName, false);
-            schemaNotReady = true;
-         }
-         // After initializing from the database, we find that the DB is setup properly - because we turned off
-         // the default schema though, need to tell the apps to go ahead and run
-         else if (!schemaChanged && schemaNotReady) {
-            schemaUpdater.setSchemaReady(dataSourceName, true);
-            schemaNotReady = false;
+         if (changeReadyState) {
+            // The deployed schema does not match and we are running interactively so tell apps to wait till we fix
+            // the DB schema before running
+            if ((initFromDBFailed || schemaChanged || dbMissingMetadata != null) && system.options.startInterpreter) {
+               markSchemaNotReady();
+            }
+            // After initializing from the database, we find that the DB is setup properly - because we turned off
+            // the default schema though, need to tell the apps to go ahead and run
+            else if (!schemaChanged && schemaNotReady) {
+               markSchemaReady();
+            }
          }
       }
+   }
+
+   public void markSchemaNotReady() {
+      ISchemaUpdater schemaUpdater = provider.getSchemaUpdater();
+      schemaUpdater.setSchemaReady(dataSourceName, false);
+      schemaNotReady = true;
    }
 
    public void markSchemaReady() {
@@ -732,6 +739,7 @@ public class SchemaManager {
          curVersion.setAlterSQL(alterSQL);
          updateDBSchema(updater, typeName, info, newModel, buildLayer);
       }
+
       return true;
    }
 

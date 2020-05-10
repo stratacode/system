@@ -4,6 +4,8 @@ class SchemaChangeDetail {
    SQLDefinition oldDef;
    SQLDefinition newDef;
    String message;
+   boolean dataLoss;
+   boolean newConstraints;
 
    public String toString() {
       StringBuilder sb = new StringBuilder();

@@ -675,6 +675,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             return res;
          typeInstances.put(id, inst);
       }
+      DBUtil.mapTestInstance(inst);
       return null;
    }
 

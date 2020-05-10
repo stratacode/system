@@ -472,18 +472,20 @@ public class SQLFileModel extends SCModel {
       SQLFileModel resModel = new SQLFileModel();
       resModel.srcType = newModel.srcType;
 
-      for (SQLCommand newCmd:newModel.sqlCommands) {
-         // If this exact SQL command was in the old model just skip it
-         SQLCommand sameCmd = findSameCommand(newCmd);
-         if (sameCmd != null)
-            continue;
-         // Some SQL commands have a name - table, sequence, index, function - so if they don't match we either alter or drop/create
-         SQLCommand oldCmd = findMatchingCommand(newCmd);
-         if (oldCmd == null) {
-            resModel.addCommand((SQLCommand) newCmd.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null));
-         }
-         else {
-            oldCmd.alterTo(resModel, newCmd, notUpgradeable);
+      if (newModel.sqlCommands != null) {
+         for (SQLCommand newCmd:newModel.sqlCommands) {
+            // If this exact SQL command was in the old model just skip it
+            SQLCommand sameCmd = findSameCommand(newCmd);
+            if (sameCmd != null)
+               continue;
+            // Some SQL commands have a name - table, sequence, index, function - so if they don't match we either alter or drop/create
+            SQLCommand oldCmd = findMatchingCommand(newCmd);
+            if (oldCmd == null) {
+               resModel.addCommand((SQLCommand) newCmd.deepCopy(ISemanticNode.CopyNormal | ISemanticNode.CopyParseNode, null));
+            }
+            else {
+               oldCmd.alterTo(resModel, newCmd, notUpgradeable);
+            }
          }
       }
 

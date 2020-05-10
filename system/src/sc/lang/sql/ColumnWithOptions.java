@@ -7,7 +7,7 @@ import java.util.Set;
 
 public class ColumnWithOptions extends TableDef {
    public SQLIdentifier columnName;
-   public NamedConstraint constraintName;
+   public NamedConstraint namedConstraint;
    public List<SQLConstraint> columnConstraints;
 
    public void addTableReferences(Set<String> refTableNames) {

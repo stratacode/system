@@ -19,6 +19,8 @@ public class SchemaUpdateWizard extends CommandWizard {
 
    boolean firstTime = true;
 
+   boolean waitForQuit = false;
+
    public int currentTypeIx = 0;
 
    public SchemaUpdateWizard(AbstractInterpreter cmd, LayeredSystem sys, SchemaManager mgr) {
@@ -28,8 +30,8 @@ public class SchemaUpdateWizard extends CommandWizard {
    }
 
    public boolean getActive() {
-      this.mgr.initFromDB(system.buildLayer);
-      return mgr.schemaChanged;
+      this.mgr.initFromDB(system.buildLayer, true);
+      return mgr.schemaChanged || waitForQuit;
    }
 
    public String prompt() {
@@ -224,8 +226,19 @@ public class SchemaUpdateWizard extends CommandWizard {
                      printNoSchemaUpdater();
                   else {
                      print("Updating schema...");
-                     if (mgr.updateSchema(system.buildLayer, true))
+                     if (mgr.updateSchema(system.buildLayer, true)) {
                         print("Schema update complete...");
+                        mgr.initFromDB(system.buildLayer, false);
+                        if (!mgr.schemaChanged) {
+                           waitForQuit = true;
+                           print("\nSchema update completed and all tables/columns are registered.\n");
+                           print("Enter q to exit and continue");
+                        }
+                        else {
+                           print("Warning: schema updated but metadata does not match");
+                           printList();
+                        }
+                     }
                      else
                         print("Schema update failed");
                   }
@@ -235,8 +248,19 @@ public class SchemaUpdateWizard extends CommandWizard {
                      printNoSchemaUpdater();
                   else {
                      print("Accepting existing schema...");
-                     if (mgr.updateSchema(system.buildLayer, false))
-                        print("Accept schema complete...");
+                     if (mgr.updateSchema(system.buildLayer, false)) {
+                        waitForQuit = true;
+                        mgr.initFromDB(system.buildLayer, false);
+                        if (!mgr.schemaChanged) {
+                           waitForQuit = true;
+                           print("\nAccept schema complete - all tables/columns present in the DB");
+                           print("Enter q to exit and continue");
+                        }
+                        else {
+                           print("Warning: schema accepted but metadata does not match");
+                           printList();
+                        }
+                     }
                      else
                         print("Accept schema failed");
                   }

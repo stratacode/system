@@ -41,4 +41,16 @@ public class IdPropertyDescriptor extends DBPropertyDescriptor {
       return currentMemoryId;
    }
 
+   public DBColumnType getDBColumnType() {
+      DBColumnType res = super.getDBColumnType();
+      if (res == null)
+         return null;
+      switch (res) {
+         case Long:
+            res = DBColumnType.LongId;
+            break;
+      }
+      return res;
+   }
+
 }

@@ -25,8 +25,7 @@ public class ParseInStream extends BinfInStream {
       if (pid == 0)
          return null;
       if (pid < BinfConstants.NumReservedIds) {
-         System.err.println("*** Invalid parselet id");
-         return null;
+         throw new IllegalArgumentException("Invalid parselet id");
       }
       Parselet res = lang.getParseletById(pid);
       if (res == null)

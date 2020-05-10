@@ -163,6 +163,11 @@ public class SQLLanguage extends SCLanguage {
    ICKeywordSpace existsKeyword = new ICKeywordSpace("exists");
    ICKeywordSpace byKeyword = new ICKeywordSpace("by");
    ICKeywordSpace optByKeyword = new ICKeywordSpace("by", OPTIONAL);
+   ICKeywordSpace addKeyword = new ICKeywordSpace("add");
+   ICKeywordSpace dropKeyword = new ICKeywordSpace("drop");
+
+   ICKeywordSpace constraintKeyword = new ICKeywordSpace("constraint");
+   ICKeywordSpace optConstraintKeyword = (ICKeywordSpace) constraintKeyword.copyWithOptions(OPTIONAL);
 
    ICSymbol dollarSymbol = new ICSymbol("$");
 
@@ -228,8 +233,10 @@ public class SQLLanguage extends SCLanguage {
 
    public Sequence optExponent = new Sequence("('','')", OPTIONAL, new ICSymbol("e"), digits);
 
-   public OrderedChoice numericConstant = new OrderedChoice(new Sequence("IntConstant(numberPart,exponent,)", digits, optExponent, spacing),
-                                                            new Sequence("FloatConstant(numberPart,,fractionPart,exponent,)", optDigits, period, optDigits, optExponent, spacing));
+   // Must parse float first since int will match part of a float but not vice versa
+   public OrderedChoice numericConstant =
+        new OrderedChoice(new Sequence("FloatConstant(numberPart,,fractionPart,exponent,)", optDigits, period, optDigits, optExponent, spacing),
+                          new Sequence("IntConstant(numberPart,exponent,)", digits, optExponent, spacing));
 
    ICSymbolChoiceSpace unaryPrefix = new ICSymbolChoiceSpace("+", "-", "~", "!!", "@", "not", "distinct", "|/", "||/");
 
@@ -308,7 +315,7 @@ public class SQLLanguage extends SCLanguage {
       sequenceOptionsWithParens.minContentSlot = 1;
    }
 
-   Sequence namedConstraint = new Sequence("NamedConstraint(,constraintName)", new ICSymbolSpace("constraint"), sqlIdentifier);
+   Sequence namedConstraint = new Sequence("NamedConstraint(,constraintName)", constraintKeyword, sqlIdentifier);
    Sequence optNamedConstraint = (Sequence) namedConstraint.copyWithOptions(OPTIONAL);
 
    Sequence notNullConstraint = new Sequence("NotNullConstraint(,)", notKeyword, nullKeyword);
@@ -391,21 +398,23 @@ public class SQLLanguage extends SCLanguage {
 
    public OrderedChoice sqlParamType = new OrderedChoice("(.,.)", sqlIdentifier, sqlDataType);
 
-   Sequence columnDef = new Sequence("ColumnDef(columnName,columnType,collation,constraintName,columnConstraints)",
+   Sequence columnDef = new Sequence("ColumnDef(columnName,columnType,collation,namedConstraint,columnConstraints)",
                                                     sqlIdentifier, sqlDataType, collation, optNamedConstraint, columnConstraints);
 
    Sequence withOptions = new Sequence("('','')", withKeyword, optionsKeyword);
 
-   Sequence columnWithOptions = new Sequence("ColumnWithOptions(columnName,,constraintName,columnConstraints)",
+   Sequence columnWithOptions = new Sequence("ColumnWithOptions(columnName,,namedConstraint,columnConstraints)",
                                                                     sqlIdentifier, withOptions, optNamedConstraint, columnConstraints);
 
    Sequence likeSource = new Sequence("LikeDef(,sourceTable,likeOptions)", likeKeyword, sqlIdentifier, new ICSymbolChoiceSpace(REPEAT, "including", "defaults", "comments", "constraints", "identity", "indexes", "statistics", "storage"));
 
    // TODO: add 'exclude' rule to list of table constraints at the end here
    // TODO: make this an indexedChoice
-   Sequence tableConstraint = new Sequence("TableConstraint(namedConstraint,constraint)", optNamedConstraint,
-           new OrderedChoice("(.,.,.,.,.,.)", checkConstraint, tableUniqueConstraint, tablePrimaryKeyConstraint,
-                             referencesConstraint, foreignKeyConstraint, excludeConstraint));
+   OrderedChoice constraint = new OrderedChoice("(.,.,.,.,.,.)", checkConstraint, tableUniqueConstraint, tablePrimaryKeyConstraint,
+                   referencesConstraint, foreignKeyConstraint, excludeConstraint);
+
+   Sequence tableConstraint = new Sequence("TableConstraint(namedConstraint,constraint)", optNamedConstraint, constraint);
+
    OrderedChoice tableDef = new OrderedChoice(columnDef, likeSource, tableConstraint, columnWithOptions);
 
    Sequence tableDefList = new Sequence("([],[])", tableDef, new Sequence("(,[])", OPTIONAL | REPEAT, commaEOL, tableDef));
@@ -509,16 +518,17 @@ public class SQLLanguage extends SCLanguage {
    Sequence dropSequence = new Sequence("DropSequence(,ifExists,seqNames,dropOptions)", sequenceKeyword, ifExists,
                                      sqlIdentifierCommaList, dropOptions);
 
-   ICKeywordSpace dropKeyword = new ICKeywordSpace("drop");
-
    OrderedChoice dropChoice = new OrderedChoice("(.,.,.,.,.)", dropTable, dropType, dropIndex, dropFunction, dropSequence);
 
    Sequence dropCommand = new Sequence("(,.,)", dropKeyword, dropChoice, semicolonEOL2);
 
    ICSymbolSpace optColumnKeyword = new ICSymbolSpace("column", OPTIONAL);
 
-   Sequence addColumn = new Sequence("AddColumn(,,ifNotExists,columnDef)", new ICSymbolSpace("add"), optColumnKeyword, ifNotExists, columnDef);
-   Sequence dropColumn = new Sequence("DropColumn(,,ifExists,columnName,dropOptions)", dropKeyword, optColumnKeyword, ifExists, sqlIdentifier, dropOptions);
+   Sequence addColumn = new Sequence("AddColumn(,ifNotExists,columnDef)", optColumnKeyword, ifNotExists, columnDef);
+   Sequence dropColumn = new Sequence("DropColumn(,ifExists,columnName,dropOptions)", optColumnKeyword, ifExists, sqlIdentifier, dropOptions);
+
+   Sequence addConstraint = new Sequence("AddConstraint(constraint)", tableConstraint);
+   Sequence dropConstraint = new Sequence("DropConstraint(constraint)", namedConstraint);
 
    Sequence alterSetType = new Sequence("AlterSetType(,,columnType,collation,usingExpression)",
                                         new Sequence(OPTIONAL, setKeyword, new ICSymbolSpace("data")),
@@ -538,7 +548,10 @@ public class SQLLanguage extends SCLanguage {
    Sequence renameColumn = new Sequence("RenameColumn(,,oldColumnName,,newColumnName)", renameKeyword, optColumnKeyword, sqlIdentifier, toKeyword, sqlIdentifier);
    Sequence renameTable = new Sequence("RenameTable(,,newTableName)", renameKeyword, toKeyword, sqlIdentifier);
 
-   OrderedChoice alterDef = new OrderedChoice("(.,.,.,.,.)", addColumn, dropColumn, alterColumn, renameColumn, renameTable);
+   Sequence alterAdd = new Sequence("(,.)", addKeyword, new OrderedChoice("(.,.)", addColumn, addConstraint));
+   Sequence alterDrop = new Sequence("(,.)", dropKeyword, new OrderedChoice("(.,.)", dropColumn, dropConstraint));
+
+   OrderedChoice alterDef = new OrderedChoice("(.,.,.,.,.)", alterAdd, alterDrop, alterColumn, renameColumn, renameTable);
 
    Sequence alterDefs = new Sequence("([],[])", alterDef, new Sequence("(,[])", REPEAT | OPTIONAL, commaEOL, alterDef));
 

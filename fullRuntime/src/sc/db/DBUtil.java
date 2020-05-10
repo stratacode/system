@@ -24,6 +24,7 @@ import sc.type.Type;
 import sc.util.IMessageHandler;
 import sc.util.JSON;
 import sc.util.MessageHandler;
+import sc.util.WeakIdentityHashMap;
 
 import static sc.type.PTypeUtil.testMode;
 
@@ -31,6 +32,7 @@ public class DBUtil {
    public static boolean verbose = false;
 
    public static Map<Long,String> testIdNameMap = null;
+   public static WeakIdentityHashMap<IDBObject, String> testInstMap = null;
 
    public static IMessageHandler msgHandler;
 
@@ -40,6 +42,28 @@ public class DBUtil {
             testIdNameMap = new HashMap<Long,String>();
          }
          testIdNameMap.put(id, idName);
+      }
+   }
+
+   public static void addTestIdInstance(IDBObject inst, String idName) {
+      if (testMode) {
+         if (testInstMap == null)
+            testInstMap = new WeakIdentityHashMap<IDBObject, String>();
+         testInstMap.put(inst, idName);
+      }
+   }
+
+   public static void mapTestInstance(IDBObject inst) {
+      if (testMode && testInstMap != null) {
+         String idName = testInstMap.get(inst);
+         if (idName != null) {
+            testInstMap.remove(inst);
+         }
+         Object id = inst.getDBId();
+         if (id instanceof Long)
+            testIdNameMap.put((Long) id, idName);
+         else
+            DBUtil.error("*** Unrecognized id type in mapTestInstance");
       }
    }
 

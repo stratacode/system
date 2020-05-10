@@ -78,6 +78,7 @@ public class SQLUtil {
                }
             }
          }
+
          // For any properties with indexed=true, create the appropriate index unless it's been defined already
          if (dbTypeDesc.allDBProps != null) {
             for (DBPropertyDescriptor prop:dbTypeDesc.allDBProps) {
@@ -85,7 +86,7 @@ public class SQLUtil {
                if (prop instanceof IdPropertyDescriptor)
                   continue;
 
-               if (prop.indexed) {
+               if (prop.indexed && prop.ownerTypeName.equals(typeName)) {
                   CreateIndex propIndex = new CreateIndex();
                   propIndex.setProperty("indexName",SQLIdentifier.create(prop.getTableName() + "_" + prop.columnName + "_index"));
                   propIndex.setProperty("tableName", SQLIdentifier.create(prop.getTableName()));
