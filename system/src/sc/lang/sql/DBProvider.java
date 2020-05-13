@@ -390,6 +390,7 @@ public class DBProvider {
                      else {
                         IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
                         primaryTable.addIdColumnProperty(idDesc);
+                        idDesc.propertyType = propType;
                      }
                   }
                }
@@ -972,6 +973,7 @@ public class DBProvider {
                   }
                }
                propTable.addColumnProperty(propDesc);
+               propDesc.propertyType = propType;
 
                newProps.add(new DBRegisteredProperty(propDesc, property));
             }
@@ -1051,7 +1053,7 @@ public class DBProvider {
          return true;
    }
 
-   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.select(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
+   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.select<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
    private static String UPDATE_PROP_TEMPLATE = "\n      if (<%= dbObjPrefix%><%= dbSetPropMethod %>(\"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";

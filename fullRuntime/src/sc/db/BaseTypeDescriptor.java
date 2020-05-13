@@ -32,6 +32,10 @@ public abstract class BaseTypeDescriptor {
       return DynUtil.getTypeName(typeDecl, false);
    }
 
+   public String getBaseTypeName() {
+      return getTypeName();
+   }
+
    public String toString() {
       StringBuilder sb = new StringBuilder();
       if (typeDecl != null)

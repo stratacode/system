@@ -4,6 +4,7 @@ package sc.db;
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
 import sc.type.CTypeUtil;
+import sc.type.IBeanMapper;
 import sc.util.StringUtil;
 
 import java.util.ArrayList;
@@ -56,6 +57,9 @@ public class DBObject implements IDBObject {
     */
    IDBObject wrapper;
 
+   Object dbId;
+   boolean unknownType;
+
    // Keep track of all of the transactions operation on this instance at one time - synchronized on this instance to access or update
    public final List<TxOperation> pendingOps = new ArrayList<TxOperation>();
 
@@ -63,6 +67,12 @@ public class DBObject implements IDBObject {
     *  Each operation will be redirected to the replaced version... maybe due to a race condition during the creation,
     *  because an instance was deserialized using the existing version. */
    public IDBObject replacedBy = null;
+
+   public DBObject(DBTypeDescriptor dbType) {
+      this.dbTypeDesc = dbType;
+      this.unknownType = true;
+      // init(); not calling init here as this is used before we have an instance to fetch the type and initial properties
+   }
 
    // We can also just extend DBObject to inherit - in this case wrapper is null.
    public DBObject() {
@@ -74,6 +84,12 @@ public class DBObject implements IDBObject {
    public DBObject(IDBObject wrapper) {
       this.wrapper = wrapper;
       this.dbTypeDesc = DBTypeDescriptor.getByType(DynUtil.getType(getInst()), true);
+   }
+
+   public void setWrapper(IDBObject wrapper, DBTypeDescriptor typeDesc) {
+      this.wrapper = wrapper;
+      this.dbTypeDesc = typeDesc;
+      this.unknownType = false;
    }
 
    public void init() {
@@ -229,6 +245,37 @@ public class DBObject implements IDBObject {
       return null;
    }
 
+   public PropUpdate dbFetchWithRefId(String property) {
+      PropUpdate res = dbFetch(property);
+      if (res == null) {
+         DBPropertyDescriptor prop = dbTypeDesc.getPropertyDescriptor(property);
+         if (prop.getNeedsRefId()) {
+            Object idVal = prop.getRefIdProperty(getInst());
+            if (idVal != null) {
+               IDBObject refInst = prop.refDBTypeDesc.findById(idVal);
+               if (refInst == null)
+                  return null;
+               else {
+                  IBeanMapper mapper = prop.getPropertyMapper();
+
+                  DBTransaction curTx = DBTransaction.getOrCreate();
+                  if (curTx.applyingDBChanges)
+                     return null;
+
+                  curTx.applyingDBChanges = true;
+                  try {
+                     mapper.setPropertyValue(getInst(), refInst);
+                  }
+                  finally {
+                     curTx.applyingDBChanges = false;
+                  }
+               }
+            }
+         }
+      }
+      return res;
+   }
+
    public boolean dbFetchDefault() {
       if (replacedBy != null)
          return replacedBy.getDBObject().dbFetchDefault();
@@ -262,7 +309,7 @@ public class DBObject implements IDBObject {
       boolean res = false;
       synchronized(this) {
          long state = fstate >> shift;
-         if (state == 0) {
+         if ((state & (PENDING | FETCHED)) == 0) {
             fstate = fstate | (PENDING << shift);
             doFetch = true;
          }
@@ -648,6 +695,10 @@ public class DBObject implements IDBObject {
    }
 
    public void setDBId(Object dbId) {
+      this.dbId = dbId;
+      if (unknownType)
+         return;
+
       List<IdPropertyDescriptor> idProps = dbTypeDesc.primaryTable.idColumns;
       int num = idProps.size();
       if (num == 1) {
@@ -687,6 +738,12 @@ public class DBObject implements IDBObject {
    public static PropUpdate select(DBObject obj, String prop) {
       if (obj != null)
          return obj.dbFetch(prop);
+      return null;
+   }
+
+   public static PropUpdate selectWithRefId(DBObject obj, String prop) {
+      if (obj != null)
+         return obj.dbFetchWithRefId(prop);
       return null;
    }
 }

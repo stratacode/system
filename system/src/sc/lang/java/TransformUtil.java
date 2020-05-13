@@ -735,6 +735,7 @@ public class TransformUtil {
    }
 
    private final static String PROPERTY_DEFINITION =
+           "<%= dbRefIdProperty %>" +
            "<% if (!omitField) { %>\n" +
            "   private <%=fieldModifiers%> <%=propertyTypeName%><%=arrayDimensions%> <%=lowerPropertyName%>" +
                                        "<% if (initializer.length() > 0 && !bindable) { %> = <%=initializer%>; <% } else { %>;<% } %> \n" +

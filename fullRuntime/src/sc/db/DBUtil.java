@@ -31,25 +31,45 @@ import static sc.type.PTypeUtil.testMode;
 public class DBUtil {
    public static boolean verbose = false;
 
-   public static Map<Long,String> testIdNameMap = null;
+   public static Map<String,Map<Long,String>> testIdNameMap = null;
    public static WeakIdentityHashMap<IDBObject, String> testInstMap = null;
 
    public static IMessageHandler msgHandler;
 
-   public static void addTestId(long id, String idName) {
+   public static void addTestId(DBTypeDescriptor typeDesc, long id, String idName) {
       if (testMode) {
          if (testIdNameMap == null) {
-            testIdNameMap = new HashMap<Long,String>();
+            testIdNameMap = new HashMap<String,Map<Long,String>>();
          }
-         testIdNameMap.put(id, idName);
+         Map<Long,String> idMap = testIdNameMap.get(typeDesc.getBaseTypeName());
+         if (idMap == null) {
+            idMap = new HashMap<Long,String>();
+            testIdNameMap.put(typeDesc.getBaseTypeName(), idMap);
+         }
+         idMap.put(id, idName);
       }
+   }
+
+   public static String getTestId(DBTypeDescriptor typeDesc, long id) {
+      if (testIdNameMap == null)
+         return null;
+
+      Map<Long,String> idMap = testIdNameMap.get(typeDesc.getBaseTypeName());
+      if (idMap == null)
+         return null;
+      return idMap.get(id);
    }
 
    public static void addTestIdInstance(IDBObject inst, String idName) {
       if (testMode) {
-         if (testInstMap == null)
-            testInstMap = new WeakIdentityHashMap<IDBObject, String>();
-         testInstMap.put(inst, idName);
+         DBObject dbObj = inst.getDBObject();
+         if (!dbObj.isPrototype() && !dbObj.isTransient())
+            addTestId(dbObj.dbTypeDesc, (Long) dbObj.getDBId(), idName);
+         else {
+            if (testInstMap == null)
+               testInstMap = new WeakIdentityHashMap<IDBObject, String>();
+            testInstMap.put(inst, idName);
+         }
       }
    }
 
@@ -58,14 +78,16 @@ public class DBUtil {
          String idName = testInstMap.get(inst);
          if (idName != null) {
             testInstMap.remove(inst);
+            Object id = inst.getDBId();
+            if (id instanceof Long) {
+               addTestId(inst.getDBObject().dbTypeDesc, (Long) id, idName);
+            }
+            else
+               DBUtil.error("*** Unrecognized id type in mapTestInstance");
          }
-         Object id = inst.getDBId();
-         if (id instanceof Long)
-            testIdNameMap.put((Long) id, idName);
-         else
-            DBUtil.error("*** Unrecognized id type in mapTestInstance");
       }
    }
+
 
    public static Connection createConnection(String dataSourceName, boolean autoCommit) {
       try {
@@ -176,7 +198,7 @@ public class DBUtil {
          logSB.append(ident);
    }
 
-   public static String formatValue(Object val, DBColumnType type) {
+   public static String formatValue(Object val, DBColumnType type, DBTypeDescriptor refType) {
       if (val == null)
          return "null";
       switch (type) {
@@ -194,9 +216,13 @@ public class DBUtil {
             return val.toString();
          case LongId:
             if (testMode && val instanceof Long) {
-               String idName = testIdNameMap == null ? null : testIdNameMap.get((Long) val);
-               if (idName != null)
-                  return "<id-" + idName + ">";
+               if (refType != null) {
+                  String idName = getTestId(refType, (Long) val);
+                  if (idName != null)
+                     return "<id-" + idName + ">";
+               }
+               else
+                  System.err.println("*** Missing ref type for id column");
             }
             break;
          case Json:
@@ -544,7 +570,7 @@ public class DBUtil {
       MessageHandler.error(msgHandler, msgs);
    }
 
-   public static String replaceNextParam(String logStr, Object colVal, DBColumnType colType) {
+   public static String replaceNextParam(String logStr, Object colVal, DBColumnType colType, DBTypeDescriptor refType) {
       int ix = logStr.indexOf('?');
       if (ix == -1) {
          System.err.println("*** replaceNextParam - found no param");
@@ -552,7 +578,7 @@ public class DBUtil {
       }
       StringBuilder res = new StringBuilder();
       res.append(logStr.substring(0, ix));
-      res.append(DBUtil.formatValue(colVal, colType));
+      res.append(DBUtil.formatValue(colVal, colType, refType));
       res.append(logStr.substring(ix+1));
       return res.toString();
    }
@@ -564,7 +590,7 @@ public class DBUtil {
          return inst.toString();
    }
 
-   public static void appendVal(StringBuilder logSB, Object val, DBColumnType colType) {
+   public static void appendVal(StringBuilder logSB, Object val, DBColumnType colType, DBTypeDescriptor refType) {
      if (val instanceof IDBObject)
         logSB.append(((IDBObject) val).getDBObject());
      else if (val instanceof CharSequence) {
@@ -573,7 +599,7 @@ public class DBUtil {
         logSB.append("'");
      }
      else if (colType != null) {
-        logSB.append(formatValue(val, colType));
+        logSB.append(formatValue(val, colType, refType));
      }
      else
         logSB.append(val);

@@ -189,7 +189,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
             if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
                needsAutoId = true;
-               primaryTable.addIdColumnProperty(new IdPropertyDescriptor("id", "id", "bigserial", true));
+               IdPropertyDescriptor newIdProp = new IdPropertyDescriptor("id", "id", "bigserial", true);
+               newIdProp.propertyType = Long.TYPE;
+               primaryTable.addIdColumnProperty(newIdProp);
             }
          }
       }
@@ -635,9 +637,20 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       DBObject dbObj;
       synchronized (this) {
          inst = resTypeDesc.createPrototype();
-         dbObj = inst.getDBObject();
-         dbObj.setDBId(id);
-         typeInstances.put(id, inst);
+         if (inst != null) {
+            dbObj = inst.getDBObject();
+            dbObj.setDBId(id);
+            typeInstances.put(id, inst);
+         }
+         // Don't know the concrete type so create a DBObject without the instance and register that instead
+         else if (selectDefault) {
+            dbObj = new DBObject(this);
+            dbObj.setDBId(id);
+            dbObj.setPrototype(true);
+            typeInstances.put(id, dbObj);
+         }
+         else // We do not know the concrete class yet for this object so just return
+            return null;
       }
 
       // If requested, select the default (primary table) property group - if the row does not exist, the object does not exist
@@ -645,6 +658,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (!dbObj.dbFetchDefault())
             return null;
       }
+      if (dbObj.wrapper != inst)
+         return dbObj.wrapper;
       return inst;
    }
 
@@ -654,7 +669,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    public IDBObject createPrototype() {
       if (typeId == DBAbstractTypeId)
-         throw new IllegalArgumentException("Unable to create prototype of abstract type: " + this);
+         return null;
       IDBObject inst = createInstance();
       DBObject dbObj = inst.getDBObject();
       dbObj.setPrototype(true);
@@ -677,6 +692,26 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
       DBUtil.mapTestInstance(inst);
       return null;
+   }
+
+   public void replaceInstance(IDBObject inst) {
+      if (baseType != null) {
+         baseType.replaceInstance(inst);
+         return;
+      }
+
+      if (typeInstances == null) {
+         initTypeInstances();
+      }
+      Object id = inst.getDBId();
+      synchronized (this) {
+         IDBObject old = typeInstances.put(id, inst);
+         if (old != null) {
+            if (!(old instanceof DBObject))
+               DBUtil.verbose("Replacing instance of type: " + this + " with id: " + id);
+         }
+      }
+      DBUtil.mapTestInstance(inst);
    }
 
    public boolean removeInstance(DBObject dbObj, boolean remove) {
@@ -1024,7 +1059,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    private void appendDBPropParamValue(SelectQuery curQuery, String parentProp, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
       if (logSB != null) {
          if (compareVal) {
-            DBUtil.appendVal(logSB, propValue, null);
+            DBUtil.appendVal(logSB, propValue, null, null);
             logSB.append(" = ");
          }
          if (dbProp.dynColumn)
@@ -1041,7 +1076,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    private void appendJSONPropParamValue(SelectQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue, String propPath) {
       if (logSB != null) {
          if (compareVal) {
-            DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType());
+            DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType(), dbProp.refDBTypeDesc);
             logSB.append(" = ");
          }
          curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName, propPath);
@@ -1108,7 +1143,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   curQuery.paramTypes.add(propColType);
 
                   if (logSB != null) {
-                     DBUtil.appendVal(logSB, propVal, propColType);
+                     DBUtil.appendVal(logSB, propVal, propColType, null);
                      logSB.append(" = ");
                   }
                }
@@ -1779,5 +1814,22 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (subTypesById != null)
          return subTypesById.get(typeId);
       return null;
+   }
+
+   public void updateTypeDescriptor(IDBObject newInst, DBObject dbObj) {
+      if (dbObj.wrapper != null) {
+         if (dbObj.wrapper != newInst) {
+            System.err.println("*** Warning - replacing wrapper for instance");
+         }
+      }
+      dbObj.setWrapper(newInst, this);
+      dbObj.setDBId(dbObj.dbId); // Need to update the id properties of the instance
+      dbObj.dbTypeDesc.replaceInstance(newInst);
+   }
+
+   public String getBaseTypeName() {
+      if (baseType != null)
+         return baseType.getBaseTypeName();
+      return getTypeName();
    }
 }

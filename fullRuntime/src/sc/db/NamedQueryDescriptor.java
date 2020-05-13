@@ -91,7 +91,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                Object paramVal = paramValues[aix];
                DBUtil.setStatementValue(st, col++, colType, paramVal);
                if (logSB != null) {
-                  DBUtil.appendVal(logSB, paramVal, DBColumnType.fromJavaType(paramTypes.get(aix)));
+                  DBUtil.appendVal(logSB, paramVal, DBColumnType.fromJavaType(paramTypes.get(aix)), null);
                }
             }
             if (logSB != null) {
@@ -188,7 +188,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                      if (logSB != null) {
                         logSB.append(colName);
                         logSB.append("=");
-                        DBUtil.appendVal(logSB, propVal, resProp.getDBColumnType());
+                        DBUtil.appendVal(logSB, propVal, resProp.getDBColumnType(), resProp.refDBTypeDesc);
                      }
                      first = false;
                   }
@@ -211,7 +211,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                   }
 
                   if (logSB != null)
-                     DBUtil.appendVal(logSB, rowVal, DBColumnType.fromJavaType(returnType));
+                     DBUtil.appendVal(logSB, rowVal, DBColumnType.fromJavaType(returnType), null);
                }
 
                if (multiRow) {

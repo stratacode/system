@@ -2,6 +2,7 @@ package sc.db;
 
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
+import sc.util.ResultWrapper;
 import sc.util.StringUtil;
 
 import java.sql.ResultSet;
@@ -17,6 +18,7 @@ import java.util.List;
  * The DBPropertyDescriptor is built from the DBPropertySettings annotation, along with defaults inherited from DBTypeSettings.
  */
 public class DBPropertyDescriptor {
+   public static final String RefIdPropertySuffix = "RefId";
    public String propertyName;
    public String columnName;
    public String columnType;
@@ -85,6 +87,9 @@ public class DBPropertyDescriptor {
    public DBEnumDescriptor refEnumTypeDesc;
 
    private IBeanMapper propertyMapper;
+
+   /** Especially for compile mode when property mapper is not available - the type of this property */
+   public Object propertyType;
 
    /**
     * If this property participates in a bi-directional relationship, points to the back-pointing property - i.e.
@@ -336,7 +341,7 @@ public class DBPropertyDescriptor {
       }
    }
 
-   public Object getValueFromResultSet(ResultSet rs, int rix, SelectTableDesc selectTable) throws SQLException {
+   public Object getValueFromResultSet(ResultSet rs, int rix, SelectTableDesc selectTable, IDBObject inst, ResultWrapper logRefIdResult) throws SQLException {
       Object val;
       int numCols = getNumColumns();
       DBTypeDescriptor refColTypeDesc = getRefColTypeDesc();
@@ -344,14 +349,22 @@ public class DBPropertyDescriptor {
          val = DBUtil.getResultSetByIndex(rs, rix, this);
          int typeId = -1;
          if (refColTypeDesc != null) {
+            if (getNeedsRefId() && inst != null && val != null) {
+               if (!ownedByOtherType(inst.getDBObject().dbTypeDesc)) {
+                  if (logRefIdResult != null)
+                     logRefIdResult.result = DBUtil.formatValue(val, DBColumnType.LongId, refDBTypeDesc);
+                  setRefIdProperty(inst, val);
+               }
+            }
             if (eagerJoinForTypeId(selectTable)) {
                DBPropertyDescriptor typeIdProperty = refColTypeDesc.getTypeIdProperty();
                Object typeIdRes = DBUtil.getResultSetByIndex(rs, rix+1, typeIdProperty);
                if (typeIdRes != null)
                   typeId = (int) typeIdRes;
             }
-            if (val != null)
+            if (val != null) {
                val = refColTypeDesc.lookupInstById(val, typeId, true, false);
+            }
          }
       }
       else {
@@ -367,6 +380,12 @@ public class DBPropertyDescriptor {
                if (idVal != null)
                   nullId = false;
                idVals.setVal(idVal, i);
+            }
+
+            if (getNeedsRefId()) {
+               if (logRefIdResult != null)
+                  logRefIdResult.result = idVals;
+               setRefIdProperty(inst, idVals);
             }
 
             int typeId = -1;
@@ -528,5 +547,20 @@ public class DBPropertyDescriptor {
 
    public Object getPropertyType() {
       return typeIdProperty ? int.class : getPropertyMapper().getPropertyType();
+   }
+
+   /** For single-valued association properties, we add a property propNameRefId to store the id */
+   public boolean getNeedsRefId() {
+      return refDBTypeDesc != null && !multiRow;
+   }
+
+   public void setRefIdProperty(IDBObject obj, Object idVal) {
+      String propName = propertyName + RefIdPropertySuffix;
+      DynUtil.setProperty(obj, propName, idVal);
+   }
+
+   public Object getRefIdProperty(IDBObject inst) {
+      String propName = propertyName + RefIdPropertySuffix;
+      return DynUtil.getProperty(inst, propName);
    }
 }

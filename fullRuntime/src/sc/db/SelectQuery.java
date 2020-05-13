@@ -3,6 +3,7 @@ package sc.db;
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 import sc.util.JSON;
+import sc.util.ResultWrapper;
 import sc.util.StringUtil;
 
 import java.sql.Connection;
@@ -281,12 +282,17 @@ public class SelectQuery implements Cloneable {
             IDBObject inst = dbObj.getInst();
             for (int i = 0; i < idColumns.size(); i++) {
                DBPropertyDescriptor propDesc = idColumns.get(i);
-               IBeanMapper propMapper = propDesc.getPropertyMapper();
-               Object colVal = propMapper.getPropertyValue(inst, false, false);
+               Object colVal;
+               if (dbObj.unknownType)
+                  colVal = dbObj.dbId;
+               else {
+                  IBeanMapper propMapper = propDesc.getPropertyMapper();
+                  colVal = propMapper.getPropertyValue(inst, false, false);
+               }
                DBColumnType colType = propDesc.getDBColumnType();
                DBUtil.setStatementValue(st, i+1, colType, colVal);
                if (logStr != null)
-                  logStr = DBUtil.replaceNextParam(logStr, colVal, DBColumnType.LongId);
+                  logStr = DBUtil.replaceNextParam(logStr, colVal, DBColumnType.LongId, mainTable.dbTypeDesc);
             }
 
             rs = st.executeQuery();
@@ -416,7 +422,7 @@ public class SelectQuery implements Cloneable {
                   IDBObject cacheObj = cacheRes.get(ci);
                   if (ci != 0)
                      logSB.append(", ");
-                  DBUtil.appendVal(logSB, cacheObj, null);
+                  DBUtil.appendVal(logSB, cacheObj, null, null);
                }
                logSB.append("]\n");
             }
@@ -458,6 +464,8 @@ public class SelectQuery implements Cloneable {
          return null;
       }
 
+      boolean first = true;
+
       int rix = 1;
       for (SelectTableDesc ftd: selectTables) {
          // If this table is actually defined in another type, and represents a reference an instance of that type (a 1-1 relationship),
@@ -480,21 +488,25 @@ public class SelectQuery implements Cloneable {
             if (propDesc.typeIdProperty && pix > 0)
                continue;
 
-            if (logSB != null && rix != 1)
-               logSB.append(", ");
-            if (logSB != null) {
-               logSB.append(propDesc.propertyName);
-               logSB.append("=");
-            }
+            ResultWrapper logResult = logSB == null ? null : new ResultWrapper();
+            String logPropName = propDesc.propertyName;
+            Object logPropVal = null;
 
             Object val;
             if (propDesc.dynColumn) {
                Object jsonVal = tableDynProps == null ? null : tableDynProps.get(propDesc.propertyName);
                val = JSON.convertTo(propDesc.getPropertyType(), jsonVal);
+               logPropVal = val;
             }
             else {
-               val = propDesc.getValueFromResultSet(rs, rix, ftd);
+               val = propDesc.getValueFromResultSet(rs, rix, ftd, selectObj, logResult);
                rix += propDesc.getNumResultSetColumns(ftd);
+
+               logPropVal = val;
+               if (logResult != null && logResult.result != null) {
+                  logPropVal = logResult.result;
+                  logPropName = logPropName + DBPropertyDescriptor.RefIdPropertySuffix;
+               }
             }
 
             if (!propDesc.typeIdProperty) {
@@ -521,8 +533,9 @@ public class SelectQuery implements Cloneable {
                   DBUtil.error("No sub-type of: " + dbObj.dbTypeDesc + " with typeId: " + typeId);
                }
                else if (refProp == null) {
-                  if (newType != dbObj.dbTypeDesc) {
-                     IDBObject newInst = dbObj.dbTypeDesc.createInstance();
+                  if (dbObj.unknownType || newType != dbObj.dbTypeDesc) {
+                     IDBObject newInst = newType.createInstance();
+                     newType.updateTypeDescriptor(newInst, dbObj);
                      newInst.getDBObject().setDBId(((IDBObject) selectInst).getDBId());
                      selectInst = newInst;
                      selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
@@ -540,10 +553,16 @@ public class SelectQuery implements Cloneable {
                }
             }
 
+            if (logSB != null && !first)
+               logSB.append(", ");
             if (logSB != null) {
-               DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
+               first = false;
+               logSB.append(logPropName);
+               logSB.append("=");
+               DBUtil.appendVal(logSB, logPropVal, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
             }
          }
+         ResultWrapper logValResult = null;
          if (ftd.revColumns != null) {
             for (int ri = 0; ri < ftd.revColumns.size(); ri++) {
               DBPropertyDescriptor propDesc = ftd.revColumns.get(ri);
@@ -551,15 +570,21 @@ public class SelectQuery implements Cloneable {
                   logSB.append(", ");
                IBeanMapper propMapper = propDesc.getPropertyMapper();
 
+               String logPropName = propMapper.getPropertyName();
                if (logSB != null) {
-                  logSB.append(propMapper.getPropertyName());
-                  logSB.append("=");
+                  logValResult = new ResultWrapper();
                }
 
-               Object val = propDesc.getValueFromResultSet(rs, rix, ftd);
+               Object revInst = ftd.revProps.get(ri).getPropertyMapper().getPropertyValue(selectInst, false, false);
+               Object val = propDesc.getValueFromResultSet(rs, rix, ftd, (IDBObject) revInst, logValResult);
                rix += propDesc.getNumResultSetColumns(ftd);
 
-               Object revInst = ftd.revProps.get(ri).getPropertyMapper().getPropertyValue(selectInst, false, false);
+               Object logPropVal = val;
+               if (val == null && logValResult != null && logValResult.result != null) {
+                  logPropName = logPropName + DBPropertyDescriptor.RefIdPropertySuffix;
+                  logPropVal = logValResult.result;
+               }
+
                if (revInst != null) {
                   propDesc.getPropertyMapper().setPropertyValue(revInst, val);
                }
@@ -567,7 +592,9 @@ public class SelectQuery implements Cloneable {
                   System.err.println("*** Error - value for reverse reference property where there's no reverse instance");
 
                if (logSB != null) {
-                  DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
+                  logSB.append(logPropName);
+                  logSB.append("=");
+                  DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
                }
             }
          }
@@ -745,7 +772,7 @@ public class SelectQuery implements Cloneable {
                         logSB.append(", ");
                         logSB.append(propMapper.getPropertyName());
                         logSB.append("=");
-                        DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
+                        DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
                      }
                   }
                   else {
@@ -756,7 +783,7 @@ public class SelectQuery implements Cloneable {
                            logSB.append(" = n/a");
                         else {
                            logSB.append(" skipped value = ");
-                           DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
+                           DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
                         }
                      }
                   }
@@ -782,6 +809,9 @@ public class SelectQuery implements Cloneable {
                      if (refTypeDesc != null) {
                         int typeId = -1;
                         DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
+                        if (readProp.getNeedsRefId()) {
+                           readProp.setRefIdProperty(currentRowVal, val);
+                        }
                         if (refTypeIdProp != null && (rci == 0 || readProp.eagerJoinForTypeId(selectTable)))
                            typeId = (int) DBUtil.getResultSetByIndex(rs, rix++, refTypeIdProp);
                         val = val == null ? null : refTypeDesc.lookupInstById(val, typeId, true, false);
@@ -874,11 +904,11 @@ public class SelectQuery implements Cloneable {
                               logSB.append("n/a");
                            else {
                               logSB.append("skipped: ");
-                              DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
+                              DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
                            }
                         }
                         else
-                           DBUtil.appendVal(logSB, val, propDesc.getDBColumnType());
+                           DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
                      }
                   }
                }

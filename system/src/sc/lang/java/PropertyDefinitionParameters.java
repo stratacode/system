@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.db.DBPropertyDescriptor;
 import sc.db.IdPropertyDescriptor;
+import sc.dyn.DynUtil;
 import sc.lang.sql.DBProvider;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
@@ -42,6 +43,7 @@ public class PropertyDefinitionParameters {
    public String dbObjPrefix ="";
    public String dbObjVarName ="";
    public DBPropertyDescriptor dbPropDesc;
+   public String dbRefIdProperty = "";
    public String dbGetProperty = "";
    public String dbSetProperty = "";
    public String dbSetPropMethod = "";
@@ -108,10 +110,8 @@ public class PropertyDefinitionParameters {
          // Only include properties that are defined in this type or a base-type. If the property is used
          // as a DB property in a sub-type we wrap the getX/setX methods in the sub-type.
          dbPropDesc = DBProvider.getDBPropertyDescriptor(sys, propLayer, varDef, false);
-         dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
 
-         dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
-         dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
+         initDBGetSet(dbProvider);
       }
    }
 
@@ -124,10 +124,31 @@ public class PropertyDefinitionParameters {
          // Only include properties that are defined in this type or a base-type. If the property is used
          // as a DB property in a sub-type we wrap the getX/setX methods in the sub-type.
          dbPropDesc = propDesc;
-         dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
 
-         dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
-         dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
+         initDBGetSet(dbProvider);
+      }
+   }
+
+   private void initDBGetSet(DBProvider dbProvider) {
+      dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
+
+      dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
+      dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
+
+      if (dbPropDesc.getNeedsRefId()) {
+         String refIdType;
+         if (dbPropDesc.getNumColumns() == 1) {
+            Object propType = dbPropDesc.refDBTypeDesc.getIdProperties().get(0).propertyType;
+            if (propType == null)
+               propType = Long.class;
+            // We need this to be an Object so 'null' represents no id
+            else if (ModelUtil.isPrimitive(propType))
+               propType = ModelUtil.wrapPrimitiveType(propType);
+            refIdType = ModelUtil.getTypeName(propType);
+         }
+         else
+            refIdType = "sc.db.MultiColIdentity";
+         dbRefIdProperty = "   public " + refIdType + " " + dbPropDesc.propertyName + DBPropertyDescriptor.RefIdPropertySuffix + ";\n";
       }
    }
 
