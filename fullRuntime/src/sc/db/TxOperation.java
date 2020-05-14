@@ -338,6 +338,7 @@ public abstract class TxOperation {
                IdPropertyDescriptor idCol = idCols.get(ci);
                columnTypes.add(idCol.getDBColumnType());
                columnValues.add(idVals.get(ci));
+               columnRefTypes.add(dbTypeDesc);
             }
             addArrayValues(dbTypeDesc, arrInst, insertTable.columns, null, columnTypes, columnValues, columnRefTypes);
          }

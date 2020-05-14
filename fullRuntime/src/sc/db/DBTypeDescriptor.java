@@ -349,7 +349,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             if (mvTable == null)
                System.err.println("*** No multi-value table for property: " + prop.propertyName);
             else
-               selectable = addToFetchGroup(mvTable.getJavaName(), prop);
+               selectable = addToFetchGroup(prop.propertyName, prop);
          }
          else {
             if (selectGroup == null) {
@@ -665,6 +665,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    public IDBObject createInstance() {
       return (IDBObject) DynUtil.createInstance(typeDecl, null);
+   }
+
+   public IDBObject createInstance(DBObject dbObj) {
+      return (IDBObject) DynUtil.createInstance(typeDecl, "Lsc/db/DBObject;", dbObj);
    }
 
    public IDBObject createPrototype() {
@@ -1823,7 +1827,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          }
       }
       dbObj.setWrapper(newInst, this);
-      dbObj.setDBId(dbObj.dbId); // Need to update the id properties of the instance
+      dbObj.setDBId(dbObj.dbId);
+      dbObj.setPrototype(false);
       dbObj.dbTypeDesc.replaceInstance(newInst);
    }
 

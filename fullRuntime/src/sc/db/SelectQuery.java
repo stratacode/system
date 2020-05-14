@@ -308,11 +308,8 @@ public class SelectQuery implements Cloneable {
                // populate properties of dbObj from the tables in this query, or return null or return a sub-type of dbObj
                IDBObject newInst = processOneRowQueryResults(dbObj, inst, rs, logSB);
                res = newInst != null;
-               if (res && newInst != inst) {
-                  DBUtil.error("selectProperties detected type change");
-                  // TODO: do we set replacedBy here because somehow we ended up selecting a typeId that conflicts with
-                  // the concrete type of the old instance.
-               }
+               // NOTE: newInst here might not be inst but should be dbObj.wrapper - this happens when inst is a generic DBObject
+               // prototype that we create in place of an abstract class that gets refined once we learn the type
             }
             else // select a multi-valued property
                res = processMultiResults(null, dbObj, inst, rs, logSB);
@@ -376,7 +373,7 @@ public class SelectQuery implements Cloneable {
 
       try {
          String queryStr = qsb.toString();
-         ArrayList<IDBObject> res = new ArrayList<IDBObject>();
+         DBList<IDBObject> res = new DBList<IDBObject>();
          DBTypeDescriptor dbTypeDesc = mainTable.dbTypeDesc;
 
          if (!dbTypeDesc.dbDisabled) {
@@ -405,7 +402,7 @@ public class SelectQuery implements Cloneable {
                return res;
             }
             else {
-               res = new ArrayList<IDBObject>();
+               res = new DBList<IDBObject>();
                processMultiResults(res, null, inst, rs, logSB);
             }
          }
@@ -534,11 +531,12 @@ public class SelectQuery implements Cloneable {
                }
                else if (refProp == null) {
                   if (dbObj.unknownType || newType != dbObj.dbTypeDesc) {
-                     IDBObject newInst = newType.createInstance();
+                     IDBObject newInst = newType.createInstance(dbObj);
                      newType.updateTypeDescriptor(newInst, dbObj);
-                     newInst.getDBObject().setDBId(((IDBObject) selectInst).getDBId());
+                     dbObj = newInst.getDBObject();
                      selectInst = newInst;
                      selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
+                     inst = newInst;
                   }
                }
                else {
@@ -608,7 +606,7 @@ public class SelectQuery implements Cloneable {
     * Here the first selectTable defines the list/array value - selectTables.get(0).props.get(0).
     * The second and subsequent select tables are only there for onDemand=false references in the referenced object
     */
-   boolean processMultiResults(List<IDBObject> resList, DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
+   boolean processMultiResults(DBList<IDBObject> resList, DBObject dbObj, Object inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       DBPropertyDescriptor listProp = null;
       int rowCt = 0;
 
@@ -626,6 +624,7 @@ public class SelectQuery implements Cloneable {
 
          for (int fi = 0; fi < selectTables.size(); fi++) {
             SelectTableDesc selectTable = selectTables.get(fi);
+            Object refId = null;
 
             DBPropertyDescriptor refProp = selectTable.refProp;
             Map<String,Object> tableDynProps = null;
@@ -661,6 +660,7 @@ public class SelectQuery implements Cloneable {
                            if (typeIdRes != null)
                               typeId = (int) typeIdRes;
                         }
+                        Object idVal = val;
                         val = val == null ? null : colTypeDesc.lookupInstById(val, typeId, true, false);
 
                         if (val != null) {
@@ -672,6 +672,9 @@ public class SelectQuery implements Cloneable {
                               //}
                               valDBObj.setPrototype(false);
                            }
+                        }
+                        else if (idVal != null) {
+                           refId = idVal;
                         }
                      }
                      else if (propDesc.typeIdProperty) {
@@ -750,11 +753,13 @@ public class SelectQuery implements Cloneable {
                      listProp = propDesc; // the first time through, the main property for this list
                   }
                   resList.add(currentRowVal);
+                  if (currentRowVal == null && refId != null)
+                     resList.setRefId(resList.size()-1, refId);
                   if (logSB != null) {
                      logSB.append("[");
                      logSB.append(rowCt);
                      logSB.append("](");
-                     logSB.append(currentRowVal == null ? null : currentRowVal.getDBObject());
+                     logSB.append(currentRowVal == null ? (refId == null ? null : "refId:" + refId) : currentRowVal.getDBObject());
                   }
                   rowCt++;
                }

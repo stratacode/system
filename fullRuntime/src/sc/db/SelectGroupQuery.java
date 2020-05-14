@@ -21,6 +21,7 @@ public class SelectGroupQuery extends DBQuery {
       this.dbTypeDesc = dbTypeDesc;
       this.propNames = propNames;
       this.selectGroup = selectGroup;
+      this.queryName = selectGroup;
    }
 
    public void addSelectGroup(String selectGroup, boolean multiRow) {

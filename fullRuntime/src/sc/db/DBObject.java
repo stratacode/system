@@ -650,7 +650,35 @@ public class DBObject implements IDBObject {
          sb.append(" - ");
          sb.append(getStateString());
       }
+      if (fstate != 0) {
+         sb.append(getFetchedStateString(dbTypeDesc, fstate));
+      }
       return sb.toString();
+   }
+
+   public static String getFetchedStateString(DBTypeDescriptor dbTypeDesc, long fstate) {
+      if (fstate == 0)
+         return "";
+      long cstate = fstate;
+      int qn = 0;
+      List<DBQuery> ql = dbTypeDesc.selectQueriesList;
+      StringBuilder res = new StringBuilder();
+      while (cstate > 0) {
+         DBQuery query = qn >= ql.size() ? null : ql.get(qn);
+         if (query == null) {
+            return "Invalid fstate";
+         }
+
+         if ((cstate & PENDING) != 0) {
+            res.append("[" + query.queryName + ":pending]");
+         }
+         if ((cstate & FETCHED) != 0) {
+            res.append("[" + query.queryName + "]");
+         }
+         cstate = cstate >> 2;
+         qn++;
+      }
+      return res.toString();
    }
 
    void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList, DBPropertyDescriptor versProp, long newVersion,

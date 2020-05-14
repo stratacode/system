@@ -11,14 +11,28 @@
 
    public static sc.db.DBTypeDescriptor dbTypeDesc;
 
+   public <%= typeBaseName %>() {
+      <% if (dbTypeDescriptor.baseType == null) { %>
+      _dbObject = new sc.db.DBObject(this);
+      _dbObject.init();
+      <% } else { %>
+      super();
+      <% } %>
+   }
+   public <%= typeBaseName %>(sc.db.DBObject _dbObj) {
+      <% if (dbTypeDescriptor.baseType == null) { %>
+       _dbObject = _dbObj;
+       _dbObject.init();
+   <% } else { %>
+        super(_dbObj);
+   <% } %>
+   }
+
    <%= formatQueries() %>
 
    <%    if (dbTypeDescriptor.baseType == null) { %>
       // Stores persistent state for the instance
-      protected transient sc.db.DBObject _dbObject = new sc.db.DBObject(this);
-      {
-         _dbObject.init();
-      }
+      protected transient sc.db.DBObject _dbObject;
 
       public void dbInsert() {
          _dbObject.dbInsert();
