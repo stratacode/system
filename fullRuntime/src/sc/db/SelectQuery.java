@@ -641,6 +641,7 @@ public class SelectQuery implements Cloneable {
                if (propDesc.typeIdProperty && pix > 0)
                   continue;
                Object val;
+               refId = null;
 
                if (propDesc.dynColumn) {
                   Object jsonVal = tableDynProps == null ? null : tableDynProps.get(propDesc.propertyName);
@@ -770,14 +771,28 @@ public class SelectQuery implements Cloneable {
 
                   IDBObject propDBObj = propInst instanceof IDBObject ? (IDBObject) propInst : null;
                   if (propDBObj != null && !propDesc.ownedByOtherType(propDBObj.getDBObject().dbTypeDesc)) {
-                     IBeanMapper propMapper = propDesc.getPropertyMapper();
-                     propMapper.setPropertyValue(propInst, val);
+                     Object logVal;
+                     String logName;
+                     DBColumnType logColType;
+                     if (val == null && refId != null && propDesc.getNeedsRefId()) {
+                        propDesc.setRefIdProperty(propDBObj, refId);
+                        logVal = refId;
+                        logName = propDesc.propertyName + DBPropertyDescriptor.RefIdPropertySuffix;
+                        logColType = DBColumnType.LongId;
+                     }
+                     else {
+                        IBeanMapper propMapper = propDesc.getPropertyMapper();
+                        propMapper.setPropertyValue(propInst, val);
+                        logVal = val;
+                        logName = propDesc.propertyName;
+                        logColType = propDesc.getDBColumnType();
+                     }
 
                      if (logSB != null) {
                         logSB.append(", ");
-                        logSB.append(propMapper.getPropertyName());
+                        logSB.append(logName);
                         logSB.append("=");
-                        DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
+                        DBUtil.appendVal(logSB, logVal, logColType, propDesc.refDBTypeDesc);
                      }
                   }
                   else {

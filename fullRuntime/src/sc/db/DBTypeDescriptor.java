@@ -353,7 +353,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          }
          else {
             if (selectGroup == null) {
-               if (prop.onDemand) {
+               // For onDemand single-valued associations, load the id with the parent type by default.
+               // For non-associations, onDemand puts the property into it's own property group (since it
+               // does not do anything else)
+               // TODO: should we have a separate flag for onDemand that's not for associations?
+               if (prop.onDemand && prop.refDBTypeDesc == null) {
                   selectGroup = prop.propertyName;
                }
                else {
