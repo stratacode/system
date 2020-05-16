@@ -6,10 +6,9 @@ import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.Parameter;
+import java.lang.reflect.ParameterizedType;
+import java.util.*;
 
 /** Lightweight JSON formatter and parser built on the sc framework, supporting dynamic properties and types. */
 public class JSON {
@@ -26,9 +25,26 @@ public class JSON {
       return convertTo(propertyType, value);
    }
 
+
    public static Object convertTo(Object propertyType, Object value) {
       if (value instanceof List) {
          List listVal = (List) value;
+         Object compType = DynUtil.getComponentType(propertyType);
+         if (compType instanceof Class && !Map.class.isAssignableFrom((Class) compType)) {
+            int listSz = listVal.size();
+            ArrayList<Object> newListVal = new ArrayList<Object>(listSz);
+            for (int i = 0; i < listSz; i++) {
+               Object listElem = listVal.get(i);
+               if (listElem instanceof Map) {
+                  Object newListElem = convertTo(compType, listElem);
+                  listElem = newListElem;
+               }
+               newListVal.add(listElem);
+            }
+            listVal = newListVal;
+         }
+         if (propertyType instanceof ParameterizedType)
+            propertyType = ((ParameterizedType) propertyType).getRawType();
          if (propertyType instanceof Class) {
             Class propCl = (Class) propertyType;
             if (propCl.isArray()) {
@@ -50,7 +66,13 @@ public class JSON {
          for (Map.Entry<String,Object> ent:map.entrySet()) {
             String propName = ent.getKey();
             Object propVal = ent.getValue();
-            DynUtil.setProperty(inst, propName, propVal);
+            IBeanMapper mapper = DynUtil.getPropertyMapping(propertyType, propName);
+            if (mapper == null) {
+               System.err.println("*** No property: " + propName + " in propertyType: " + DynUtil.getTypeName(propertyType, false) + " for JSON deserialization");
+               continue;
+            }
+            Object newPropVal = convertTo(mapper.getGenericType(), propVal);
+            DynUtil.setProperty(inst, propName, newPropVal);
          }
          return inst;
       }
@@ -66,7 +88,7 @@ public class JSON {
    }
 
    private static class JSONContext {
-      List<Object> addedObjs = new ArrayList<Object>();
+      IdentityHashMap<Object,Boolean> addedObjs = new IdentityHashMap<Object,Boolean>();
    }
    public static StringBuilder toJSON(Object o) {
       StringBuilder sb = new StringBuilder();
@@ -76,7 +98,7 @@ public class JSON {
    }
 
    private static void appendObject(JSONContext ctx, StringBuilder sb, Object o) {
-      ctx.addedObjs.add(o);
+      ctx.addedObjs.put(o, Boolean.TRUE);
       sb.append("{");
       IBeanMapper[] props = DynUtil.getProperties(DynUtil.getType(o));
       boolean any = false;
@@ -91,7 +113,7 @@ public class JSON {
             continue;
 
          Object val = prop.getPropertyValue(o, false, false);
-         if (val != null && !ctx.addedObjs.contains(val)) {
+         if (val != null && ctx.addedObjs.get(val) == null) {
             if (any)
                sb.append(", ");
             appendString(sb, prop.getPropertyName());
@@ -100,6 +122,7 @@ public class JSON {
             any = true;
          }
       }
+      ctx.addedObjs.remove(o);
       sb.append("}");
    }
 
@@ -134,7 +157,7 @@ public class JSON {
             if (!(key instanceof CharSequence))
                throw new IllegalArgumentException("JSON map property - non-char key unsupported");
             Object entVal = ent.getValue();
-            if (entVal != null && !ctx.addedObjs.contains(entVal)) {
+            if (entVal != null && ctx.addedObjs.get(entVal) == null) {
                if (any)
                   sb.append(", ");
                appendString(sb, key.toString());
