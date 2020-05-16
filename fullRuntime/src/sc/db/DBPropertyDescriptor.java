@@ -546,7 +546,7 @@ public class DBPropertyDescriptor {
    }
 
    public Object getPropertyType() {
-      return typeIdProperty ? int.class : getPropertyMapper().getPropertyType();
+      return typeIdProperty ? int.class : getPropertyMapper().getGenericType();
    }
 
    /** For single-valued association properties, we add a property propNameRefId to store the id */
