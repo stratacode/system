@@ -254,5 +254,19 @@ public class DBList<E extends IDBObject> extends java.util.ArrayList<E> implemen
       else
          refIds.set(ix, refId);
    }
+
+   public Object[] toArray() {
+      if (refIds != null) {
+         for (int i = 0; i < refIds.size(); i++) {
+            Object refId = refIds.get(i);
+            if (refId != null) {
+               Object cur = getAndCheckRefId(i);
+               // ignoring cur here - need to resolve this reference and call super.set(.) on the value so it gets
+               // returned below...
+            }
+         }
+      }
+      return super.toArray();
+   }
    // TODO: add subList, iterator, sort, and more - at least the methods that make sense on a modified list
 }
