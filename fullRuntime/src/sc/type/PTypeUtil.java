@@ -1001,6 +1001,16 @@ public class PTypeUtil {
    }
 
    public static Object getComponentType(Object cl) {
+      if (cl instanceof ParameterizedType) {
+         ParameterizedType pt = (ParameterizedType) cl;
+         java.lang.reflect.Type t = pt.getRawType();
+         if (t instanceof Class && Collection.class.isAssignableFrom(((Class) t))) {
+            java.lang.reflect.Type[] args = pt.getActualTypeArguments();
+            if (args != null && args.length == 1 && args[0] instanceof Class)
+               return args[0];
+         }
+         return null;
+      }
       return cl instanceof Class ? ((Class) cl).getComponentType() : null;
    }
 
