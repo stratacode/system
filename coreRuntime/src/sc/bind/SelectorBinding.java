@@ -447,7 +447,7 @@ public class SelectorBinding extends DestinationListener {
             Bind.parentBindingChanged(boundProps[i]);
             if (activated) {
                //boundValues[i] = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : boundProps[i].getPropertyValue(bindingParent);
-               updateBoundValue(i, boundValues[i] = bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, pendingChild));
+               updateBoundValue(i, bindingParent == null || bindingParent == UNSET_VALUE_SENTINEL ? UNSET_VALUE_SENTINEL : PBindUtil.getPropertyValue(bindingParent, boundProps[i], false, pendingChild));
             }
             bindingParent = boundValues[i];
          }
