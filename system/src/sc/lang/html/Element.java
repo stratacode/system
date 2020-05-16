@@ -1206,6 +1206,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          str = addExtraAttributes(str, strExprs);
 
          if (!inactive) {
+            if (tagName.equalsIgnoreCase("option") && getAttribute("selected") == null) {
+               strExprs.add(QuestionMarkExpression.create(IdentifierExpression.create("selected"), StringLiteral.create(" selected"), StringLiteral.create("")));
+            }
             if (needsId() && !isSingletonTag()) {
                str.append(" id='");
                strExprs.add(StringLiteral.create(str.toString()));
@@ -1404,6 +1407,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             str = addExtraAttributes(str, strExprs);
 
             if (!inactive) {
+               if (tagName.equalsIgnoreCase("option") && getAttribute("selected") == null) {
+                  if (str.length() > 0) {
+                     StringLiteral nextStr = StringLiteral.create(str.toString());
+                     strExprs.add(nextStr);
+                     str = new StringBuilder();
+                  }
+                  strExprs.add(QuestionMarkExpression.create(IdentifierExpression.create("selected"), StringLiteral.create(" selected"), StringLiteral.create("")));
+                  addInvalidateListener(parentType, "selected");
+               }
                Expression texpr;
                if (needsId() && !isSingletonTag()) {
                   str.append(" id='");
@@ -3447,6 +3459,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
       // Generate the outputBody method
       return tagType;
+   }
+
+   private void addInvalidateListener(TypeDeclaration tagType, String propName) {
+      IdentifierExpression methCall = IdentifierExpression.createMethodCall(new SemanticNodeList(), "invalidateStartTag");
+      PropertyAssignment ba = PropertyAssignment.create(propName, methCall, "=:");
+      tagType.addBodyStatementIndent(ba);
    }
 
    private void addStyleSheetPathsForChildren(ArrayList<String> styleSheetPaths) {
@@ -5586,7 +5604,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));
-      SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));
+      // We sync this value via the Select tag's selectedIndex. The option tag is not like repeat in that it's one instance rendered over and over with different
+      // optionData values. TODO: should a child option tag create a class and the select tag manage the replication like repeat?
+      //SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));
       SyncManager.addSyncType(Window.class, new SyncProperties(null, null, new Object[]{"innerWidth", "innerHeight", "devicePixelRatio"}, null, 0));
       // This class inherits from Element but we are not inheriting the sync properties of Element right now... this api is not for content, just for global events
       SyncManager.addSyncType(Document.class, new SyncProperties(null, null, new Object[]{"mouseDownEvent", "mouseMoveEvent", "mouseUpEvent", new SyncPropOptions("activeElement", SyncPropOptions.SYNC_ON_DEMAND)}, null, SyncPropOptions.SYNC_RECEIVE_ONLY));

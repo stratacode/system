@@ -53,9 +53,9 @@ public class Option<T> extends HTMLElement {
       return optionData;
    }
 
-   @Bindable(manual=true) public void setOptionData(T values) {
-      optionData = values;
-      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _optionDataProp, values);
+   @Bindable(manual=true) public void setOptionData(T value) {
+      optionData = value;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _optionDataProp, value);
    }
 
    @sc.obj.EditorSettings(visible=false)
