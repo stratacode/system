@@ -1,18 +1,16 @@
 package sc.db;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.TreeMap;
 
 /**
- * Represents a per-thread representation of the current transaction, including cached DB connection, list of pending updates
- * made by this transaction.
+ * Represents a per-thread representation of the current transaction, including cached DB connections for each data source,
+ * and a list of pending updates made by this transaction.
  *
  * This class is not thread-safe itself.
- *
- * TODO:  Not sure if there's a use case to use one from more than one thread but perhaps we
- * should at least detect and print an error if the current thread does not match?
  */
 public class DBTransaction {
    static ThreadLocal<DBTransaction> currentTransaction = new ThreadLocal<DBTransaction>();
@@ -71,12 +69,17 @@ public class DBTransaction {
    }
 
    public void removeOp(TxOperation op) {
-      if (operationList.remove(op))
+      if (operationList != null && operationList.remove(op))
          operationIndex.remove(op.dbObject);
       else
          throw new IllegalArgumentException("tx:removeOp: operation not found");
    }
 
+   /**
+    * Applies any queued operations. By default setting properties are queued until dbUpdate is called.
+    * Inserts and deletes are applied immediate (and flush the queue of pending changes) but it's possible
+    * to enable queuing of inserts and deletes as well.
+    */
    public void flush() {
       while (operationList != null) {
          ArrayList<TxOperation> toApply = operationList;
@@ -85,9 +88,70 @@ public class DBTransaction {
          operationIndex = null;
 
          for (TxOperation op:toApply) {
-            op.apply();
+            if (op.removeOp())
+               op.apply();
+            else
+               DBUtil.error("Attempt to flush operation not found in pendingOps for DBObject");
          }
       }
+   }
+
+   /** Cancels any pending operations that have been queued and rolls back any uncommitted connections */
+   public void rollback() {
+      while (operationList != null) {
+         ArrayList<TxOperation> toCancel = operationList;
+
+         operationList = null;
+         operationIndex = null;
+
+         for (TxOperation op:toCancel) {
+            op.cancel();
+         }
+      }
+      if (connections != null) {
+         TreeMap<String,Connection> toRollback = connections;
+         if (!autoCommit) {
+            for (Connection conn:toRollback.values()) {
+               try {
+                  conn.rollback();
+               }
+               catch (SQLException exc) {
+                  System.err.println("Rollback transaction failed: " + exc);
+               }
+            }
+         }
+      }
+      close();
+   }
+
+   /** Flush pending operations and commit any transactions */
+   public void commit() {
+      flush();
+      if (connections != null) {
+         TreeMap<String,Connection> toCommit = connections;
+         if (!autoCommit) {
+            for (Connection conn:toCommit.values()) {
+               try {
+                  conn.commit();
+               }
+               catch (SQLException exc) {
+                  throw new IllegalArgumentException("Commit transaction failed: " + exc);
+               }
+            }
+         }
+      }
+      close();
+   }
+
+   public void close() {
+      if (connections != null) {
+         TreeMap<String,Connection> toClose = connections;
+         connections = null;
+         for (Connection conn:toClose.values()) {
+            DBUtil.close(conn);
+         }
+      }
+      currentTransaction.remove();
    }
 
    TreeMap<String,Connection> connections = null;

@@ -53,6 +53,7 @@ public class SchemaManager {
 
    public ArrayList<SchemaTypeChange> changedTypes = new ArrayList<SchemaTypeChange>();
    public ArrayList<SQLFileModel> newModels = new ArrayList<SQLFileModel>();
+   public ArrayList<SQLFileModel> conflictModels = new ArrayList<SQLFileModel>();
 
    boolean needsInitFromDB = true;
    public boolean initFromDBFailed = false, dbMetadataFailed = false;
@@ -145,7 +146,8 @@ public class SchemaManager {
          if (!initFromDBFailed) {
             needsInitFromDB = false;
 
-            // We're going to go through the results we go
+            // Compare the db_schema_ table contents to the new+changed types as computed from the most recent deployed build.
+            // We'll recompute the new+alter scripts accordingly
             for (DBSchemaType dbTypeSchema: dbSchemaTypes) {
                String typeName = dbTypeSchema.getTypeName();
                SQLFileModel newSchema = schemasByType.get(typeName);
@@ -167,7 +169,7 @@ public class SchemaManager {
                   // Check the current database schema against what we have in the db_schema_ tables
                   DBMetadata missingTableInfo = dbModel.getMissingTableInfo(dbMetadata);
                   if (missingTableInfo != null) {
-                     DBUtil.error("Current db_schema_type table for: " + typeName + " has: " + missingTableInfo + " missing in current DB");
+                     DBUtil.error("Current db_schema_type table for: " + typeName + " - out of sync. It has this info: " + missingTableInfo + " missing in current DB");
                      schemaUpdater.removeDBSchemaForType(dataSourceName, typeName);
                      continue;
                   }
@@ -175,6 +177,7 @@ public class SchemaManager {
                   // This model already matches what's in the database schema so it's not actually a new model
                   if (DynUtil.equalObjects(dbModel.sqlCommands, newSchema.sqlCommands)) {
                      newModels.remove(newSchema);
+                     alterSchema.remove(newSchema);
                      removeChangedType(typeName);
                      recordDeployedSchema(typeName, newSchema, buildLayer);
                   }
@@ -189,6 +192,8 @@ public class SchemaManager {
                         // else - we already have this change from the file system cache
                      }
                      else {
+                        newModels.remove(newSchema);
+                        alterSchema.remove(newSchema);
                         DBUtil.info("Schema for type: " + typeName + " discovered from database schema");
                         SchemaTypeChange change = new SchemaTypeChange(typeName, dbModel, newSchema);
                         updateAlterModel(change);
@@ -197,6 +202,32 @@ public class SchemaManager {
                   }
                }
             }
+
+            if (dbMetadata != null) {
+               ArrayList<SQLFileModel> toRemove = new ArrayList<SQLFileModel>();
+               for (TableInfo tableInfo:dbMetadata.tableInfos) {
+                  for (SQLFileModel newSchema:newModels) {
+                     CreateTable table = newSchema.findCreateTable(tableInfo.tableName);
+                     if (table != null) {
+                        TableInfo missingInfo = table.getMissingTableInfo(tableInfo);
+                        toRemove.add(newSchema);
+                        if (missingInfo == null) {
+                           DBUtil.warn("Matching table: " + tableInfo.tableName + " exists in: " + dbMetadata.dataSourceName);
+                           // TODO: We're removing all changes for this type rather than just the 'create table' that might not be fully accurate
+                        }
+                        else {
+                           DBUtil.warn("Table: " + tableInfo.tableName + " exists in: " + dbMetadata.dataSourceName + " but is missing: " + missingInfo);
+                           conflictModels.add(newSchema);
+                        }
+                     }
+                  }
+               }
+               if (toRemove.size() > 0) {
+                  newModels.removeAll(toRemove);
+                  alterSchema.removeAll(toRemove);
+               }
+            }
+
             schemaChanged = newModels.size() > 0 || changedTypes.size() > 0;
          }
 
@@ -672,15 +703,17 @@ public class SchemaManager {
    }
 
    public int getNumChangedTypes() {
-      return newModels.size() + changedTypes.size();
+      return newModels.size() + changedTypes.size() + conflictModels.size();
    }
 
    public String getChangedTypeName(int index) {
       int newSize = newModels.size();
       if (index < newSize)
          return newModels.get(index).srcType.getFullTypeName();
-      else
+      else if (index < newSize + changedTypes.size())
          return changedTypes.get(index).fromModel.srcType.getFullTypeName();
+      else
+         return conflictModels.get(index).srcType.getFullTypeName();
    }
 
    public boolean updateSchema(Layer buildLayer, boolean doAlter) {

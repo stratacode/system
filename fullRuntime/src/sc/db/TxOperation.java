@@ -21,6 +21,17 @@ public abstract class TxOperation {
 
    public abstract int apply();
 
+   public void cancel() {
+      if (applied)
+         throw new IllegalArgumentException("Cancel of applied operation");
+      if (!dbObject.removeOperation(this))
+         DBUtil.error("Attempt to cancel operation not found in it's object");
+   }
+
+   public boolean removeOp() {
+      return dbObject.removeOperation(this);
+   }
+
    /** Used by both TxInsert and TxUpdate */
    protected int doInsert(TableDescriptor insertTable) {
       if (insertTable.isReadOnly())
@@ -807,5 +818,6 @@ public abstract class TxOperation {
       return 1;
    }
 
+   public abstract Map<String, String> validate();
 }
 

@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.PreparedStatement;
@@ -25,6 +28,9 @@ import sc.util.IMessageHandler;
 import sc.util.JSON;
 import sc.util.MessageHandler;
 import sc.util.WeakIdentityHashMap;
+
+import java.security.MessageDigest;
+import java.util.Base64;
 
 import static sc.type.PTypeUtil.testMode;
 
@@ -92,6 +98,9 @@ public class DBUtil {
    public static Connection createConnection(String dataSourceName, boolean autoCommit) {
       try {
          DBDataSource dbDS = DataSourceManager.getDBDataSource(dataSourceName);
+         if (dbDS == null) {
+            throw new IllegalArgumentException("No dataSource found: " + dataSourceName);
+         }
          DataSource javaDS = dbDS.getDataSource();
          Connection res = javaDS.getConnection();
          if (!autoCommit)
@@ -277,7 +286,11 @@ public class DBUtil {
             st.setObject(index, enumVal.name(), Types.OTHER);
             break;
          case Reference:
-            throw new IllegalArgumentException("type should be the id column type");
+            if (!(val instanceof IDBObject))
+               throw new IllegalArgumentException("type should be the id column type");
+            // TODO: support id type conversion if necessary? Multi-columns
+            st.setObject(index, ((IDBObject) val).getDBId());
+            break;
          case Json:
             String jsonStr = JSON.toJSON(val).toString();
             // TODO: using reflection here because we don't want this dependency unless using the postgresql driver.
@@ -696,4 +709,36 @@ public class DBUtil {
    public static boolean isAssociationType(Object propType) {
       return getDefaultSQLType(propType, false) == null;
    }
+
+   private static final SecureRandom randGen = new SecureRandom();
+   private static final Base64.Encoder base64Encoder = Base64.getUrlEncoder().withoutPadding();
+   private static final Base64.Decoder base64Decoder = Base64.getUrlDecoder();
+
+   public static String createSecureUniqueToken() {
+      byte[] buf = new byte[20];
+      randGen.nextBytes(buf);
+      return base64Encoder.encodeToString(buf);
+   }
+
+   public static String createSalt() {
+      SecureRandom random = new SecureRandom();
+      byte[] salt = new byte[16];
+      random.nextBytes(salt);
+      return base64Encoder.encodeToString(salt);
+   }
+
+   public static String hashPassword(String salt64, String password) {
+      try {
+         byte[] salt = base64Decoder.decode(salt64);
+         MessageDigest md = MessageDigest.getInstance("SHA-512");
+         md.update(salt);
+         byte[] buf = md.digest(password.getBytes(StandardCharsets.UTF_8));
+         return base64Encoder.encodeToString(buf);
+      }
+      catch (NoSuchAlgorithmException exc) {
+         throw new IllegalArgumentException("DBUtil.hashPassword failed with: " + exc);
+      }
+   }
+
 }
+

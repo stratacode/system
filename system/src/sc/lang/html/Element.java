@@ -67,6 +67,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    /** When a tag is invisible, instead of rendering the tag, we render the 'alt' child if there is one */
    private final static String ALT_ID = "alt";
+   private final static String ALT_SUFFIX = "__alt";
    private final static Element[] EMPTY_ELEMENT_ARRAY = new Element[]{};
 
    // These are the properties of the Element which are populated from the HTMLLanguage - i.e. the 'non-transient' properties
@@ -1029,7 +1030,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Element par = getEnclosingTag();
       if (par != null) {
          String parId = par.getElementId();
-         return parId + "_" + ALT_ID;
+         return parId + ALT_SUFFIX;
       }
       return getFixedAttribute("id");
    }
@@ -4254,7 +4255,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
       if (!visible) {
          if (invisTags == null) {
-            invisTags = getChildrenById(getElementId() + "_" + ALT_ID);
+            invisTags = getAltChildren();
             if (invisTags == null)
                invisTags = EMPTY_ELEMENT_ARRAY;
          }
@@ -4539,6 +4540,21 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (res == null)
          return null;
       return res.toArray(new Element[res.size()]);
+   }
+
+   public Element[] getAltChildren() {
+      ArrayList<Element> res = null;
+      Object[] childList = getObjChildren(true);
+      if (childList != null) {
+         for (Object child:childList) {
+            if (child instanceof Element && ((Element) child).getElementId().endsWith(ALT_SUFFIX)) {
+               if (res == null)
+                  res = new ArrayList<Element>();
+               res.add((Element) child);
+            }
+         }
+      }
+      return res == null ? null : res.toArray(new Element[res.size()]);
    }
 
    public Element[] getChildrenById(String id) {

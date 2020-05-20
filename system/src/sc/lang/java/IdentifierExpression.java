@@ -2224,7 +2224,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                         isType = false;
                      break;
                   case ThisExpression:
-                     value = ctx.findThisType(value);
+                     value = ctx == null ? null : ctx.findThisType(value);
                      if (value == null)
                         throw new IllegalArgumentException("Unable to evaluate this expression - no type: " + value + " in context");
                      isType = false;
@@ -2235,7 +2235,7 @@ public class IdentifierExpression extends ArgumentsExpression {
                      break;
 
                   case UnboundName:
-                     value = ctx.resolveUnboundName(id);
+                     value = ctx == null ? null : ctx.resolveUnboundName(id);
                      break;
                   case ResolvedObjectName:
                      break; // handled above.

@@ -745,8 +745,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       methodsByName = null;
       memberCache = null;
       // Propagate this up the hierarchy since we transform the modified type and need to invalidate the member cache of any modified types.
-      if (replacedByType != null)
+      if (replacedByType != null) {
+         if (replacedByType == this) {
+            replacedByType = null;
+            System.err.println("*** Found invalid replacedByType in clearCachedMemberInfo");
+         }
          replacedByType.clearCachedMemberInfo();
+      }
    }
 
    protected void incrVersion() {

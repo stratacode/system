@@ -80,8 +80,16 @@ public class SchemaUpdateWizard extends CommandWizard {
 
    private void printCurrentType() {
       int nsz = this.mgr.newModels.size();
+      int csz = this.mgr.changedTypes.size();
       if (currentTypeIx >= nsz) {
-         printChange(this.mgr.changedTypes.get(currentTypeIx - nsz));
+         if (currentTypeIx - nsz < csz)
+            printChange(this.mgr.changedTypes.get(currentTypeIx - nsz));
+         else {
+            SQLFileModel conflictModel = this.mgr.conflictModels.get(currentTypeIx - nsz - csz);
+            print("Conflicting type: " + conflictModel.srcType.typeName);
+            print("--- ");
+            print(conflictModel.toLanguageString());
+         }
       }
       else {
          SQLFileModel newModel = this.mgr.newModels.get(currentTypeIx);
@@ -110,6 +118,11 @@ public class SchemaUpdateWizard extends CommandWizard {
          printChangesList();
          print("---");
       }
+      if (this.mgr.conflictModels.size() > 0) {
+         print("- Conflicting types: " + this.mgr.conflictModels.size());
+         printConflictModelsList();
+         print("---");
+      }
 
       if (mgr.dbMissingMetadata != null && (mgr.noCurrentSchema || mgr.initFromDBFailed)) {
          print("- Warning: current database is missing these items:" + mgr.dbMissingMetadata + "\n---");
@@ -136,7 +149,20 @@ public class SchemaUpdateWizard extends CommandWizard {
       }
    }
 
+   private void printConflictModelsList() {
+      List<SQLFileModel> conflictModels = this.mgr.conflictModels;
+      int nsz = this.mgr.newModels.size();
+      int csz = this.mgr.changedTypes.size();
+      for (int i = 0; i < nsz; i++) {
+         SQLFileModel model = conflictModels.get(i);
+         int ix = i + nsz + csz;
+         print("     " + (ix == currentTypeIx? "*" : " ") + "[" + ix + "] conflict: " + model.srcType.getFullTypeName() + ": " + model.getCommandSummary());
+      }
+   }
+
    private void printUpgradeWarning(SchemaManager.SchemaTypeChange change) {
+      if (mgr.conflictModels.size() > 0)
+         print("   Warning - schema not upgradeable due to conflicts found in metadata");
       if (change.notUpgradeable.size() > 0) {
          print("   Warning - tables for type cannot be upgraded without losing data:");
          for (int i = 0; i < change.notUpgradeable.size(); i++) {

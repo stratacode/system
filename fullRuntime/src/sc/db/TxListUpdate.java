@@ -1,6 +1,7 @@
 package sc.db;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 class TxListUpdate<E extends IDBObject> extends TxOperation {
    DBList<E> oldList;
@@ -59,5 +60,9 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
       }
       oldList.updateToList(newList);
       return 0;
+   }
+
+   public Map<String,String> validate() {
+      return null;
    }
 }

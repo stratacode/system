@@ -46,7 +46,6 @@ public class PropertyDefinitionParameters {
    public String dbRefIdProperty = "";
    public String dbGetProperty = "";
    public String dbSetProperty = "";
-   public String dbSetPropMethod = "";
 
    public String bindClass = "sc.bind.Bind";
    public String bindableClass = "sc.bind.Bindable";
@@ -105,8 +104,14 @@ public class PropertyDefinitionParameters {
       DBProvider dbProvider = DBProvider.getDBProviderForProperty(sys, propLayer, varDef);
       if (dbProvider != null && dbProvider.getNeedsGetSet()) {
          persist = true;
-         dbObjVarName = "_dbObject";
-         dbObjPrefix = ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType) ? "" : "_dbObject.";
+         if (ModelUtil.isAssignableFrom(sc.db.DBObject.class, enclType)) {
+            dbObjVarName = "this";
+            dbObjPrefix =  "";
+         }
+         else {
+            dbObjVarName = "_dbObject";
+            dbObjPrefix =  "_dbObject.";
+         }
          // Only include properties that are defined in this type or a base-type. If the property is used
          // as a DB property in a sub-type we wrap the getX/setX methods in the sub-type.
          dbPropDesc = DBProvider.getDBPropertyDescriptor(sys, propLayer, varDef, false);
@@ -130,8 +135,6 @@ public class PropertyDefinitionParameters {
    }
 
    private void initDBGetSet(DBProvider dbProvider) {
-      dbSetPropMethod = dbPropDesc instanceof IdPropertyDescriptor ? "dbSetIdProp" : "dbSetProp";
-
       dbGetProperty = dbProvider.evalGetPropertyTemplate(this);
       dbSetProperty = dbProvider.evalUpdatePropertyTemplate(this);
 

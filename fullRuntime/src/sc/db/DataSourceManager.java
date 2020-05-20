@@ -14,7 +14,18 @@ public class DataSourceManager {
    public static boolean defaultSchemaReady = true;
 
    public static DBDataSource getDBDataSource(String dsName) {
-      return dataSources.get(dsName);
+      DBDataSource res = dataSources.get(dsName);
+      if (res == null) {
+         res = new DBDataSource();
+         res.jndiName = dsName;
+         javax.sql.DataSource ds = res.getDataSource();
+         if (ds != null) {
+            dataSources.put(dsName, res);
+         }
+         else
+            res = null;
+      }
+      return res;
    }
 
    public static void addDBDataSource(String jndiName, DBDataSource ds) {

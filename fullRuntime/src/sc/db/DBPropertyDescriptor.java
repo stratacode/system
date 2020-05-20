@@ -1,6 +1,7 @@
 package sc.db;
 
 import sc.dyn.DynUtil;
+import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.util.ResultWrapper;
 import sc.util.StringUtil;
@@ -98,6 +99,9 @@ public class DBPropertyDescriptor {
    public DBPropertyDescriptor reversePropDesc;
 
    private boolean started = false;
+
+   private boolean validatorInited = false;
+   private Object validateMethod;
 
    // TODO - restructure as (propertyName, colName, colType).withTable(tableName).withFlags(required, unique, onDemand, indexed).withDataSource(...), etc.
    public DBPropertyDescriptor(String propertyName, String columnName, String columnType, String tableName,
@@ -562,5 +566,25 @@ public class DBPropertyDescriptor {
    public Object getRefIdProperty(IDBObject inst) {
       String propName = propertyName + RefIdPropertySuffix;
       return DynUtil.getProperty(inst, propName);
+   }
+
+   public boolean hasValidator() {
+      if (!validatorInited) {
+         validatorInited = true;
+         validateMethod = DynUtil.resolveMethod(dbTypeDesc.typeDecl, "validate" + CTypeUtil.capitalizePropertyName(propertyName), String.class, null);
+      }
+      return validateMethod != null;
+   }
+
+   public String validate(DBObject dbObj, Object propVal) {
+      if (hasValidator()) {
+         try {
+            return (String) DynUtil.invokeMethod(dbObj.getInst(), validateMethod, propVal);
+         }
+         catch (IllegalArgumentException exc) {
+            return "Invalid value for property " + propertyName;
+         }
+      }
+      return null;
    }
 }

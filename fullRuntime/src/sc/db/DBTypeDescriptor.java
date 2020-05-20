@@ -587,18 +587,18 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return findBy(null, null, null, orderByNames, startIx, maxResults);
    }
 
-   public List<? extends IDBObject> findBy(List<Object> paramValues, String selectGroup, List<String> paramNames, List<String> orderByNames, int startIx, int maxResults) {
-      int numVals = paramValues == null ? 0 : paramValues.size();
-      int numParams = paramNames == null ? 0 : paramNames.size();
+   public List<? extends IDBObject> findBy(List<Object> propValues, String selectGroup, List<String> propNames, List<String> orderByNames, int startIx, int maxResults) {
+      int numVals = propValues == null ? 0 : propValues.size();
+      int numParams = propNames == null ? 0 : propNames.size();
       if (numVals != numParams)
          throw new IllegalArgumentException("Mismatching numParamValues = " + numVals + " numParamNames: " + numParams);
 
       IDBObject proto = createPrototype();
       DBObject protoDB = proto.getDBObject();
       for (int i = 0; i < numVals; i++) {
-         protoDB.setPropertyInPath(paramNames.get(i), paramValues.get(i));
+         protoDB.setPropertyInPath(propNames.get(i), propValues.get(i));
       }
-      return matchQuery(proto.getDBObject(), selectGroup, paramNames, orderByNames, startIx, maxResults);
+      return matchQuery(proto.getDBObject(), selectGroup, propNames, orderByNames, startIx, maxResults);
    }
 
    private void initTypeInstances() {
@@ -847,7 +847,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
 
       if (dataSource == null) {
-         dataSource = DataSourceManager.getDBDataSource(dataSourceName);
+         dataSource = !runtimeMode ? null : DataSourceManager.getDBDataSource(dataSourceName);
          if (dataSource == null) {
             if (runtimeMode)
                throw new IllegalArgumentException("No data source: " + dataSourceName);

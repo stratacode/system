@@ -241,4 +241,18 @@ public class TxUpdate extends VersionedOperation {
    public String toString() {
       return "update: " + dbObject + (updateList == null ? "" : " (" + (updateList.size() + (applied ? " applied" : " pending") + " changes)"));
    }
+
+   public Map<String,String> validate() {
+      Map<String,String> res = null;
+      for (PropUpdate propUpdate:updateList) {
+         DBPropertyDescriptor propDesc = propUpdate.prop;
+         String propError = propDesc.validate(dbObject, propUpdate.value);
+         if (propError != null) {
+            if (res == null)
+               res = new TreeMap<String,String>();
+            res.put(propDesc.propertyName, propError);
+         }
+      }
+      return res;
+   }
 }

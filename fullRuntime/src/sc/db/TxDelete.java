@@ -1,5 +1,7 @@
 package sc.db;
 
+import java.util.Map;
+
 public class TxDelete extends VersionedOperation {
    public TxDelete(DBTransaction tx, DBObject inst) {
       super(tx, inst);
@@ -26,5 +28,9 @@ public class TxDelete extends VersionedOperation {
       ct += doDelete(dbTypeDesc.primaryTable);
       //deleteOwnedRefs(false);
       return ct;
+   }
+
+   public Map<String,String> validate() {
+      return null;
    }
 }

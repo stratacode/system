@@ -7,9 +7,7 @@ import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.util.StringUtil;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 /**
  * Database object class, usually stored as a code-generated field _dbObject in a given instance.
@@ -121,9 +119,11 @@ public class DBObject implements IDBObject {
          TxUpdate objUpd = (TxUpdate) op;
          PropUpdate propUpd = objUpd.updateIndex.get(property);
          if (propUpd == null) {
-            propUpd = new PropUpdate(pdesc);
-            objUpd.updateIndex.put(property, propUpd);
-            objUpd.updateList.add(propUpd);
+            if (createUpdateProp) {
+               propUpd = new PropUpdate(pdesc);
+               objUpd.updateIndex.put(property, propUpd);
+               objUpd.updateList.add(propUpd);
+            }
          }
          return propUpd;
       }
@@ -164,6 +164,12 @@ public class DBObject implements IDBObject {
          }
       }
       return null;
+   }
+
+   boolean removeOperation(TxOperation op) {
+      synchronized (pendingOps) {
+         return pendingOps.remove(op);
+      }
    }
 
    // get or create operations using one lock
@@ -480,6 +486,27 @@ public class DBObject implements IDBObject {
       }
    }
 
+   public Map<String,String> dbValidate() {
+      DBTransaction curr = DBTransaction.getOrCreate();
+      Map<String,String> curRes = null;
+      synchronized (pendingOps) {
+         // If we've updated the property in this transaction, find the updated value and return
+         // a reference to that update so the updated value gets returned - only for that transaction.
+         int txSz = pendingOps.size();
+         for (int i = 0; i < txSz; i++) {
+            TxOperation c = pendingOps.get(i);
+            if (c.transaction == curr) {
+               Map<String,String> errors = c.validate();
+               if (curRes == null)
+                  curRes = errors;
+               else
+                  curRes.putAll(errors);
+            }
+         }
+      }
+      return curRes;
+   }
+
    public boolean dbRefresh() {
       if (replacedBy != null)
          return replacedBy.dbRefresh();
@@ -763,15 +790,27 @@ public class DBObject implements IDBObject {
       return "persistent";
    }
 
-   public static PropUpdate select(DBObject obj, String prop) {
+   public static PropUpdate dbGetProperty(DBObject obj, String prop) {
       if (obj != null)
          return obj.dbFetch(prop);
       return null;
    }
 
-   public static PropUpdate selectWithRefId(DBObject obj, String prop) {
+   public static PropUpdate dbGetPropertyWithRefId(DBObject obj, String prop) {
       if (obj != null)
          return obj.dbFetchWithRefId(prop);
+      return null;
+   }
+
+   public static PropUpdate dbSetProperty(DBObject obj, String propName, Object propVal) {
+      if (obj != null)
+         return obj.dbSetProp(propName, propVal);
+      return null;
+   }
+
+   public static PropUpdate dbSetIdProperty(DBObject obj, String propName, Object propVal) {
+      if (obj != null)
+         return obj.dbSetIdProp(propName, propVal);
       return null;
    }
 }

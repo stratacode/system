@@ -248,11 +248,13 @@ public class TransformUtil {
                    "<%=getModifiers%> <%=variableTypeName%> get<%=upperClassName%>(boolean doInit) {\n" +
                    "<% if (needsCustomResolver) { %>\n" +
                       "<%= customResolver %>" +
-                   "<% } %> \n" +
-                   "   if (<%=lowerClassName%> == null) {\n" +
-                   "      <%=variableTypeName%> _<%=lowerClassName%>;<%=beforeNewObject%>\n" +
-                   "      <%=lowerClassName%> = _<%=lowerClassName%> = new <%=typeName%>(<%=constructorParams%>);\n" +
-                         "<%= customSetter %>" +
+                   "<% } else { %> \n" +
+                   "      <%=variableTypeName%> _<%=lowerClassName%> = <%=returnCast%><%= lowerClassName %>;" +
+                   "<% } %>" +
+                   "   if (_<%=lowerClassName%> == null) {\n" +
+                   "<%=beforeNewObject%>\n" +
+                   "      _<%=lowerClassName%> = new <%=typeName%>(<%=constructorParams%>);\n" +
+                         "<%= objectVariableSetter %>" +
                          "<%= preAssignment %>" +
                    "      _<%=lowerClassName%>.<%=altPrefix%>preInit();\n" +
                    "      <%=getDynamicTypeDefinition('_' + lowerClassName, 2)%>\n<%=propertyAssignments%>\n" +
@@ -264,7 +266,6 @@ public class TransformUtil {
                    "      return <%=returnCast%>_<%=lowerClassName%>;\n" +
                    "   } \n" +
                    "   else {\n" +
-                   "      <%=variableTypeName%> _<%=lowerClassName%> = <%=returnCast%><%=lowerClassName%>;\n" +
                    "      <%=accessHook%>\n" +
                    "      return _<%=lowerClassName%>;\n" +
                    "   }\n" +

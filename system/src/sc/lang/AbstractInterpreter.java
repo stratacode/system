@@ -62,6 +62,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
       }
    }
+   public void runtimeInitialized() {
+      super.runtimeInitialized();
+      // Do this here so that we are in the app server thread
+      initCommandWizards();
+   }
 
    public void initCommandWizards() {
       while (currentWizard != null && !currentWizard.getActive()) {

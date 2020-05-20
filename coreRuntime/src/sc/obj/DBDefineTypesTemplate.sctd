@@ -43,6 +43,9 @@
       public int dbUpdate() {
          return _dbObject.dbUpdate();
       }
+      public Map<String,String> dbValidate() {
+         return _dbObject.dbValidate();
+      }
       public boolean dbRefresh() {
          return _dbObject.dbRefresh();
       }
@@ -60,7 +63,7 @@
       }
    <%    }
          if (dbTypeDescriptor.needsAutoId) { %>
-      @sc.db.IdSettings // Generated id
+      @sc.db.IdSettings(generated=true) // Generated id
       long id;
    <%    }
    }

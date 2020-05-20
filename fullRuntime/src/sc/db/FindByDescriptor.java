@@ -17,6 +17,7 @@ public class FindByDescriptor extends BaseQueryDescriptor {
    public boolean multiRow;
    public String selectGroup;
    public boolean paged;
+   public boolean findOne;
 
    public List<Object> propTypes;
    public List<Object> optionTypes;
@@ -27,7 +28,7 @@ public class FindByDescriptor extends BaseQueryDescriptor {
      */
    public List<String> protoProps;
 
-   public FindByDescriptor(String name, List<String> properties, List<String> options, List<String> orderByProps, boolean orderByOption, boolean multiRow, String selectGroup, boolean paged) {
+   public FindByDescriptor(String name, List<String> properties, List<String> options, List<String> orderByProps, boolean orderByOption, boolean multiRow, String selectGroup, boolean paged, boolean findOne) {
       this.queryName = name;
       this.propNames = properties;
       this.optionNames = options;
@@ -36,6 +37,7 @@ public class FindByDescriptor extends BaseQueryDescriptor {
       this.orderByProps = orderByProps;
       this.orderByOption = orderByOption;
       this.paged = paged;
+      this.findOne = findOne;
    }
 
    public boolean typesInited() {

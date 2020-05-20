@@ -296,6 +296,7 @@ public class DBProvider {
 
                      String selectGroup = (String) ModelUtil.getAnnotationValue(findByProp, "selectGroup");
                      Boolean paged = (Boolean) ModelUtil.getAnnotationValue(findByProp, "paged");
+                     Boolean findOne = (Boolean) ModelUtil.getAnnotationValue(findByProp, "findOne");
 
                      String orderByStr = (String) ModelUtil.getAnnotationValue(findByProp, "orderBy");
 
@@ -338,7 +339,7 @@ public class DBProvider {
                         }
                      }
 
-                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, selectGroup, paged != null && paged);
+                     FindByDescriptor fbDesc = new FindByDescriptor(propName, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, selectGroup, paged != null && paged, findOne != null && findOne);
                      if (queries == null)
                         queries = new ArrayList<BaseQueryDescriptor>();
                      queries.add(fbDesc);
@@ -351,6 +352,14 @@ public class DBProvider {
                      String idColumnName = null;
                      String idColumnType = null;
                      boolean definedByDB = true;
+
+                     // If we modify another type, it might have the generated id which we ignore here because we are replacing it anyway
+                     Boolean generated = (Boolean) ModelUtil.getAnnotationValue(idSettings, "generated");
+                     if (generated != null && generated) {
+                        Object propEnclType = ModelUtil.getEnclosingType(property);
+                        if (ModelUtil.sameTypes(propEnclType, typeDecl))
+                           continue;
+                     }
 
                      String tmpColumnName = (String) ModelUtil.getAnnotationValue(idSettings, "columnName");
                      if (tmpColumnName != null) {
@@ -374,7 +383,6 @@ public class DBProvider {
                         if (idColumnType == null)
                            throw new IllegalArgumentException("Invalid property type: " + propType + " for id: " + idColumnName);
                      }
-
 
                      if (baseTD != null) {
                         boolean found = false;
@@ -416,6 +424,7 @@ public class DBProvider {
 
                   String selectGroup = (String) ModelUtil.getAnnotationValue(findByCl, "selectGroup");
                   Boolean paged = (Boolean) ModelUtil.getAnnotationValue(findByCl, "paged");
+                  Boolean findOne = (Boolean) ModelUtil.getAnnotationValue(findByCl, "findOne");
                   String orderByStr = (String) ModelUtil.getAnnotationValue(findByCl, "orderBy");
 
                   List<String> orderByProps = null;
@@ -428,7 +437,7 @@ public class DBProvider {
                      }
                   }
 
-                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, selectGroup, paged != null && paged);
+                  FindByDescriptor fbDesc = new FindByDescriptor(name, fbProps, fbOptions, orderByProps, orderByOption, multiRowQuery, selectGroup, paged != null && paged, findOne != null && findOne);
                   if (queries == null)
                      queries = new ArrayList<BaseQueryDescriptor>();
                   queries.add(fbDesc);
@@ -1053,10 +1062,10 @@ public class DBProvider {
          return true;
    }
 
-   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.select<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
+   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.dbGetProperty<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
-   private static String UPDATE_PROP_TEMPLATE = "\n      if (<%= dbObjPrefix%><%= dbSetPropMethod %>(\"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";
+   private static String UPDATE_PROP_TEMPLATE = "\n      if (sc.db.DBObject.<%= dbPropDesc.isId() ? \"dbSetIdProperty\" : \"dbSetProperty\"%>(<%= dbObjVarName %>, \"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";
 
    private static Template getPropertyTemplate;
    private static Template updatePropertyTemplate;

@@ -365,12 +365,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
     * the local variable name is used.
     *
     * For accessHooks, the lowerClassName should be used or maybe the getX method.  This logic only applies for the create.
-    *
-    * TODO IMPORTANT: For some reason components use just the lowerClassName, without the "_".  We should clean this up because these
-    * conventions are an important part of the API.
     */
    public String getInstanceVariableName() {
-      //return noCreationTemplate ? "this" : (typeIsComponent ? lowerClassName : "_" + lowerClassName);
       return noCreationTemplate ? "this" : "_" + lowerClassName;
    }
 
@@ -478,7 +474,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          if (queryDesc instanceof FindByDescriptor) {
             FindByDescriptor fbDesc = (FindByDescriptor) queryDesc;
             sb.append("public static ");
-            if (fbDesc.multiRow) {
+            if (fbDesc.multiRow && !fbDesc.findOne) {
                sb.append("java.util.List<");
                sb.append(typeBaseName);
                sb.append(">");
@@ -606,7 +602,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                sb.append(");\n");
             }
             sb.append("      return (");
-            if (fbDesc.multiRow) {
+            if (fbDesc.multiRow && !fbDesc.findOne) {
                sb.append("java.util.List<");
                sb.append(typeBaseName);
                sb.append(">");
@@ -615,14 +611,14 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                sb.append(typeBaseName);
             }
             sb.append(") dbTypeDesc.");
-            if (fbDesc.multiRow)
+            if (fbDesc.multiRow && !fbDesc.findOne)
                sb.append("matchQuery(");
             else
                sb.append("matchOne(");
             sb.append("proto.getDBObject(),");
             appendString(sb, fbDesc.selectGroup, false);
             sb.append(", propList");
-            if (fbDesc.multiRow) {
+            if (fbDesc.multiRow && !fbDesc.findOne) {
                if (fbDesc.orderByOption || fbDesc.orderByProps != null)
                   sb.append(", orderBy");
                else
@@ -801,6 +797,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             appendString(sb, fbDesc.selectGroup, true);
             sb.append(", ");
             sb.append(fbDesc.paged);
+            sb.append(", ");
+            sb.append(fbDesc.findOne);
             sb.append(")");
          }
          else if (query instanceof NamedQueryDescriptor) {
@@ -1035,4 +1033,12 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    public String getBeforeNewObject() {
       return beforeNewObject;
    }
+
+   public String getObjectVariableSetter() {
+      if (customSetter != null && customSetter.length() > 0)
+         return customSetter;
+      else
+         return "      " + lowerClassName + " = _" + lowerClassName + ";\n";
+   }
+
 }

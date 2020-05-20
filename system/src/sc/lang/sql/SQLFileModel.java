@@ -213,7 +213,7 @@ public class SQLFileModel extends SCModel {
       def.addModifier(annot);
    }
 
-   private CreateTable findCreateTable(String tableName) {
+   public CreateTable findCreateTable(String tableName) {
       if (sqlCommands == null)
          return null;
       for (SQLCommand cmd:sqlCommands) {

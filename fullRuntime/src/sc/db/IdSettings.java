@@ -6,6 +6,7 @@ package sc.db;
  */
 public @interface IdSettings {
    boolean definedByDB() default true;
+   boolean generated() default false;
    String columnName() default "";
    String columnType() default "";
 }

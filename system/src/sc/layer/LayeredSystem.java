@@ -15971,8 +15971,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    // Once the SyncManager and destinations have been registered, we might need to init the sync types for the command interpreter
    public void runtimeInitialized() {
-      if (cmd != null)
+      if (cmd != null) {
          cmd.runtimeInitialized();
+      }
       synchronized (runtimeInitLock) {
          runtimeInited = true;
          runtimeInitLock.notify();

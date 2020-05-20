@@ -55,6 +55,5 @@ public @interface FindBy {
    boolean paged() default true;
 
    /** When true the findBy method will always return the first result of the query  */
-   // TODO: should we add this option? If should it still support options for orderBy and startIndex?
-   //boolean findOne() default false;
+   boolean findOne() default false;
 }

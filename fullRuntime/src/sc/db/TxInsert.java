@@ -1,6 +1,8 @@
 package sc.db;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 public class TxInsert extends TxOperation {
    public TxInsert(DBTransaction tx, DBObject inst) {
@@ -28,5 +30,30 @@ public class TxInsert extends TxOperation {
       }
       insertTransientRefs(false);
       return ct;
+   }
+
+   public Map<String,String> validate() {
+      IDBObject inst = dbObject.getInst();
+
+      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+
+      List<DBPropertyDescriptor> allProps = dbTypeDesc.allDBProps;
+      int psz = allProps.size();
+
+      Map<String,String> res = null;
+
+      for (int i = 0; i < psz; i++) {
+         DBPropertyDescriptor prop = allProps.get(i);
+
+         if (prop.hasValidator()) {
+            String error = prop.validate(dbObject, prop.getPropertyMapper().getPropertyValue(inst, false, false));
+            if (error != null) {
+               if (res == null)
+                  res = new TreeMap<String,String>();
+               res.put(prop.propertyName, error);
+            }
+         }
+      }
+      return res;
    }
 }
