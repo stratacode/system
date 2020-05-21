@@ -195,19 +195,21 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
    public Object getAnnotationValue(String identifier) {
       AnnotationValue av = getAnnotationValueWrapper(identifier);
       if (av != null) {
+         Object avalue = av.elementValue;
          // Just handling literals for now... not sure if anything else is valid in annotation defs
-         if (av.elementValue instanceof IValueNode)
-            return ((IValueNode) av.elementValue).eval(null, null);
-         else if (av.elementValue instanceof List) {
+         if (avalue instanceof IValueNode) {
+            return ((IValueNode) avalue).eval(null, null);
+         }
+         else if (avalue instanceof List) {
             Object annotType = getAnnotationValueType(identifier);
             Class rtClass = annotType == null ? null : ModelUtil.getCompiledClass(annotType);
             if (rtClass == null)
                rtClass = Object.class;
-            return initAnnotationArray(rtClass, (List<Expression>) av.elementValue, new ExecutionContext());
+            return initAnnotationArray(rtClass, (List<Expression>) avalue, new ExecutionContext());
          }
          // When copied over from the compile time versions
-         else if (av.elementValue instanceof String)
-            return av.elementValue;
+         else if (avalue instanceof String)
+            return avalue;
       }
       return null;
    }
