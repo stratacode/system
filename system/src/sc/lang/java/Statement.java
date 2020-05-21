@@ -188,6 +188,11 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return false;
    }
 
+   /** Does this method call super.methName() */
+   public boolean callsSuperMethod(String methName) {
+      return false;
+   }
+
    public void markFixedSuper() {
    }
 

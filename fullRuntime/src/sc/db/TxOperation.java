@@ -671,7 +671,7 @@ public abstract class TxOperation {
                      if (refObj.isTransient()) {
                         if (DBUtil.verbose)
                            DBUtil.verbose(" Inserting reference: " + ref.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper + "[]");
-                        ref.dbInsert();
+                        ref.dbInsert(false);
                      }
                      else
                         refObj.dbUpdate();
@@ -685,7 +685,7 @@ public abstract class TxOperation {
                   if (refDBObj.isTransient() && !refDBObj.isPendingInsert()) {
                      if (DBUtil.verbose)
                         DBUtil.verbose(" Inserting reference: " + refInst.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper);
-                     refInst.dbInsert();
+                     refInst.dbInsert(false);
                   }
                }
             }

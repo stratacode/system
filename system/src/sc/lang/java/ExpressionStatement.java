@@ -16,6 +16,10 @@ public abstract class ExpressionStatement extends Statement {
       return expression != null && expression.callsSuper(checkModSuper);
    }
 
+   public boolean callsSuperMethod(String methName) {
+      return expression != null && expression.callsSuperMethod(methName);
+   }
+
    public boolean callsThis() {
       return expression != null && expression.callsThis();
    }

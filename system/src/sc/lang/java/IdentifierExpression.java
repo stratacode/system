@@ -1960,6 +1960,12 @@ public class IdentifierExpression extends ArgumentsExpression {
          List<IString> idents = getAllIdentifiers();
          int sz = idents.size();
 
+         // Failed to start
+         if (idTypes == null) {
+            System.err.println("*** Failed to start identifier expression - eval returning null");
+            return null;
+         }
+
          JavaModel jmodel = getJavaModel();
          switch (idTypes[0]) {
             case PackageName:
@@ -5006,6 +5012,15 @@ public class IdentifierExpression extends ArgumentsExpression {
             return !constr.isModifySuper(); // Eliminate the case where super is really going to a modified constructor.  This method is for real super's in the constructor that go to a base class for the purposes of maintaining the dynamic/compiled type constract.
          }
          else // In the JS method case we've been detached from the parent.
+            return true;
+      }
+      return false;
+   }
+
+   public boolean callsSuperMethod(String methName) {
+      if (idTypes != null && idTypes.length == 2 && idTypes[0] == IdentifierType.SuperExpression && idTypes[1] == IdentifierType.MethodInvocation && arguments != null) {
+         Object meth = boundTypes[1];
+         if (meth != null && ModelUtil.getMethodName(meth).equals(methName))
             return true;
       }
       return false;

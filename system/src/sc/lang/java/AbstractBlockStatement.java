@@ -234,6 +234,17 @@ public abstract class AbstractBlockStatement extends Statement implements IBlock
       return false;
    }
 
+   public boolean callsSuperMethod(String methName) {
+      if (statements == null)
+         return false;
+
+      for (Statement st:statements)
+         if (st.callsSuperMethod(methName))
+            return true;
+
+      return false;
+   }
+
    public boolean callsThis() {
       if (statements == null)
          return false;

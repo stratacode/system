@@ -686,6 +686,10 @@ public class BinaryExpression extends Expression {
       return lhs.callsSuper(checkModSuper) || getRhsExpr().callsSuper(checkModSuper);
    }
 
+   public boolean callsSuperMethod(String methName) {
+      return lhs.callsSuperMethod(methName) || getRhsExpr().callsSuperMethod(methName);
+   }
+
    public boolean callsThis() {
       return lhs.callsThis() || getRhsExpr().callsThis();
    }

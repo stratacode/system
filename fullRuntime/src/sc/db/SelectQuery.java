@@ -457,8 +457,12 @@ public class SelectQuery implements Cloneable {
          if (dbObj.isPrototype())
             return null;
 
-         dbObj.setTransient(true);
-         return null;
+         if (includesPrimary) {
+            dbObj.setTransient(true);
+            return null;
+         }
+         else
+            return dbObj;
       }
 
       boolean first = true;

@@ -1170,6 +1170,18 @@ public class ClassDeclaration extends TypeDeclaration {
    }
 
    private void addGuardAndSuperInitCall(MethodDefinition method, String name, String superName, int level, boolean extendsIsComponent) {
+      Object extendsMethod;
+
+      boolean extendsDefinesMethod = extendsIsComponent ||
+              (extendsMethod = extendsDefinesMethod(name, null, null, null,
+                                              false, false, null, null)) != null &&
+              (ModelUtil.hasModifier(extendsMethod, "public") || ModelUtil.hasModifier(extendsMethod, "protected"));
+
+      boolean methodCallsSuper = extendsDefinesMethod && method.callsSuperMethod(superName);
+
+      if (methodCallsSuper)
+         return;
+
       // if _initState > level return;  _initState = level;
       Expression ce = ConditionalExpression.create(IdentifierExpression.create("_initState"),">", IntegerLiteral.create(level-1));
 
@@ -1182,11 +1194,8 @@ public class ClassDeclaration extends TypeDeclaration {
 
       method.addStatementAt(spot++, ifStatement);
 
-      Object extendsMethod;
-
       // super.method() - either, there is a preInit method or we will generate one anyway cause it is a component too
-      if (extendsIsComponent || (extendsMethod = extendsDefinesMethod(name, null, null, null, false, false, null, null)) != null &&
-          (ModelUtil.hasModifier(extendsMethod, "public") || ModelUtil.hasModifier(extendsMethod, "protected"))) {
+      if (extendsDefinesMethod) {
          IdentifierExpression ie = IdentifierExpression.create("super", superName);
          ie.setProperty("arguments", new SemanticNodeList(0));
          ie.fromStatement = this;

@@ -688,6 +688,16 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return false;
    }
 
+   public boolean callsSuperMethod(String methName) {
+      BlockStatement bd = body;
+      if (bd == null || bd.statements == null)
+         return false;
+      for (Statement st:bd.statements)
+         if (st.callsSuperMethod(methName))
+            return true;
+      return false;
+   }
+
    public boolean callsThis() {
       BlockStatement bd = body;
       if (bd == null || bd.statements == null)

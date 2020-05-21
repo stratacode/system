@@ -5,9 +5,9 @@ import sc.obj.IObjectId;
 import java.util.Map;
 
 public interface IDBObject extends IObjectId {
-   void dbInsert();
+   void dbInsert(boolean queue);
 
-   void dbDelete();
+   void dbDelete(boolean queue);
 
    int dbUpdate();
 

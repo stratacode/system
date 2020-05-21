@@ -100,7 +100,7 @@ public class DBObject implements IDBObject {
       return wrapper == null ? this : wrapper;
    }
 
-   private PropUpdate getPendingUpdate(DBTransaction curr, String property, boolean createUpdateProp) {
+   private PropUpdate getPendingUpdate(DBTransaction curr, String property, boolean createUpdateProp, Object propertyValue) {
       DBPropertyDescriptor pdesc = dbTypeDesc.getPropertyDescriptor(property);
       if (pdesc == null)
          throw new IllegalArgumentException("Property update for: " + property + " without db property descriptor for type: " + dbTypeDesc);
@@ -111,10 +111,16 @@ public class DBObject implements IDBObject {
       if (pdesc.readOnly) {
          if (pdesc.reversePropDesc == null)
             throw new IllegalArgumentException("Attempt to update readOnly property that's not the reverse side of a relationship");
+         // We have an association that is transient - this is our only change to insert the value
+         else if (propertyValue instanceof IDBObject) {
+            IDBObject assocVal = (IDBObject) propertyValue;
+            if (assocVal.getDBObject().isTransient() && !isTransient())
+               assocVal.dbInsert(true);
+         }
          return null;
       }
 
-      TxOperation op = getPendingOperation(curr, createUpdateProp, false, false, false);
+      TxOperation op = getPendingOperation(curr, createUpdateProp, false, false, false, false);
       if (op instanceof TxUpdate) {
          TxUpdate objUpd = (TxUpdate) op;
          PropUpdate propUpd = objUpd.updateIndex.get(property);
@@ -173,7 +179,8 @@ public class DBObject implements IDBObject {
    }
 
    // get or create operations using one lock
-   private TxOperation getPendingOperation(DBTransaction curr, boolean createUpdateProp, boolean createInsert, boolean createDelete, boolean remove) {
+   private TxOperation getPendingOperation(DBTransaction curr, boolean createUpdateProp, boolean createInsert,
+                                           boolean createDelete, boolean remove, boolean queue) {
       synchronized (pendingOps) {
          // If we've updated the property in this transaction, find the updated value and return
          // a reference to that update so the updated value gets returned - only for that transaction.
@@ -181,9 +188,21 @@ public class DBObject implements IDBObject {
          for (int i = 0; i < txSz; i++) {
             TxOperation c = pendingOps.get(i);
             if (c.transaction == curr) {
+               boolean apply = false;
+               if (createInsert && c instanceof TxInsert) {
+                  remove = true;
+                  apply = true;
+               }
+               if (createDelete && c instanceof TxDelete) {
+                  remove = true;
+                  apply = true;
+               }
                if (remove) {
                   curr.removeOp(c);
                   pendingOps.remove(i);
+               }
+               if (apply) {
+                  c.apply();
                }
                return c;
             }
@@ -196,7 +215,7 @@ public class DBObject implements IDBObject {
          }
          if (createInsert) {
             TxInsert ins = new TxInsert(curr, this);
-            if (dbTypeDesc.queueInserts) {
+            if (queue) {
                curr.addOp(ins);
                pendingOps.add(ins);
             }
@@ -206,7 +225,7 @@ public class DBObject implements IDBObject {
          }
          if (createDelete) {
             TxDelete del = new TxDelete(curr, this);
-            if (dbTypeDesc.queueDeletes) {
+            if (queue) {
                curr.addOp(del);
                pendingOps.add(del);
             }
@@ -230,7 +249,7 @@ public class DBObject implements IDBObject {
 
       DBTransaction curTransaction = DBTransaction.getOrCreate();
 
-      PropUpdate pu = getPendingUpdate(curTransaction, property, false);
+      PropUpdate pu = getPendingUpdate(curTransaction, property, false, null);
       if (pu != null)
          return pu;
 
@@ -413,7 +432,7 @@ public class DBObject implements IDBObject {
       if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
          return null;
 
-      PropUpdate pu = getPendingUpdate(curr, propertyName, true);
+      PropUpdate pu = getPendingUpdate(curr, propertyName, true, propertyValue);
       if (pu == null)
          return null;
       pu.value = propertyValue;
@@ -427,21 +446,21 @@ public class DBObject implements IDBObject {
       return pu;
    }
 
-   public void dbInsert() {
+   public void dbInsert(boolean queue) {
       if (replacedBy != null) {
-         replacedBy.dbInsert();
+         replacedBy.dbInsert(queue);
          return;
       }
 
       synchronized (this) {
-         if ((flags & (REMOVED | STOPPED | PENDING_INSERT | PENDING_DELETE)) != 0)
+         if ((flags & (REMOVED | STOPPED | PENDING_DELETE)) != 0)
             throw new IllegalStateException("dbInsert on " + getStateString() + " instance: " + this);
          if ((flags & TRANSIENT) == 0) // TODO: Is this right?
             throw new IllegalArgumentException("Attempting to insert non-transient instance");
          flags |= PENDING_INSERT;
       }
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, false, true, false, false);
+      TxOperation op = getPendingOperation(curr, false, true, false, false, queue);
       // The createInsert flag should return a new TxInsert, unless there's another operation already associated
       // to this instance in this transaction which I think should flag an error.
       if (!(op instanceof TxInsert))
@@ -455,15 +474,15 @@ public class DBObject implements IDBObject {
 
    public int dbUpdate() {
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, false, false, false, true);
+      TxOperation op = getPendingOperation(curr, false, false, false, true, false);
       if (op != null)
          return op.apply();
       return 0;
    }
 
-   public void dbDelete() {
+   public void dbDelete(boolean queue) {
       if (replacedBy != null) {
-         replacedBy.dbDelete();
+         replacedBy.dbDelete(queue);
          return;
       }
       DBTransaction curr = DBTransaction.getOrCreate();
@@ -475,7 +494,7 @@ public class DBObject implements IDBObject {
             throw new IllegalStateException("Attempting to remove instance never added");
          flags |= PENDING_DELETE;
       }
-      TxOperation op = getPendingOperation(curr, false, false, true, false);
+      TxOperation op = getPendingOperation(curr, false, false, true, false, queue);
       if (!(op instanceof TxDelete))
          throw new UnsupportedOperationException();
 
@@ -548,7 +567,7 @@ public class DBObject implements IDBObject {
       if (val)
          flags = TRANSIENT;
       else
-         flags &= ~TRANSIENT;
+         flags &= ~(TRANSIENT | PENDING_INSERT);
    }
 
    public boolean isPrototype() {

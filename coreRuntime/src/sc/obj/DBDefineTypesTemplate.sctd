@@ -34,11 +34,11 @@
       // Stores persistent state for the instance
       protected transient sc.db.DBObject _dbObject;
 
-      public void dbInsert() {
-         _dbObject.dbInsert();
+      public void dbInsert(boolean queue) {
+         _dbObject.dbInsert(queue);
       }
-      public void dbDelete() {
-         _dbObject.dbDelete();
+      public void dbDelete(boolean queue) {
+         _dbObject.dbDelete(queue);
       }
       public int dbUpdate() {
          return _dbObject.dbUpdate();

@@ -213,7 +213,7 @@ public class TxUpdate extends VersionedOperation {
                      IDBObject refObj = ((IDBObject) value);
                      // If we are asked to update a property that refers to a transient value, insert it first.
                      if (refObj.getDBObject().isTransient() && !prop.readOnly)
-                        refObj.dbInsert();
+                        refObj.dbInsert(false);
                      value = refObj.getDBId();
                   }
                }
