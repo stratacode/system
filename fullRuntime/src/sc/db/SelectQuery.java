@@ -306,7 +306,7 @@ public class SelectQuery implements Cloneable {
 
             if (!multiRow) {
                // populate properties of dbObj from the tables in this query, or return null or return a sub-type of dbObj
-               IDBObject newInst = processOneRowQueryResults(dbObj, inst, rs, logSB);
+               IDBObject newInst = processOneRowQueryResults(transaction, dbObj, inst, rs, logSB);
                res = newInst != null;
                // NOTE: newInst here might not be inst but should be dbObj.wrapper - this happens when inst is a generic DBObject
                // prototype that we create in place of an abstract class that gets refined once we learn the type
@@ -395,7 +395,7 @@ public class SelectQuery implements Cloneable {
             transaction.applyingDBChanges = true;
 
             if (!multiRow) {
-               IDBObject resInst = processOneRowQueryResults(proto, inst, rs, logSB);
+               IDBObject resInst = processOneRowQueryResults(transaction, proto, inst, rs, logSB);
                if (resInst == null)
                   return null;
                res.add(resInst);
@@ -452,7 +452,7 @@ public class SelectQuery implements Cloneable {
       return res.size() == 0 ? null : res.get(0);
    }
 
-   IDBObject processOneRowQueryResults(DBObject dbObj, IDBObject inst, ResultSet rs, StringBuilder logSB) throws SQLException {
+   IDBObject processOneRowQueryResults(DBTransaction tx, DBObject dbObj, IDBObject inst, ResultSet rs, StringBuilder logSB) throws SQLException {
       if (!rs.next()) {
          if (dbObj.isPrototype())
             return null;
@@ -521,7 +521,9 @@ public class SelectQuery implements Cloneable {
                // A null single-valued reference - just skip it
                if (selectInst == null && val == null && refProp != null)
                   continue;
+               tx.updateSelectState = false;
                propDesc.updateReferenceForPropValue(selectInst, val);
+               tx.updateSelectState = true;
                propMapper.setPropertyValue(selectInst, val);
             }
             else {

@@ -419,18 +419,28 @@ public class DBObject implements IDBObject {
       if (selectQuery == null)
          throw new IllegalArgumentException("Missing propQueries entry for property: " + propertyName);
       int lockCt = selectQuery.queryNumber;
+      long fetchedBit = FETCHED << (lockCt * 2);
 
       // For the case where we are populating a newly selected instance, mark the property as selected and update the field
-      if (curr.applyingDBChanges || (flags & PROTOTYPE) != 0) {
-         synchronized (this) {
-            fstate |= FETCHED << (lockCt *2);
+      if (curr.applyingDBChanges) {
+         if ((fstate & fetchedBit) != 0)
+            return null;
+
+         // This is by default true but set to false when updating referenced values, since we might be setting the reverse
+         // property in an object but do not want to mark it's state as fetched - just the parent object's state.
+         if (curr.updateSelectState) {
+            synchronized (this) {
+               fstate |= fetchedBit;
+            }
          }
          return null;
       }
 
       // Setting a property that has not been selected from the DB - possibly being selected from a query
-      if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
+      if ((fstate & fetchedBit) == 0)
          return null;
+      //if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
+      //   return null;
 
       PropUpdate pu = getPendingUpdate(curr, propertyName, true, propertyValue);
       if (pu == null)

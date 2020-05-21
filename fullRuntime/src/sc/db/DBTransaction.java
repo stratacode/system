@@ -28,6 +28,7 @@ public class DBTransaction {
    public boolean commitInProgress = false;
 
    public boolean applyingDBChanges = false;
+   public boolean updateSelectState = true;
 
    public boolean autoCommit = true;
 

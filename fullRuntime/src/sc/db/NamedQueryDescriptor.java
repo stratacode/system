@@ -181,7 +181,9 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
 
                      Object propVal = resProp.getValueFromResultSetByName(rs, colName);
 
+                     transaction.updateSelectState = false;
                      resProp.updateReferenceForPropValue(rowInst, propVal);
+                     transaction.updateSelectState = true;
 
                      resProp.getPropertyMapper().setPropertyValue(rowInst, propVal);
 
