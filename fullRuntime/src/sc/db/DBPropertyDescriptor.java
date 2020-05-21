@@ -422,7 +422,7 @@ public class DBPropertyDescriptor {
          if (refDBObj.isPrototype()) {
             // Fill in the reverse property
             if (reversePropDesc != null) {
-               reversePropDesc.updateReverseValue(propVal, inst);
+               updateReverseValue(propVal, inst);
             }
             // Because we have stored a reference and there's an integrity constraint, we're going to assume the
             // reference refers to a persistent object.
