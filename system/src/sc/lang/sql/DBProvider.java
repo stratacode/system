@@ -498,6 +498,7 @@ public class DBProvider {
       while (ix < pathLen) {
          String propName = propNameArr[ix++];
          if (ix == 1) {
+            // First see if we already have the property in the list for this type
             for (Object prop:properties) {
                if (ModelUtil.getPropertyName(prop).equals(propName)) {
                   curProp = prop;
@@ -508,6 +509,9 @@ public class DBProvider {
                   break;
                }
             }
+            // Since the list only has properties in this type, not the base type, if we don't find it just do the regular search
+            if (curProp == null)
+               curProp = ModelUtil.definesMember(curType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
          }
          else {
             curProp = ModelUtil.definesMember(curType, propName, JavaSemanticNode.MemberType.PropertyAnySet, null, null, sys);
