@@ -34,32 +34,46 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
       //  primitive values -
       ArrayList<IDBObject> toRemove = new ArrayList<IDBObject>();
       ArrayList<IDBObject> toInsert = new ArrayList<IDBObject>();
+      DBPropertyDescriptor listProp = oldList.listProp;
       if (oldList != null) {
          for (int i = 0; i < oldList.size(); i++) {
             IDBObject oldElem = oldList.get(i);
-            if (newList == null || !newList.contains(oldElem))
-               toRemove.add(oldElem);
+            if (newList == null || !newList.contains(oldElem)) {
+               if (!oldElem.getDBObject().isTransient() || !listProp.readOnly)
+                  toRemove.add(oldElem);
+               // else for a bi-directional one-to-many the item has been inserted if it's not transient
+            }
          }
       }
       if (newList != null) {
          for (int i = 0; i < newList.size(); i++) {
             IDBObject newElem = newList.get(i);
-            if (oldList == null || !oldList.contains(newElem))
-               toInsert.add(newElem);
+            if (oldList == null || !oldList.contains(newElem)) {
+               if (newElem.getDBObject().isTransient() || !listProp.readOnly)
+                  toInsert.add(newElem);
+               // else - if we are adding to a multi-valued one-to-many list that's owned by another type
+               // we only do the insert if the element is transient. This way, we can do the batch inserts
+               // of only the new items
+            }
+
          }
       }
+      int resCt = 0;
       if (toRemove.size() > 0) {
          int ct = doMultiDelete(oldList.listProp.getTable(), toRemove, false);
          if (ct != toRemove.size())
             DBUtil.error("Failed to remove all of the rows in a list update");
+
+         resCt = ct;
       }
       if (toInsert.size() > 0) {
          int ct = doMultiInsert(oldList.listProp.getTable(), toInsert, false);
          if (ct != toInsert.size())
             DBUtil.error("Failed to insert all of the rows in a list update");
+         resCt += ct;
       }
       oldList.updateToList(newList);
-      return 0;
+      return resCt;
    }
 
    public Map<String,String> validate() {

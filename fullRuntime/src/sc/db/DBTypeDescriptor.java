@@ -1067,17 +1067,24 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    private void appendDBPropParamValue(SelectQuery curQuery, String parentProp, DBPropertyDescriptor dbProp, StringBuilder logSB, boolean compareVal, Object propValue) {
       if (logSB != null) {
          if (compareVal) {
-            DBUtil.appendVal(logSB, propValue, null, null);
-            logSB.append(" = ");
+            if (propValue == null) {
+               logSB.append(dbProp.columnName + " IS NULL");
+            }
+            else {
+               DBUtil.appendVal(logSB, propValue, null, null);
+               logSB.append(" = ");
+            }
          }
          if (dbProp.dynColumn)
             curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), DBTypeDescriptor.DBDynPropsColumnName, dbProp.propertyName);
-         else
+         else if (!compareVal || propValue != null)
             curQuery.appendLogWhereColumn(logSB, parentProp, dbProp);
       }
       if (compareVal) {
-         curQuery.paramValues.add(propValue);
-         curQuery.paramTypes.add(dbProp.getDBColumnType());
+         if (propValue != null) {
+            curQuery.paramValues.add(propValue);
+            curQuery.paramTypes.add(dbProp.getDBColumnType());
+         }
       }
    }
 
@@ -1622,10 +1629,16 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             }
          }
 
-         if (compareVal) {
-            curQuery.whereAppend("? = ");
+         Object propValue = curObj.getProperty(dbProp.propertyName);
+         if (compareVal && propValue == null && parentPropPath == null) {
+            curQuery.whereAppend(dbProp.columnName + " IS NULL");
          }
-         curQuery.appendWhereColumn(parentPropPath, dbProp);
+         else {
+            if (compareVal) {
+               curQuery.whereAppend("? = ");
+            }
+            curQuery.appendWhereColumn(parentPropPath, dbProp);
+         }
       }
       else {
          String[] propNames = StringUtil.split(propNamePath, '.');

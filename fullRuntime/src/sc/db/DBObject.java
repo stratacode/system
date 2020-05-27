@@ -120,7 +120,7 @@ public class DBObject implements IDBObject {
          return null;
       }
 
-      TxOperation op = getPendingOperation(curr, createUpdateProp, false, false, false, false);
+      TxOperation op = getPendingOperation(curr, property, createUpdateProp, false, false, false, false);
       if (op instanceof TxUpdate) {
          TxUpdate objUpd = (TxUpdate) op;
          PropUpdate propUpd = objUpd.updateIndex.get(property);
@@ -134,7 +134,8 @@ public class DBObject implements IDBObject {
          return propUpd;
       }
       else if (op instanceof TxListUpdate) {
-         return ((TxListUpdate) op).getPropUpdate();
+         TxListUpdate listUpdate = (TxListUpdate) op;
+         return listUpdate.getPropUpdate();
       }
       else if (op instanceof TxInsert)
          return null; // The insert will insert the instance when the transaction is committed, so don't override the property value
@@ -153,19 +154,28 @@ public class DBObject implements IDBObject {
          return null;
       synchronized (pendingOps) {
          int txSz = pendingOps.size();
+         TxUpdate upd = null;
          for (int i = 0; i < txSz; i++) {
             TxOperation c = pendingOps.get(i);
-            if (c.transaction == cur && c instanceof TxListUpdate) {
-               TxListUpdate<E> listUpdate = (TxListUpdate<E>) c;
-               if (listUpdate.oldList.listProp == list.listProp)
+            if (c.transaction == cur && c instanceof TxUpdate) {
+               upd = (TxUpdate) c;
+
+               TxListUpdate<E> listUpdate = upd.listUpdateIndex.get(list.listProp.propertyName);
+               if (listUpdate != null)
                   return listUpdate;
             }
          }
 
          if (create) {
+            if (upd == null) {
+               upd = new TxUpdate(cur, this);
+               pendingOps.add(upd);
+               cur.addOp(upd);
+            }
             TxListUpdate<E> listUpdate = new TxListUpdate<E>(cur, this, list, emptyList);
-            cur.addOp(listUpdate);
-            pendingOps.add(listUpdate);
+            upd.listUpdateIndex.put(list.listProp.propertyName, listUpdate);
+            upd.listUpdates.add(listUpdate);
+
             return listUpdate;
          }
       }
@@ -179,7 +189,7 @@ public class DBObject implements IDBObject {
    }
 
    // get or create operations using one lock
-   private TxOperation getPendingOperation(DBTransaction curr, boolean createUpdateProp, boolean createInsert,
+   private TxOperation getPendingOperation(DBTransaction curr, String property, boolean createUpdateProp, boolean createInsert,
                                            boolean createDelete, boolean remove, boolean queue) {
       synchronized (pendingOps) {
          // If we've updated the property in this transaction, find the updated value and return
@@ -196,6 +206,15 @@ public class DBObject implements IDBObject {
                if (createDelete && c instanceof TxDelete) {
                   remove = true;
                   apply = true;
+               }
+               if (createUpdateProp) { // TODO: Remove this if statement
+                  if (c instanceof TxListUpdate) {
+                     TxListUpdate listUpdate = (TxListUpdate) c;
+                     if (!listUpdate.oldList.listProp.propertyName.equals(property)) {
+                        System.err.println("*** Remove this whole thing!");
+                        continue;
+                     }
+                  }
                }
                if (remove) {
                   curr.removeOp(c);
@@ -470,7 +489,7 @@ public class DBObject implements IDBObject {
          flags |= PENDING_INSERT;
       }
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, false, true, false, false, queue);
+      TxOperation op = getPendingOperation(curr, null, false, true, false, false, queue);
       // The createInsert flag should return a new TxInsert, unless there's another operation already associated
       // to this instance in this transaction which I think should flag an error.
       if (!(op instanceof TxInsert))
@@ -484,7 +503,7 @@ public class DBObject implements IDBObject {
 
    public int dbUpdate() {
       DBTransaction curr = DBTransaction.getOrCreate();
-      TxOperation op = getPendingOperation(curr, false, false, false, true, false);
+      TxOperation op = getPendingOperation(curr, null, false, false, false, true, false);
       if (op != null)
          return op.apply();
       return 0;
@@ -504,7 +523,7 @@ public class DBObject implements IDBObject {
             throw new IllegalStateException("Attempting to remove instance never added");
          flags |= PENDING_DELETE;
       }
-      TxOperation op = getPendingOperation(curr, false, false, true, false, queue);
+      TxOperation op = getPendingOperation(curr, null, false, false, true, false, queue);
       if (!(op instanceof TxDelete))
          throw new UnsupportedOperationException();
 

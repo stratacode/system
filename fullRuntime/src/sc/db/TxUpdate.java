@@ -10,6 +10,8 @@ import java.util.*;
 public class TxUpdate extends VersionedOperation {
    public ArrayList<PropUpdate> updateList = new ArrayList<PropUpdate>();
    public TreeMap<String, PropUpdate> updateIndex = new TreeMap<String, PropUpdate>();
+   public ArrayList<TxListUpdate> listUpdates = new ArrayList<TxListUpdate>();
+   public TreeMap<String, TxListUpdate> listUpdateIndex = new TreeMap<String, TxListUpdate>();
 
    public TxUpdate(DBTransaction tx, DBObject inst) {
       super(tx, inst);
@@ -29,7 +31,9 @@ public class TxUpdate extends VersionedOperation {
             ct += doUpdate(auxTable);
       }
 
-      // TODO: - apply changes to multi tables here
+      for (TxListUpdate listUpd:listUpdates) {
+         ct += listUpd.apply();
+      }
 
       if (ct == 0)
          System.err.println("*** Warning no properties changed in TxUpdate apply!");

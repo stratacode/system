@@ -895,7 +895,7 @@ public class SelectQuery implements Cloneable {
                   if (rci == 0 && fi == 0) {
                      currentRowVal = (IDBObject) val;
                      if (resList == null) {
-                        resList = new DBList(10, dbObj, propDesc);
+                        resList = new DBList(10, dbObj, revProp == null ? propDesc : revProp);
                         listProp = revProp; // For reverse properties, it's always the reverse prop - waiting for the first element to set the list
                      }
                      resList.add(currentRowVal);
