@@ -6392,11 +6392,17 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String origLayerPathName = layerPathName;
       Layer layer = findLayerInPath(layerPathName, relDir, null, markDynamic, lpi);
       int ix;
+      /* TODO: remove this? not sure what it was doing but it can cause weird errors if a layer is not found and some
+       * component part of the path matches - e.g. if we are trying to resolve content.html.core it will find html.core
+       * and complain that the layer name does not match
       while (layer == null && (ix = layerPathName.indexOf(".")) != -1) {
          prefix = CTypeUtil.prefixPath(prefix, layerPathName.substring(0, ix));
          layerPathName = layerPathName.substring(ix+1);
          layer = findLayerInPath(layerPathName, relDir, prefix, markDynamic, lpi);
+         if (layer != null)
+            System.out.println("*** Weird case of returning prefixed layer: " + layerPathName + " relDir: " + relDir);
       }
+      */
 
       if (layer == null && relPath != null) {
          // relPath NOT propagated here
