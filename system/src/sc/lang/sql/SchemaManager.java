@@ -133,6 +133,8 @@ public class SchemaManager {
       if (!needsInitFromDB)
          return;
       ISchemaUpdater schemaUpdater = provider.getSchemaUpdater();
+      int numOutOfSync = 0;
+      int numChanged = 0;
       if (schemaUpdater != null) {
          if (dataSourceName != null) {
             dbSchemaTypes = schemaUpdater.getDBSchemas(dataSourceName);
@@ -171,6 +173,7 @@ public class SchemaManager {
                   if (missingTableInfo != null) {
                      DBUtil.error("Current db_schema_type table for: " + typeName + " - out of sync. It has this info: " + missingTableInfo + " missing in current DB");
                      schemaUpdater.removeDBSchemaForType(dataSourceName, typeName);
+                     numOutOfSync++;
                      continue;
                   }
 
@@ -198,6 +201,7 @@ public class SchemaManager {
                         SchemaTypeChange change = new SchemaTypeChange(typeName, dbModel, newSchema);
                         updateAlterModel(change);
                         changedTypes.add(change);
+                        numChanged++;
                      }
                   }
                }
@@ -229,6 +233,13 @@ public class SchemaManager {
             }
 
             schemaChanged = newModels.size() > 0 || changedTypes.size() > 0;
+
+            if (!schemaChanged) {
+               DBUtil.info("Schema manager - init from DB found all tables/columns in schema");
+            }
+            else {
+               DBUtil.info("Schema manager - init from DB found:  " + numChanged + " types changed and " + numOutOfSync + " out of sync ");
+            }
          }
 
          // There's no db_schema_type metadata, but there is metadata provided by the DB. We'll check it against the
@@ -652,9 +663,7 @@ public class SchemaManager {
       if (changed) {
          if (generateAlterSchema(buildLayer)) {
             if (system.options.startInterpreter && schemaMode == SchemaMode.Prompt) {
-               if (noCurrentSchema)
-                  DBUtil.info("No current deployed schema for this app - setting defaultSchemaReady=false");
-               else
+               if (!noCurrentSchema)
                   DBUtil.info("Schema changes found - setting defaultSchemaReady=false");
                DataSourceManager.defaultSchemaReady = false;
             }
