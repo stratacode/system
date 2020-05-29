@@ -238,14 +238,170 @@ public abstract class TxOperation {
       return 1;
    }
 
-   protected int doMultiDelete(TableDescriptor delTable, List<IDBObject> toRemove, boolean removeCurrent) {
-      if (delTable.isReadOnly())
+   protected int doMultiDelete(TableDescriptor deleteTable, List<IDBObject> toRemove, boolean removeCurrent) {
+      if (deleteTable.isReadOnly())
          return 0;
-      // TODO: any differences we need to add here?
-      return doDelete(delTable);
+      if (deleteTable.isReadOnly())
+         return 0;
+
+      DBPropertyDescriptor revProp = deleteTable.reverseProperty;
+
+      IDBObject parentInst = dbObject.getInst();
+
+      DBPropertyDescriptor multiValueProp = revProp == null ? deleteTable.columns.get(0) : revProp;
+      IBeanMapper multiValueMapper = multiValueProp.getPropertyMapper();
+      if (removeCurrent)
+         toRemove = (List<IDBObject>) multiValueMapper.getPropertyValue(parentInst, false, false);
+
+      int numToRemove = toRemove.size();
+      if (numToRemove == 0)
+         return 0;
+
+      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
+      boolean isPrimary = deleteTable.primary;
+      DBPropertyDescriptor versProp = isPrimary && this instanceof VersionedOperation ? dbTypeDesc.versionProperty : null;
+      long version = -1;
+      if (versProp != null)
+         version = ((VersionedOperation) this).version;
+
+      List<IdPropertyDescriptor> idCols = deleteTable.getIdColumns();
+
+      ArrayList<String> columnNames = new ArrayList<String>();
+      ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
+      ArrayList<Object> columnValues = new ArrayList<Object>();
+
+      List<String> nullProps = null;
+      for (int i = 0; i < idCols.size(); i++) {
+         IdPropertyDescriptor idCol = idCols.get(i);
+         IBeanMapper mapper = idCol.getPropertyMapper();
+         Object val = mapper.getPropertyValue(parentInst, false, false);
+         if (val == null) {
+            if (nullProps == null)
+               nullProps = new ArrayList<String>();
+            nullProps.add(idCol.propertyName);
+         }
+         columnValues.add(val);
+         columnNames.add(idCol.columnName);
+         columnTypes.add(idCol.getDBColumnType());
+      }
+
+      if (nullProps != null)
+         throw new IllegalArgumentException("Null id properties for DBObject in delete: " + nullProps);
+
+      int numCols = columnNames.size();
+
+      StringBuilder sb = new StringBuilder();
+      sb.append("DELETE FROM ");
+      DBUtil.appendIdent(sb, null, deleteTable.tableName);
+      sb.append(" WHERE ");
+
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(sb) : null;
+
+      for (int i = 0; i < numCols; i++) {
+         if (i != 0) {
+            DBUtil.append(sb, logSB, " AND ");
+         }
+         DBUtil.appendIdent(sb, logSB, columnNames.get(i));
+         sb.append(" = ?");
+         if (logSB != null) {
+            logSB.append(" = ");
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), dbTypeDesc));
+         }
+      }
+
+      DBPropertyDescriptor refIdProp = deleteTable.columns.get(0);
+      DBUtil.append(sb, logSB, " AND ");
+      DBUtil.appendIdent(sb, logSB, refIdProp.columnName);
+      DBUtil.append(sb, logSB, " IN (");
+      DBColumnType multiValueColumnType = refIdProp.getDBColumnType();
+      if (multiValueColumnType == DBColumnType.Reference)
+         multiValueColumnType = refIdProp.refDBTypeDesc.getIdDBColumnType(0);
+      for (int i = 0; i < numToRemove; i++) {
+         if (i != 0) {
+            DBUtil.append(sb, logSB, ", ");
+         }
+         sb.append("?");
+
+         columnTypes.add(multiValueColumnType);
+         IDBObject toRem = toRemove.get(i);
+         columnValues.add(toRem.getDBId());
+
+         if (logSB != null) {
+            DBUtil.appendVal(logSB, toRem, multiValueColumnType, multiValueProp.refDBTypeDesc);
+         }
+      }
+      sb.append(")");
+      if (logSB != null)
+         logSB.append(")");
+
+      numCols += numToRemove;
+
+      if (versProp != null) {
+         DBUtil.append(sb, logSB, " AND ");
+         DBUtil.appendIdent(sb, logSB, versProp.columnName);
+         sb.append(" = ?");
+         if (logSB != null) {
+            logSB.append(" = ");
+            logSB.append(DBUtil.formatValue(version, versProp.getDBColumnType(), null));
+         }
+      }
+
+      try {
+         if (!dbTypeDesc.dbReadOnly) {
+            Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
+            String statementStr = sb.toString();
+            PreparedStatement st = conn.prepareStatement(statementStr);
+
+            for (int i = 0; i < numCols; i++) {
+               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
+            }
+            if (versProp != null)
+               DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
+
+            int numDeleted = st.executeUpdate();
+
+            if (deleteTable.primary) {
+               if (numDeleted != numToRemove) {
+                  if (numDeleted == 0) {
+                     if (versProp == null)
+                        DBUtil.error("Delete from multi valued table failed to remove row for: " + dbObject);
+                     else
+                        DBUtil.info("Delete - StaleDataException for versioned object: " + dbObject);
+                     throw new StaleDataException(dbObject, version);
+                  }
+               }
+            }
+
+            if (logSB != null) {
+               if (numDeleted == numToRemove)
+                  logSB.append(" -> removed " + numToRemove + " rows");
+               if (versProp != null)
+                  logSB.append(" - version: " + version);
+            }
+         }
+         else {
+            if (logSB != null) {
+               logSB.append(" (dbDisabled)");
+            }
+         }
+
+         if (logSB != null)
+            DBUtil.info(logSB);
+
+         if (deleteTable.primary) {
+            dbTypeDesc.removeInstance(dbObject, true);
+         }
+      }
+      catch (SQLException exc) {
+         throw new IllegalArgumentException("*** Delete: " + dbObject + " failed with DB error: " + exc);
+      }
+      return 1;
    }
 
-   /** Called with null to insert the current property value, or a list of values to insert */
+   /**
+    * Called with the useCurrent flag set to true to insert parentInst's current multi-valued property value, or for
+    * incremental updates, the propList parameter specifies the list of values to insert
+    */
    protected int doMultiInsert(TableDescriptor insertTable, List<IDBObject> propList, boolean useCurrent) {
       if (insertTable.isReadOnly())
          return 0;
