@@ -1,8 +1,8 @@
 package sc.db;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 /**
  This acts like a java.util.ArrayList but is usable with data binding and persistence
@@ -268,5 +268,35 @@ public class DBList<E extends IDBObject> extends java.util.ArrayList<E> implemen
       }
       return super.toArray();
    }
-   // TODO: add subList, iterator, sort, and more - at least the methods that make sense on a modified list
+
+   public Iterator<E> iterator() {
+      TxListUpdate<E> listUpdate = dbObject == null ? null : dbObject.getListUpdate(this, false, false);
+      if (listUpdate != null)
+         return listUpdate.newList.iterator();
+      return super.iterator();
+   }
+
+   public List<E> subList(int from, int to) {
+      TxListUpdate<E> listUpdate = dbObject == null ? null : dbObject.getListUpdate(this, false, false);
+      if (listUpdate != null)
+         return listUpdate.newList.subList(from, to);
+      return super.subList(from, to);
+   }
+
+   public void forEach(Consumer<? super E> action) {
+      TxListUpdate<E> listUpdate = dbObject == null ? null : dbObject.getListUpdate(this, false, false);
+      if (listUpdate != null)
+         listUpdate.newList.forEach(action);
+      else
+         super.forEach(action);
+   }
+
+   public void sort(Comparator<? super E> c) {
+      throw new UnsupportedOperationException("sort not supported yet on DBList");
+   }
+
+   public void replaceAll(UnaryOperator<E> operator) {
+      throw new UnsupportedOperationException("replaceAll not supported yet on DBList");
+   }
+
 }
