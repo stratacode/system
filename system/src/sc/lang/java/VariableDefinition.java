@@ -207,7 +207,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          if (dbProvider != null && dbProvider.getNeedsGetSet()) {
             convertGetSet = true;
             // Need to be able to listen to events on the property to keep the reverse side in sync
-            if (prop.reversePropDesc != null)
+            if (prop.reverseProperty != null || prop.reversePropDesc != null)
                bindable = true;
          }
          if (dbPropDesc == null)
