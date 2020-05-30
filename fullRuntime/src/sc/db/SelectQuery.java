@@ -826,7 +826,7 @@ public class SelectQuery implements Cloneable {
                   Object val;
                   int numCols = propDesc.getNumColumns();
 
-                  // If this is the first selectTable and the first column in the revProps list is the id of the reverse property instance
+                     // If this is the first selectTable and the first column in the revProps list is the id of the reverse property instance
                   DBPropertyDescriptor readProp = rci == 0 && fi == 0 ? revProp : propDesc;
                   DBTypeDescriptor refTypeDesc = readProp.refDBTypeDesc;
                   if (numCols == 1)  {
@@ -835,7 +835,7 @@ public class SelectQuery implements Cloneable {
                      if (refTypeDesc != null) {
                         int typeId = -1;
                         DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
-                        if (readProp.getNeedsRefId()) {
+                        if (readProp.getNeedsRefId() && val != null) {
                            readProp.setRefIdProperty(currentRowVal, val);
                         }
                         if (refTypeIdProp != null && (rci == 0 || readProp.eagerJoinForTypeId(selectTable)))

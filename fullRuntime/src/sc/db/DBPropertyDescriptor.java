@@ -98,6 +98,7 @@ public class DBPropertyDescriptor {
     */
    public DBPropertyDescriptor reversePropDesc;
 
+   private boolean inited = false;
    private boolean started = false;
 
    private boolean validatorInited = false;
@@ -126,11 +127,14 @@ public class DBPropertyDescriptor {
    }
 
    void init(DBTypeDescriptor typeDesc, TableDescriptor tableDesc) {
+      if (inited)
+         return;
       if (ownerTypeName != null && typeDesc != null)
          this.dbTypeDesc = typeDesc.findSubType(ownerTypeName);
       else
          this.dbTypeDesc = typeDesc;
       this.tableDesc = tableDesc;
+      inited = true;
       started = false;
    }
 
@@ -183,10 +187,15 @@ public class DBPropertyDescriptor {
    }
 
    public void start() {
+      if (!inited)
+         System.out.println("*** Property not initialized!");
       if (started)
          return;
 
       started = true;
+
+      if (dbTypeDesc != null && dbTypeDesc.runtimeMode && propertyName != null && propertyName.equals(DBTypeDescriptor.DBTypeIdPropertyName))
+         typeIdProperty = true;
 
       if (refDBTypeDesc != null)
          refDBTypeDesc.start();
@@ -338,7 +347,23 @@ public class DBPropertyDescriptor {
                         continue;
                      selectCols.add(mainProp);
                   }
-                  tableDesc.columns = selectCols;
+                  /*
+                  if (dbTypeDesc.runtimeMode && tableDesc.columns != null) {
+                     // In runtime model, the tables have already been set up with the right columns but we do need to initialize them here
+                     if (false && selectCols.size() == tableDesc.columns.size()) {
+                        for (DBPropertyDescriptor selectCol:tableDesc.columns)
+                           selectCol.init(selectCol.dbTypeDesc, tableDesc);
+                     }
+                     else {
+                        tableDesc.columns = selectCols;
+                     }
+                  }
+                  else {
+                  */
+                     tableDesc.columns = selectCols;
+                     for (DBPropertyDescriptor selectCol:selectCols)
+                        selectCol.init(selectCol.dbTypeDesc, tableDesc);
+                  //}
                }
             }
          }

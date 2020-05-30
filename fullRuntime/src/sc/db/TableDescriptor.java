@@ -30,6 +30,8 @@ public class TableDescriptor {
 
    public boolean hasDynColumns = false;
 
+   private boolean inited = false;
+
    /**
     * Set for the 'many' side of a 1-many case where the id column here is used for the 'value' of the reverse property, so
     * there is no reverse property descriptor in the columns list. We still need to look up this property descriptor from
@@ -65,6 +67,9 @@ public class TableDescriptor {
    }
 
    void init(DBTypeDescriptor dbTypeDesc) {
+      if (inited)
+         return;
+      this.inited = true;
       this.dbTypeDesc = dbTypeDesc;
       if (this == dbTypeDesc.primaryTable)
          insertWithNullValues = true;
@@ -195,6 +200,7 @@ public class TableDescriptor {
    }
 
    public void addTypeIdProperty(DBPropertyDescriptor typeIdProperty) {
+      typeIdProperty.init(dbTypeDesc, this);
       columns.add(0, typeIdProperty);
    }
 }

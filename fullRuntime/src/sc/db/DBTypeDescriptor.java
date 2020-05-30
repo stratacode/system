@@ -797,6 +797,23 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (baseType != null)
          baseType.init();
 
+      // There might be reverse properties in these tables that need to be started here
+      if (auxTables != null) {
+         for (TableDescriptor auxTable:auxTables) {
+            DBTypeDescriptor propType = auxTable.reverseProperty == null ? this : auxTable.reverseProperty.dbTypeDesc;
+            for (DBPropertyDescriptor prop:auxTable.columns) {
+               prop.init(prop.dbTypeDesc == null ? propType : prop.dbTypeDesc, auxTable);
+            }
+         }
+      }
+      if (multiTables != null) {
+         for (TableDescriptor multiTable:multiTables) {
+            DBTypeDescriptor propType = multiTable.reverseProperty == null ? this : multiTable.reverseProperty.dbTypeDesc;
+            for (DBPropertyDescriptor prop:multiTable.columns)
+               prop.init(prop.dbTypeDesc == null ? propType : prop.dbTypeDesc, multiTable);
+         }
+      }
+
       if (queries != null) {
          for (BaseQueryDescriptor fbDesc: queries)
             if (!fbDesc.typesInited())
@@ -815,12 +832,36 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       /* Resolve the property descriptor's owner type and reference types, reverse properties now that all types have been initialized */
       for (DBPropertyDescriptor prop:allDBProps) {
-         if (runtimeMode && prop.ownerTypeName != null && !prop.ownerTypeName.equals(getTypeName())) {
-            prop.dbTypeDesc = (DBTypeDescriptor) DBTypeDescriptor.getByName(prop.ownerTypeName, false);
-         }
-         else
-            prop.dbTypeDesc = this;
+         prop.dbTypeDesc = resolvePropTypeDesc(prop);
          prop.resolve();
+      }
+      // There might be reverse properties in these tables that need to be started here
+      if (auxTables != null) {
+         for (TableDescriptor auxTable:auxTables) {
+            for (DBPropertyDescriptor prop:auxTable.columns) {
+               prop.dbTypeDesc = resolvePropTypeDesc(prop);
+               prop.resolve();
+            }
+         }
+      }
+      if (multiTables != null) {
+         for (TableDescriptor multiTable:multiTables) {
+            for (DBPropertyDescriptor prop:multiTable.columns) {
+               prop.dbTypeDesc = resolvePropTypeDesc(prop);
+               prop.resolve();
+            }
+         }
+      }
+   }
+
+   private DBTypeDescriptor resolvePropTypeDesc(DBPropertyDescriptor prop) {
+      if (runtimeMode && prop.ownerTypeName != null && !prop.ownerTypeName.equals(getTypeName())) {
+         return DBTypeDescriptor.getByName(prop.ownerTypeName, false);
+      }
+      else {
+         if (prop.dbTypeDesc != null)
+            return prop.dbTypeDesc;
+         return this;
       }
    }
 
@@ -837,7 +878,6 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          for (TableDescriptor multiTable:multiTables) {
             DBPropertyDescriptor revProp = multiTable.reverseProperty;
             if (multiTable.reverseProperty != null) {
-
                for (DBPropertyDescriptor revPropCol:multiTable.columns) {
                   if (revPropCol.dbTypeDesc == null)
                      revPropCol.dbTypeDesc = revProp.refDBTypeDesc;
@@ -862,6 +902,20 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       for (DBPropertyDescriptor prop:allDBProps) {
          prop.start();
+      }
+      // There might be reverse properties in these tables that need to be started here
+      if (auxTables != null) {
+         for (TableDescriptor auxTable:auxTables) {
+            for (DBPropertyDescriptor prop:auxTable.columns) {
+               prop.start();
+            }
+         }
+      }
+      if (multiTables != null) {
+         for (TableDescriptor multiTable:multiTables) {
+            for (DBPropertyDescriptor prop:multiTable.columns)
+               prop.start();
+         }
       }
       initFetchGroups();
    }

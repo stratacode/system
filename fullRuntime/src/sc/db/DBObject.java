@@ -393,8 +393,9 @@ public class DBObject implements IDBObject {
                throw exc;
          }
          synchronized(this) {
-            if (selected)
+            if (selected) {
                fstate = (fstate & ~(PENDING << shift)) | (FETCHED << shift);
+            }
             notify();
          }
       }

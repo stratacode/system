@@ -1,5 +1,6 @@
 package sc.db;
 
+import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 import sc.util.JSON;
 
@@ -84,6 +85,8 @@ public abstract class TxOperation {
             columnValues.add(val);
             columnNames.add(idCol.columnName);
             columnTypes.add(idCol.getDBColumnType());
+            if (columnRefTypes != null)
+               columnRefTypes.add(null);
             //columnTypes.add(idCol.getPropertyMapper().getPropertyType());
          }
       }
@@ -104,6 +107,9 @@ public abstract class TxOperation {
          columnNames.add(lmtProp.columnName);
          columnTypes.add(lmtProp.getDBColumnType());
          columnValues.add(lmtValue = new Date());
+         if (columnRefTypes != null)
+            columnRefTypes.add(null);
+         numCols++;
       }
 
       StringBuilder sb = new StringBuilder();

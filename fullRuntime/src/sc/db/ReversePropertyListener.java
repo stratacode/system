@@ -182,7 +182,22 @@ class ReversePropertyListener extends AbstractListener {
                if (oListener != null)
                   oListener.lastValue = newList;
 
-               omapper.setPropertyValue(newVal, newList);
+               // Because we do not have the complete value for this list just because one reverse property was set
+               // do not update the pending status for this property.
+               DBTransaction curTx = DBTransaction.getCurrent();
+               boolean oldSelectedState = false;
+               if (curTx != null) {
+                  oldSelectedState = curTx.updateSelectState;
+                  curTx.updateSelectState = false;
+               }
+
+               try {
+                  omapper.setPropertyValue(newVal, newList);
+               }
+               finally {
+                  if (curTx !=null)
+                     curTx.updateSelectState = oldSelectedState;
+               }
             }
          }
          else {
