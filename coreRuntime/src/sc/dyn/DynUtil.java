@@ -14,6 +14,12 @@ import sc.type.*;
 import sc.util.IdentityWrapper;
 
 import java.lang.reflect.Modifier;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 /**
@@ -22,7 +28,7 @@ import java.util.*;
  * that is used for managing operations on dynamic objects.  When that is null, only the compile time features are
  * available.   Compiled classes can link against this class and then run either with or without the interpreter.
  */
-@sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_", dependentJSFiles = "js/jvsys.js")
+@sc.js.JSSettings(jsLibFiles="js/scdyn.js", prefixAlias="sc_", usesJSFiles = "js/jvsys.js")
 public class DynUtil {
 
    private DynUtil() {
@@ -1888,5 +1894,27 @@ public class DynUtil {
          dynamicSystem.addSystemExitListener(sys);
       else // TODO: add a hook for this so it can be implemented for each runtime
          throw new UnsupportedOperationException();
+   }
+
+   /** Parse dates in 8601 format (there's a Javascript version of this method for client/server code) */
+   public static Date parseDate(String dateStr) {
+      return Date.from(Instant.parse(dateStr));
+   }
+
+   /** Format dates in 8601 format (there's a JS version of this method too) */
+   public static String formatDate(Date date) {
+      return date.toInstant().atZone(ZoneOffset.UTC).format(DateTimeFormatter.ISO_INSTANT);
+      /*
+      TimeZone tz = TimeZone.getTimeZone("UTC");
+      DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm'Z'"); // Quoted "Z" to indicate UTC, no timezone offset
+      df.setTimeZone(tz);
+      return df.format(date);
+      */
+   }
+
+   public static boolean isImmutableObject(Object obj) {
+      if (obj instanceof String || obj instanceof Number || obj instanceof Boolean)
+         return true;
+      return false;
    }
 }

@@ -21,11 +21,12 @@ import java.util.*;
  * Updates are stored in a transaction-specific way so that pending changes are only visible to the current thread.
  * Each object stores a set of pendingOps - TxUpdate, Insert, or Delete for this instance in different transactions.
  * The getX method looks in the list of pendingOps and returns a pending update before the cached value.
- * During the 'commit', the object instance itself is locked and all values from the commmited transaction are applied
+ * During the 'commit', the object instance itself is locked and all values from the committed transaction are applied
  * to the cached value. It's possible to use getX methods without synchronizing on the instance, but to ensure
  * a transactionally consistent view of an instance, sync on the instance while calling getX/setX or store make sure it's
  * stored a synchronized scope.
  */
+@sc.js.JSSettings(prefixAlias="sc_", jsLibFiles="js/db.js")
 public class DBObject implements IDBObject {
    final static int MAX_FETCH_ERROR_COUNT = 3;
 

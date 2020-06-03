@@ -68,10 +68,10 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
 
    private void updateMethObj(Object newMethObj, boolean doRemove) {
       if (direction.doForward()) {
-         if (doRemove && methObj != null && methObj != dstObj)
+         if (doRemove && methObj != null && methObj != dstObj && !DynUtil.isImmutableObject(methObj))
             Bind.removeListener(methObj, null, this, VALUE_CHANGED_MASK);
          super.setMethObj(newMethObj);
-         if (newMethObj != null && newMethObj != dstObj)
+         if (newMethObj != null && newMethObj != dstObj && !DynUtil.isImmutableObject(newMethObj))
             Bind.addListener(newMethObj, null, this, VALUE_CHANGED_MASK);
       }
    }
@@ -250,7 +250,7 @@ public class MethodBinding extends AbstractMethodBinding implements IResponseLis
    public void removeListener() {
       super.removeListener();
       if (direction.doForward()) {
-         if (methObj != null && methObj != dstObj) {
+         if (methObj != null && methObj != dstObj && !DynUtil.isImmutableObject(methObj)) {
             Bind.removeListener(methObj, null, this, VALUE_CHANGED_MASK);
             methObj = null;
          }

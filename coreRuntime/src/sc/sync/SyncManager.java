@@ -1520,6 +1520,19 @@ public class SyncManager {
          }
          else
             throw new UnsupportedOperationException();
+
+         if (childSyncInsts != null) {
+            Set<InstInfo> childInstInfos = childSyncInsts.get(inst);
+            if (childInstInfos != null) {
+               for (InstInfo childInstInfo:childInstInfos) {
+                  if (childInstInfo.syncContext == this)
+                     System.err.println("*** Invalid childInstInfo in startSync!");
+                  else {
+                     childInstInfo.syncContext.startSync(inst, propName);
+                  }
+               }
+            }
+         }
       }
 
       /** Performs an update of the sync property specified.  It will initialize the property if necessary and force an update, even if the value has not changed, if forceUpdate is true. */
@@ -1586,6 +1599,13 @@ public class SyncManager {
             if ((flags & SyncPropOptions.SYNC_RECEIVE_ONLY) != 0)
                return false;
 
+            boolean isStatic = (flags & SyncPropOptions.SYNC_STATIC) != 0;
+            if (isStatic) {
+               // TODO: do we need to support these? If so, we should do some type of initProperty for the static properties in addType
+               System.err.println("*** Not listening for changes on static synchronized property: " + propName);
+               return false;
+            }
+
             // Inherited instances will get the changes propagated from the shared sync context so don't listen themselves
             if (!inherited && !isConst)
                Bind.addListener(inst, propName, syncListener, IListener.VALUE_CHANGED_MASK);
@@ -1593,7 +1613,7 @@ public class SyncManager {
             Object curVal = DynUtil.getPropertyValue(inst, propName);
 
             if (initial)
-               addInitialValue(inst, ii,  propName, curVal);
+               addInitialValue(inst, ii, propName, curVal);
 
             // On refresh, the initial sync layer will already have the change in the right order - if we re-add it, we mess up the order
             if (addPropChanges && (flags & SyncPropOptions.SYNC_INIT) != 0 && curVal != null) {
@@ -2494,7 +2514,7 @@ public class SyncManager {
                   return sp;
             }
          }
-         throw new IllegalArgumentException("No sync properties registered for destination: " + destName + " for type: " + DynUtil.getTypeName(type, false));
+         return null;
       }
       return syncMgr.getSyncProperties(type);
    }
@@ -2604,7 +2624,7 @@ public class SyncManager {
       // but there's the issue of how to support sharing and synchronization. Using a separate instance to hold the
       // static properties lets you put that object into different scopes etc. Maybe there's a use case in server-to-server synchronization?
       if (syncProps.staticProps != null && old == null) {
-         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + syncProps);
+         System.err.println("*** Static synchronized properties not implemented: " + DynUtil.getTypeName(type, false) + ": " + Arrays.asList(syncProps.staticProps));
       }
    }
 
@@ -3202,9 +3222,10 @@ public class SyncManager {
    }
 
    public static void startSync(Object inst, String prop) {
-      SyncContext syncCtx = getSyncContextForInst(inst);
+      SyncContext syncCtx = getRootSyncContextForInst(inst);
       if (syncCtx != null) {
          syncCtx.startSync(inst, prop);
+
       }
       else if (verbose) // Not treating this as an error because we might use the same code with and without synchronization so this is only a debug message.
          System.out.println("No sync inst: " + DynUtil.getInstanceName(inst) + " registered for startSync of: " + prop);

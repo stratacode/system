@@ -11,6 +11,7 @@ import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
 import sc.type.Type;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
@@ -162,10 +163,18 @@ public class SyncHandler {
                ser.formatNumber(out, (Number) changedObj);
                break;
             case Object:
-               String val = syncContext.getObjectName(changedObj, varName, false, false, null, syncLayer);
-               if (val == null)
-                  val = syncContext.createOnDemandInst(changedObj, depChanges, varName, syncLayer);
-               ser.formatReference(out, val, currentPackageName);
+               if (changedObj instanceof Date) {
+                  ser.formatDate(out, (Date) changedObj);
+               }
+               else if (changedObj instanceof BigDecimal) {
+                  ser.formatString(out, changedObj.toString());
+               }
+               else {
+                  String val = syncContext.getObjectName(changedObj, varName, false, false, null, syncLayer);
+                  if (val == null)
+                     val = syncContext.createOnDemandInst(changedObj, depChanges, varName, syncLayer);
+                  ser.formatReference(out, val, currentPackageName);
+               }
                break;
             default:
                ser.formatDefault(out, changedObj);
@@ -184,6 +193,20 @@ public class SyncHandler {
          return value;
       if (type == StringBuilder.class)
          return new StringBuilder((String) value);
+      if (type == Date.class || (type instanceof Class) && Date.class.isAssignableFrom((Class) type)) {
+         if (value == null)
+            return null;
+         if (value instanceof String) {
+            return DynUtil.parseDate((String) value);
+         }
+      }
+      if (type == BigDecimal.class) {
+         if (value == null)
+            return null;
+         if (value instanceof String) {
+            return new BigDecimal((String) value);
+         }
+      }
       if (value instanceof List) {
          List propValList = (List) value;
          // Convert if necessary to get the correct array type - e.g. a String[] instead of just an Object[]

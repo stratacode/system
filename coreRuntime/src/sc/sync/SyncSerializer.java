@@ -12,6 +12,7 @@ import sc.obj.SyncMode;
 import sc.type.CTypeUtil;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -459,6 +460,12 @@ public class SyncSerializer {
    // Here for javascript
    public void formatNumber(StringBuilder sb, Number val) {
       sb.append(val.toString());
+   }
+
+   public void formatDate(StringBuilder sb, Date val) {
+      sb.append('"');
+      sb.append(DynUtil.formatDate(val));
+      sb.append('"');
    }
 
    public void formatDouble(StringBuilder sb, Double val) {

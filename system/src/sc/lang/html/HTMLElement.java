@@ -33,7 +33,7 @@ import java.util.HashSet;
  * it works but in the general case it falls over.  You would Need to change the code to generate an extends like:   class InnerSubClass<TP> extends outerClass<Object>.innerBaseClass<TP>
  */
 //@Sync(syncMode= SyncMode.Automatic) // Turn back on sync mode for subclasses with this enabled.  Turned out to not be a good idea to sync both the UI and the model
-@sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentJSFiles="js/javasys.js")
+@sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", extendsJSFiles="js/javasys.js")
 @Sync(syncMode=SyncMode.Disabled, includeSuper=true)
 @sc.obj.CompilerSettings(exportProperties=false)
 public class HTMLElement<RE> extends Element<RE> {

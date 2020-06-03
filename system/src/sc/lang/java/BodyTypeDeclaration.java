@@ -364,6 +364,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public abstract DeclarationType getDeclarationType();
 
+   public DeclarationType getDeclarationTypeNoInit() {
+      return getDeclarationType();
+   }
+
    @Constant
    public void setDeclarationType(DeclarationType dt) {
       throw new UnsupportedOperationException();
@@ -9384,6 +9388,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (ModelUtil.hasModifier(prop, "private"))
                   continue;
 
+               // TODO: any use case to support synchronizing static properties? If so, need to put a flag or something in so that we add
+               // the listener and get the property value for a static property (i.e. use the class, not the instance). Also not sure
+               // when we would need to initialize the bindings in initSyncType
+               //if (ModelUtil.hasModifier(prop, "static"))
+               //   continue;
+
                if (!ModelUtil.checkAccess(this, prop, MemberType.GetMethod))
                   continue;
 
@@ -9413,14 +9423,15 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   propConstant = constDefaultObj != null && constDefaultObj;
                   if (propConstant)
                      propFlags |= SyncPropOptions.SYNC_CONSTANT;
-
-                  if (ModelUtil.hasModifier(prop, "static")) {
-                     propFlags |= SyncPropOptions.SYNC_STATIC;
-                  }
                }
                else {
                   propSyncMode = null;
                }
+
+               if (ModelUtil.hasModifier(prop, "static")) {
+                  propFlags |= SyncPropOptions.SYNC_STATIC;
+               }
+
                boolean thisIsWritable = ModelUtil.isWritableProperty(prop);
                boolean inheritedSync = false;
                if (propSyncMode == null) {

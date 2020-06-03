@@ -254,6 +254,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // TODO: move this to the 'layer' and only inherit it if your layer extends the one that sets it so that we can assembly stacks with more than one default that still work.
    /** Set this to support @DBTypeSettings with no dataSourceName, to more easily aggregate components into one default db without having to set all of the types individually */
    public DBDataSource defaultDataSource;
+   public DBProvider defaultDBProvider;
    public Map<String,DBProvider> inactiveDBProviders = new TreeMap<String,DBProvider>();
    public Map<String,DBProvider> activeDBProviders = new TreeMap<String,DBProvider>();
 

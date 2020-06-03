@@ -4,9 +4,7 @@
 
 package sc.lang.html;
 
-import java.util.Map;
-
-@sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentJSFiles="js/jvsys.js,js/scbind.js,js/sync.js")
+@sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", extendsJSFiles="js/jvsys.js,js/scbind.js,js/sync.js")
 public class Page extends HTMLElement {
    public Page() {
    }

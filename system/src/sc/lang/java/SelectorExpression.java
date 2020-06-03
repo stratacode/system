@@ -936,7 +936,19 @@ public class SelectorExpression extends ChainedExpression {
    }
 
    public Statement transformToJS() {
-      if (idTypes[0] == IdentifierExpression.IdentifierType.ThisExpression) {
+      IdentifierExpression.IdentifierType idType0 = idTypes[0];
+      if (expression instanceof ClassValueExpression && selectors.size() == 1 &&
+          idType0 == IdentifierExpression.IdentifierType.MethodInvocation &&
+          selectors.get(0) instanceof VariableSelector &&((VariableSelector)selectors.get(0)).identifier.equals("isAssignableFrom")) {
+         SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
+         args.add(expression);
+         args.add(((VariableSelector) selectors.get(0)).arguments.get(0));
+         IdentifierExpression newExpr = IdentifierExpression.createMethodCall(args, "sc_isAssignableFrom");
+         parentNode.replaceChild(this, newExpr);
+         return newExpr.transformToJS();
+      }
+
+      if (idType0 == IdentifierExpression.IdentifierType.ThisExpression) {
          IdentifierExpression newExpr = IdentifierExpression.create("this");
          Object refType = boundTypes[0];
          Object curType = getEnclosingType();

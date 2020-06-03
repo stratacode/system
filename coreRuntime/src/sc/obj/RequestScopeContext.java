@@ -7,6 +7,7 @@ import sc.dyn.DynUtil;
 
 import java.util.HashMap;
 
+@sc.js.JSSettings(jsModuleFile="js/scgen.js", prefixAlias="sc_")
 public class RequestScopeContext extends BaseScopeContext {
    String id;
    public RequestScopeContext(String id) {

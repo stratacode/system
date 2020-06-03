@@ -493,15 +493,17 @@ public class SchemaManager {
 
       if (schemaChanged) {
          if (schemaMode == SchemaMode.Prompt) {
-            if (system.options.startInterpreter) {
+            if (system.options.startInterpreter && system.cmd != null) {
                system.cmd.addCommandWizard(new SchemaUpdateWizard(system.cmd, system, this));
             }
             else {
-               if (noCurrentSchema) {
-                  system.warning("Database schema may not be in sync: no deployed/cached schema files and not running SchemaUpdateWizard because command interpreter is disabled");
-               }
-               else {
-                  system.warning("Database schema has changed and not running SchemaUpdateWizard because command interpreter is disabled");
+               if (system.defaultDBProvider == null || system.defaultDBProvider.needsSchema) {
+                  if (noCurrentSchema) {
+                     system.warning("Database schema may not be in sync: no deployed/cached schema files and not running SchemaUpdateWizard because command interpreter is disabled");
+                  }
+                  else {
+                     system.warning("Database schema has changed and not running SchemaUpdateWizard because command interpreter is disabled");
+                  }
                }
             }
          }

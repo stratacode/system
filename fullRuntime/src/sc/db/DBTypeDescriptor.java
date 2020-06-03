@@ -2,6 +2,8 @@ package sc.db;
 
 import sc.bind.*;
 import sc.dyn.DynUtil;
+import sc.sync.SyncManager;
+import sc.sync.SyncProperties;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.util.StringUtil;
@@ -111,15 +113,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    public DBTypeDescriptor baseType;
 
-   public boolean queueInserts = false;
-   public boolean queueDeletes = false;
-
    /** Turn off writes to the database - instead, these will be stored in memory and merged into query results for testing purposes */
    public boolean dbReadOnly = false;
    /** Turn off database entirely - store objects and run queries only in memory for testing */
    public boolean dbDisabled = false;
-
-   public boolean memStoreEnabled = false;
 
    /** Set to true for types where the source has no 'id' property */
    public boolean needsAutoId = false;
@@ -147,6 +144,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    DBPropertyDescriptor typeIdProperty = null;
 
    public int[] typeIdList = null;
+
+   public SyncProperties syncProps = null;
+   public boolean syncPropsInited = false;
 
    public DBTypeDescriptor findSubType(String subTypeName) {
       // During code-processing time, this is not set yet
@@ -684,10 +684,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return inst;
    }
 
-   public IDBObject registerInstance(IDBObject inst) {
-      if (baseType != null)
-         return baseType.registerInstance(inst);
-
+   private IDBObject registerInstanceInternal(IDBObject inst) {
       if (typeInstances == null) {
          initTypeInstances();
       }
@@ -698,15 +695,35 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             return res;
          typeInstances.put(id, inst);
       }
-      DBUtil.mapTestInstance(inst);
       return null;
    }
 
-   public void replaceInstance(IDBObject inst) {
-      if (baseType != null) {
-         baseType.replaceInstance(inst);
-         return;
+   public IDBObject registerInstance(IDBObject inst) {
+      IDBObject res = null;
+      if (baseType != null)
+         res = baseType.registerInstanceInternal(inst);
+      else
+         res = registerInstanceInternal(inst);
+
+      DBUtil.mapTestInstance(inst);
+      initSyncForInst(inst);
+      return res;
+   }
+
+   private void initSyncForInst(Object inst) {
+      if (!syncPropsInited) {
+         syncProps = SyncManager.getSyncProperties(typeDecl, null);
+         syncPropsInited = true;
       }
+      // Need to make the addSyncInst call after the id has been defined since we use the object id in the sync id.
+      // The generated addSyncInst call is not included in the generated code so we do it here
+      // TODO: do we need to specify a different value of onDemand here?  Maybe it gets put into SyncProperties so
+      // it's available?
+      if (syncProps != null)
+         SyncManager.addSyncInst(inst, true, syncProps.initDefault, null, syncProps);
+   }
+
+   private void replaceInstanceInternal(IDBObject inst) {
 
       if (typeInstances == null) {
          initTypeInstances();
@@ -720,6 +737,15 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          }
       }
       DBUtil.mapTestInstance(inst);
+
+   }
+
+   public void replaceInstance(IDBObject inst) {
+      if (baseType != null) {
+         baseType.replaceInstanceInternal(inst);
+      }
+      replaceInstanceInternal(inst);
+      initSyncForInst(inst);
    }
 
    public boolean removeInstance(DBObject dbObj, boolean remove) {

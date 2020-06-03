@@ -35,8 +35,10 @@ public @interface JSSettings {
    /** Like replaceWith but for types without the _c on the end */
    String replaceWithNative() default "";
 
-   /** Comma separated list of jsLibFiles which this lib file depends on being included before it */
-   String dependentJSFiles() default "";
+   /** Comma separated list of jsLibFiles which this lib file uses in it's classes. This does not affect the sorting order of the lib files */
+   String usesJSFiles() default "";
+   /** Comma separated list of jsLibFiles which this lib file may extend one or more classes - using extends changes the sorting order of the JS files so the extended JS files come first */
+   String extendsJSFiles() default "";
 
    /**
     * For a class with jsLibFiles set, specifies a comma separated list of type dependencies that are used by the native class.  Once we see jsLibFiles we stop looking for dependencies in that class but sometimes

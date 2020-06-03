@@ -750,6 +750,12 @@ public class ModifyDeclaration extends TypeDeclaration {
       incrVersion();
    }
 
+   public DeclarationType getDeclarationTypeNoInit() {
+      if (typeInitialized)
+         return getDeclarationType();
+      return DeclarationType.UNKNOWN;
+   }
+
    public DeclarationType getDeclarationType() {
       if (isLayerType)
          return DeclarationType.OBJECT;

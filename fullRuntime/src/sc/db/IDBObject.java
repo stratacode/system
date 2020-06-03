@@ -4,6 +4,7 @@ import sc.obj.IObjectId;
 
 import java.util.Map;
 
+@sc.js.JSSettings(prefixAlias="sc_", jsLibFiles="js/db.js")
 public interface IDBObject extends IObjectId {
    void dbInsert(boolean queue);
 

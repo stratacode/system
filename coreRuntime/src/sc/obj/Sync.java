@@ -52,7 +52,7 @@ public @interface Sync {
    boolean constant() default false;
 
    /**
-    * Currently this is only set in serialized layers in the 'scn' format where @Sync is used as a marker attribute annotation.
+    * An internal property set in serialized layers in the 'scn' format where @Sync is used as a marker attribute annotation.
     * Don't set this in normal source code.  It signals a switch to marking content as originating from the remote side (the client),
     * so that it's returned to the server on a session reset.   Ordinarily the client's changes are marked as 'remote changes' automatically without any need to
     * mark them, but during a refresh, the server sets this flag to separate those client-originated changes from the ones that are really coming from the server.

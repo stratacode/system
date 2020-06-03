@@ -84,6 +84,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    DBEnumDescriptor dbEnumDescriptor;
    DBTypeDescriptor dbTypeDescriptor;
 
+   DBProvider dbProvider;
+
    public ObjectDefinitionParameters() {
    }
 
@@ -177,11 +179,16 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          dbType = objType.resolve(true);
       else
          dbType = objType;
-      BaseTypeDescriptor baseTypeDesc = DBProvider.getDBTypeDescriptor(dbType.getLayeredSystem(), dbType.getLayer(), dbType, false);
+      LayeredSystem sys = dbType.getLayeredSystem();
+      Layer typeLayer = dbType.getLayer();
+      BaseTypeDescriptor baseTypeDesc = DBProvider.getDBTypeDescriptor(sys, typeLayer, dbType, false);
       if (baseTypeDesc instanceof DBTypeDescriptor)
          dbTypeDescriptor = (DBTypeDescriptor) baseTypeDesc;
       else
          dbEnumDescriptor = (DBEnumDescriptor) baseTypeDesc;
+
+      if (dbTypeDescriptor != null || dbEnumDescriptor != null)
+         dbProvider = DBProvider.getDBProviderForType(sys, typeLayer, dbType);
    }
 
    public ObjectDefinitionParameters(Object compiledClass, String objectClassName, String variableTypeName,
@@ -334,6 +341,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return objType.needsSync();
    }
 
+   public boolean getNeedsAddSyncInst() {
+      return objType.needsSync() && dbTypeDescriptor == null && !isAbstract;
+   }
+
    public boolean getNeedsSyncAccessHook() {
       if (!objType.needsSync())
          return false;
@@ -465,7 +476,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    }
 
    public String formatQueries() {
-      if (dbTypeDescriptor == null || dbTypeDescriptor.queries == null)
+      if (dbTypeDescriptor == null || dbTypeDescriptor.queries == null || (dbProvider != null && !dbProvider.needsQueryMethods))
          return "";
 
       StringBuilder sb = new StringBuilder();
@@ -682,7 +693,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    }
 
    public String formatDBEnumDescriptorDefinition() {
-      if (dbEnumDescriptor == null)
+      if (dbEnumDescriptor == null || (dbProvider != null && !dbProvider.needsMetadata))
          return "";
       dbEnumDescriptor.init();
       dbEnumDescriptor.start();
@@ -711,7 +722,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
    }
 
    public String formatDBTypeDescriptorDefinition() {
-      if (dbTypeDescriptor == null)
+      if (dbTypeDescriptor == null || (dbProvider != null && !dbProvider.needsMetadata))
          return "";
 
       if (!dbTypeDescriptor.tablesInitialized) {

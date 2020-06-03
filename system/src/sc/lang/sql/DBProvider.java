@@ -23,6 +23,11 @@ public class DBProvider {
    public String providerName;
    public Layer definedInLayer;
 
+   public boolean needsSchema = true;
+   public boolean needsMetadata = true;
+   public boolean needsQueryMethods = true;
+   public boolean needsGetSet = true;
+
    private ISchemaUpdater schemaUpdater;
 
    public DBProvider(String providerName) {
@@ -75,7 +80,10 @@ public class DBProvider {
    public static DBProvider getDBProviderForDataSource(LayeredSystem sys, Layer refLayer, String dataSourceName) {
       DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
       if (dataSource != null) {
-         return sys.getDBProvider(dataSource.provider, refLayer);
+         String provider = dataSource.provider;
+         if (provider == null)
+            return sys.defaultDBProvider;
+         return sys.getDBProvider(provider, refLayer);
       }
       return null;
    }
@@ -90,11 +98,7 @@ public class DBProvider {
 
    public static DBProvider getDBProviderForPropertyDesc(LayeredSystem sys, Layer refLayer, DBPropertyDescriptor propDesc) {
       String dataSourceName = propDesc.getDataSourceForProp();
-      DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
-      if (dataSource != null) {
-         return sys.getDBProvider(dataSource.provider, refLayer);
-      }
-      return null;
+      return getDBProviderForDataSource(sys, refLayer, dataSourceName);
    }
 
    public static DBProvider getDBProviderForProperty(LayeredSystem sys, Layer refLayer, Object propObj) {
@@ -116,10 +120,7 @@ public class DBProvider {
          DBPropertyDescriptor propDesc = ((DBTypeDescriptor) typeDesc).getPropertyDescriptor(propName);
          if (propDesc != null) {
             String dataSourceName = propDesc.getDataSourceForProp();
-            DBDataSource dataSource = sys.getDataSource(dataSourceName, refLayer.activated);
-            if (dataSource != null) {
-               return sys.getDBProvider(dataSource.provider, refLayer);
-            }
+            return getDBProviderForDataSource(sys, refLayer, dataSourceName);
          }
       }
       return null;
@@ -1063,7 +1064,7 @@ public class DBProvider {
    }
 
    public boolean getNeedsGetSet() {
-         return true;
+      return needsGetSet;
    }
 
    private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.dbGetProperty<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
@@ -1144,6 +1145,8 @@ public class DBProvider {
    }
 
    public void generateSchemas(Layer buildLayer) {
+      if (!needsSchema)
+         return;
       if (dbSchemas != null) {
          for (Map.Entry<String,SchemaManager> ent:dbSchemas.entrySet()) {
             SchemaManager schemaMgr = ent.getValue();

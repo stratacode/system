@@ -9,6 +9,8 @@
       return (<%= typeBaseName %>) getDBTypeDescriptor().findById(<%= formatIdParams(true) %>);
    }
 
+   @sc.obj.Constant
+   @sc.obj.Sync(syncMode=sc.obj.SyncMode.Disabled)
    public static sc.db.DBTypeDescriptor dbTypeDesc;
 
    public <%= typeBaseName %>() {
@@ -31,6 +33,8 @@
    <%= formatQueries() %>
 
    <%    if (dbTypeDescriptor.baseType == null) { %>
+
+      @sc.obj.Sync(syncMode=sc.obj.SyncMode.Disabled)
       // Stores persistent state for the instance
       protected transient sc.db.DBObject _dbObject;
 

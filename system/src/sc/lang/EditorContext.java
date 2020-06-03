@@ -50,7 +50,7 @@ public class EditorContext extends ClientEditorContext {
 
    static protected CommandSCLanguage cmdlang = CommandSCLanguage.INSTANCE;
 
-   public static int MaxCompletions = 20;
+   public static final int MaxCompletions = 20;
 
    /** Global flag set to true when this context should interpret property changes as editing the types, rather than just editing the instances or current instance */
    public boolean edit = true;
