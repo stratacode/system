@@ -1495,6 +1495,10 @@ public class SyncManager {
        * the results of the next sync.
        */
       public void startSync(Object inst, String propName) {
+         InstInfo ii = getInstInfo(inst);
+         Boolean od;
+         if (ii != null && ii.onDemandProps != null && ((od = ii.onDemandProps.get(propName)) != null) && od)
+            return;
          SyncProperties syncProps = getSyncPropertiesForInst(inst);
          if (syncProps == null) {
             System.err.println("*** SyncManager.startSync: Type for instance: " + DynUtil.getInstanceName(inst) + " not added to the SyncManager with addSyncType");
