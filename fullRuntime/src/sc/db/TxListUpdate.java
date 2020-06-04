@@ -60,7 +60,7 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
       }
       int resCt = 0;
       if (toRemove.size() > 0) {
-         int ct = doMultiDelete(oldList.listProp.getTable(), toRemove, false);
+         int ct = doMultiDelete(oldList.listProp.getTable(), toRemove, false, false);
          if (ct != toRemove.size())
             DBUtil.error("Failed to remove all of the rows in a list update");
 

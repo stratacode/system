@@ -303,6 +303,10 @@ public class DBPropertyDescriptor {
     */
    public void resetTable(TableDescriptor mainPropTable) {
       if (tableDesc != null) {
+         if (tableDesc.reverseProperty == this)
+            return; // this likely means we are in runtimeMode - we set this table up in the compiled definition
+         if (tableDesc.reverseProperty != null)
+            System.err.println("*** Reverse property conflict");
          if (tableDesc.primary) {
             TableDescriptor primaryTable = tableDesc;
             if (!primaryTable.columns.remove(this))
@@ -314,7 +318,7 @@ public class DBPropertyDescriptor {
                System.err.println("*** Relationships and reverse don't have matching columnTypes");
 
             // The id property in this side's table is the value column in the reverse table
-            IdPropertyDescriptor thisIdProp = new IdPropertyDescriptor(primaryTable.idColumns.get(0).propertyName, reversePropDesc.columnName, columnType, false);
+            IdPropertyDescriptor thisIdProp = new IdPropertyDescriptor(primaryTable.idColumns.get(0).propertyName, reversePropDesc.columnName, columnType, false, null);
             // The value column for this property is the reverse table's id column - TODO: deal with multi column primary keys by overriding this in MultiColPropertyDescriptor
             columnName = mainPropTable.idColumns.get(0).columnName;
             tableDesc.idColumns = Collections.singletonList(thisIdProp);

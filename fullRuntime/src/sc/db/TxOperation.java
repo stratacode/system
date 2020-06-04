@@ -244,9 +244,7 @@ public abstract class TxOperation {
       return 1;
    }
 
-   protected int doMultiDelete(TableDescriptor deleteTable, List<IDBObject> toRemove, boolean removeCurrent) {
-      if (deleteTable.isReadOnly())
-         return 0;
+   protected int doMultiDelete(TableDescriptor deleteTable, List<IDBObject> toRemove, boolean removeCurrent, boolean removeAll) {
       if (deleteTable.isReadOnly())
          return 0;
 
@@ -256,12 +254,15 @@ public abstract class TxOperation {
 
       DBPropertyDescriptor multiValueProp = revProp == null ? deleteTable.columns.get(0) : revProp;
       IBeanMapper multiValueMapper = multiValueProp.getPropertyMapper();
-      if (removeCurrent)
-         toRemove = (List<IDBObject>) multiValueMapper.getPropertyValue(parentInst, false, false);
+      int numToRemove = 0;
+      if (!removeAll) {
+         if (removeCurrent)
+            toRemove = (List<IDBObject>) multiValueMapper.getPropertyValue(parentInst, false, false);
 
-      int numToRemove = toRemove.size();
-      if (numToRemove == 0)
-         return 0;
+         numToRemove = toRemove.size();
+         if (numToRemove == 0)
+            return 0;
+      }
 
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       boolean isPrimary = deleteTable.primary;
@@ -315,32 +316,34 @@ public abstract class TxOperation {
          }
       }
 
-      DBPropertyDescriptor refIdProp = deleteTable.columns.get(0);
-      DBUtil.append(sb, logSB, " AND ");
-      DBUtil.appendIdent(sb, logSB, refIdProp.columnName);
-      DBUtil.append(sb, logSB, " IN (");
-      DBColumnType multiValueColumnType = refIdProp.getDBColumnType();
-      if (multiValueColumnType == DBColumnType.Reference)
-         multiValueColumnType = refIdProp.refDBTypeDesc.getIdDBColumnType(0);
-      for (int i = 0; i < numToRemove; i++) {
-         if (i != 0) {
-            DBUtil.append(sb, logSB, ", ");
-         }
-         sb.append("?");
+      if (!removeAll) {
+         DBPropertyDescriptor refIdProp = deleteTable.columns.get(0);
+         DBUtil.append(sb, logSB, " AND ");
+         DBUtil.appendIdent(sb, logSB, refIdProp.columnName);
+         DBUtil.append(sb, logSB, " IN (");
+         DBColumnType multiValueColumnType = refIdProp.getDBColumnType();
+         if (multiValueColumnType == DBColumnType.Reference)
+            multiValueColumnType = refIdProp.refDBTypeDesc.getIdDBColumnType(0);
+         for (int i = 0; i < numToRemove; i++) {
+            if (i != 0) {
+               DBUtil.append(sb, logSB, ", ");
+            }
+            sb.append("?");
 
-         columnTypes.add(multiValueColumnType);
-         IDBObject toRem = toRemove.get(i);
-         columnValues.add(toRem.getDBId());
+            columnTypes.add(multiValueColumnType);
+            IDBObject toRem = toRemove.get(i);
+            columnValues.add(toRem.getDBId());
 
-         if (logSB != null) {
-            DBUtil.appendVal(logSB, toRem, multiValueColumnType, multiValueProp.refDBTypeDesc);
+            if (logSB != null) {
+               DBUtil.appendVal(logSB, toRem, multiValueColumnType, multiValueProp.refDBTypeDesc);
+            }
          }
+         sb.append(")");
+         if (logSB != null)
+            logSB.append(")");
+
+         numCols += numToRemove;
       }
-      sb.append(")");
-      if (logSB != null)
-         logSB.append(")");
-
-      numCols += numToRemove;
 
       if (versProp != null) {
          DBUtil.append(sb, logSB, " AND ");
@@ -367,7 +370,7 @@ public abstract class TxOperation {
             int numDeleted = st.executeUpdate();
 
             if (deleteTable.primary) {
-               if (numDeleted != numToRemove) {
+               if (!removeAll && numDeleted != numToRemove) {
                   if (numDeleted == 0) {
                      if (versProp == null)
                         DBUtil.error("Delete from multi valued table failed to remove row for: " + dbObject);
@@ -379,7 +382,9 @@ public abstract class TxOperation {
             }
 
             if (logSB != null) {
-               if (numDeleted == numToRemove)
+               if (removeAll)
+                  logSB.append(" -> removed all " + numDeleted + " rows");
+               else if (numDeleted == numToRemove)
                   logSB.append(" -> removed " + numToRemove + " rows");
                if (versProp != null)
                   logSB.append(" - version: " + version);

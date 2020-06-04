@@ -31,6 +31,25 @@ public class TxUpdate extends VersionedOperation {
             ct += doUpdate(auxTable);
       }
 
+      List<TableDescriptor> multiTables = dbTypeDesc.multiTables;
+      if (multiTables != null) {
+         for (TableDescriptor multiTable:multiTables) {
+            for (PropUpdate propUpdate:updateList) {
+               DBPropertyDescriptor prop = propUpdate.prop;
+               if (prop.tableDesc == multiTable) {
+                  doMultiDelete(multiTable, null, false, true);
+                  if (propUpdate.value != null) {
+                     if (!(propUpdate.value instanceof List))
+                        System.err.println("*** Unsupported type for db list: ");
+                     else
+                        ct += doMultiInsert(multiTable, (List<IDBObject>) propUpdate.value, false);
+                  }
+               }
+            }
+         }
+      }
+
+
       for (TxListUpdate listUpd:listUpdates) {
          ct += listUpd.apply();
       }

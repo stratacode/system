@@ -189,7 +189,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
             if (primaryTable.idColumns == null || primaryTable.idColumns.size() == 0) {
                needsAutoId = true;
-               IdPropertyDescriptor newIdProp = new IdPropertyDescriptor("id", "id", "bigserial", true);
+               IdPropertyDescriptor newIdProp = new IdPropertyDescriptor("id", "id", "bigserial", true, null);
                newIdProp.propertyType = Long.TYPE;
                primaryTable.addIdColumnProperty(newIdProp);
             }

@@ -23,7 +23,7 @@ public class TxDelete extends VersionedOperation {
       }
       if (dbTypeDesc.multiTables != null) {
          for (TableDescriptor table:dbTypeDesc.multiTables)
-            ct += doMultiDelete(table, null, true);
+            ct += doMultiDelete(table, null, true, true);
       }
       ct += doDelete(dbTypeDesc.primaryTable);
       //deleteOwnedRefs(false);

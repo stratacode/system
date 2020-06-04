@@ -397,7 +397,7 @@ public class DBProvider {
                            DBUtil.error("IdSettings set on property: " + propName + " in class: " + typeName + " conflicts with id properties in base class: " + baseTD);
                      }
                      else {
-                        IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB);
+                        IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB, null);
                         primaryTable.addIdColumnProperty(idDesc);
                         idDesc.propertyType = propType;
                      }
@@ -1070,7 +1070,7 @@ public class DBProvider {
    private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.dbGetProperty<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
-   private static String UPDATE_PROP_TEMPLATE = "\n      if (sc.db.DBObject.<%= dbPropDesc.isId() ? \"dbSetIdProperty\" : \"dbSetProperty\"%>(<%= dbObjVarName %>, \"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>) != null) return;";
+   private static String UPDATE_PROP_TEMPLATE = "\n      if (sc.db.DBObject.<%= dbPropDesc.isId() ? \"dbSetIdProperty\" : \"dbSetProperty\"%>(<%= dbObjVarName %>, \"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>, <%= superGetName %>) != null) return;";
 
    private static Template getPropertyTemplate;
    private static Template updatePropertyTemplate;

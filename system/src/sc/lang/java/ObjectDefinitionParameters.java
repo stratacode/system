@@ -876,9 +876,9 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
 
       sb.append(tableDesc.tableName);
       sb.append("\", ");
-      appendPropertyList(sb, tableDesc.idColumns, true);
+      appendPropertyList(sb, tableDesc.idColumns);
       sb.append(", ");
-      appendPropertyList(sb, tableDesc.columns, false);
+      appendPropertyList(sb, tableDesc.columns);
       sb.append(", ");
       if (tableDesc.reverseProperty == null)
          sb.append("null");
@@ -890,13 +890,11 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       sb.append(")");
    }
 
-   private void appendPropertyList(StringBuilder sb, List<? extends DBPropertyDescriptor> propList, boolean isIdProperty) {
+   private void appendPropertyList(StringBuilder sb, List<? extends DBPropertyDescriptor> propList) {
       if (propList == null) {
          sb.append("null");
          return;
       }
-      // TODO: simplify!
-      String descClassName = isIdProperty ? "sc.db.IdPropertyDescriptor" : "sc.db.DBPropertyDescriptor";
       sb.append("java.util.Arrays.asList(");
       boolean first = true;
       for (DBPropertyDescriptor propDesc:propList) {
@@ -904,6 +902,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
             first = false;
          else
             sb.append(", ");
+         boolean isIdProperty = propDesc instanceof IdPropertyDescriptor;
+         String descClassName = isIdProperty ? "sc.db.IdPropertyDescriptor" : "sc.db.DBPropertyDescriptor";
          appendProperty(sb, propDesc, isIdProperty, descClassName);
       }
       sb.append(")");
@@ -945,6 +945,10 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       else {
          sb.append(", ");
          sb.append(((IdPropertyDescriptor) propDesc).definedByDB);
+         if (propDesc.dbTypeDesc != dbTypeDescriptor && propDesc.dbTypeDesc != null)
+            appendString(sb, propDesc.dbTypeDesc.getTypeName(), true);
+         else
+            appendString(sb, null, true);
       }
       sb.append(")");
    }

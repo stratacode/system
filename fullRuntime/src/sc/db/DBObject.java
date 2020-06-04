@@ -405,11 +405,14 @@ public class DBObject implements IDBObject {
       return res;
    }
 
-   public PropUpdate dbSetIdProp(String propertyName, Object propertyValue)  {
+   public PropUpdate dbSetIdProp(String propertyName, Object propertyValue, Object oldVal)  {
       if (replacedBy != null)
-         return replacedBy.getDBObject().dbSetIdProp(propertyName, propertyValue);
+         return replacedBy.getDBObject().dbSetIdProp(propertyName, propertyValue, oldVal);
 
       if ((flags & (TRANSIENT | REMOVED | STOPPED | PROTOTYPE)) != 0)
+         return null;
+
+      if (propertyValue == oldVal)
          return null;
 
       throw new IllegalStateException("Id property values can't be changed on a persistent instance");
@@ -422,9 +425,9 @@ public class DBObject implements IDBObject {
     * Bind.sendEvent call should be made by the framework since the setX method won't do anything else... for example,
     * in a reverse relationship change.
     */
-   public PropUpdate dbSetProp(String propertyName, Object propertyValue)  {
+   public PropUpdate dbSetProp(String propertyName, Object propertyValue, Object oldValue)  {
       if (replacedBy != null)
-         return replacedBy.getDBObject().dbSetProp(propertyName, propertyValue);
+         return replacedBy.getDBObject().dbSetProp(propertyName, propertyValue, oldValue);
 
       if ((flags & (REMOVED | STOPPED)) != 0)
          throw new IllegalStateException("setProperty on: " + getStateString() + " dbObject: " + this);
@@ -463,7 +466,11 @@ public class DBObject implements IDBObject {
       //if (((fstate >> (lockCt * 2)) & FETCHED) == 0)
       //   return null;
 
-      PropUpdate pu = getPendingUpdate(curr, propertyName, true, propertyValue);
+      // If we are setting the value to the same value that's in the cache don't create a new DB update. A common case is
+      // setting a property that's been fetched to null that's already null.
+      boolean createUpdate = propertyValue != oldValue;
+
+      PropUpdate pu = getPendingUpdate(curr, propertyName, createUpdate, propertyValue);
       if (pu == null)
          return null;
       pu.value = propertyValue;
@@ -852,15 +859,15 @@ public class DBObject implements IDBObject {
       return null;
    }
 
-   public static PropUpdate dbSetProperty(DBObject obj, String propName, Object propVal) {
+   public static PropUpdate dbSetProperty(DBObject obj, String propName, Object propVal, Object oldValue) {
       if (obj != null)
-         return obj.dbSetProp(propName, propVal);
+         return obj.dbSetProp(propName, propVal, oldValue);
       return null;
    }
 
-   public static PropUpdate dbSetIdProperty(DBObject obj, String propName, Object propVal) {
+   public static PropUpdate dbSetIdProperty(DBObject obj, String propName, Object propVal, Object oldVal) {
       if (obj != null)
-         return obj.dbSetIdProp(propName, propVal);
+         return obj.dbSetIdProp(propName, propVal, oldVal);
       return null;
    }
 }
