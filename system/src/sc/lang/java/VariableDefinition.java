@@ -101,7 +101,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          }
          if (annot != null && ModelUtil.isAutomaticBindingAnnotation(annot)) {
             if (canMakeBindable())
-               convertGetSet = true;
+               enableConvertGetSet();
             else
                displayError("@Bindable not allowed on static interface properties for: ");
          }
@@ -117,7 +117,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
             else {
                Object value = ModelUtil.getAnnotationValue(annotObj, "value");
                if (value == null || (value instanceof Boolean && ((Boolean) value)))
-                  convertGetSet = true;
+                  enableConvertGetSet();
             }
          }
          /*
@@ -160,7 +160,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
 
       // @Bindable(manual=true) also now here implies that the DBObject code is in there - we'd need some other marker like that to prevent
       // converting the field that's already part of the convertGetSet method.
-      if (!convertGetSet && !bindable) {
+      if (!convertGetSet && !bindable && isProperty()) {
          LayeredSystem sys = getLayeredSystem();
          Layer refLayer = getLayer();
          DBPropertyDescriptor dbPropDesc = this.dbPropDesc == null ? DBProvider.getDBPropertyDescriptor(sys, refLayer, this, true) : this.dbPropDesc;
@@ -205,7 +205,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       if (prop != null && !getDefinition().hasModifier("private")) {
          DBProvider dbProvider = DBProvider.getDBProviderForPropertyDesc(sys, refLayer, prop);
          if (dbProvider != null && dbProvider.getNeedsGetSet()) {
-            convertGetSet = true;
+            enableConvertGetSet();
             // Need to be able to listen to events on the property to keep the reverse side in sync
             if (prop.reverseProperty != null || prop.reversePropDesc != null)
                bindable = true;
@@ -215,6 +215,13 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       }
    }
 
+   private void enableConvertGetSet() {
+      if (!isProperty()) {
+         displayError("*** convertGetSet - cannot be enabled on VariableStatement: ");
+         return;
+      }
+      convertGetSet = true;
+   }
 
    /** Can be an AnnotatedElementTypeDeclaration or a TypedDefinition of some kind */
    public Statement getDefinition() {
@@ -455,7 +462,7 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
             // Cannot get RuntimePropertyMapping here - the validate phase happens before the compile so that's not available
             Object field = getDefinition();
             if (canMakeBindable() && (field == null || !ModelUtil.isConstant(field))) {
-               convertGetSet = true;
+               enableConvertGetSet();
             }
          }
          bindable = true;
