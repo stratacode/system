@@ -944,7 +944,8 @@ public class TransformUtil {
       String origPropName = variableDefinition.variableName;
 
       PropertyDefinitionParameters params = PropertyDefinitionParameters.create(convertedPropName);
-      FieldDefinition field = (FieldDefinition) variableDefinition.getDefinition();
+      Definition enclDef = variableDefinition.getDefinition();
+      FieldDefinition field = (FieldDefinition) enclDef;
       TypeDeclaration typeDeclaration = field.getEnclosingType();
 
       if (typeDeclaration.propertiesToMakeBindable != null && typeDeclaration.propertiesToMakeBindable.get(origPropName) != null)
@@ -1013,11 +1014,10 @@ public class TransformUtil {
          params.initializer = ParseUtil.toLanguageString(SCLanguage.INSTANCE.variableInitializer, varInit);
       }
 
+      makePropertyBindableInType(field, typeDeclaration, convertedPropName, params, true, bindable);
 
       Object enclType = ModelUtil.getEnclosingType(variableDefinition);
       params.initForProperty(sys, enclType, variableDefinition);
-
-      makePropertyBindableInType(field, typeDeclaration, convertedPropName, params, true, bindable);
 
       int vix = -1;
       if (field.variableDefinitions.size() == 1)
@@ -1282,12 +1282,12 @@ public class TransformUtil {
 
       int ix = typeDeclaration.body.size();
 
+      makePropertyBindableInType(variableDef, typeDeclaration, propertyName, params, false, true);
+
       Layer refLayer = typeDeclaration.getLayer();
       DBPropertyDescriptor propDesc = DBProvider.getDBPropertyDescriptor(sys, refLayer, typeDeclaration, propertyName);
       if (propDesc != null)
          params.initForPropertyDesc(sys, refLayer, typeDeclaration, propDesc);
-
-      makePropertyBindableInType(variableDef, typeDeclaration, propertyName, params, false, true);
 
       params.omitField = params.overrideField || params.overrideGetSet;
 
