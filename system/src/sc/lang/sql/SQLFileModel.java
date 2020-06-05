@@ -331,7 +331,7 @@ public class SQLFileModel extends SCModel {
                constraints.add(new PrimaryKeyConstraint());
             colDef.setProperty("columnConstraints", constraints);
          }
-         if (propDesc.refTypeName != null) {
+         if (propDesc.refTypeName != null && propDesc.getNeedsReferencesConstraint()) {
             Object refType = findTypeDeclaration(propDesc.refTypeName, false);
             if (refType == null) {
                System.err.println("*** Failed to find refType: " + propDesc.refTypeName + " for: " + propDesc.propertyName);

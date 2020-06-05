@@ -115,7 +115,7 @@ public class DBObject implements IDBObject {
          // We have an association that is transient - this is our only change to insert the value
          else if (propertyValue instanceof IDBObject) {
             IDBObject assocVal = (IDBObject) propertyValue;
-            if (assocVal.getDBObject().isTransient() && !isTransient())
+            if (((DBObject) assocVal.getDBObject()).isTransient() && !isTransient())
                assocVal.dbInsert(true);
          }
          return null;
@@ -259,7 +259,7 @@ public class DBObject implements IDBObject {
 
    public PropUpdate dbFetch(String property) {
       if (replacedBy != null)
-         return replacedBy.getDBObject().dbFetch(property);
+         return ((DBObject) replacedBy.getDBObject()).dbFetch(property);
 
       if ((flags & (TRANSIENT | PROTOTYPE)) != 0)
          return null;
@@ -323,7 +323,7 @@ public class DBObject implements IDBObject {
 
    public boolean dbFetchDefault() {
       if (replacedBy != null)
-         return replacedBy.getDBObject().dbFetchDefault();
+         return ((DBObject) replacedBy.getDBObject()).dbFetchDefault();
 
       if ((flags & TRANSIENT) != 0)
          return false;
@@ -407,7 +407,7 @@ public class DBObject implements IDBObject {
 
    public PropUpdate dbSetIdProp(String propertyName, Object propertyValue, Object oldVal)  {
       if (replacedBy != null)
-         return replacedBy.getDBObject().dbSetIdProp(propertyName, propertyValue, oldVal);
+         return ((DBObject) replacedBy.getDBObject()).dbSetIdProp(propertyName, propertyValue, oldVal);
 
       if ((flags & (TRANSIENT | REMOVED | STOPPED | PROTOTYPE)) != 0)
          return null;
@@ -427,7 +427,7 @@ public class DBObject implements IDBObject {
     */
    public PropUpdate dbSetProp(String propertyName, Object propertyValue, Object oldValue)  {
       if (replacedBy != null)
-         return replacedBy.getDBObject().dbSetProp(propertyName, propertyValue, oldValue);
+         return ((DBObject) replacedBy.getDBObject()).dbSetProp(propertyName, propertyValue, oldValue);
 
       if ((flags & (REMOVED | STOPPED)) != 0)
          throw new IllegalStateException("setProperty on: " + getStateString() + " dbObject: " + this);
@@ -623,15 +623,20 @@ public class DBObject implements IDBObject {
    public void initProtoProperties(String... protoProps) {
       for (String protoProp:protoProps) {
          DBPropertyDescriptor pdesc = dbTypeDesc.getPropertyDescriptor(protoProp);
-         if (pdesc.refDBTypeDesc != null) {
-            setPropertyInPath(protoProp, pdesc.refDBTypeDesc.createPrototype());
+         if (pdesc.multiRow) {
+            DBUtil.error("Failed to init multi-valued prototype property: " + protoProp + ": " + pdesc + " - don't handle list prototype properties yet");
          }
-         else if (pdesc.getDBColumnType() == DBColumnType.Json) {
-            Object inst = DynUtil.createInstance(pdesc.getPropertyMapper().getPropertyType(), null);
-            setPropertyInPath(protoProp, inst);
+         else {
+            if (pdesc.refDBTypeDesc != null) {
+               setPropertyInPath(protoProp, pdesc.refDBTypeDesc.createPrototype());
+            }
+            else if (pdesc.getDBColumnType() == DBColumnType.Json) {
+               Object inst = DynUtil.createInstance(pdesc.getPropertyMapper().getPropertyType(), null);
+               setPropertyInPath(protoProp, inst);
+            }
+            else
+               DBUtil.error("Failed to init parent prototype: " + protoProp + ": " + pdesc + " not a reference type");
          }
-         else
-            DBUtil.error("Failed to init parent prototype: " + protoProp + ": " + pdesc + " not a reference type");
       }
    }
 

@@ -39,7 +39,7 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
          for (int i = 0; i < oldList.size(); i++) {
             IDBObject oldElem = oldList.get(i);
             if (newList == null || !newList.contains(oldElem)) {
-               if (!oldElem.getDBObject().isTransient() || !listProp.readOnly)
+               if (!((DBObject) oldElem.getDBObject()).isTransient() || !listProp.readOnly)
                   toRemove.add(oldElem);
                // else for a bi-directional one-to-many the item has been inserted if it's not transient
             }
@@ -49,7 +49,7 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
          for (int i = 0; i < newList.size(); i++) {
             IDBObject newElem = newList.get(i);
             if (oldList == null || !oldList.contains(newElem)) {
-               if (newElem.getDBObject().isTransient() || !listProp.readOnly)
+               if (((DBObject) newElem.getDBObject()).isTransient() || !listProp.readOnly)
                   toInsert.add(newElem);
                // else - if we are adding to a multi-valued one-to-many list that's owned by another type
                // we only do the insert if the element is transient. This way, we can do the batch inserts

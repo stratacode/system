@@ -7,11 +7,13 @@ package sc.sync;
 import sc.bind.BindingContext;
 import sc.bind.IListener;
 import sc.dyn.DynUtil;
+import sc.dyn.INameContext;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 import sc.sync.JSONFormat.Commands;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
+import sc.util.JSONResolver;
 
 import java.util.*;
 
@@ -21,7 +23,7 @@ import static sc.sync.JSONFormat.ExprPrefixes.isRefPrefix;
 
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
 @Sync(syncMode= SyncMode.Disabled)
-public class JSONDeserializer {
+public class JSONDeserializer implements JSONResolver {
    JSONParser parser;
    String destName;
    String scopeName;
@@ -400,5 +402,9 @@ public class JSONDeserializer {
       }
       else
          throw new IllegalArgumentException("Invalid remote method call in JSON: " + parser);
+   }
+
+   public Object resolveRef(String name, Object expectedType) {
+      return resolveObject(name, false);
    }
 }

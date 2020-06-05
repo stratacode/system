@@ -136,7 +136,10 @@ public abstract class TxOperation {
          sb.append("?");
          if (logSB != null) {
             DBTypeDescriptor colRefType = columnRefTypes.get(i);
-            logSB.append(DBUtil.formatValue(columnValues.get(i), colRefType != null ? DBColumnType.LongId : columnTypes.get(i), colRefType));
+            DBColumnType colType = columnTypes.get(i);
+            if (colRefType != null && colType != DBColumnType.Json)
+               colType = DBColumnType.LongId;
+            logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType));
          }
       }
 
@@ -551,13 +554,14 @@ public abstract class TxOperation {
 
       if (useCurrent && !(propList instanceof DBList)) {
          DBList dbList = new DBList(propList, dbObject, multiValueProp);
+         boolean origDBChanges = transaction.applyingDBChanges;
          transaction.applyingDBChanges = true;
          try {
             multiValueMapper.setPropertyValue(parentInst, dbList);
             dbList.trackingChanges = true;
          }
          finally {
-            transaction.applyingDBChanges = false;
+            transaction.applyingDBChanges = origDBChanges;
          }
       }
 
@@ -649,7 +653,7 @@ public abstract class TxOperation {
 
          for (int ix = 0; ix < numInsts; ix++) {
             IDBObject arrInst = propList.get(ix);
-            arrInst.getDBObject().registerNew();
+            ((DBObject) arrInst.getDBObject()).registerNew();
          }
       }
       catch (SQLException exc) {
@@ -694,7 +698,7 @@ public abstract class TxOperation {
             if (numCols == 1) {
                if (val != null) {
                   DBColumnType colType;
-                  if (col.refDBTypeDesc != null) {
+                  if (col.refDBTypeDesc != null && !col.isJsonReference()) {
                      val = col.refDBTypeDesc.getIdColumnValue(val, 0);
                      colType = col.refDBTypeDesc.getIdDBColumnType(0);
                   }
@@ -763,7 +767,7 @@ public abstract class TxOperation {
                      refType = col.refDBTypeDesc;
                   }
                }
-               else if (col.refDBTypeDesc != null) {
+               else if (col.refDBTypeDesc != null && !col.isJsonReference()) {
                   val = col.refDBTypeDesc.getIdColumnValue(val, 0);
                   colType = col.refDBTypeDesc.getIdDBColumnType(0);
                   refType = col.refDBTypeDesc;
@@ -781,7 +785,7 @@ public abstract class TxOperation {
             }
          }
          else {
-            DBTypeDescriptor arrDesc = col.refDBTypeDesc;
+            DBTypeDescriptor arrDesc = col.isJsonReference() ? null : col.refDBTypeDesc;
             if (reverseItem) {
                if (col instanceof IdPropertyDescriptor) {
                   // The database will provide this one - its not defined in
@@ -833,7 +837,7 @@ public abstract class TxOperation {
                   IDBObject ref = refList.get(j);
                   if (ref == null)
                      continue;
-                  DBObject refObj = ref.getDBObject();
+                  DBObject refObj = (DBObject) ref.getDBObject();
                   if (!refObj.isPendingInsert()) {
                      if (refObj.isTransient()) {
                         if (DBUtil.verbose)
@@ -848,7 +852,7 @@ public abstract class TxOperation {
             else {
                IDBObject refInst = (IDBObject) mapper.getPropertyValue(inst, false, false);
                if (refInst != null) {
-                  DBObject refDBObj = refInst.getDBObject();
+                  DBObject refDBObj = (DBObject) refInst.getDBObject();
                   if (refDBObj.isTransient() && !refDBObj.isPendingInsert()) {
                      if (DBUtil.verbose)
                         DBUtil.verbose(" Inserting reference: " + refInst.getObjectId() + " from: " + dbObject.dbTypeDesc.getTypeName() + "." + mapper);

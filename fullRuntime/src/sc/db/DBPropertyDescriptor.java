@@ -233,7 +233,7 @@ public class DBPropertyDescriptor {
 
    public String getTableName() {
       if (tableName == null) {
-         if (multiRow) {
+         if (isMultiRowProperty()) {
             if (reversePropDesc != null) {
                if (!reversePropDesc.multiRow || reversePropDesc.reverseProperty != null)
                   return reversePropDesc.getTableName();
@@ -249,10 +249,9 @@ public class DBPropertyDescriptor {
    public TableDescriptor getTable() {
       if (tableDesc != null)
          return tableDesc;
-      if (multiRow) {
-         if (tableName == null)
-
-         tableDesc = dbTypeDesc.getMultiTableByName(getTableName(), this);
+      if (isMultiRowProperty()) {
+         if (tableDesc == null)
+             tableDesc = dbTypeDesc.getMultiTableByName(getTableName(), this);
          return tableDesc;
       }
 
@@ -274,8 +273,11 @@ public class DBPropertyDescriptor {
    }
 
    public boolean eagerJoinForTypeId(SelectTableDesc tableDesc) {
-      if (refDBTypeDesc != null && refDBTypeDesc.getTypeIdProperty() != null && !onDemand && tableDesc.hasJoinTableForRef(this))
+      if (refDBTypeDesc != null && refDBTypeDesc.getTypeIdProperty() != null && !onDemand && tableDesc.hasJoinTableForRef(this)) {
+         if (multiRow)
+            return false;
          return true;
+      }
       return false;
    }
 
@@ -324,7 +326,7 @@ public class DBPropertyDescriptor {
             tableDesc.idColumns = Collections.singletonList(thisIdProp);
             tableDesc.columns = new ArrayList<DBPropertyDescriptor>();
             tableDesc.columns.add(this);
-            if (multiRow)
+            if (isMultiRowProperty())
                dbTypeDesc.addMultiTable(tableDesc);
             else
                dbTypeDesc.addAuxTable(tableDesc);
@@ -381,9 +383,9 @@ public class DBPropertyDescriptor {
       if (numCols == 1)  {
          val = DBUtil.getResultSetByIndex(rs, rix, this);
          int typeId = -1;
-         if (refColTypeDesc != null) {
+         if (refColTypeDesc != null && !isJsonReference()) {
             if (getNeedsRefId() && inst != null && val != null) {
-               if (!ownedByOtherType(inst.getDBObject().dbTypeDesc)) {
+               if (!ownedByOtherType(((DBObject) inst.getDBObject()).dbTypeDesc)) {
                   if (logRefIdResult != null)
                      logRefIdResult.result = DBUtil.formatValue(val, DBColumnType.LongId, refDBTypeDesc);
                   setRefIdProperty(inst, val);
@@ -401,7 +403,7 @@ public class DBPropertyDescriptor {
          }
       }
       else {
-         if (refColTypeDesc != null) {
+         if (refColTypeDesc != null && !isJsonReference()) {
             List<IdPropertyDescriptor> refIdCols = refColTypeDesc.primaryTable.getIdColumns();
             if (numCols != refIdCols.size())
                throw new UnsupportedOperationException();
@@ -444,10 +446,10 @@ public class DBPropertyDescriptor {
    }
 
    public void updateReferenceForPropValue(Object inst, Object propVal) {
-      if (refDBTypeDesc != null && propVal != null) {
+      if (refDBTypeDesc != null && propVal != null && !isJsonReference()) {
          if (!(propVal instanceof IDBObject))
             throw new IllegalArgumentException("Invalid return from get value for reference");
-         DBObject refDBObj = ((IDBObject) propVal).getDBObject();
+         DBObject refDBObj = (DBObject) ((IDBObject) propVal).getDBObject();
          if (refDBObj.isPrototype()) {
             // Fill in the reverse property
             if (reversePropDesc != null) {
@@ -464,7 +466,7 @@ public class DBPropertyDescriptor {
 
    private void updateReverseValue(Object propVal, Object inst) {
       // TODO: is this necessary? shouldn't the data binding events take care of it
-      if (!reversePropDesc.multiRow && !multiRow)
+      if (!reversePropDesc.isMultiRowProperty() && !isMultiRowProperty())
          reversePropDesc.getPropertyMapper().setPropertyValue(propVal, inst);
       else {
          // use code from ReversePropertyListener if we need to do this at all...
@@ -533,7 +535,7 @@ public class DBPropertyDescriptor {
 
 
    public DBColumnType getDBColumnType() {
-      if (refDBTypeDesc != null)
+      if (refDBTypeDesc != null && !isJsonReference())
          return DBColumnType.Reference;
       if (typeIdProperty)
          return DBColumnType.Int;
@@ -616,4 +618,19 @@ public class DBPropertyDescriptor {
       }
       return null;
    }
+
+   public boolean getNeedsReferencesConstraint() {
+      return !multiRow || isMultiRowProperty();
+   }
+
+   public boolean isMultiRowProperty() {
+      if (multiRow && !isJsonReference())
+         return true;
+      return false;
+   }
+
+   public boolean isJsonReference() {
+      return refTypeName != null && columnType.equals("jsonb");
+   }
+
 }

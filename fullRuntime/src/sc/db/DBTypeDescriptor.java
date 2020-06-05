@@ -344,7 +344,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       for (DBPropertyDescriptor prop:allDBProps) {
          String selectGroup = prop.selectGroup;
          boolean selectable = false;
-         if (prop.multiRow) {
+         if (prop.isMultiRowProperty()) {
             TableDescriptor mvTable = getMultiTableByName(prop.getTableName(), prop);
             if (mvTable == null)
                System.err.println("*** No multi-value table for property: " + prop.propertyName);
@@ -573,6 +573,23 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       selectQueriesIndex.put(query.queryName, query);
    }
 
+   public Object stringToId(String idStr) {
+      Object idType = getIdColumnType(0);
+      if (idType == Long.class || idType == Long.TYPE) {
+         try {
+            return Long.parseLong(idStr);
+         }
+         catch (NumberFormatException exc) {
+            System.err.println("*** Invalid id string: " + idStr + " for db type: " + this);
+         }
+         return null;
+      }
+      else if (idType == String.class)
+         return idStr;
+      // TODO add multi column, maybe int id support
+      throw new IllegalArgumentException("Unsupported id type");
+   }
+
    public IDBObject findById(Object... idArgs) {
       Object id;
       if (idArgs.length == 1)
@@ -594,11 +611,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          throw new IllegalArgumentException("Mismatching numParamValues = " + numVals + " numParamNames: " + numParams);
 
       IDBObject proto = createPrototype();
-      DBObject protoDB = proto.getDBObject();
+      DBObject protoDB = (DBObject) proto.getDBObject();
       for (int i = 0; i < numVals; i++) {
          protoDB.setPropertyInPath(propNames.get(i), propValues.get(i));
       }
-      return matchQuery(proto.getDBObject(), selectGroup, propNames, orderByNames, startIx, maxResults);
+      return matchQuery((DBObject) proto.getDBObject(), selectGroup, propNames, orderByNames, startIx, maxResults);
    }
 
    private void initTypeInstances() {
@@ -642,7 +659,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       synchronized (this) {
          inst = resTypeDesc.createPrototype();
          if (inst != null) {
-            dbObj = inst.getDBObject();
+            dbObj = (DBObject) inst.getDBObject();
             dbObj.setDBId(id);
             typeInstances.put(id, inst);
          }
@@ -679,7 +696,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (typeId == DBAbstractTypeId)
          return null;
       IDBObject inst = createInstance();
-      DBObject dbObj = inst.getDBObject();
+      DBObject dbObj = (DBObject) inst.getDBObject();
       dbObj.setPrototype(true);
       return inst;
    }
@@ -743,6 +760,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    public void replaceInstance(IDBObject inst) {
       if (baseType != null) {
          baseType.replaceInstanceInternal(inst);
+         return;
       }
       replaceInstanceInternal(inst);
       initSyncForInst(inst);
@@ -761,10 +779,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (res == dbObj.getInst()) {
             removed = typeInstances.remove(id);
             if (removed != null) {
+               DBObject remDBObj = (DBObject) removed.getDBObject();
                if (remove)
-                  removed.getDBObject().markRemoved();
+                  remDBObj.markRemoved();
                else
-                  removed.getDBObject().markStopped();
+                  remDBObj.markStopped();
                return true;
             }
          }
@@ -783,7 +802,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       synchronized (this) {
          for (IDBObject dbObj:typeInstances.values()) {
-            dbObj.getDBObject().markStopped();
+            ((DBObject) dbObj.getDBObject()).markStopped();
          }
          typeInstances.clear();
       }
@@ -1129,7 +1148,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       for (IDBObject inst: typeInstances.values()) {
          if (fromType != null && !DynUtil.instanceOf(inst, fromType.typeDecl))
             continue;
-         DBObject dbObj = inst.getDBObject();
+         DBObject dbObj = (DBObject) inst.getDBObject();
          boolean matched = true;
          for (int i = 0; i < numProps; i++) {
             Object propVal = dbObj.getPropertyInPath(props.get(i));

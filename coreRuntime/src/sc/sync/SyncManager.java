@@ -215,6 +215,8 @@ public class SyncManager {
 
       ScopeContext scope;
 
+      boolean isShared = false;
+
       protected boolean initialSync = false;  // Before we've sent our context remotely we're in the initial sync
 
       // The server stores around the initial sync layer so clients can refresh, the client does not have to do that.
@@ -1808,11 +1810,12 @@ public class SyncManager {
 
       public void setInitialSync(boolean value) {
          initialSync = value;
-         // TODO: this is not thread-safe as we could be sharing this parent context.
-         // I think in general it only affects the case where we are modifying either the session or global context from the request which is hopefully not a common case.  We should technically synchronize against writes though to the global context so we can update "the initial" global sync layer which all clients are updated with.  We also may need to init the global context in a synchronous way the first time, if this affects any on-demand objects?
-         if (parentContexts != null)
-            for (SyncContext parentContext:parentContexts)
-               parentContext.setInitialSync(value);
+         if (parentContexts != null) {
+            for (SyncContext parentContext:parentContexts) {
+               if (!parentContext.isShared)
+                  parentContext.setInitialSync(value);
+            }
+         }
       }
 
       private InstInfo lookupParentInheritedInstInfo(Object changedObj) {
@@ -2109,6 +2112,8 @@ public class SyncManager {
          if (childContexts == null)
             childContexts = new HashSet<SyncContext>();
          childContexts.add(childCtx);
+         if (!isShared && childContexts.size() > 1)
+            isShared = true;
       }
 
       public synchronized void scopeDestroyed(ScopeContext scope) {

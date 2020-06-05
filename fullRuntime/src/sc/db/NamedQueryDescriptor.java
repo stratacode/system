@@ -82,6 +82,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
          PreparedStatement st = null;
 
          int col = 1;
+         boolean origDBChanges = transaction.applyingDBChanges;
          try {
             conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
             st = conn.prepareStatement(querySB.toString());
@@ -158,7 +159,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                   }
 
                   IDBObject rowInst = resType.lookupInstById(idVal, typeId, true, false);
-                  DBObject rowDBObj = rowInst.getDBObject();
+                  DBObject rowDBObj = (DBObject) rowInst.getDBObject();
                   rowDBObj.setPrototype(false);
 
                   rowVal = rowInst;
@@ -234,7 +235,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
             throw new IllegalArgumentException("Invalid query: " + exc);
          }
          finally {
-            transaction.applyingDBChanges = false;
+            transaction.applyingDBChanges = origDBChanges;
             DBUtil.close(null, st, rs);
          }
       }

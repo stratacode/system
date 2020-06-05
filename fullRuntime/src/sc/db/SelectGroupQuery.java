@@ -40,7 +40,7 @@ public class SelectGroupQuery extends DBQuery {
       TableDescriptor table = prop.getTable();
       String dataSourceName = table.getDataSourceName();
 
-      SelectQuery query = getSelectQuery(dataSourceName, multiRowSelect || prop.multiRow);
+      SelectQuery query = getSelectQuery(dataSourceName, multiRowSelect || prop.isMultiRowProperty());
       query.addProperty(curRefProp, prop);
       return query;
    }

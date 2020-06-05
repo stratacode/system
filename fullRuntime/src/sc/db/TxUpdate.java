@@ -230,12 +230,12 @@ public class TxUpdate extends VersionedOperation {
             else {
                columnNames.add(prop.columnName);
                Object value = propUpdate.value;
-               if (prop.refDBTypeDesc != null) {
+               if (prop.refDBTypeDesc != null && !prop.isJsonReference()) {
                   columnTypes.add(prop.refDBTypeDesc.getIdDBColumnType(0));
                   if (value != null) {
                      IDBObject refObj = ((IDBObject) value);
                      // If we are asked to update a property that refers to a transient value, insert it first.
-                     if (refObj.getDBObject().isTransient() && !prop.readOnly)
+                     if (((DBObject) refObj.getDBObject()).isTransient() && !prop.readOnly)
                         refObj.dbInsert(false);
                      value = refObj.getDBId();
                   }

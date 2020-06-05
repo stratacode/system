@@ -4,7 +4,9 @@
 
 package sc.sync;
 
+import sc.dyn.INameContext;
 import sc.type.CTypeUtil;
+import sc.util.JSONResolver;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,12 +20,12 @@ public class JSONParser {
    int len;
    int curPos;
    /** Optional component to support resolving references with 'ref:' as used in the sync system */
-   JSONDeserializer dser;
+   JSONResolver resolver;
 
-   public JSONParser(CharSequence input, JSONDeserializer dser) {
+   public JSONParser(CharSequence input, JSONResolver resolver) {
       this.input = input;
       this.len = input.length();
-      this.dser = dser;
+      this.resolver = resolver;
    }
 
    public boolean parseCharToken(char token) {
@@ -82,7 +84,7 @@ public class JSONParser {
    public Object parseRefOrString() {
       CharSequence val = parseString(true);
       int len;
-      if (dser != null && val != null && (len = val.length()) > 4) {
+      if (resolver != null && val != null && (len = val.length()) > 4) {
          if (isRefPrefix(val, 0)) {
             return resolveRefString(val, len);
          }
@@ -97,7 +99,9 @@ public class JSONParser {
 
    Object resolveRefString(CharSequence val, int valLen) {
       String objName = val.subSequence(4, valLen).toString();
-      Object obj = dser.resolveObject(objName, false); // TODO - this dependency makes JSONParser unusable outside of the sync system but could be easily removed
+      // For sync, this will be JSONDeserializer that resolves named object references in the sync stream
+      // For DB types it will resolve a reference to either DB object or a rooted object in the tree
+      Object obj = resolver.resolveRef(objName, null);
       if (obj == null)
          System.err.println("No object: " + objName + " for reference in JSON: " + this);
       return obj;

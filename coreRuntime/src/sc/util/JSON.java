@@ -1,5 +1,6 @@
 package sc.util;
 
+import sc.db.IDBObject;
 import sc.dyn.DynUtil;
 import sc.sync.JSONParser;
 import sc.type.CTypeUtil;
@@ -18,15 +19,14 @@ public class JSON {
       return parser.parseJSONValue();
    }
 
-   public static Object toObject(Object propertyType, String jsonStr) {
+   public static Object toObject(Object propertyType, String jsonStr, JSONResolver resolver) {
       Object value = parseJSON(jsonStr);
       if (propertyType == null)
          return value;
-      return convertTo(propertyType, value);
+      return convertTo(propertyType, value, resolver);
    }
 
-
-   public static Object convertTo(Object propertyType, Object value) {
+   public static Object convertTo(Object propertyType, Object value, JSONResolver resolver) {
       if (value instanceof List) {
          List listVal = (List) value;
          Object compType = DynUtil.getComponentType(propertyType);
@@ -35,8 +35,8 @@ public class JSON {
             ArrayList<Object> newListVal = new ArrayList<Object>(listSz);
             for (int i = 0; i < listSz; i++) {
                Object listElem = listVal.get(i);
-               if (listElem instanceof Map) {
-                  Object newListElem = convertTo(compType, listElem);
+               if (listElem instanceof Map || listElem instanceof CharSequence) {
+                  Object newListElem = convertTo(compType, listElem, resolver);
                   listElem = newListElem;
                }
                newListVal.add(listElem);
@@ -71,13 +71,31 @@ public class JSON {
                System.err.println("*** No property: " + propName + " in propertyType: " + DynUtil.getTypeName(propertyType, false) + " for JSON deserialization");
                continue;
             }
-            Object newPropVal = convertTo(mapper.getGenericType(), propVal);
+            Object newPropVal = convertTo(mapper.getGenericType(), propVal, resolver);
             DynUtil.setProperty(inst, propName, newPropVal);
          }
          return inst;
       }
       else if (value instanceof CharSequence) {
-         return value.toString();
+         String res = value.toString();
+         int len = res.length();
+         if (len > 4 && res.charAt(3) == ':' && res.charAt(0) == 'r' && res.charAt(1) == 'e' && res.charAt(2) == 'f') {
+            String refName = res.substring(4);
+            if (propertyType == null) {
+               System.err.println("*** Expected property type for JSON reference");
+               res = null;
+            }
+            else if (resolver == null) {
+               System.err.println("*** No resolver for JSON reference");
+               res = null;
+            }
+            else
+               return resolver.resolveRef(refName, propertyType);
+         }
+         else if (len > 5 && res.charAt(0) == '\\' && res.charAt(4) == ':' && res.charAt(1) == 'r' && res.charAt(2) == 'e' & res.charAt(3) == 'f') {
+            res = res.substring(1);
+         }
+         return res;
       }
       else if (value instanceof Number)
          return value;
@@ -98,32 +116,44 @@ public class JSON {
    }
 
    private static void appendObject(JSONContext ctx, StringBuilder sb, Object o) {
-      ctx.addedObjs.put(o, Boolean.TRUE);
-      sb.append("{");
-      IBeanMapper[] props = DynUtil.getProperties(DynUtil.getType(o));
-      boolean any = false;
-      for (int i = 0; i < props.length; i++) {
-         IBeanMapper prop = props[i];
-
-         if (prop == null || !prop.isReadable() || !prop.isWritable()) {
-            continue;
-         }
-         Object member = prop.getPropertyMember();
-         if (member == null || DynUtil.hasModifier(member, "transient") || DynUtil.hasModifier(member, "static"))
-            continue;
-
-         Object val = prop.getPropertyValue(o, false, false);
-         if (val != null && ctx.addedObjs.get(val) == null) {
-            if (any)
-               sb.append(", ");
-            appendString(sb, prop.getPropertyName());
-            sb.append(":");
-            appendValue(ctx, sb, val);
-            any = true;
-         }
+      if (o instanceof IDBObject) {
+         sb.append("\"ref:db:");
+         appendValue(ctx, sb, ((IDBObject) o).getDBId());
+         sb.append('"');
       }
-      ctx.addedObjs.remove(o);
-      sb.append("}");
+      else if (DynUtil.isRootedObject(o)) {
+         sb.append("\"ref:");
+         appendValue(ctx, sb, DynUtil.getObjectName(o));
+         sb.append('"');
+      }
+      else {
+         ctx.addedObjs.put(o, Boolean.TRUE);
+         sb.append("{");
+         IBeanMapper[] props = DynUtil.getProperties(DynUtil.getType(o));
+         boolean any = false;
+         for (int i = 0; i < props.length; i++) {
+            IBeanMapper prop = props[i];
+
+            if (prop == null || !prop.isReadable() || !prop.isWritable()) {
+               continue;
+            }
+            Object member = prop.getPropertyMember();
+            if (member == null || DynUtil.hasModifier(member, "transient") || DynUtil.hasModifier(member, "static"))
+               continue;
+
+            Object val = prop.getPropertyValue(o, false, false);
+            if (val != null && ctx.addedObjs.get(val) == null) {
+               if (any)
+                  sb.append(", ");
+               appendString(sb, prop.getPropertyName());
+               sb.append(":");
+               appendValue(ctx, sb, val);
+               any = true;
+            }
+         }
+         sb.append("}");
+         ctx.addedObjs.remove(o);
+      }
    }
 
    static void appendValue(JSONContext ctx, StringBuilder sb, Object val) {

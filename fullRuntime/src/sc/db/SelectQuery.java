@@ -92,7 +92,7 @@ public class SelectQuery implements Cloneable {
          // When the reference is not onDemand, add the primary+aux tables from the referenced type to the query for this property
          // so that we do one query to select the list of instances - rather than the 1 + N queries if we did them one-by-one
          DBTypeDescriptor refType = prop.refDBTypeDesc;
-         if (!prop.onDemand && refType != null) {
+         if (!prop.onDemand && refType != null && !prop.isJsonReference()) {
             // For the read-only side of the reverse relationship, the property's table is the primary table of the other
             // side so add the additional properties to define the other side to the properties we select with this table
             if (prop.reversePropDesc != null && prop.readOnly) {
@@ -272,6 +272,7 @@ public class SelectQuery implements Cloneable {
       ResultSet rs = null;
       List<IdPropertyDescriptor> idColumns = mainTable.getIdColumns();
       StringBuilder logSB = null;
+      boolean origDBChanges = transaction.applyingDBChanges;
       try {
          String queryStr = qsb.toString();
          boolean res;
@@ -329,7 +330,7 @@ public class SelectQuery implements Cloneable {
          throw new IllegalArgumentException("*** selectProperties failed with SQL error: " + exc);
       }
       finally {
-         transaction.applyingDBChanges = false;
+         transaction.applyingDBChanges = origDBChanges;
          if (rs != null)
             DBUtil.close(rs);
       }
@@ -371,6 +372,7 @@ public class SelectQuery implements Cloneable {
          }
       }
 
+      boolean origDBChanges = transaction.applyingDBChanges;
       try {
          String queryStr = qsb.toString();
          DBList<IDBObject> res = new DBList<IDBObject>();
@@ -437,7 +439,7 @@ public class SelectQuery implements Cloneable {
          throw new IllegalArgumentException("*** selectProperties failed with SQL error: " + exc);
       }
       finally {
-         transaction.applyingDBChanges = false;
+         transaction.applyingDBChanges = origDBChanges;
          if (rs != null)
             DBUtil.close(rs);
       }
@@ -496,7 +498,7 @@ public class SelectQuery implements Cloneable {
             Object val;
             if (propDesc.dynColumn) {
                Object jsonVal = tableDynProps == null ? null : tableDynProps.get(propDesc.propertyName);
-               val = JSON.convertTo(propDesc.getPropertyType(), jsonVal);
+               val = JSON.convertTo(propDesc.getPropertyType(), jsonVal, DBUtil.refResolver);
                logPropVal = val;
             }
             else {
@@ -511,7 +513,7 @@ public class SelectQuery implements Cloneable {
             }
 
             if (!propDesc.typeIdProperty) {
-               if (selectObj != null && propDesc.ownedByOtherType(selectObj.getDBObject().dbTypeDesc))
+               if (selectObj != null && propDesc.ownedByOtherType(((DBObject) selectObj.getDBObject()).dbTypeDesc))
                   continue;
                IBeanMapper propMapper = propDesc.getPropertyMapper();
                if (propMapper == null) {
@@ -539,7 +541,7 @@ public class SelectQuery implements Cloneable {
                   if (dbObj.unknownType || newType != dbObj.dbTypeDesc) {
                      IDBObject newInst = newType.createInstance(dbObj);
                      newType.updateTypeDescriptor(newInst, dbObj);
-                     dbObj = newInst.getDBObject();
+                     dbObj = (DBObject) newInst.getDBObject();
                      selectInst = newInst;
                      selectObj = selectInst instanceof IDBObject ? (IDBObject) selectInst : null;
                      inst = newInst;
@@ -651,14 +653,14 @@ public class SelectQuery implements Cloneable {
 
                if (propDesc.dynColumn) {
                   Object jsonVal = tableDynProps == null ? null : tableDynProps.get(propDesc.propertyName);
-                  val = JSON.convertTo(propDesc.getPropertyType(), jsonVal);
+                  val = JSON.convertTo(propDesc.getPropertyType(), jsonVal, DBUtil.refResolver);
                }
                else {
                   int numCols = propDesc.getNumColumns();
                   DBTypeDescriptor colTypeDesc = propDesc.getRefColTypeDesc();
                   if (numCols == 1)  {
                      val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
-                     if (colTypeDesc != null) {
+                     if (colTypeDesc != null && !propDesc.isJsonReference()) {
                         DBPropertyDescriptor colTypeIdProp = colTypeDesc.getTypeIdProperty();
                         int typeId = -1;
                         // If we are joining in a 1-1 relationship eagerly, we ensure the db_type_id is right after the id so we can create the object of the right type
@@ -672,7 +674,7 @@ public class SelectQuery implements Cloneable {
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
-                           DBObject valDBObj = valObj.getDBObject();
+                           DBObject valDBObj = (DBObject) valObj.getDBObject();
                            if (valDBObj.isPrototype()) {
                               // TODO: if this has a reverse property, do we want to update the other side - in this case, add it to the reverseProperty which is a list here
                               //if (propDesc.reversePropDesc != null)  {
@@ -736,7 +738,7 @@ public class SelectQuery implements Cloneable {
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
-                           DBObject valDBObj = valObj.getDBObject();
+                           DBObject valDBObj = (DBObject) valObj.getDBObject();
                            if (valDBObj.isPrototype()) {
                               // TODO: update the reverse property (a list at this point)?
                               //if (propDesc.reversePropDesc != null)
@@ -776,7 +778,7 @@ public class SelectQuery implements Cloneable {
                      throw new UnsupportedOperationException("Multi value select tables - not attached to reference");
 
                   IDBObject propDBObj = propInst instanceof IDBObject ? (IDBObject) propInst : null;
-                  if (propDBObj != null && !propDesc.ownedByOtherType(propDBObj.getDBObject().dbTypeDesc)) {
+                  if (propDBObj != null && !propDesc.ownedByOtherType(((DBObject) propDBObj.getDBObject()).dbTypeDesc)) {
                      Object logVal;
                      String logName;
                      DBColumnType logColType;
@@ -832,7 +834,7 @@ public class SelectQuery implements Cloneable {
                   if (numCols == 1)  {
                      val = DBUtil.getResultSetByIndex(rs, rix++, propDesc);
 
-                     if (refTypeDesc != null) {
+                     if (refTypeDesc != null && !propDesc.isJsonReference()) {
                         int typeId = -1;
                         DBPropertyDescriptor refTypeIdProp = refTypeDesc.getTypeIdProperty();
                         if (readProp.getNeedsRefId() && val != null) {
@@ -844,7 +846,7 @@ public class SelectQuery implements Cloneable {
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
-                           DBObject valDBObj = valObj.getDBObject();
+                           DBObject valDBObj = (DBObject) valObj.getDBObject();
                            if (valDBObj.isPrototype()) {
                               // TODO: do we need to update the reverse property
                               //if (propDesc.reversePropDesc != null)
@@ -855,7 +857,7 @@ public class SelectQuery implements Cloneable {
                      }
                   }
                   else {
-                     if (refTypeDesc != null) {
+                     if (refTypeDesc != null && !propDesc.isJsonReference()) {
                         List<IdPropertyDescriptor> refIdCols = refTypeDesc.primaryTable.getIdColumns();
                         if (numCols != refIdCols.size())
                            throw new UnsupportedOperationException();
@@ -879,7 +881,7 @@ public class SelectQuery implements Cloneable {
 
                         if (val != null) {
                            IDBObject valObj = (IDBObject) val;
-                           DBObject valDBObj = valObj.getDBObject();
+                           DBObject valDBObj = (DBObject) valObj.getDBObject();
                            if (valDBObj.isPrototype()) {
                               //if (propDesc.reversePropDesc != null)
                               //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
@@ -913,7 +915,7 @@ public class SelectQuery implements Cloneable {
                         throw new UnsupportedOperationException("Multi value select tables - not attached to reference");
 
                      boolean skipped = false;
-                     if (!propDesc.ownedByOtherType(currentRowVal.getDBObject().dbTypeDesc)) {
+                     if (!propDesc.ownedByOtherType(((DBObject) currentRowVal.getDBObject()).dbTypeDesc)) {
                         IBeanMapper propMapper = propDesc.getPropertyMapper();
                         propMapper.setPropertyValue(currentRowVal, val);
                      }
@@ -947,7 +949,7 @@ public class SelectQuery implements Cloneable {
          // TODO: handle arrays, incremental update of existing destination list for incremental 'refresh' when the list is
          //  bound to a UI, handle other concrete classes for the list type and IBeanIndexMapper.
          listProp.getPropertyMapper().setPropertyValue(inst, resList);
-         ((DBList) resList).trackingChanges = true;
+         resList.trackingChanges = true;
       }
       return true;
    }
@@ -1100,7 +1102,7 @@ public class SelectQuery implements Cloneable {
       appendColumnSelect(queryStr, tableDesc, prop.columnName);
 
       DBTypeDescriptor refTypeDesc = prop.refDBTypeDesc;
-      if (refTypeDesc != null && !prop.onDemand && tableDesc.hasJoinTableForRef(prop)) {
+      if (refTypeDesc != null && !prop.onDemand && tableDesc.hasJoinTableForRef(prop) && !prop.isJsonReference()) {
          DBPropertyDescriptor typeIdProp = refTypeDesc.getTypeIdProperty();
          if (typeIdProp != null) {
             queryStr.append(", ");

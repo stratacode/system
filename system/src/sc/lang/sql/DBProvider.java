@@ -885,6 +885,7 @@ public class DBProvider {
                      propType = Object.class;
                }
 
+               boolean jsonArray = false;
                if (propColumnType == null) {
                   propColumnType = DBUtil.getDefaultSQLType(propType, false);
                   if (propColumnType == null) {
@@ -924,10 +925,18 @@ public class DBProvider {
                      }
                   }
                }
+               else if (propColumnType.equals("jsonb") && isArrayProperty && propType != null) {
+                  refBaseTypeDesc = getDBTypeDescriptor(sys, refLayer, propType, true);
+                  if (refBaseTypeDesc != null) {
+                     jsonArray = true;
+                  }
+                  else
+                     isArrayProperty = false; // Just a plain old json array with a value object
+               }
 
                boolean multiRow = false;
                // TODO: should we allow scalar arrays - arrays of strings and stuff like that?
-               if (isArrayProperty && refBaseTypeDesc != null)
+               if (isArrayProperty && refBaseTypeDesc != null && !jsonArray)
                   multiRow = true;
 
                DBPropertyDescriptor propDesc;
@@ -956,7 +965,7 @@ public class DBProvider {
                           propColumnType, propTableName, propRequired, propUnique, propOnDemand, propIndexed, propDynColumn,
                           propDataSourceName, propSelectGroup,
                           refBaseTypeDesc == null ? null : refBaseTypeDesc.getTypeName(),
-                          multiRow, propReverseProperty, propDBDefault, fullTypeName);
+                          multiRow || jsonArray, propReverseProperty, propDBDefault, fullTypeName);
                }
 
                propDesc.refDBTypeDesc = refDBTypeDesc;
@@ -1046,6 +1055,9 @@ public class DBProvider {
             prop.dbTypeDesc = sys.getDBTypeDescriptor(prop.ownerTypeName);
             if (prop.dbTypeDesc == null)
                DBUtil.error("No ownerTypeName: " + prop.ownerTypeName + " for property: " + prop);
+         }
+         if (prop.refTypeName != null && prop.refDBTypeDesc == null) {
+            prop.refDBTypeDesc = sys.getDBTypeDescriptor(prop.refTypeName);
          }
       }
    }

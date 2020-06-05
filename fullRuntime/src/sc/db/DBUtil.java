@@ -24,10 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import sc.type.Type;
-import sc.util.IMessageHandler;
-import sc.util.JSON;
-import sc.util.MessageHandler;
-import sc.util.WeakIdentityHashMap;
+import sc.util.*;
 
 import java.security.MessageDigest;
 import java.util.Base64;
@@ -68,7 +65,7 @@ public class DBUtil {
 
    public static void addTestIdInstance(IDBObject inst, String idName) {
       if (testMode) {
-         DBObject dbObj = inst.getDBObject();
+         DBObject dbObj = (DBObject) inst.getDBObject();
          if (!dbObj.isPrototype() && !dbObj.isTransient())
             addTestId(dbObj.dbTypeDesc, (Long) dbObj.getDBId(), idName);
          else {
@@ -86,7 +83,7 @@ public class DBUtil {
             testInstMap.remove(inst);
             Object id = inst.getDBId();
             if (id instanceof Long) {
-               addTestId(inst.getDBObject().dbTypeDesc, (Long) id, idName);
+               addTestId(((DBObject) inst.getDBObject()).dbTypeDesc, (Long) id, idName);
             }
             else
                DBUtil.error("*** Unrecognized id type in mapTestInstance");
@@ -322,6 +319,19 @@ public class DBUtil {
       return getResultSetByName(rs, colName, propertyType, colType, dbProp.refDBTypeDesc);
    }
 
+   static JSONResolver refResolver = new JSONResolver() {
+      public Object resolveRef(String refName, Object propertyType) {
+         if (refName.startsWith("db:")) {
+            String idStr = refName.substring(3);
+            DBTypeDescriptor typeDesc = DBTypeDescriptor.getByType(propertyType, true);
+            Object dbId = typeDesc.stringToId(idStr);
+            return typeDesc.findById(dbId);
+         }
+         else
+            return DynUtil.resolveName(refName, true, false);
+      }
+   };
+
    public static Object getResultSetByName(ResultSet rs, String colName, Object propertyType, DBColumnType colType, DBTypeDescriptor refType) throws SQLException {
       switch (colType) {
          case Int:
@@ -399,7 +409,7 @@ public class DBUtil {
                String jsonStr = (String) DynUtil.getPropertyValue(ores, "value");
                if (jsonStr == null || jsonStr.length() == 0)
                   return null;
-               return JSON.toObject(propertyType, jsonStr);
+               return JSON.toObject(propertyType, jsonStr, refResolver);
             }
             else
                throw new UnsupportedOperationException("Unrecognized type from getObject");
@@ -500,7 +510,7 @@ public class DBUtil {
                String jsonStr = (String) DynUtil.getPropertyValue(ores, "value");
                if (jsonStr == null || jsonStr.length() == 0)
                   return null;
-               return JSON.toObject(propertyType, jsonStr);
+               return JSON.toObject(propertyType, jsonStr, refResolver);
             }
             else
                throw new UnsupportedOperationException("Unrecognized type from getObject");
