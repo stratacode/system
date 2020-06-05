@@ -168,8 +168,10 @@ public class ClassType extends JavaType {
    public String getAbsoluteGenericTypeName(Object resultType, boolean includeDims) {
       StringBuilder sb = new StringBuilder();
       sb.append(getAbsoluteBaseTypeName());
-      if (typeArguments != null) {  // TODO: Should this be getResolvedTypeArguments?
-         sb.append(typeArguments.toLanguageString());
+
+      SemanticNodeList<JavaType> typeArgs = getResolvedTypeArguments();
+      if (typeArgs != null) {
+         sb.append(typeArgs.toLanguageString(JavaLanguage.getJavaLanguage().optTypeArguments));
       }
       if (includeDims && arrayDimensions != null)
          sb.append(arrayDimensions);
