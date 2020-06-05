@@ -5114,11 +5114,14 @@ public class ModelUtil {
          return res;
       }
       else if (member instanceof ITypedObject) {
-         Object pval = ((ITypedObject) member).getTypeDeclaration();
-         String res = resolveGenericTypeName(getEnclosingType(member), resultType, pval, includeDims);
-         if (res == null)
+         //Object pval = ((ITypedObject) member).getTypeDeclaration();
+         //String res = resolveGenericTypeName(getEnclosingType(member), resultType, pval, includeDims);
+         String newRes = ((ITypedObject) member).getAbsoluteGenericTypeName(resultType, includeDims);
+         //if (res == null)
+         //   res = newRes;
+         if (newRes == null)
             return "Object";
-         return res;
+         return newRes;
       }
       else
          throw new IllegalArgumentException();
