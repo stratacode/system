@@ -507,7 +507,7 @@ public class SelectQuery implements Cloneable {
 
                logPropVal = val;
                if (logResult != null && logResult.result != null) {
-                  logPropVal = logResult.result;
+                  logPropVal = "ref:db:" + logResult.result;
                   logPropName = logPropName + DBPropertyDescriptor.RefIdPropertySuffix;
                }
             }
@@ -588,7 +588,7 @@ public class SelectQuery implements Cloneable {
                Object logPropVal = val;
                if (val == null && logValResult != null && logValResult.result != null) {
                   logPropName = logPropName + DBPropertyDescriptor.RefIdPropertySuffix;
-                  logPropVal = logValResult.result;
+                  logPropVal = "ref:db:" + logValResult.result;
                }
 
                if (revInst != null) {
@@ -600,7 +600,7 @@ public class SelectQuery implements Cloneable {
                if (logSB != null) {
                   logSB.append(logPropName);
                   logSB.append("=");
-                  DBUtil.appendVal(logSB, val, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
+                  DBUtil.appendVal(logSB, logPropVal, propDesc.getDBColumnType(), propDesc.refDBTypeDesc);
                }
             }
          }
@@ -784,7 +784,7 @@ public class SelectQuery implements Cloneable {
                      DBColumnType logColType;
                      if (val == null && refId != null && propDesc.getNeedsRefId()) {
                         propDesc.setRefIdProperty(propDBObj, refId);
-                        logVal = refId;
+                        logVal = "ref:db:" + refId;
                         logName = propDesc.propertyName + DBPropertyDescriptor.RefIdPropertySuffix;
                         logColType = DBColumnType.LongId;
                      }

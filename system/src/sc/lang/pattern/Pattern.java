@@ -275,17 +275,25 @@ public class Pattern extends SemanticNode {
    }
 
    public String replaceString(String fromStr) {
-      ReplaceResult res = doMatch(fromStr, true, null);
-      if (res == null)
-         return null;
-      int fromLen = fromStr.length();
-      if (res.matchedLen == fromLen)
-         return res.result;
-      else if (res.matchedLen > fromLen)
-         throw new IllegalArgumentException("Invalid match result for pattern");
       StringBuilder cres = new StringBuilder();
-      cres.append(res.result);
-      cres.append(fromStr.substring(res.matchedLen));
+      int matchedLen = 0;
+      int fromLen = fromStr.length();
+      String curStr = fromStr;
+      while (matchedLen < fromLen) {
+         ReplaceResult res = doMatch(curStr, true, null);
+         if (res == null || res.matchedLen == 0) {
+            matchedLen++;
+            cres.append(curStr.charAt(0));
+            curStr = curStr.substring(1);
+         }
+         else {
+            cres.append(res.result);
+            matchedLen += res.matchedLen;
+            if (matchedLen < fromLen) {
+               curStr = fromStr.substring(matchedLen);
+            }
+         }
+      }
       return cres.toString();
    }
 

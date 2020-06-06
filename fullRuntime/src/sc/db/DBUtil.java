@@ -215,7 +215,7 @@ public class DBUtil {
          logSB.append(ident);
    }
 
-   private static final long epsilonMillis = 60*60*1000; // less than one hour ago
+   private static final long epsilonMillis = 60*60*1000L; // less than one hour ago
    private static final long monthMillis = 30*24*60*60*1000L; // 30 days ago
 
    public static String formatValue(Object val, DBColumnType type, DBTypeDescriptor refType) {
@@ -241,10 +241,12 @@ public class DBUtil {
                if (millisAgo >= 0) {
                   if (millisAgo < epsilonMillis)
                      return "<recent-date>";
-                  else if (millisAgo < monthMillis + epsilonMillis && millisAgo > monthMillis - epsilonMillis)
-                     return "<month-ago-date>";
                }
-
+               else {
+                  long millisAhead = -millisAgo;
+                  if (millisAhead < monthMillis + epsilonMillis && millisAhead > monthMillis - epsilonMillis)
+                     return "<month-from-now-date>";
+               }
             }
             return val.toString();
          case LongId:
