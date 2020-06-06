@@ -119,7 +119,6 @@ public class HtmlPage extends Html implements IPage {
       Bind.sendEvent(IListener.VALUE_CHANGED, this, _pageVisitProp);
    }
 
-
    // TODO: this only works for the most rudimentary cases and should do escaping etc.
    /*
    public static String query(String url, String param, String value) {

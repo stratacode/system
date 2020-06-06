@@ -28,10 +28,14 @@ public class URLPath implements Comparable {
    @Constant
    public Object pageType;
 
+   @Constant
+   public boolean realTime;
+
    public URLPath(String templatePathName, Object pageType) {
       keyName = templatePathName;
       name = templatePathName;
       this.pageType = pageType;
+      this.realTime = true;
 
       // Turn /path/foo.html into path/foo as a display name
       if (name.startsWith("/"))
@@ -45,11 +49,12 @@ public class URLPath implements Comparable {
       url = templatePathName;
    }
 
-   public URLPath(String url, String name, String keyName, Object pageType) {
+   public URLPath(String url, String name, String keyName, Object pageType, boolean realTime) {
       this.url = url;
       this.name = name;
       this.keyName = keyName;
       this.pageType = pageType;
+      this.realTime = realTime;
    }
 
    public int hashCode() {
@@ -203,7 +208,7 @@ public class URLPath implements Comparable {
    }
 
    public String toString() {
-      return name + ":" + url + " (key=" + keyName + ")";
+      return name + ":" + url + " (key=" + keyName + ", realTime=" + realTime + ")";
    }
 
    public void convertToRelativePath() {

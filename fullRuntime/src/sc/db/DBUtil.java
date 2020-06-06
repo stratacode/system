@@ -36,6 +36,7 @@ public class DBUtil {
 
    public static Map<String,Map<Long,String>> testIdNameMap = null;
    public static WeakIdentityHashMap<IDBObject, String> testInstMap = null;
+   public static Map<String,String> testTokens = null;
 
    public static IMessageHandler msgHandler;
 
@@ -51,6 +52,14 @@ public class DBUtil {
          }
          idMap.put(id, idName);
       }
+   }
+
+   public static void addTestToken(String token, String name) {
+      if (!testMode)
+         return;
+      if (testTokens == null)
+         testTokens = new HashMap<String,String>();
+      testTokens.put(token, name);
    }
 
    public static String getTestId(DBTypeDescriptor typeDesc, long id) {
@@ -71,7 +80,9 @@ public class DBUtil {
          else {
             if (testInstMap == null)
                testInstMap = new WeakIdentityHashMap<IDBObject, String>();
-            testInstMap.put(inst, idName);
+            String oldIdName = testInstMap.put(inst, idName);
+            if (oldIdName != null)
+               info("replaced instance id: " + oldIdName + " with: " + idName);
          }
       }
    }
@@ -204,20 +215,36 @@ public class DBUtil {
          logSB.append(ident);
    }
 
+   private static final long epsilonMillis = 60*60*1000; // less than one hour ago
+   private static final long monthMillis = 30*24*60*60*1000L; // 30 days ago
+
    public static String formatValue(Object val, DBColumnType type, DBTypeDescriptor refType) {
       if (val == null)
          return "null";
       switch (type) {
          case String:
+            if (testMode) {
+               if (testTokens != null) {
+                  String tokenId = testTokens.get(val.toString());
+                  if (tokenId != null) {
+                     return "<" + tokenId + ">";
+                  }
+               }
+            }
             return "\"" + val + "\"";
          case Date:
             // We want to record dates that are in the past to catch logic errors but recent dates in the
             // test are last-modified or created-on dates that change from run to run so we return a code instead
             if (testMode) {
                Date dateVal = (Date) val;
-               long dateDiff = System.currentTimeMillis() - dateVal.getTime();
-               if (dateDiff >= 0 && dateDiff < 60*60*1000)
-                  return "<recent-date>";
+               long millisAgo = System.currentTimeMillis() - dateVal.getTime();
+               if (millisAgo >= 0) {
+                  if (millisAgo < epsilonMillis)
+                     return "<recent-date>";
+                  else if (millisAgo < monthMillis + epsilonMillis && millisAgo > monthMillis - epsilonMillis)
+                     return "<month-ago-date>";
+               }
+
             }
             return val.toString();
          case LongId:
@@ -727,14 +754,20 @@ public class DBUtil {
    public static String createSecureUniqueToken() {
       byte[] buf = new byte[20];
       randGen.nextBytes(buf);
-      return base64Encoder.encodeToString(buf);
+      String res = base64Encoder.encodeToString(buf);
+      if (testMode)
+         addTestToken(res, "secure-token");
+      return res;
    }
 
    public static String createSalt() {
       SecureRandom random = new SecureRandom();
       byte[] salt = new byte[16];
       random.nextBytes(salt);
-      return base64Encoder.encodeToString(salt);
+      String res = base64Encoder.encodeToString(salt);
+      if (testMode)
+         addTestToken(res, "secure-salt");
+      return res;
    }
 
    public static String hashPassword(String salt64, String password) {
@@ -743,7 +776,10 @@ public class DBUtil {
          MessageDigest md = MessageDigest.getInstance("SHA-512");
          md.update(salt);
          byte[] buf = md.digest(password.getBytes(StandardCharsets.UTF_8));
-         return base64Encoder.encodeToString(buf);
+         String res = base64Encoder.encodeToString(buf);
+         if (testMode)
+            addTestToken(res, "password-hash");
+         return res;
       }
       catch (NoSuchAlgorithmException exc) {
          throw new IllegalArgumentException("DBUtil.hashPassword failed with: " + exc);

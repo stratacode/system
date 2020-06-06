@@ -700,7 +700,10 @@ public class BuildInfo {
       }
    }
 
-   /** Returns all of the declared URL top-level system types, including those in the mainInit and URLTypes type groups. */
+   /**
+    * Returns all of the declared URL top-level system types, including those in the mainInit and URLTypes type groups.
+    * It also includes any @URL(testURLs=...) that are found.
+    */
    public List<URLPath> getURLPaths() {
       ArrayList<URLPath> res = null;
       try {
@@ -742,11 +745,10 @@ public class BuildInfo {
                String annotURL = (String) memb.getAnnotationValue("sc.html.URL", "pattern");
                // When the server is not enabled, the URLPath's have to refer to the file system right now.
                // TODO: add a hook so for static sites (!serverEnabled), we could generate the path-mapping file for some other web server apache, nginx, etc?
-               if (annotURL != null) {
-
-               }
                if (annotURL != null && system.serverEnabled)
                   path.url = annotURL;
+               Boolean realTimeDef = (Boolean) memb.getAnnotationValue("sc.html.URL", "realTime");
+               path.realTime = realTimeDef == null || realTimeDef;
                if (!system.serverEnabled) {
                   path.convertToRelativePath();
                }
@@ -760,6 +762,7 @@ public class BuildInfo {
                      URLPath testURLPath = new URLPath(memb.templatePathName + "/test" + testIx,
                                                         memb.getType());
                      testURLPath.url = testURL;
+                     testURLPath.realTime = path.realTime;
                      if (!res.contains(testURLPath))
                         res.add(testURLPath);
                      testIx++;
