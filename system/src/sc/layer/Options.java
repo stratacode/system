@@ -602,6 +602,7 @@ public class Options {
                   }
                   else if (opt.equals("t")) {
                      testMode = true;
+                     headlessSet = true;
                      if (i == args.length - 1)
                         System.err.println("*** missing arg to run -t option");
                      else {
@@ -626,12 +627,6 @@ public class Options {
                   }
                   else
                      Options.usage("Unrecognized option: " + opt, args);
-                  break;
-               case 'y':
-                  if (opt.equals("yh")) {
-                     System.out.println("Warning - deprecated yh option - use sw instead");
-                     headlessSet = true;
-                  }
                   break;
                case 'u':
                   if (opt.equals("u"))
