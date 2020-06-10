@@ -145,7 +145,7 @@ public class JSONDeserializer implements JSONResolver {
       if (sz > 0 && prefixParent) {
          String prefix = null;
          for (int i = 0; i < sz; i++) {
-            prefix = CTypeUtil.prefixPath(curTypeNames.get(i), prefix);
+            prefix = CTypeUtil.prefixPath(prefix, curTypeNames.get(i));
          }
          name = CTypeUtil.prefixPath(prefix, name);
       }
