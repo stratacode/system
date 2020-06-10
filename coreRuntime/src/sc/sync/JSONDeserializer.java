@@ -218,6 +218,12 @@ public class JSONDeserializer implements JSONResolver {
             }
             else {
                Object inst = resolveObject(nextNameStr, true);
+               // If we are setting a map property that already has an old map value, the resolveObject returns it as an object
+               // but this operation is not incremental - it's replacing the old map with a new one.
+               // TODO: right now, the map serialization is not incremental but maybe if we have an event-aware map, we can track keys being added/removed
+               // and send over commands to add/remove from the map
+               if (inst instanceof HashMap)
+                  inst = null;
                // If there's no object name, it might be a map property
                if (inst == null) {
                   // Collect the object value as a HashMap in case it's a Map property.  We'll get an error when we try to set it if it's not a map property
