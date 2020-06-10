@@ -34,10 +34,18 @@ public class SyncPropOptions {
 
    public String propName;
    public int flags;
+   public boolean hasDefault;
+   public Object defaultValue;
 
    public SyncPropOptions(String propName, int flags) {
       this.propName = propName;
       this.flags = flags;
+   }
+
+   public SyncPropOptions(String propName, int flags, Object defaultValue) {
+      this(propName, flags);
+      hasDefault = true;
+      this.defaultValue = defaultValue;
    }
 
    public String toString() {
@@ -57,6 +65,8 @@ public class SyncPropOptions {
          sb.append(" (constant)");
       if ((flags & SYNC_STATIC) != 0)
          sb.append(" (static)");
+      if (hasDefault)
+         sb.append(" fixed default: " + defaultValue);
       return sb.toString();
    }
 

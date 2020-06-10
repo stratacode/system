@@ -1621,8 +1621,27 @@ public class SyncManager {
             if (initial)
                addInitialValue(inst, ii, propName, curVal);
 
+            boolean addInitialValue;
+
+            if (!addPropChanges)
+               addInitialValue = false;
+            else {
+               // When the SyncProp is configured internally with a default value, the logic for determining when
+               // a value has changed because simpler and more robust. With the SYNC_INIT flag, we might miss a property
+               // change that needs to be sent but that happens before the addSyncInst call is made and the listener added.
+               boolean hasDefaultValue = syncProps.hasDefaultValue(propName);
+               if (hasDefaultValue) {
+                  Object defaultValue = syncProps.getDefaultValue(propName);
+                  addInitialValue = !DynUtil.equalObjects(defaultValue, curVal);
+               }
+               else if ((flags & SyncPropOptions.SYNC_INIT) != 0 && curVal != null)
+                  addInitialValue = true;
+               else
+                  addInitialValue = false;
+            }
+
             // On refresh, the initial sync layer will already have the change in the right order - if we re-add it, we mess up the order
-            if (addPropChanges && (flags & SyncPropOptions.SYNC_INIT) != 0 && curVal != null) {
+            if (addInitialValue) {
                SyncLayer toUse = null;
 
                // On the server, on demand properties, when initialized act just like regular property changes - i.e. must go into the init layer and the change layer.
@@ -1800,6 +1819,8 @@ public class SyncManager {
 
       public void addMethodResult(Object ctxObj, Object type, String callId, Object retValue, String exceptionStr) {
          SyncLayer changedLayer = getChangedSyncLayer(null);
+         if (exceptionStr != null)
+            System.err.println("Remote method: " + name + " - runtime exception: " + exceptionStr);
          if (trace || verbose || verboseValues) {
             System.out.println("Add method result: " + callId + " scope: " + name + (!needsSync ? " *** first change in sync" : ""));
          }

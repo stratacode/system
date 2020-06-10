@@ -9,6 +9,7 @@ import sc.util.IntCoalescedHashMap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 
 /** Represents a set of properties which are synchronized to a specific destination. */
@@ -49,6 +50,8 @@ public class SyncProperties {
 
    Object[] staticProps;
 
+   HashMap<String,Object> defaultValueMap = null;
+
    public SyncProperties(String destName, String syncGroup, Object[] props, int defaultPropOptions) {
       this(destName, syncGroup, props, null, defaultPropOptions, -1);
    }
@@ -76,18 +79,29 @@ public class SyncProperties {
       ArrayList<Object> newProps = null;
       ArrayList<Object> newStaticProps = null;
       if (props != null) {
-         if (chainedProps != null)
+         if (chainedProps != null) {
             propIndex.putAll(chainedProps.propIndex);
+            if (chainedProps.defaultValueMap != null)
+               chainedProps.defaultValueMap = new HashMap<String,Object>(chainedProps.defaultValueMap);
+         }
          for (Object prop:props) {
             int options;
             String propName;
             if (prop instanceof SyncPropOptions) {
                SyncPropOptions opt = (SyncPropOptions) prop;
+               /*
                // TODO: should there be a way to turn off SYNC_INIT when initDefault is true?  Or should SYNC_INIT be the default?
                if (initDefault)
                   opt.flags |= SyncPropOptions.SYNC_INIT;
+               */
                options = opt.flags;
                propName = opt.propName;
+
+               if (opt.hasDefault) {
+                  if (defaultValueMap == null)
+                     defaultValueMap = new HashMap<String,Object>();
+                  defaultValueMap.put(propName, opt.defaultValue);
+               }
             }
             else {
                options = defaultPropOptions;
@@ -133,6 +147,14 @@ public class SyncProperties {
       return propIndex == null ? -1 : propIndex.get(prop);
    }
 
+   public boolean hasDefaultValue(String prop) {
+      return defaultValueMap != null && defaultValueMap.containsKey(prop);
+   }
+
+   public Object getDefaultValue(String prop) {
+      return defaultValueMap.get(prop);
+   }
+
    public int getNumProperties() {
       if (allProps == null)
          return 0;
@@ -166,10 +188,16 @@ public class SyncProperties {
       for (Object prop: other.classProps) {
          String propName;
          int propFlags;
+         boolean hasDefault = false;
+         Object defaultValue = null;
          if (prop instanceof SyncPropOptions) {
             SyncPropOptions opts = (SyncPropOptions) prop;
             propName = opts.propName;
             propFlags = opts.flags;
+            if (opts.hasDefault) {
+               hasDefault = true;
+               defaultValue = opts.defaultValue;
+            }
          }
          else {
             propName = (String) prop;
@@ -191,6 +219,11 @@ public class SyncProperties {
                myProps = new ArrayList<Object>(Arrays.asList(classProps));
             myProps.add(prop);
             propIndex.put(propName, propFlags);
+            if (hasDefault) {
+               if (defaultValueMap == null)
+                  defaultValueMap = new HashMap<String,Object>();
+               defaultValueMap.put(propName, defaultValue);
+            }
          }
       }
       if (myProps != null) {
