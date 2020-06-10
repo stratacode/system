@@ -13,6 +13,7 @@ import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
+import sc.type.Type;
 import sc.type.TypeUtil;
 import sc.lang.java.*;
 import sc.parser.*;
@@ -132,7 +133,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
             }
             else if (initType != propType) {
                if (ModelUtil.isANumber(propType)) {
-                  needsCastOnConvert = true;
+                  // It's a syntax error if we do Integer foo = (java.lang.Integer) -1;
+                  if (!ModelUtil.isPrimitiveNumberType(propType) && !ModelUtil.isPrimitiveNumberType(initType))
+                     needsCastOnConvert = true;
+                  // TODO for the else here are there other cases that need the cast?
                }
             }
          }
