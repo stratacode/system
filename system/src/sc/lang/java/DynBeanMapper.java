@@ -16,7 +16,7 @@ import java.lang.reflect.Method;
 
 /** This gets created for any property which is implemented by a dynamic field or dynamic get/set methods */
 public class DynBeanMapper extends AbstractBeanMapper {
-   Object field, getSelector, setSelector, ownerType;
+   Object field, getSelector, setSelector, ownerType, validateMethod;
 
    private final static int GET_IS_DYN = 2;
    private final static int SET_IS_DYN = 4;
@@ -53,6 +53,7 @@ public class DynBeanMapper extends AbstractBeanMapper {
    public DynBeanMapper(IBeanMapper base) {
       setGetSelector(base.getGetSelector());
       setSetSelector(base.getSetSelector());
+      setValidateMethod(base.getValidateMethod());
       field = base.getField();
       instPosition = base.getPropertyPosition();
       staticPosition = base.getStaticPropertyPosition();
@@ -391,4 +392,11 @@ public class DynBeanMapper extends AbstractBeanMapper {
       return null;
    }
 
+   public void setValidateMethod(Object meth) {
+      this.validateMethod = meth;
+   }
+
+   public Object getValidateMethod() {
+      return this.validateMethod;
+   }
 }

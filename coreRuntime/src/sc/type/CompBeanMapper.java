@@ -116,6 +116,10 @@ public class CompBeanMapper extends AbstractBeanMapper {
       throw new UnsupportedOperationException();
    }
 
+   public Object getValidateMethod() {
+      throw new UnsupportedOperationException();
+   }
+
    public void setConstant(boolean val) {
       constant = val;
    }

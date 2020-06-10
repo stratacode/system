@@ -16,7 +16,7 @@ public class BeanMapper extends AbstractBeanMapper {
 
    // TODO: performance - keep track of the type of each of up front these so we can just call "invoke" directly
    // without the instance of test in TypeUtil.setPropertyValue each time.
-   protected Object getSelector, setSelector;
+   protected Object getSelector, setSelector, validateMethod;
 
    // TODO: performance: use bit masks and only store one position?
    public int instPosition = -1;
@@ -303,6 +303,14 @@ public class BeanMapper extends AbstractBeanMapper {
 
    public Object getOwnerType() {
       return ownerType;
+   }
+
+   public void setValidateMethod(Object validateMethod) {
+      this.validateMethod = validateMethod;
+   }
+
+   public Object getValidateMethod() {
+      return validateMethod;
    }
 
 }

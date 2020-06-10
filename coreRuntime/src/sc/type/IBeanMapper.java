@@ -52,6 +52,8 @@ public interface IBeanMapper extends IBinding, Comparable<IBeanMapper> {
 
    Object getSetSelector();
 
+   Object getValidateMethod();
+
    /** Forces a property mapping to be treated as constant, i.e. attempts to change it will result in an error, no need to listen for changes */
    void setConstant(boolean val);
 

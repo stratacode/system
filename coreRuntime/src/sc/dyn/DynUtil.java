@@ -1917,4 +1917,41 @@ public class DynUtil {
          return true;
       return false;
    }
+
+   public static Map<String,String> validateProperties(Object obj, List<String> propNames) {
+      IBeanMapper[] props = DynUtil.getProperties(DynUtil.getType(obj));
+      TreeMap<String,String> resMap = null;
+      for (IBeanMapper prop: props) {
+         if (prop == null)
+            continue;
+         String propName = prop.getPropertyName();
+         if (propName == null)
+            continue;
+         if (propNames == null || propNames.contains(propName)) {
+            Object validateMethod = prop.getValidateMethod();
+            if (validateMethod == null) {
+               if (propNames != null)
+                  throw new IllegalArgumentException("Specified property: " + propName + " has no validate" + CTypeUtil.capitalizePropertyName(propName) + "() method");
+               continue;
+            }
+            Object[] paramTypes = DynUtil.getParameterTypes(validateMethod);
+            Object res;
+            if (paramTypes.length == 0) {
+               res = DynUtil.invokeMethod(obj, validateMethod);
+            }
+            else if (paramTypes.length == 1) {
+               res = DynUtil.invokeMethod(obj, validateMethod, DynUtil.getProperty(obj, propName));
+            }
+            else {
+               throw new IllegalArgumentException("Invalid validator: " + validateMethod + " - should have zero or one parameter");
+            }
+            if(res != null) {
+               if (resMap == null)
+                  resMap = new TreeMap<String,String>();
+               resMap.put(propName, res.toString());
+            }
+         }
+      }
+      return resMap;
+   }
 }

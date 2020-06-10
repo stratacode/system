@@ -27,6 +27,7 @@ import sc.util.*;
 
 import java.io.File;
 import java.io.Serializable;
+import java.lang.reflect.Modifier;
 import java.util.*;
 
 /**
@@ -3529,6 +3530,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             }
          }
 
+         TreeMap<String,IBeanMapper> pendingValidates = null;
+
          for (int i = 0; i < size; i++) {
             Statement st = body.get(i);
             if (st instanceof MethodDefinition) {
@@ -3537,6 +3540,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                Object[] ptypes;
                String propName;
                PropertyMethodType type;
+
+               if (method.hasModifier("private"))
+                  continue;
 
                char c = name.charAt(0);
                switch (c) {
@@ -3572,14 +3578,33 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      propName = CTypeUtil.decapitalizePropertyName(name.substring(2));
                      type = PropertyMethodType.Is;
                      break;
+                  case 'v':
+                     if (!name.startsWith("validate"))
+                        continue;
+                     ptypes = method.getParameterTypes(false);
+                     if (ptypes != null && ptypes.length != 0 && ptypes.length != 1 || name.length() < 9)
+                        continue;
+                     Object retType = method.getReturnType(false);
+                     if (!ModelUtil.sameTypes(retType, String.class))
+                        continue;
+                     propName = CTypeUtil.decapitalizePropertyName(name.substring(8));
+                     type = PropertyMethodType.Validate;
+                     break;
                   default:
                      continue;
                }
-               if (type == null || propName.length() == 0)
+               if (propName.length() == 0)
                   continue;
 
                boolean isStatic = method.hasModifier("static");
                mapper = cache.getPropertyMapper(propName);
+               if (mapper == null && pendingValidates != null && type != PropertyMethodType.Validate) {
+                  mapper = pendingValidates.get(propName);
+                  if (mapper != null) {
+                     cache.addProperty(propName, mapper);
+                     pendingValidates.remove(propName);
+                  }
+               }
                if (mapper == null) {
                   newMapper = new DynBeanMapper();
                   if (isStatic) {
@@ -3592,7 +3617,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      else
                         newMapper.instPosition = cache.propertyCount++;
                   }
-                  cache.addProperty(propName, newMapper);
+                  // This logic is to avoid adding a property with no get or set method but with a validate method
+                  if (type == PropertyMethodType.Validate) {
+                     if (pendingValidates == null)
+                        pendingValidates = new TreeMap<String,IBeanMapper>();
+                     pendingValidates.put(propName, mapper);
+                  }
+                  else
+                     cache.addProperty(propName, newMapper);
                }
                else {
                   if (superType != null && superType.getPropertyMapper(propName) == mapper) {
@@ -3686,11 +3718,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      }
                      ((DynBeanIndexMapper) newMapper).setIndexMethod = method;
                      break;
+                  case Validate:
+                     newMapper.setValidateMethod(method);
+                     break;
                }
             }
          }
       }
-
    }
 
    public Object getExtendsTypeDeclaration() {

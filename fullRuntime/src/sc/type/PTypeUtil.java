@@ -701,6 +701,8 @@ public class PTypeUtil {
             numFieldsCached++;
          }
 
+         TreeMap<String,BeanMapper> pendingValidates = null;
+
          for (int i = 0; i < methods.length; i++) {
             Method method = methods[i];
             method.setAccessible(true);
@@ -712,9 +714,9 @@ public class PTypeUtil {
             char c = name.charAt(0);
             switch (c) {
                case 's':
-                  ptypes = method.getParameterTypes();
                   if (!name.startsWith("set") || Modifier.isPrivate(method.getModifiers()))
                      continue;
+                  ptypes = method.getParameterTypes();
                   if (ptypes.length == 1)
                      type = PropertyMethodType.Set;
                   else if (ptypes.length == 2 && ptypes[0] == int.class)
@@ -724,9 +726,9 @@ public class PTypeUtil {
                   propName = CTypeUtil.decapitalizePropertyName(name.substring(3));
                   break;
                case 'g':
-                  ptypes = method.getParameterTypes();
                   if (!name.startsWith("get") || Modifier.isPrivate(method.getModifiers()))
                      continue;
+                  ptypes = method.getParameterTypes();
                   if (ptypes.length == 0)
                      type = PropertyMethodType.Get;
                   else if (ptypes.length == 1 && ptypes[0] == int.class)
@@ -743,6 +745,18 @@ public class PTypeUtil {
                   propName = CTypeUtil.decapitalizePropertyName(name.substring(2));
                   type = PropertyMethodType.Is;
                   break;
+               case 'v':
+                  if (!name.startsWith("validate") || Modifier.isPrivate(method.getModifiers()))
+                     continue;
+                  ptypes = method.getParameterTypes();
+                  if (ptypes.length != 0 && ptypes.length != 1 || name.length() < 9)
+                     continue;
+                  Class retType = method.getReturnType();
+                  if (retType != String.class)
+                     continue;
+                  propName = CTypeUtil.decapitalizePropertyName(name.substring(8));
+                  type = PropertyMethodType.Validate;
+                  break;
                default:
                   continue;
             }
@@ -753,6 +767,13 @@ public class PTypeUtil {
 
             boolean isStatic = Modifier.isStatic(method.getModifiers());
             mapper = (BeanMapper) cache.getPropertyMapper(propName);
+            if (mapper == null && pendingValidates != null && type != PropertyMethodType.Validate) {
+               mapper = pendingValidates.get(propName);
+               if (mapper != null) {
+                  cache.addProperty(propName, mapper);
+                  pendingValidates.remove(propName);
+               }
+            }
             if (mapper == null) {
                mapper = new BeanMapper();
                if (isStatic) {
@@ -763,7 +784,14 @@ public class PTypeUtil {
                   mapper.instPosition = pos++;
                else
                   mapper.instPosition = IBeanMapper.DYNAMIC_LOOKUP_POSITION;  // Interfaces need to do a dynamic lookup
-               cache.addProperty(propName, mapper);
+               // This logic is to avoid adding a property with no get or set method but with a validate method
+               if (type == PropertyMethodType.Validate) {
+                  if (pendingValidates == null)
+                     pendingValidates = new TreeMap<String,BeanMapper>();
+                  pendingValidates.put(propName, mapper);
+               }
+               else
+                  cache.addProperty(propName, mapper);
             }
             else {
                boolean cloned = false;
@@ -859,6 +887,9 @@ public class PTypeUtil {
                      mapper = new BeanIndexMapper(mapper);
                   ((BeanIndexMapper) mapper).setIndexMethod = method;
                   cache.addProperty(propName, mapper);
+                  break;
+               case Validate:
+                  mapper.setValidateMethod(method);
                   break;
             }
          }
