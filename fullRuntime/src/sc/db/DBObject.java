@@ -673,7 +673,7 @@ public class DBObject implements IDBObject {
 
    public void registerNew() {
       IDBObject curInst = getInst();
-      IDBObject newInst = dbTypeDesc.registerInstance(curInst);
+      IDBObject newInst = dbTypeDesc.registerInstance(curInst, true);
       if (newInst != null) {
          if (newInst != curInst) {
             System.err.println("*** Warning - registering new instance that has already been replaced!");
@@ -685,7 +685,6 @@ public class DBObject implements IDBObject {
       // Mark all of the property queries in this type as selected so we don't re-query them until the cache is invalidated
       int numFetchQueries = dbTypeDesc.getNumFetchPropQueries();
       synchronized (this) {
-         setTransient(false);
          for (int f = 0; f < numFetchQueries; f++) {
             fstate |= DBObject.FETCHED << (f*2);
          }

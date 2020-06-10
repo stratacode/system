@@ -602,7 +602,7 @@ public class DBPropertyDescriptor {
    public boolean hasValidator() {
       if (!validatorInited) {
          validatorInited = true;
-         validateMethod = DynUtil.resolveMethod(dbTypeDesc.typeDecl, "validate" + CTypeUtil.capitalizePropertyName(propertyName), String.class, null);
+         validateMethod = DynUtil.resolveMethod(dbTypeDesc.typeDecl, "validate" + CTypeUtil.capitalizePropertyName(propertyName), String.class, "Ljava/lang/String;");
       }
       return validateMethod != null;
    }

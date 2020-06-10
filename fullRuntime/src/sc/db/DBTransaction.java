@@ -21,6 +21,8 @@ public class DBTransaction {
    ArrayList<TxOperation> operationList;
    IdentityHashMap<Object,TxOperation> operationIndex;
 
+   ArrayList<TxOperation> operationApplyList;
+
    public long startTime = System.currentTimeMillis();
    public boolean completed = false;
 
@@ -72,6 +74,9 @@ public class DBTransaction {
    public void removeOp(TxOperation op) {
       if (operationList != null && operationList.remove(op))
          operationIndex.remove(op.dbObject);
+      else if (operationApplyList != null && operationApplyList.remove(op)) {
+         return;
+      }
       else
          throw new IllegalArgumentException("tx:removeOp: operation not found");
    }
@@ -84,7 +89,7 @@ public class DBTransaction {
    public void flush() {
       while (operationList != null) {
          ArrayList<TxOperation> toApply = operationList;
-
+         operationApplyList = toApply;
          operationList = null;
          operationIndex = null;
 

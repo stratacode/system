@@ -701,7 +701,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return inst;
    }
 
-   private IDBObject registerInstanceInternal(IDBObject inst) {
+   private IDBObject registerInstanceInternal(IDBObject inst, boolean clearTransient) {
       if (typeInstances == null) {
          initTypeInstances();
       }
@@ -711,16 +711,18 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (res != null)
             return res;
          typeInstances.put(id, inst);
+         if (clearTransient)
+            ((DBObject) inst.getDBObject()).setTransient(false);
       }
       return null;
    }
 
-   public IDBObject registerInstance(IDBObject inst) {
+   public IDBObject registerInstance(IDBObject inst, boolean clearTransient) {
       IDBObject res = null;
       if (baseType != null)
-         res = baseType.registerInstanceInternal(inst);
+         res = baseType.registerInstanceInternal(inst, clearTransient);
       else
-         res = registerInstanceInternal(inst);
+         res = registerInstanceInternal(inst, clearTransient);
 
       DBUtil.mapTestInstance(inst);
       initSyncForInst(inst);
@@ -1601,6 +1603,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          ConditionalBinding cond = (ConditionalBinding) binding;
          IBinding[] params = cond.getBoundParams();
          SelectQuery curQuery = groupQuery.curQuery;
+         String operator = cond.operator;
          boolean needsParen = curQuery != null;
          if (needsParen) {
             curQuery.whereAppend("(");
@@ -1608,9 +1611,20 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          for (int i = 0; i < params.length; i++) {
             IBinding param = params[i];
             if (i != 0) {
-               groupQuery.curQuery.whereAppend(" ");
-               groupQuery.curQuery.whereAppend(DBUtil.cvtJavaToSQLOperator(cond.operator).toString());
-               groupQuery.curQuery.whereAppend(" ");
+               if (param instanceof ConstantBinding && ((ConstantBinding) param).getConstantValue() == null) {
+                  if (operator.equals("=="))
+                     groupQuery.curQuery.whereAppend(" IS NULL");
+                  else if (operator.equals("!="))
+                     groupQuery.curQuery.whereAppend(" IS NOT NULL");
+                  else
+                     System.err.println("*** Unsupported operator with null comparison in db query: " + operator);
+                  continue;
+               }
+               else {
+                  groupQuery.curQuery.whereAppend(" ");
+                  groupQuery.curQuery.whereAppend(DBUtil.cvtJavaToSQLOperator(operator).toString());
+                  groupQuery.curQuery.whereAppend(" ");
+               }
             }
             appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, param);
          }

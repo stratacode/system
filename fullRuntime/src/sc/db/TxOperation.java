@@ -115,36 +115,41 @@ public abstract class TxOperation {
       StringBuilder sb = new StringBuilder();
       sb.append("INSERT INTO ");
       DBUtil.appendIdent(sb, null, insertTable.tableName);
-      sb.append("(");
-      for (int i = 0; i < numCols; i++) {
-         if (i != 0) {
-            sb.append(", ");
-         }
-         DBUtil.appendIdent(sb, null, columnNames.get(i));
-      }
-      sb.append(") VALUES (");
-
-      if (logSB != null)
-         logSB.append(sb);
-
-      for (int i = 0; i < numCols; i++) {
-         if (i != 0) {
-            sb.append(", ");
-            if (logSB != null)
-               logSB.append(", ");
-         }
-         sb.append("?");
-         if (logSB != null) {
-            DBTypeDescriptor colRefType = columnRefTypes.get(i);
-            DBColumnType colType = columnTypes.get(i);
-            if (colRefType != null && colType != DBColumnType.Json)
-               colType = DBColumnType.LongId;
-            logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType));
-         }
-      }
 
       StringBuilder rest = new StringBuilder();
-      rest.append(")");
+      if (numCols == 0) {
+         sb.append(" DEFAULT VALUES");
+      }
+      else {
+         sb.append("(");
+         for (int i = 0; i < numCols; i++) {
+            if (i != 0) {
+               sb.append(", ");
+            }
+            DBUtil.appendIdent(sb, null, columnNames.get(i));
+         }
+         sb.append(") VALUES (");
+
+         if (logSB != null)
+            logSB.append(sb);
+
+         for (int i = 0; i < numCols; i++) {
+            if (i != 0) {
+               sb.append(", ");
+               if (logSB != null)
+                  logSB.append(", ");
+            }
+            sb.append("?");
+            if (logSB != null) {
+               DBTypeDescriptor colRefType = columnRefTypes.get(i);
+               DBColumnType colType = columnTypes.get(i);
+               if (colRefType != null && colType != DBColumnType.Json)
+                  colType = DBColumnType.LongId;
+               logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType));
+            }
+         }
+         rest.append(")");
+      }
 
       if (dbIdCols != null) {
          rest.append(" RETURNING ");
