@@ -5173,7 +5173,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public static String escAtt(CharSequence in, boolean singleQuote) {
       if (in == null)
-         return null;
+         return "";
       return StringUtil.escapeQuotes(in, singleQuote);
    }
 
@@ -5349,6 +5349,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public ServerTag serverTagInfo = null;
 
+   public void addServerTagFlags(ServerTag st) {
+   }
+
    public ServerTag getServerTagInfo(String id) {
       if (serverTagInfo != null)
          return serverTagInfo;
@@ -5359,6 +5362,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          stag = new ServerTag();
          stag.id = id;
          stag.eventSource = isEventSource();
+         addServerTagFlags(stag);
       }
       if (listeners != null) {
          stag = addServerTagProps(listeners, stag, HTMLElement.domAttributes);

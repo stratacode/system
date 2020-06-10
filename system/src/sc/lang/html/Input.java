@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.js.ServerTag;
 import sc.lang.java.TypeDeclaration;
 import sc.type.IBeanMapper;
 
@@ -57,11 +58,12 @@ public class Input extends HTMLElement {
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _sizeProp, _s);
    }
 
-   private String value;
+   private String value = "";
    @Bindable(manual=true) public String getValue() {
       return value;
    }
    @Bindable(manual=true) public void setValue(String _value) {
+      if (_value == null) _value = "";
       value = _value;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _valueProp, _value);
    }
@@ -108,5 +110,13 @@ public class Input extends HTMLElement {
    @sc.obj.EditorSettings(visible=false)
    public boolean isEventSource() {
       return true;
+   }
+
+   public boolean liveEdit = true;
+   public int liveEditDelay = 0;
+
+   public void addServerTagFlags(ServerTag st) {
+      st.liveEdit = liveEdit;
+      st.liveEditDelay = liveEditDelay;
    }
 }
