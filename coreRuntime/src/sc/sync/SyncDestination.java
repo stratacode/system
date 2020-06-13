@@ -235,6 +235,7 @@ public abstract class SyncDestination {
       }
 
       public void completeSync(Integer errorCode, String message) {
+         //System.out.println("Completing sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
          updateInProgress(false, anyChanges);
          if (syncLayers != null) {
             for (SyncLayer syncLayer:syncLayers) {
@@ -263,12 +264,18 @@ public abstract class SyncDestination {
          // The server reset it's session which means it cannot respond to the sync.  We respond by sending the initial layer
          // to the server to reset it's data to what we have.
          if (errorCode == 205) {
+            System.out.println("Error 205 for sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
+            // TODO: do we need this call here?
+            //updateInProgress(false, anyChanges);
             setConnected(true);
             ArrayList<SyncLayer> toSend = clientContext.getChangedSyncLayers(null);
             SyncResult res = sendResetSync(clientContext, toSend);
          }
          // Server went away and told us it wasn't coming back so turn off realTime and we are now disconnected
          else if (errorCode == 410) {
+            System.out.println("Error 410 for sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
+            // TODO: do we need this call here?
+            //updateInProgress(false, anyChanges);
             setConnected(false);
             realTime = false;
             System.out.println("*** Server shutdown");
@@ -295,6 +302,7 @@ public abstract class SyncDestination {
                   syncManager.scheduleConnectSync(currentReconnectTime);
                }
             }
+            System.out.println("Other Error for sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
             completeSync(errorCode, error == null ? null : error.toString());
             if (!serverError)
                applySyncLayer((String) error, null, null, false, "error response");
@@ -333,6 +341,7 @@ public abstract class SyncDestination {
                }
                */
          anyChanges = sb.length() > 0;
+         System.out.println("Sending reset sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
          updateInProgress(true, anyChanges);
          writeToDestination(sb.toString(), null, new SyncListener(layers, anyChanges), "reset=true", null);
          complete = true;
@@ -357,7 +366,7 @@ public abstract class SyncDestination {
       }
 
       if (numSendsInProgress < 0 || numSendsInProgress > 10 || numWaitsInProgress < 0 || numWaitsInProgress > 10) {
-         System.err.println("*** Warning: sync destination - invalid parameters: numSends=" + numSendsInProgress + " numWaits" + numWaitsInProgress);
+         System.err.println("*** Warning: sync destination - invalid parameters: numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
       }
    }
 
@@ -399,6 +408,9 @@ public abstract class SyncDestination {
                System.out.println("Sending sync from " + parentContext + " thread:" + DynUtil.getCurrentThreadString() + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
          }
          if (!markAsSentOnly) {
+            //if (numWaitsInProgress > 5)
+            //   System.out.println("*** More than 5 waits in progress");
+            //System.out.println("Sending sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
             updateInProgress(true, anyChanges);
             writeToDestination(layerDef, syncGroup, new SyncListener(layers, anyChanges), null, codeUpdates);
          }

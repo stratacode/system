@@ -2616,7 +2616,7 @@ public class Sequence extends NestedParselet  {
                   PartialArrayResult par = (PartialArrayResult) arrVal;
                   pnode.copyGeneratedFrom(par.resultNode);
                   progress += ctx.progress(par.resultNode);
-                  nodeList = getRemainingValue(nodeList, par.numProcessed);
+                  nodeList = getRemainingValue(nodeList, par.numProcessed, 0);
                   numProcessed += par.numProcessed;
                }
                else if (arrVal instanceof GenerateError) {
@@ -2861,7 +2861,7 @@ public class Sequence extends NestedParselet  {
                               if (nodeVal instanceof GenerateError) {
                                  ((GenerateError)nodeVal).progress += progress;
                                  return optional &&
-                                        emptyValue(ctx, getRemainingValue(nodeList, arrayIndex)) ? null : nodeVal;
+                                        emptyValue(ctx, getRemainingValue(nodeList, arrayIndex, 0)) ? null : nodeVal;
                               }
                               // Make sure we actually consume the array value here.  If the parselet is optional, it could return an empty match instead
                               else if (nodeVal != null && (!(nodeVal instanceof IParseNode) || ((IParseNode) nodeVal).getSemanticValue() == nodeValue))
@@ -2874,9 +2874,20 @@ public class Sequence extends NestedParselet  {
                            }
                         }
                         else {
-                           childValue = getRemainingValue(nodeList, arrayIndex);
+                           int numToTrim = 0;
+                           for (int j = i + 1; j < numParselets; j++) {
+                              if (parameterMapping[j] != ParameterMapping.ARRAY)
+                                 break;
+                              Parselet nextP = parselets.get(j);
+                              if (ParseUtil.isArrayParselet(nextP) || nextP.optional)
+                                 break;
+                              // We need to reserve at least this many array elements to match the
+                              // required scalar that forms part of this array.
+                              numToTrim++;
+                           }
+                           childValue = getRemainingValue(nodeList, arrayIndex, numToTrim);
                            if (childValue != null)
-                              numProcessed = nodeList.size() - arrayIndex;
+                              numProcessed = nodeList.size() - arrayIndex - numToTrim;
                         }
                      }
                      else {
@@ -2893,7 +2904,7 @@ public class Sequence extends NestedParselet  {
                               }
                            }
                            else {
-                              childValue = getRemainingValue((SemanticNodeList) value, arrayIndex);
+                              childValue = getRemainingValue((SemanticNodeList) value, arrayIndex, 0);
                               if (childValue != null)
                                  numProcessed = nodeList.size() - arrayIndex;
                            }

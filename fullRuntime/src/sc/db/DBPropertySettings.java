@@ -2,6 +2,9 @@ package sc.db;
 
 /** Set on a property inside of a class with DBTypeSettings to control how or whether the property is mapped to a column in the DB  */
 public @interface DBPropertySettings {
+   /** Set to false to turn off persistence of this property */
+   boolean persist() default true;
+
    /** Override the default column name to use for this property. The default converts from camelCase to underscore_names */
    String columnName() default "";
    /** A string to define the complete type to use for the type. It should be parseable by the SQLDataType parselet */

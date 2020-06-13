@@ -20,6 +20,12 @@ public class SymbolChoice extends Parselet {
    // Specifies the number of characters to use as an index for choosing the choice
    public int keySize = -1;
 
+   /**
+    * When you have a SymbolChoice that is able to choose from it's values during the generate phase (e.g. the
+    * newline at the end of a CSV row), set this to the value to use
+    */
+   public String defaultGenerateValue = null;
+
    // Match the EOF input
    private boolean matchEOF = false;
 
@@ -545,6 +551,9 @@ public class SymbolChoice extends Parselet {
       IString istr = PString.toIString(value);
 
       if (istr == null) {
+         if (defaultGenerateValue != null)
+            return generateResult(ctx, defaultGenerateValue);
+
          if (optional)
             return null;
 

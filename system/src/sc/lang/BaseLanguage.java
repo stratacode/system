@@ -81,6 +81,9 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    }
 
    public SymbolChoice lineTerminator = new SymbolChoice(NOERROR, "\r\n", "\r", "\n");
+   {
+      lineTerminator.defaultGenerateValue = "\n"; // The symbol to use when generating this node from scratch - i.e. the default terminator
+   }
    public SymbolChoice notLineTerminators = new SymbolChoice(NOT | REPEAT | OPTIONAL | NOERROR, "\r\n", "\r", "\n", Symbol.EOF);
 
    IndexedChoice whiteSpaceChunk = new IndexedChoice("<whitespaceChunk>", NOERROR | OPTIONAL);

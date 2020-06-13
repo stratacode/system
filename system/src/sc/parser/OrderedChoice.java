@@ -1498,7 +1498,7 @@ public class OrderedChoice extends NestedParselet  {
                   if (arrVal instanceof PartialArrayResult) {
                      PartialArrayResult par = (PartialArrayResult) arrVal;
                      pnode.copyGeneratedFrom(par.resultNode);
-                     nodeList = getRemainingValue(nodeList, par.numProcessed);
+                     nodeList = getRemainingValue(nodeList, par.numProcessed, 0);
                      numProcessed += par.numProcessed;
                      progress += ctx.progress(par.resultNode);
                   }

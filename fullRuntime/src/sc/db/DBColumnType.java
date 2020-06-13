@@ -8,21 +8,21 @@ public enum DBColumnType {
    Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId, Numeric, EnumInt, EnumDB;
 
    public static DBColumnType fromJavaType(Object propertyType) {
-      if (propertyType == Integer.class || propertyType == Integer.TYPE) {
+      if (propertyType == java.lang.Integer.class || propertyType == java.lang.Integer.TYPE) {
          return DBColumnType.Int;
       }
-      else if (propertyType == String.class || propertyType == Character.class) {
+      else if (propertyType == java.lang.String.class || propertyType == java.lang.Character.class) {
          return DBColumnType.String;
       }
-      else if (propertyType == Long.class || propertyType == java.lang.Long.TYPE) {
+      else if (propertyType == java.lang.Long.class || propertyType == java.lang.Long.TYPE) {
          return DBColumnType.Long;
       }
-      else if (propertyType == Boolean.class || propertyType == java.lang.Boolean.TYPE) {
+      else if (propertyType == java.lang.Boolean.class || propertyType == java.lang.Boolean.TYPE) {
          return DBColumnType.Boolean;
       }
-      else if (propertyType == Float.class)
+      else if (propertyType == java.lang.Float.class || propertyType == java.lang.Float.TYPE)
          return DBColumnType.Float;
-      else if (propertyType == Double.class)
+      else if (propertyType == java.lang.Double.class || propertyType == java.lang.Double.TYPE)
          return DBColumnType.Double;
       else if (propertyType == java.util.Date.class)
          return DBColumnType.Date;

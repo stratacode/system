@@ -23,8 +23,8 @@ public class ServerTag implements IObjectId {
    /** Set to true for server tags which generate events on the client */
    public boolean eventSource = false;
 
-   /** Set to false for server tags that should not sync their changes */
-   public boolean liveEdit = true;
+   /** Set to 'on', 'off', or 'change' to control how the Input tag sends events */
+   public String liveEdit = "on";
 
    /** Set to the number of millis to pause */
    public int liveEditDelay = 0;

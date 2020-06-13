@@ -493,8 +493,11 @@ public class DBObject implements IDBObject {
       synchronized (this) {
          if ((flags & (REMOVED | STOPPED | PENDING_DELETE)) != 0)
             throw new IllegalStateException("dbInsert on " + getStateString() + " instance: " + this);
-         if ((flags & TRANSIENT) == 0) // TODO: Is this right?
+         if ((flags & TRANSIENT) == 0) {
+            if ((flags & PROTOTYPE) != 0) // TODO: or should we just allow this?
+               throw new IllegalArgumentException("Attempting to insert prototype - use createInstance(), not createPrototype() for instances to be inserted ");
             throw new IllegalArgumentException("Attempting to insert non-transient instance");
+         }
          flags |= PENDING_INSERT;
       }
       DBTransaction curr = DBTransaction.getOrCreate();

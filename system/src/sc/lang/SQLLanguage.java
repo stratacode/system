@@ -392,7 +392,10 @@ public class SQLLanguage extends SCLanguage {
       dimsList.allowNullElements = true; // We need to store an empty element when there are no digits to keep track of the brackets themselves
       dimsList.minContentSlot = 1;
    }
-   public Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", identifier, sizeList, dimsList, intervalOptions);
+   ICKeywordSpace doubleKeyword = new ICKeywordSpace("double");
+   ICKeywordSpace precisionKeyword = new ICKeywordSpace("precision");
+   OrderedChoice typeIdentifier = new OrderedChoice("(.,.)", new Sequence("('','')", doubleKeyword, precisionKeyword), identifier);
+   public Sequence sqlDataType = new Sequence("SQLDataType(typeName,sizeList,dimsList,intervalOptions)", typeIdentifier, sizeList, dimsList, intervalOptions);
 
    Sequence stringLiteralList = new Sequence("([],[])", escapedStringLiteral, new Sequence("(,[])", REPEAT | OPTIONAL, comma, escapedStringLiteral));
 

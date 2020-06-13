@@ -3,6 +3,7 @@ package sc.db;
 import sc.dyn.DynUtil;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
+import sc.type.Type;
 import sc.util.ResultWrapper;
 import sc.util.StringUtil;
 
@@ -10,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -633,4 +635,16 @@ public class DBPropertyDescriptor {
       return refTypeName != null && columnType.equals("jsonb");
    }
 
+   public Object stringToValue(String strVal) {
+      if (propertyType == null)
+         propertyType = getPropertyMapper().getPropertyType();
+      if (propertyType == Date.class)
+         return DynUtil.parseDate(strVal);
+      if (propertyType instanceof Class) {
+         Type t = Type.get((Class) propertyType);
+         if (t != Type.Object)
+            return t.stringToValue(strVal);
+      }
+      throw new IllegalArgumentException("Unable to convert property type: " + propertyType + " from string");
+   }
 }

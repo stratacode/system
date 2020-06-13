@@ -53,6 +53,7 @@ public class CSSLanguage extends TemplateLanguage {
     // CUSTOM CLASS DEFINITIONS FOR CSS PARSING
     //////////////////////////////////////////////////
 
+    // TODO: change this to use the ignoreCase flag in the Symbol as it's a lot faster
     // There is at least 1 case where we need to be able to match a string without case sensitivity (@charset).
     class CaseInsensitiveSequence extends Sequence {
         public CaseInsensitiveSequence(String stringSource){

@@ -1843,6 +1843,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       ds.waitForReady();
    }
 
+   public boolean getSchemaReady() {
+      DBDataSource ds = getDataSource();
+      return ds.getSchemaReady();
+   }
+
    public Object namedQuery(String queryName, Object...args) {
       DBTransaction curTx = DBTransaction.getOrCreate();
       NamedQueryDescriptor namedQuery = namedQueryIndex == null ? null : namedQueryIndex.get(queryName);

@@ -112,7 +112,7 @@ public class Input extends HTMLElement {
       return true;
    }
 
-   public boolean liveEdit = true;
+   public String liveEdit = "on";
    public int liveEditDelay = 0;
 
    public void addServerTagFlags(ServerTag st) {

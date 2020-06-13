@@ -273,12 +273,13 @@ public class SelectQuery implements Cloneable {
       List<IdPropertyDescriptor> idColumns = mainTable.getIdColumns();
       StringBuilder logSB = null;
       boolean origDBChanges = transaction.applyingDBChanges;
+      PreparedStatement st = null;
       try {
          String queryStr = qsb.toString();
          boolean res;
          if (!mainTable.dbTypeDesc.dbDisabled) {
             Connection conn = transaction.getConnection(mainTable.getDataSourceName());
-            PreparedStatement st = conn.prepareStatement(queryStr);
+            st = conn.prepareStatement(queryStr);
             String logStr = DBUtil.verbose ? queryStr : null;
             IDBObject inst = dbObj.getInst();
             for (int i = 0; i < idColumns.size(); i++) {
@@ -332,7 +333,7 @@ public class SelectQuery implements Cloneable {
       finally {
          transaction.applyingDBChanges = origDBChanges;
          if (rs != null)
-            DBUtil.close(rs);
+            DBUtil.close(null, st, rs);
       }
    }
 
@@ -373,6 +374,7 @@ public class SelectQuery implements Cloneable {
       }
 
       boolean origDBChanges = transaction.applyingDBChanges;
+      PreparedStatement st = null;
       try {
          String queryStr = qsb.toString();
          DBList<IDBObject> res = new DBList<IDBObject>();
@@ -380,7 +382,7 @@ public class SelectQuery implements Cloneable {
 
          if (!dbTypeDesc.dbDisabled) {
             Connection conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
-            PreparedStatement st = conn.prepareStatement(queryStr);
+            st = conn.prepareStatement(queryStr);
             IDBObject inst = proto.getInst();
             int numParams = paramValues == null ? 0 : paramValues.size();
             for (int i = 0; i < numParams; i++) {
@@ -440,8 +442,8 @@ public class SelectQuery implements Cloneable {
       }
       finally {
          transaction.applyingDBChanges = origDBChanges;
-         if (rs != null)
-            DBUtil.close(rs);
+         DBUtil.close(rs);
+         DBUtil.close(st);
       }
    }
 

@@ -156,11 +156,12 @@ public class TxUpdate extends VersionedOperation {
             logSB.append(DBUtil.formatValue(opVersion, versProp.getDBColumnType(), null));
       }
 
+      PreparedStatement st = null;
       try {
          if (!dbTypeDesc.dbReadOnly) {
             Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
             String updateStr = sb.toString();
-            PreparedStatement st = conn.prepareStatement(updateStr);
+            st = conn.prepareStatement(updateStr);
             int pos = 1;
             for (int i = 0; i < numCols; i++) {
                DBColumnType colType = columnTypes.get(i);
@@ -210,6 +211,9 @@ public class TxUpdate extends VersionedOperation {
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert without ids sql error: " + exc);
+      }
+      finally {
+         DBUtil.close(st);
       }
 
       return 1;

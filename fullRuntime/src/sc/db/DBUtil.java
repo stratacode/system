@@ -5,10 +5,7 @@ import sc.obj.IObjectId;
 import sc.type.IBeanMapper;
 
 import javax.sql.DataSource;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
@@ -19,15 +16,12 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.ResultSet;
 import java.sql.Types;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import sc.type.Type;
 import sc.util.*;
 
 import java.security.MessageDigest;
-import java.util.Base64;
 
 import static sc.type.PTypeUtil.testMode;
 
@@ -786,6 +780,58 @@ public class DBUtil {
       catch (NoSuchAlgorithmException exc) {
          throw new IllegalArgumentException("DBUtil.hashPassword failed with: " + exc);
       }
+   }
+
+   public static int importCSVFile(String fileName, Object rowType, String separator, List<String> properties) {
+      int lineCt = 0;
+      File file = new File(fileName);
+      BufferedReader reader = null;
+      int numProps = properties.size();
+      DBTypeDescriptor dbTypeDesc = DBTypeDescriptor.getByType(rowType, true);
+      if (dbTypeDesc == null)
+         throw new IllegalArgumentException("No DBTypeDescriptor found for: " + DynUtil.getTypeName(rowType,false));
+      try {
+         FileInputStream fileInput = new FileInputStream(file);
+         reader = new BufferedReader(new InputStreamReader(fileInput, "UTF-8"));
+         String nextLine;
+         while ((nextLine = reader.readLine()) != null) {
+            lineCt++;
+            String[] values = nextLine.split(separator);
+
+            // If there is one fewer value, the last property is treated as empty or null - we just won't set it. We could also make sure there really is a \t\r\n at the end
+            if (values.length != numProps && values.length != numProps - 1)
+               throw new IllegalArgumentException("Column mismatch - file has: " + values.length + " but expected: " + properties.size() + " for line: " + lineCt);
+
+            IDBObject obj = dbTypeDesc.createInstance();
+            int numValues = values.length;
+            for (int pi = 0; pi < numValues; pi++) {
+               String strVal = values[pi];
+               String propName = properties.get(pi);
+               DBPropertyDescriptor propDesc = dbTypeDesc.getPropertyDescriptor(propName);
+               if (propDesc == null)
+                  throw new IllegalArgumentException("No property: " + propName + " in DBTypeDescriptor: " + dbTypeDesc);
+
+               Object val = propDesc.stringToValue(strVal);
+               ((DBObject) obj.getDBObject()).setPropertyInPath(propName, val);
+            }
+            obj.dbInsert(false);
+
+            DynUtil.dispose(obj);
+         }
+      }
+      catch (IOException exc) {
+         throw new IllegalArgumentException(exc.toString());
+      }
+      finally {
+         try {
+            if (reader != null)
+               reader.close();
+         }
+         catch (IOException exc) {
+            System.err.println("*** Error closing reader: " + exc);
+         }
+      }
+      return lineCt;
    }
 
 }

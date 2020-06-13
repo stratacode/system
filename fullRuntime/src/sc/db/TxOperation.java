@@ -166,18 +166,20 @@ public abstract class TxOperation {
       DBDataSource ds = dbTypeDesc.getDataSource();
       boolean addToDB = !dbTypeDesc.dbReadOnly;
 
+      PreparedStatement st = null;
+      ResultSet rs = null;
       try {
          if (addToDB) { // If the db is read-only will store the objects in memory for easier testing, prototyping
             Connection conn = transaction.getConnection(ds.jndiName);
             String statementStr = sb.toString();
-            PreparedStatement st = conn.prepareStatement(statementStr);
+            st = conn.prepareStatement(statementStr);
 
             for (int i = 0; i < numCols; i++) {
                DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
             }
 
             if (dbIdCols != null) {
-               ResultSet rs = st.executeQuery();
+               rs = st.executeQuery();
                if (!rs.next())
                   throw new IllegalArgumentException("Missing returned id result for insert with definedByDB ids: " + dbIdCols);
                if (logSB != null)
@@ -248,6 +250,9 @@ public abstract class TxOperation {
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Insert: " + dbTypeDesc + " with dbIdCols: " + dbIdCols + " returned failed: " + exc);
+      }
+      finally {
+         DBUtil.close(null, st, rs);
       }
       return 1;
    }
@@ -363,11 +368,12 @@ public abstract class TxOperation {
          }
       }
 
+      PreparedStatement st = null;
       try {
          if (!dbTypeDesc.dbReadOnly) {
             Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
             String statementStr = sb.toString();
-            PreparedStatement st = conn.prepareStatement(statementStr);
+            st = conn.prepareStatement(statementStr);
 
             for (int i = 0; i < numCols; i++) {
                DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
@@ -413,6 +419,9 @@ public abstract class TxOperation {
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Delete: " + dbObject + " failed with DB error: " + exc);
+      }
+      finally {
+         DBUtil.close(st);
       }
       return 1;
    }
@@ -574,12 +583,13 @@ public abstract class TxOperation {
          return 0;
 
       boolean addToDB = !dbTypeDesc.dbReadOnly;
+      PreparedStatement st = null;
       ResultSet rs = null;
       try {
          if (addToDB) {
             Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
             String insertStr = sb.toString();
-            PreparedStatement st = conn.prepareStatement(insertStr);
+            st = conn.prepareStatement(insertStr);
 
             for (int ci = 0; ci < columnValues.size(); ci++) {
                DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci));
@@ -666,6 +676,7 @@ public abstract class TxOperation {
       }
       finally {
          DBUtil.close(rs);
+         DBUtil.close(st);
       }
       return 1;
    }
@@ -936,11 +947,12 @@ public abstract class TxOperation {
          }
       }
 
+      PreparedStatement st = null;
       try {
          if (!dbTypeDesc.dbReadOnly) {
             Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
             String statementStr = sb.toString();
-            PreparedStatement st = conn.prepareStatement(statementStr);
+            st = conn.prepareStatement(statementStr);
 
             for (int i = 0; i < numCols; i++) {
                DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
@@ -990,6 +1002,9 @@ public abstract class TxOperation {
       }
       catch (SQLException exc) {
          throw new IllegalArgumentException("*** Delete: " + dbObject + " failed with DB error: " + exc);
+      }
+      finally {
+         DBUtil.close(st);
       }
       return 1;
    }

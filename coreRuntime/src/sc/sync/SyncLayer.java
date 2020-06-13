@@ -305,7 +305,7 @@ public class SyncLayer {
       addChangedValue(obj, propName, val, false);
    }
 
-   private void updateChangedValue(Object obj, String propName, Object val) {
+   private boolean updateChangedValue(Object obj, String propName, Object val) {
       HashMap<String,Object> changeMap = changedValues.get(obj);
       if (changeMap == null) {
          changeMap = new HashMap<String,Object>();
@@ -314,7 +314,8 @@ public class SyncLayer {
 
       // TODO: should we remove the old one if changedBefore is true?  There could be data dependencies so maybe we need to apply them in order, ala a transaction log
       // boolean changedBefore = changeMap.containsKey(propName);
-      changeMap.put(propName, val);
+      Object oldVal = changeMap.put(propName, val);
+      return oldVal != val;
    }
 
    /**
@@ -322,14 +323,16 @@ public class SyncLayer {
     * Use remote = true for changes which originated on the other side
     */
    public void addChangedValue(Object obj, String propName, Object val, boolean remote) {
-      updateChangedValue(obj, propName, val);
+      if (!updateChangedValue(obj, propName, val))
+         return;
 
       SyncChange change = new SyncPropChange(obj, propName, val, remote);
       addSyncChange(change);
    }
 
    public void addDepChangedValue(List<SyncChange> depChanges, Object obj, String propName, Object val, boolean remote) {
-      updateChangedValue(obj, propName, val);
+      if (!updateChangedValue(obj, propName, val))
+         return;
       depChanges.add(new SyncPropChange(obj, propName, val, remote));
    }
 
@@ -724,7 +727,7 @@ public class SyncLayer {
             // sample which only needs the name of the remote object, since the object itself is not sync'd.
             if (parentInstInfo == null) {
                if (isNew) {
-                  System.err.println("*** Invalid sync change - no inst info for new object");
+                  System.err.println("*** Invalid sync change - no inst info for new object"); // TODO: fixme - this is happening when the SyncContext is for a different window - why is it getting queued into this sync layer?
                   return;
                }
             }

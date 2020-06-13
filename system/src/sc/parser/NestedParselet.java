@@ -2405,18 +2405,19 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
    /**
     * Return the remaining items in the list
     */
-   SemanticNodeList getRemainingValue(SemanticNodeList l, int arrayIndex) {
-      if (arrayIndex == 0)
+   SemanticNodeList getRemainingValue(SemanticNodeList l, int arrayIndex, int numToTrim) {
+      if (arrayIndex == 0 && numToTrim == 0)
          return l;
 
-      if (arrayIndex == l.size())
+      if (arrayIndex >= l.size() - numToTrim)
          return null;
 
-      SemanticNodeList sub = new SemanticNodeList(l.size() - arrayIndex);
+      SemanticNodeList sub = new SemanticNodeList(l.size() - arrayIndex - numToTrim);
       sub.parentNode = l.parentNode;
       // Add nodes to a semantic list here but do not change the parent node
       // those values need to stay part of their original graph
-      for (int i = arrayIndex; i < l.size(); i++)
+      int max = l.size() - numToTrim;
+      for (int i = arrayIndex; i < max; i++)
          sub.add(l.get(i), false, true);
       return sub;
    }
@@ -2569,7 +2570,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                      listSize = snl.size();
                      while (ix < snl.size()) {
                         if (ParseUtil.isArrayParselet(p)) {
-                           List childList = getRemainingValue(snl, ix);
+                           List childList = getRemainingValue(snl, ix, 0);
                            // processing one at a time to avoid the whole partial array stuff... will that work?
                            int numMatched = p.updateParseNodes(childList, childParseNode);
 
@@ -2693,7 +2694,7 @@ public abstract class NestedParselet extends Parselet implements IParserConstant
                   ret = num;
                else
                   ret += num;
-               remaining = getRemainingValue(remaining, num);
+               remaining = getRemainingValue(remaining, num, 0);
             } while (remaining.size() > 0);
          }
       }
