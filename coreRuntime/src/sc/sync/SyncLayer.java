@@ -323,16 +323,15 @@ public class SyncLayer {
     * Use remote = true for changes which originated on the other side
     */
    public void addChangedValue(Object obj, String propName, Object val, boolean remote) {
-      if (!updateChangedValue(obj, propName, val))
-         return;
+      // TODO: this returns false if the value has not changed but if we just return, it messes up the ordering in the prepDemoTodoWindow test for an on-demand instance
+      updateChangedValue(obj, propName, val);
 
       SyncChange change = new SyncPropChange(obj, propName, val, remote);
       addSyncChange(change);
    }
 
    public void addDepChangedValue(List<SyncChange> depChanges, Object obj, String propName, Object val, boolean remote) {
-      if (!updateChangedValue(obj, propName, val))
-         return;
+      updateChangedValue(obj, propName, val);
       depChanges.add(new SyncPropChange(obj, propName, val, remote));
    }
 
