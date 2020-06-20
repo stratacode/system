@@ -345,7 +345,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public SymbolChoice escapedStringBody = new SymbolChoice(NOT, "\\", "\"", "\n", EOF);
    public Parselet escapedString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, escapedStringBody);
-   public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "\'", "\n", EOF));
+   public Parselet escapedSingleQuoteString = new OrderedChoice("('','')", OPTIONAL | REPEAT, escapeSequence, new SymbolChoice(NOT, "\\", "'", "\n", EOF));
    {
       escapedString.styleName = escapedSingleQuoteString.styleName = "string";
       escapedSingleQuoteString.setLanguage(this);
