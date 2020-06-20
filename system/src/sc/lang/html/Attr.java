@@ -11,6 +11,7 @@ import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
 import sc.parser.*;
+import sc.type.CTypeUtil;
 import sc.util.FileUtil;
 import sc.util.URLUtil;
 
@@ -47,7 +48,7 @@ public class Attr extends Node implements ISrcStatement {
 
    public String getOutputString() {
       if (valueExpr instanceof StringLiteral)
-         return ((StringLiteral) valueExpr).value;
+         return CTypeUtil.unescapeJavaString(((StringLiteral) valueExpr).value);
       return value.toString();
    }
 
@@ -129,7 +130,7 @@ public class Attr extends Node implements ISrcStatement {
       String op = "=";
       initQuoteType();
       if (PString.isString(attValue)) {
-         String attStr = attValue.toString();
+         String attStr = CTypeUtil.unescapeJavaString(attValue.toString());
          String opStr = getOperationFromExpression(attStr);
 
          Object propType = prop == null ? String.class : ModelUtil.getPropertyType(prop);
