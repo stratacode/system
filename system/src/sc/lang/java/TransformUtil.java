@@ -948,8 +948,6 @@ public class TransformUtil {
       FieldDefinition field = (FieldDefinition) enclDef;
       TypeDeclaration typeDeclaration = field.getEnclosingType();
 
-      if (typeDeclaration.propertiesToMakeBindable != null && typeDeclaration.propertiesToMakeBindable.get(origPropName) != null)
-         return;
 
       LayeredSystem sys = typeDeclaration.getLayeredSystem();
 
@@ -964,6 +962,15 @@ public class TransformUtil {
       params.setMethod = typeDeclaration.declaresMember(origPropName, JavaSemanticNode.MemberType.SetMethodSet, null, null);
 
       params.arrayDimensions = field.type.arrayDimensions;
+
+      if (typeDeclaration.propertiesToMakeBindable != null && typeDeclaration.propertiesToMakeBindable.get(origPropName) != null) {
+         Object getMethod = typeDeclaration.definesMember(origPropName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
+         Object setMethod = typeDeclaration.definesMember(origPropName, JavaSemanticNode.MemberType.SetMethodSet, null, null);
+         // If we are overriding an abstract implementation, continue to convert the field to a getX/setX to implement the interface or abstract methods
+         if ((getMethod == null || !ModelUtil.isAbstractMethod(getMethod)) && (setMethod == null || !ModelUtil.isAbstractMethod(setMethod))) {
+            return;
+         }
+      }
 
       // TODO: Right now we cannot do static bindable properties on interfaces.  Not sure how that will work
       if (toInterface && params.isStatic) {
@@ -1264,7 +1271,10 @@ public class TransformUtil {
       }
 
       if ((getMethod != null && ModelUtil.isAbstractMethod(getMethod)) || (setMethod != null && ModelUtil.isAbstractMethod(setMethod))) {
-         typeDeclaration.displayError("Unable to make properties implemented with abstract methods bindable: " + propertyName + ": ");
+         // If the variableDef is not null, this property should be converted in the convertFieldToGetSetMethods - the case where we have a field that
+         // implements getX/setX methods from an interface or abstract class
+         if (variableDef == null)
+            typeDeclaration.displayError("Unable to make properties implemented with abstract methods bindable: " + propertyName + ": ");
          return;
       }
 

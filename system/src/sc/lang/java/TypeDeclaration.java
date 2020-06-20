@@ -951,7 +951,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                List implList = removeStaticProperties(implResult);
                // Not replacing properties here... preserve the offsets of properties defined in a real class
                // Interfaces can add new abstract properties
-               result = ModelUtil.mergeProperties(implList, result, false, includeAssigns);
+               result = ModelUtil.mergeProperties(implList, result, true, includeAssigns);
             }
          }
       }
@@ -1052,7 +1052,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
                   result.addAll(implRes);
                }
                else {
-                  result = ModelUtil.mergeProperties(result, implRes, false, includeAssigns);
+                  result = ModelUtil.mergeProperties(result, implRes, true, includeAssigns);
                }
             }
          }
