@@ -3,6 +3,7 @@ package sc.db;
 
 import sc.bind.Bind;
 import sc.dyn.DynUtil;
+import sc.dyn.IPropValidator;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.util.StringUtil;
@@ -777,14 +778,50 @@ public class DBObject implements IDBObject {
       synchronized (pendingOps) {
          transaction.commitInProgress = true;
          try {
-            Object inst = getInst();
+            IDBObject inst = getInst();
+            boolean needsValidate = inst instanceof IPropValidator;
+            boolean errorsChanged = false;
+            Map<String,String> propErrors = needsValidate ? ((IPropValidator) inst).getPropErrors() : null;
+            Map<String,String> newPropErrors = null;
             for (PropUpdate propUpdate:updateList) {
-               propUpdate.prop.getPropertyMapper().setPropertyValue(inst, propUpdate.value);
+               DBPropertyDescriptor prop = propUpdate.prop;
+               Object newVal = propUpdate.value;
+               String propName = prop.propertyName;
+               if (needsValidate && prop.hasValidator()) {
+                  String err = propUpdate.prop.validate(this, newVal);
+                  if (err == null) {
+                     if (propErrors != null) {
+                        if (newPropErrors == null)
+                           newPropErrors = new TreeMap<String,String>(propErrors);
+                        newPropErrors.remove(propName);
+                        errorsChanged = true;
+                     }
+                  }
+                  else {
+                     if (propErrors != null) {
+                        String oldError = propErrors.get(propName);
+                        if (!StringUtil.equalStrings(oldError, err)) {
+                           if (newPropErrors == null)
+                              newPropErrors = new TreeMap<String,String>(propErrors);
+                           newPropErrors.put(propName, err);
+                           errorsChanged = true;
+                        }
+                     }
+                     else {
+                        newPropErrors = new TreeMap<String,String>();
+                        newPropErrors.put(propName, err);
+                        errorsChanged = true;
+                     }
+                  }
+               }
+               propUpdate.prop.getPropertyMapper().setPropertyValue(inst, newVal);
             }
             if (versProp != null)
                versProp.getPropertyMapper().setPropertyValue(inst, newVersion);
             if (lastModifiedProp != null)
                lastModifiedProp.getPropertyMapper().setPropertyValue(inst, lmtValue);
+            if (errorsChanged)
+               ((IPropValidator) inst).setPropErrors(newPropErrors.size() == 0 ? null : newPropErrors);
          }
          finally {
             transaction.commitInProgress = false;
