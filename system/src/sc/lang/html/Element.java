@@ -3720,7 +3720,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
       addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex", "tabindex"}, null);
       addTagAttributes("option", "element", new String[] {"selected", "value", "disabled", "tabindex"}, null);
-      addTagAttributes("input", "element", new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size", "autocomplete", "list", "tabindex", "maxlength", "pattern"}, null);
+      addTagAttributes("input", "element",
+           new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size",
+                         "autocomplete", "list", "tabindex", "minlength", "maxlength", "pattern", "min", "max", "accept", "alt", "multiple",
+                         "autofocus", "capture", "dirname", "formaction", "formenctype", "formmethod", "formnovalidate", "formtarget",
+                         "height", "list", "readonly", "required", "src", "step", "width"}, null);
       addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size", "tabindex"}, null);
       addTagAttributes("button", "input", emptyArgs, null);
       addTagAttributes("span", "element", emptyArgs, null);
