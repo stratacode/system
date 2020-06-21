@@ -150,6 +150,9 @@ public class DBProvider {
       if (typeDecl instanceof EnumConstant)
          return null;
 
+      if (refLayer == null)
+         return null;
+
       ArrayList<Object> typeSettings = ModelUtil.getAllInheritedAnnotations(sys, typeDecl, "sc.db.DBTypeSettings", false, refLayer, false);
       // TODO: should check for annotations on the Layer of all types in the type tree. For each attribute, check the layer annotation if it's not set at the type level
       // TODO: need getAllLayerAnnotations(typeDecl, annotName)
