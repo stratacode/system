@@ -5024,7 +5024,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** Used by both the command line and layers view to append a description for the layer based on what you are interested in */
    public boolean appendDetailString(StringBuilder sb, boolean first, boolean details, boolean runtime, boolean sync) {
-      boolean useHidden = getVisibleInEditor();
+      boolean useHidden = !getVisibleInEditor();
       if (details) {
          if (useHidden)
             first = opAppend(sb, "hidden", first);
