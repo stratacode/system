@@ -182,6 +182,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public transient boolean refreshOnLoad = true;
 
    private transient String cachedObjectName = null;
+   private transient Element origTypeElem = null;
 
    /**
     * For an schtml page with a behavior tag like input or submit that's used in the context where the code expects
@@ -1577,9 +1578,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             JavaModel model = getJavaModel();
             if (model != null) {
                res = model.findTypeDeclaration(extStr, true, false);
+               if (res == null && origTypeElem != null)
+                  res = origTypeElem.getJavaModel().findTypeDeclaration(extStr, true, false);
                if (res == null) {
                   Attr attr = getAttribute("extends");
-                  attr.displayError("No extends type: ", extStr, " for tag: ");
+                  attr.displayError("No extends type: ", extStr, " for attribute: ");
                   res = findType(extStr, this, null);
                   res = model.findTypeDeclaration(extStr, true, false);
                }
@@ -2357,6 +2360,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   Element copyElem = (Element) copyNode;
                   // Make sure we copy the name.  It's expensive to recompute it and we may get it wrong because it's hard to find the child in the peers-list after it's been copied.  It does not get associated with the current parent after it's been copied so don't find the exact instance.
                   copyElem.cachedObjectName = origElem.getObjectName();
+                  copyElem.origTypeElem = origElem;
                }
                res.add(copyNode);
             }
@@ -4698,6 +4702,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                return res;
          }
       }
+      // If this element was copied we also need to resolve this reference in the context of the original
+      // element or else we might not find an extends type relative to the original package.
+      if (origTypeElem != null) {
+         Object res = origTypeElem.findType(name, refType, context);
+         if (res != null)
+            return res;
+      }
       return super.findType(name, refType, context);
    }
 
@@ -5298,6 +5309,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       extendsTypeDecl = null;
       defaultExtendsType = null;
       cachedObjectName = null;
+      origTypeElem = null;
       childrenById = null;
       tagObject = null;
       hiddenChildren = null;
@@ -5343,6 +5355,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       res.fromElement = this;
       // This is important to avoid some extra computation
       res.cachedObjectName = cachedObjectName;
+      res.origTypeElem = origTypeElem;
       return res;
    }
 
