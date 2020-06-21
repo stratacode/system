@@ -453,4 +453,16 @@ public class Attr extends Node implements ISrcStatement {
             }
       }
    }
+
+   public String toSafeLanguageString() {
+      if (name == null)
+         return super.toSafeLanguageString();
+      return name + " = " + value;
+   }
+
+   public String getUserVisibleName() {
+      if (name == null)
+         return super.getUserVisibleName();
+      return name;
+   }
 }
