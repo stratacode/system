@@ -7,6 +7,8 @@ package sc.type;
 import sc.dyn.DynUtil;
 import sc.js.JSSettings;
 
+import java.math.BigDecimal;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Set;
 
@@ -945,6 +947,10 @@ public enum Type {
    }
 
    public static Object propertyStringToValue(Object propType, String strVal) {
+      if (propType == BigDecimal.class)
+         return new BigDecimal(strVal);
+      if (propType == Date.class)
+         return DynUtil.parseDate(strVal);
       if (propType instanceof Class) {
          sc.type.Type t = sc.type.Type.get((Class) propType);
          return t.stringToValue(strVal);

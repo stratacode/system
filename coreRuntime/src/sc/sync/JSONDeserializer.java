@@ -265,6 +265,14 @@ public class JSONDeserializer implements JSONResolver {
                               propVal = SyncHandler.convertRemoteType(propVal, propType);
                            }
                         }
+                        // Dates and BigDecimals come in as Strings and also need to be converted
+                        else if (propVal instanceof CharSequence) {
+                           if (objType == null)
+                              objType = DynUtil.getSType(curObj);
+                           Object propType = DynUtil.getPropertyType(objType, nextNameStr);
+                           if (propType != null)
+                              propVal = SyncHandler.convertRemoteType(propVal, propType);
+                        }
                         if (curObj instanceof Map) {// TODO - it's possible for a map to have regular properties too... we should perhaps be keying off of whether we created a Map before calling parseSubs
                            ((Map) curObj).put(nextNameKey, propVal);
                         }

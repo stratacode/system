@@ -26,6 +26,7 @@ import sc.util.PerfMon;
 import sc.util.StringUtil;
 
 import java.lang.annotation.RetentionPolicy;
+import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -1210,7 +1211,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    }
 
    private boolean needsJSMetadata(Object propType) {
-      return ModelUtil.isArray(propType) || ModelUtil.isAssignableFrom(Collection.class, propType);
+      return ModelUtil.isArray(propType) || ModelUtil.isAssignableFrom(Collection.class, propType) || ModelUtil.sameTypes(propType, Date.class) || ModelUtil.sameTypes(propType, BigDecimal.class);
    }
 
    private Boolean getRuntimeRetention(Object cl, String retentionAnnotTypeName) {

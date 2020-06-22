@@ -11,6 +11,7 @@ import sc.util.StringUtil;
 
 import java.lang.reflect.*;
 import java.lang.reflect.Modifier;
+import java.math.BigDecimal;
 import java.util.*;
 
 public class RTypeUtil {
@@ -1452,6 +1453,17 @@ public class RTypeUtil {
          }
       });
       fromStringTable.put(Boolean.TYPE, tmp);
+
+      fromStringTable.put(BigDecimal.class, new IFromString() {
+         public String fromString(String value) {
+            try {
+               return "new BigDecimal(\"" + value + "\")";
+            }
+            catch (NumberFormatException exc) {
+               throw new IllegalArgumentException("Invalid string to BigDecimal conversion: " + exc.toString());
+            }
+         }
+      });
    }
 
    public static boolean canConvertTypeFromString(Object propType) {
