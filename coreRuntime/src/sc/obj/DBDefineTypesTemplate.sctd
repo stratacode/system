@@ -67,6 +67,7 @@
       }
    <%    }
          if (dbTypeDescriptor.needsAutoId) { %>
+      @sc.bind.Bindable(manual=true)
       @sc.db.IdSettings(generated=true) // Generated id
       long id;
    <%    }
