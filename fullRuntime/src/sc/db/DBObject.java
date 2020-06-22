@@ -818,7 +818,7 @@ public class DBObject implements IDBObject {
             }
             if (versProp != null)
                versProp.getPropertyMapper().setPropertyValue(inst, newVersion);
-            if (lastModifiedProp != null)
+            if (lastModifiedProp != null && lmtValue != null)
                lastModifiedProp.getPropertyMapper().setPropertyValue(inst, lmtValue);
             if (errorsChanged)
                ((IPropValidator) inst).setPropErrors(newPropErrors.size() == 0 ? null : newPropErrors);
