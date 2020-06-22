@@ -73,6 +73,9 @@ public class JavaLanguage extends BaseLanguage {
                             semicolonEOL);
 
    // TODO: eliminate this definition by cloning ImportDeclaration and then setting REPEAT | OPTIONAL flags
+   // - this requires changing reqImport in CommandSCLanguage but has bugs during generation. Might be a worthwhile
+   // optimization to pursue at some point
+   //Sequence imports = (Sequence) importDeclaration.copyWithOptions(REPEAT | OPTIONAL);
    Sequence imports = new Sequence("([])", REPEAT | OPTIONAL, importDeclaration);
 
    KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char", "int", "float", "long", "double", "void");
