@@ -2360,7 +2360,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   Element copyElem = (Element) copyNode;
                   // Make sure we copy the name.  It's expensive to recompute it and we may get it wrong because it's hard to find the child in the peers-list after it's been copied.  It does not get associated with the current parent after it's been copied so don't find the exact instance.
                   copyElem.cachedObjectName = origElem.getObjectName();
-                  copyElem.origTypeElem = origElem;
+                  copyElem.origTypeElem = origElem.origTypeElem == null ? origElem : origElem.origTypeElem;
                }
                res.add(copyNode);
             }
