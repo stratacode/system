@@ -63,7 +63,11 @@ public class Input extends HTMLElement {
       return value;
    }
    @Bindable(manual=true) public void setValue(String _value) {
-      if (_value == null) _value = "";
+      if (_value == null) {
+         if (value.length() == 0) // Don't send an event for this since the value did not change
+            return;
+         _value = "";
+      }
       value = _value;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _valueProp, _value);
    }
