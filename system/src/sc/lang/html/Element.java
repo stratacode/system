@@ -5638,7 +5638,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{
             "startTagTxt", "innerHTML", "style", "class", "clickEvent", "dblClickEvent", "mouseDownEvent", "mouseOutEvent", "mouseMoveEvent",
             "mouseUpEvent", "mouseDownMoveUp", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "clientWidth", "clientHeight", "offsetLeft", "offsetTop", "offsetWidth", "offsetHeight"}, 0));
-      SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex"}, Element.class, 0));
+      SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount"}, Element.class, 0));
       // We sync this value via the Select tag's selectedIndex. The option tag is not like repeat in that it's one instance rendered over and over with different

@@ -20,6 +20,7 @@ public class Select<RE> extends HTMLElement<RE> {
    private final static sc.type.IBeanMapper _disabledProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "disabled");
    private final static sc.type.IBeanMapper _multipleProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "multiple");
    private final static sc.type.IBeanMapper _selectedIndexProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "selectedIndex");
+   private final static sc.type.IBeanMapper _changeEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "changeEvent");
    private final static sc.type.IBeanMapper _optionDataSourceProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "optionDataSource");
    private final static TreeMap<String,IBeanMapper> selectServerTagProps = new TreeMap<String,IBeanMapper>();
    private final static sc.type.IBeanMapper _sizeProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Select.class, "size");
@@ -164,5 +165,13 @@ public class Select<RE> extends HTMLElement<RE> {
    @sc.obj.EditorSettings(visible=false)
    public boolean isEventSource() {
       return true;
+   }
+
+   @sc.obj.EditorSettings(visible=false)
+   @Bindable(manual=true) public Event getChangeEvent() {
+      return (Event) getDOMEvent(EventType.Change);
+   }
+   @Bindable(manual=true) public void setChangeEvent(Event changeEvent) {
+      setDOMEvent(EventType.Change, changeEvent, _changeEventProp);
    }
 }
