@@ -958,7 +958,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       if (hiddenBody != null) {
          if (result == null)
             result = new ArrayList<Object>();
-         addAllProperties(hiddenBody, result, modifier, includeAssigns);
+         addAllProperties(hiddenBody, result, modifier, includeAssigns, false);
       }
       return result;
    }

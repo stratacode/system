@@ -2106,9 +2106,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return null;
 
       List<Object> props = new ArrayList<Object>();
-      addAllProperties(body, props, modifier, includeAssigns);
+      addAllProperties(body, props, modifier, includeAssigns, editorProperties);
       if (hiddenBody != null)
-         addAllProperties(hiddenBody, props, modifier, includeAssigns);
+         addAllProperties(hiddenBody, props, modifier, includeAssigns, editorProperties);
       return props.size() > 0 ? props : null;
    }
 
@@ -2134,7 +2134,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return getDeclaredProperties(modifier, includeAssigns, false, false);
    }
 
-   public static void addAllProperties(SemanticNodeList<Statement> body, List<Object> props, String modifier, boolean includeAssigns) {
+   private static HashSet<String> filteredProps = new HashSet<String>();
+   static {
+      filteredProps.add("class");
+      filteredProps.add("initState");
+      filteredProps.add("serialVersionUID");
+      filteredProps.add("DBTypeDescriptor");
+      filteredProps.add("DBObject");
+      filteredProps.add("DBId");
+   }
+
+   public static void addAllProperties(SemanticNodeList<Statement> body, List<Object> props, String modifier, boolean includeAssigns, boolean editorProperties) {
       for (int i = 0; i < body.size(); i++) {
          Definition member = body.get(i);
          if ((member instanceof TypedDefinition && ((TypedDefinition) member).isProperty()) &&
@@ -2157,6 +2167,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       for (int i = 0; i < props.size(); i++) {
          Object checkProp = props.get(i);
          String checkName = ModelUtil.getPropertyName(checkProp);
+         if (editorProperties && filteredProps.contains(checkName)) {
+            props.remove(i);
+            i--;
+            continue;
+         }
          for (int j = i+1; j < props.size(); j++) {
             Object nextProp = props.get(j);
             String nextName = ModelUtil.getPropertyName(nextProp);

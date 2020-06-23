@@ -507,7 +507,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
          return new DynProp[0];
 
       ArrayList<Object> props = new ArrayList<Object>();
-      BodyTypeDeclaration.addAllProperties(objTypeDecl.body, props, null, false);
+      BodyTypeDeclaration.addAllProperties(objTypeDecl.body, props, null, false, false);
 
       ArrayList<DynProp> res = new ArrayList<DynProp>();
 
