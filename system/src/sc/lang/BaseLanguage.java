@@ -385,7 +385,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
       public KeywordChoice(String name, int options, boolean doSpacing, String... expectedValues) {
          super(name, options | NOERROR);
-         add(new SymbolChoice(expectedValues), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar));
+         int symbolOpts = options & IGNORE_CASE;
+         add(new SymbolChoice(symbolOpts, expectedValues), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar));
          if (doSpacing)
             add(spacing);
          styleName = "keyword";
@@ -393,7 +394,8 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
       public KeywordChoice(int options, String... expectedValues) {
          super("('',)", options | NOERROR);
-         add(new SymbolChoice(expectedValues), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar));
+         int symbolOpts = options & IGNORE_CASE;
+         add(new SymbolChoice(symbolOpts, expectedValues), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar));
          styleName = "keyword";
       }
 
