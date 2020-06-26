@@ -724,6 +724,8 @@ public class DBObject implements IDBObject {
             Object idVal = idProp.getPropertyMapper().getPropertyValue(inst, false, false);
             if (idVal == null) // TODO: not sure what to do here since the object won't have an id until it's actually persisted and getObjectId has no way to change the id for the same instance (would require some changes to the sync system?)
                idVal = "null_id";
+            if (idVal instanceof Long && ((Long) idVal) == 0)
+               System.out.println("*** Warning - allocating object id with no real id");
             sb.append(idVal);
          }
       }

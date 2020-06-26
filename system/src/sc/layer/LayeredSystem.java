@@ -12217,6 +12217,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (parentName != null && parentName.equals(Layer.LAYER_COMPONENT_FULL_TYPE_NAME))
          return true;
 
+      DBTypeDescriptor dbTypeDesc = DBTypeDescriptor.getByName(typeName, false);
+      if (dbTypeDesc != null && dbTypeDesc.liveDynTypes)
+         return true;
+
       Object type = getSrcTypeDeclaration(typeName, null, true, false, false, null, false);
       if (type != null)
          return ModelUtil.getLiveDynamicTypes(type);
@@ -14518,6 +14522,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public Iterator<Object> getInstancesOfTypeAndSubTypes(String typeName) {
       Set<Object> res = null;
       WeakIdentityHashMap<Object,Boolean> insts = instancesByType.get(typeName);
+      if (insts == null) {
+         DBTypeDescriptor dbTypeDesc = DBTypeDescriptor.getByName(typeName, false);
+         if (dbTypeDesc != null && !dbTypeDesc.liveDynTypes) {
+            dbTypeDesc.enableLiveDynTypes();
+            insts = instancesByType.get(typeName);
+         }
+      }
       TypeDeclaration td = getSrcTypeDeclaration(typeName, null, true, true);
       if (td == null) {
          return insts == null ? EmptyIterator.EMPTY_ITERATOR : insts.keySet().iterator();

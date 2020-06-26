@@ -54,6 +54,6 @@ public @interface FindBy {
    /** When true, startIndex and maxResults options for the query are added */
    boolean paged() default true;
 
-   /** When true the findBy method will always return the first result of the query  */
+   /** When true the findBy method returns a single value - the first result of the query if more than one row matches */
    boolean findOne() default false;
 }

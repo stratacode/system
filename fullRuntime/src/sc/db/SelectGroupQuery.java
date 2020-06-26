@@ -82,7 +82,7 @@ public class SelectGroupQuery extends DBQuery {
       return res;
    }
 
-   public List<IDBObject> matchQuery(DBTransaction transaction, DBObject proto) {
+   public List<IDBObject> runQuery(DBTransaction transaction, DBObject proto) {
       // Here we pick the main query, run it first, look for queries that just select additional properties (i.e. without a 'where clause') and do
       // selectProperties on them.
       // For any additional queries with 'where' clauses, I think we need to just make sure we select those properties, then do the test against each item

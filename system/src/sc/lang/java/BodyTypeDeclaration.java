@@ -24,6 +24,7 @@ import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.*;
 import sc.util.*;
+import sun.reflect.generics.tree.BaseType;
 
 import java.io.File;
 import java.io.Serializable;
@@ -4199,9 +4200,19 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          return true;
       Object setting = getCompilerSetting("liveDynamicTypes");
       // By default, only turn this on for components and objects so we are not tracking every class by default.  Using IObjChildren here to pick up Element and because it seems like another good way to find 'components' even that do not have @Component
-      if (setting == null)
-         return isComponentType() || getDeclarationType() == DeclarationType.OBJECT || isAssignableFromClass(IObjChildren.class);
+      if (setting == null) {
+         return isComponentType() || getDeclarationType() == DeclarationType.OBJECT || isAssignableFromClass(IObjChildren.class) || needsDBLiveDynamicTypes();
+      }
       return ((Boolean) setting);
+   }
+
+   private boolean needsDBLiveDynamicTypes() {
+      BaseTypeDescriptor dbTypeDesc = getDBTypeDescriptor();
+      if (dbTypeDesc != null) {
+         DBProvider dbProvider = DBProvider.getDBProviderForType(getLayeredSystem(), getLayer(), this);
+         return dbProvider != null && dbProvider.needsLiveDynamicTypes;
+      }
+      return false;
    }
 
    public void initDynamicFields(Object inst, ExecutionContext ctx) {
@@ -10473,6 +10484,26 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public AbstractMethodDefinition getEditorCreateMethod() {
       return (AbstractMethodDefinition) ModelUtil.getEditorCreateMethod(getLayeredSystem(), this);
    }
+
+   /*
+   public List<MethodDefinition> getEditorFindByMethods() {
+      Object annot = getAnnotation("sc.obj.EditorSettings");
+      List<String> findMethodNames = null;
+      if (annot != null) {
+         String findNamesStr = (String) ModelUtil.getAnnotationValue(annot, "findMethods");
+         if (findNamesStr != null) {
+            findMethodNames = Arrays.asList(StringUtil.split(findNamesStr,','));
+         }
+      }
+      if (findMethodNames == null) {
+         BaseTypeDescriptor dbTypeDesc = getDBTypeDescriptor();
+         if (dbTypeDesc != null) {
+
+         }
+      }
+
+   }
+   */
 
    public String getConstructorParamNames() {
       Object createMeth = getEditorCreateMethod();

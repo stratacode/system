@@ -87,7 +87,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (res == null) {
          Object findType = DynUtil.findType(typeName);
          if (findType == null) {
-            DBUtil.error("No type: " + typeName + " for persistent reference");
+            return null;
          }
          else {
             res = typeDescriptorsByName.get(typeName);
@@ -147,6 +147,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    public SyncProperties syncProps = null;
    public boolean syncPropsInited = false;
+   public boolean liveDynTypes = false;
 
    public DBTypeDescriptor findSubType(String subTypeName) {
       // During code-processing time, this is not set yet
@@ -618,6 +619,58 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return matchQuery((DBObject) proto.getDBObject(), selectGroup, propNames, orderByNames, startIx, maxResults);
    }
 
+   private void appendNext(StringBuilder whereSB, String whereClause) {
+      if (whereSB.length() > 0)
+         whereSB.append(" OR ");
+      whereSB.append(whereClause);
+   }
+
+   public List<? extends IDBObject> searchQuery(String selectGroup, String text, List<String> orderByProps, int startIx, int maxResults) {
+      ArrayList<Object> paramValues = new ArrayList<Object>();
+      ArrayList<DBColumnType> paramTypes = new ArrayList<DBColumnType>();
+
+      Long longVal = null;
+      try {
+         longVal = Long.parseLong(text);
+      }
+      catch (NumberFormatException exc) {
+      }
+
+      String pattern = '%' + text + '%';
+
+      StringBuilder whereSB = new StringBuilder();
+      for (DBPropertyDescriptor prop:allDBProps) {
+         if (prop.typeIdProperty)
+            continue;
+
+         DBColumnType type = prop.getDBColumnType();
+         switch (type) {
+            case Int:
+            case Long:
+               if (longVal != null) {
+                  appendNext(whereSB, prop.columnName);
+                  whereSB.append(" = ?");
+                  if (type == DBColumnType.Int)
+                     paramValues.add(longVal.intValue());
+                  else
+                     paramValues.add(longVal);
+                  paramTypes.add(type);
+               }
+               break;
+            case String:
+               appendNext(whereSB, prop.columnName);
+               whereSB.append(" ILIKE ?");
+               paramValues.add(pattern);
+               paramTypes.add(type);
+               break;
+            case Boolean:
+               break;
+         }
+      }
+
+      return execQuery(selectGroup, whereSB.toString(), paramValues, paramTypes, orderByProps, startIx, maxResults);
+   }
+
    private void initTypeInstances() {
       synchronized (this) {
          if (typeInstances == null)
@@ -635,7 +688,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
     * null is returned in that case.
     */
    public IDBObject lookupInstById(Object id, int typeId, boolean createProto, boolean selectDefault) {
-     if (baseType != null) {
+      if (baseType != null) {
          return baseType.lookupInstById(id, typeId == -1 ? this.typeId : typeId, createProto, selectDefault);
       }
 
@@ -740,6 +793,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       // it's available?
       if (syncProps != null)
          SyncManager.addSyncInst(inst, true, syncProps.initDefault, null, syncProps);
+
+      if (liveDynTypes)
+         sc.dyn.DynUtil.addDynInstance(getTypeName(), inst);
    }
 
    private void replaceInstanceInternal(IDBObject inst) {
@@ -1000,7 +1056,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
    }
 
-   private SelectGroupQuery initQuery(DBObject proto, String selectGroup, List<String> props, boolean multiRow) {
+   private SelectGroupQuery initQuery(DBObject proto, String selectGroup, List<String> props, String whereClause, boolean multiRow) {
       if (selectGroup == null)
          selectGroup = defaultFetchGroup;
       SelectGroupQuery groupQuery =  new SelectGroupQuery(this, props, selectGroup);
@@ -1018,20 +1074,26 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
 
       // Second pass - build the where clause query string
-      boolean anyProps = false;
+      boolean anyWhere = false;
       for (int i = 0; i < numProps; i++) {
          String propName = props.get(i);
          if (i != 0 && groupQuery.curQuery != null)
             groupQuery.curQuery.whereAppend(" AND ");
          appendPropToWhereClause(groupQuery,  this, proto, CTypeUtil.getPackageName(propName), propName, numProps > 1, true);
-         anyProps = true;
+         anyWhere = true;
+      }
+      if (whereClause != null && whereClause.length() > 0) {
+         if (groupQuery.curQuery == null)
+            groupQuery.curQuery = groupQuery.queries.get(0);
+         groupQuery.curQuery.whereAppendClause(whereClause);
+         anyWhere = true;
       }
       if (baseType != null) {
          int[] typeIds = getTypeIdList();
          if (typeIds != null && typeIds.length > 0) {
             DBPropertyDescriptor typeIdProp = getTypeIdProperty();
             SelectQuery query = groupQuery.findQueryForProperty(typeIdProp, true);
-            if (anyProps)
+            if (anyWhere)
                query.whereAppend(" AND ");
             query.appendWhereColumn(null, typeIdProp);
             query.whereAppend(" IN (");
@@ -1069,7 +1131,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
     * start and max properties for limit/offset in the result list.
     */
    public List<? extends IDBObject> matchQuery(DBObject proto, String selectGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
-      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, protoProps, true);
+      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, protoProps, null, true);
       addParamValues(groupQuery, proto, protoProps);
       if (orderByProps != null) {
          groupQuery.setOrderBy(orderByProps);
@@ -1080,15 +1142,35 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          groupQuery.setMaxResults(maxResults);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
-      return groupQuery.matchQuery(curTx, proto.getDBObject());
+      return groupQuery.runQuery(curTx, proto.getDBObject());
    }
 
    public IDBObject matchOne(DBObject proto, String selectGroup, List<String> props) {
-      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, props, true);
+      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, props, null, true);
       addParamValues(groupQuery, proto, props);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
       return groupQuery.matchOne(curTx, proto.getDBObject());
+   }
+
+   public List<? extends IDBObject> execQuery(String selectGroup, String whereClause, List<Object> paramValues, List<DBColumnType> paramTypes, List<String> orderByProps, int startIx, int maxResults) {
+      SelectGroupQuery groupQuery = initQuery(null, selectGroup, null, whereClause, true);
+      // The passed in paramValues/Types come from the whereClause
+      if (paramValues != null && paramValues.size() > 0) {
+         groupQuery.curQuery.paramValues.addAll(paramValues);
+         groupQuery.curQuery.paramTypes.addAll(paramTypes);
+      }
+      if (orderByProps != null) {
+         groupQuery.setOrderBy(orderByProps);
+      }
+      if (startIx != 0)
+         groupQuery.setStartIndex(startIx);
+      if (maxResults > 0)
+         groupQuery.setMaxResults(maxResults);
+
+      DBTransaction curTx = DBTransaction.getOrCreate();
+
+      return groupQuery.runQuery(curTx, null);
    }
 
    public List<IDBObject> mergeResultLists(List<IDBObject> primary, List<IDBObject> other) {
@@ -1971,5 +2053,19 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (baseType != null)
          return baseType.getBaseTypeName();
       return getTypeName();
+   }
+
+   public void enableLiveDynTypes() {
+      if (!liveDynTypes) {
+         liveDynTypes = true;
+
+         Map<Object,IDBObject> instList = baseType == null ? typeInstances : baseType.typeInstances;
+         if (instList != null) {
+            String typeName = getTypeName();
+            for (IDBObject inst:instList.values()) {
+               DynUtil.addDynInstance(typeName, inst);
+            }
+         }
+      }
    }
 }

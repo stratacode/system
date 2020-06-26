@@ -1407,13 +1407,17 @@ public class ModifyDeclaration extends TypeDeclaration {
       if (!modifyInherited) {
          if (thisModel.mergeDeclaration) {
             BodyTypeDeclaration modType = getModifyTypeForTransform();
+            JavaModel prevModel = modType.getJavaModel();
+
+            // need to turn off type errors before mergeDefinitionsInto since that might do some resolving of
+            // the types we are merging in. We'll set this and clear this in transform below for this model
+            prevModel.disableTypeErrors = true;
 
             // Do imports first so we can use them to resolve any types when adding the implements etc.
             TypeDeclaration outer = getEnclosingType();
             if (outer == null) {
-               JavaModel extendedModel = modType.getJavaModel();
-               thisModel.copyImports(extendedModel);
-               extendedModel.syncAutoImports();
+               thisModel.copyImports(prevModel);
+               prevModel.syncAutoImports();
             }
 
 
@@ -1449,8 +1453,6 @@ public class ModifyDeclaration extends TypeDeclaration {
                 subNode = subNode.getParentNode().getParentNode();
                ix = ix + 1;
             }
-
-            JavaModel prevModel = modType.getJavaModel();
 
             if (parentNode.replaceChild(this, subNode) == -1)
                System.err.println("*** failed to replace modifyType from parent");

@@ -383,7 +383,7 @@ public class SelectQuery implements Cloneable {
          if (!dbTypeDesc.dbDisabled) {
             Connection conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
             st = conn.prepareStatement(queryStr);
-            IDBObject inst = proto.getInst();
+            IDBObject inst = proto == null ? null : proto.getInst();
             int numParams = paramValues == null ? 0 : paramValues.size();
             for (int i = 0; i < numParams; i++) {
                Object paramValue = paramValues.get(i);
@@ -1275,6 +1275,14 @@ public class SelectQuery implements Cloneable {
    public void whereAppend(String s) {
       initWhereQuery();
       whereSB.append(s);
+   }
+
+   public void whereAppendClause(String clause) {
+      if (whereSB != null && whereSB.length() > 0)
+         whereSB.append(" AND ");
+      else
+         initWhereQuery();
+      whereSB.append(clause);
    }
 
    public void whereAppendIdent(String ident) {

@@ -28,6 +28,8 @@ public class DBProvider {
    public boolean needsQueryMethods = true;
    public boolean needsGetSet = true;
 
+   public boolean needsLiveDynamicTypes = false;
+
    private ISchemaUpdater schemaUpdater;
 
    public DBProvider(String providerName) {

@@ -24,4 +24,6 @@ public @interface EditorSettings {
    String editorType() default "";
    /** Include static properties and types in the editor view of the type. */
    boolean includeStatic() default false;
+   /** Comma separated list of method names to use for the 'find' screen. If not set, includes the @FindBy methods */
+   //String findMethods() default "";
 }

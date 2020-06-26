@@ -535,7 +535,6 @@ public class DBPropertyDescriptor {
       return refDBTypeDesc;
    }
 
-
    public DBColumnType getDBColumnType() {
       if (refDBTypeDesc != null && !isJsonReference())
          return DBColumnType.Reference;
