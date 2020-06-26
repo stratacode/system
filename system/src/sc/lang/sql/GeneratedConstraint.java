@@ -6,7 +6,5 @@ import sc.parser.IString;
 import java.util.List;
 
 public class GeneratedConstraint extends SQLConstraint {
-   public String whenOptions;
-
-   public List<SequenceOption> sequenceOptions;
+   public GeneratedBaseConstraint genConstraint;
 }
