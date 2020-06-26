@@ -364,10 +364,15 @@ public class SQLLanguage extends SCLanguage {
    Sequence referencesConstraint = new Sequence("ReferencesConstraint(,refTable,columnRef,matchOption,onOptions)",
                                                  referencesKeyword, sqlIdentifier, optColumnRef, matchOption, onOptions);
 
-   Sequence generatedConstraint = new Sequence("GeneratedConstraint(,whenOptions,sequenceOptions)",
+   ICKeywordSpace alwaysKeyword = new ICKeywordSpace("always");
+   ICKeywordSpace storedKeyword = new ICKeywordSpace("stored");
+
+   Sequence generatedConstraint = new Sequence("GeneratedConstraint(,genConstraint)",
                    new ICSymbolSpace("generated"),
-                   new OrderedChoice(OPTIONAL, new ICSymbolSpace("always"), new Sequence(byKeyword, defaultKeyword)),
-                   new Sequence("(,,.)", new ICSymbolSpace("as"),  new ICSymbolSpace("identity"), sequenceOptionsWithParens));
+                   new OrderedChoice("(.,.)", new Sequence("GeneratedIdentity(whenOptions,,,sequenceOptions)",
+                                                  new OrderedChoice("(.,.)", alwaysKeyword, new Sequence(byKeyword, defaultKeyword)),
+                                                  asKeyword, new ICKeywordSpace("identity"), sequenceOptionsWithParens),
+                                     new Sequence("GeneratedExpr(,,,expression,,)", alwaysKeyword, asKeyword, openParen, sqlExpression, closeParen, storedKeyword)));
 
    OrderedChoice columnConstraints = new OrderedChoice("([],[],[],[],[],[],[],[])", OPTIONAL | REPEAT,
          notNullConstraint, nullConstraint, checkConstraint, defaultConstraint, generatedConstraint,
@@ -502,12 +507,37 @@ public class SQLLanguage extends SCLanguage {
 
    OrderedChoice funcOptions = new OrderedChoice("([],[],[])", REPEAT, funcDef, funcBehaviorType, funcLang);
 
-   ICSymbolSpace functionKeyword = new ICSymbolSpace("function");
+   ICKeywordSpace functionKeyword = new ICKeywordSpace("function");
 
    Sequence createFunction = new Sequence("CreateFunction(orReplace,,funcName,argList,funcReturn,funcOptions)", orReplace, functionKeyword,
                                           sqlIdentifier, funcArgList, funcReturn, funcOptions);
 
-   OrderedChoice createChoice = new OrderedChoice("(.,.,.,.,.)", createTable, createType, createIndex, createSequence, createFunction);
+   ICKeywordSpace triggerKeyword = new ICKeywordSpace("trigger");
+   ICKeywordSpace orKeyword = new ICKeywordSpace("or");
+   ICKeywordSpace forKeyword = new ICKeywordSpace("for");
+   ICKeywordSpace whenKeyword = new ICKeywordSpace("when");
+   ICKeywordSpace executeKeyword = new ICKeywordSpace("execute");
+   ICKeywordSpace procedureKeyword = new ICKeywordSpace("procedure");
+   ICKeywordSpace insertKeyword = new ICKeywordSpace("insert");
+   ICKeywordSpace updateKeyword = new ICKeywordSpace("update");
+   ICKeywordSpace deleteKeyword = new ICKeywordSpace("delete");
+
+   OrderedChoice triggerEvent = new OrderedChoice("(.,.,.,.)", insertKeyword, deleteKeyword, new ICKeywordSpace("truncate"),
+                                                  new Sequence("UpdateEvent(,columns)", updateKeyword, new Sequence("(,.)", OPTIONAL, ofKeyword, sqlIdentifierCommaList)));
+
+   Sequence triggerEvents = new Sequence("([],[])", triggerEvent, new Sequence("(,[])", OPTIONAL | REPEAT, orKeyword, triggerEvent));
+
+   Sequence triggerForOpts = new Sequence("TriggerOptions(,each,rowOrStatement)", forKeyword, new ICKeywordSpace("each", OPTIONAL), new ICKeywordChoice("row", "statement"));
+
+   Sequence optWhenExpression = new Sequence("(,.)", OPTIONAL, whenKeyword, sqlExpression);
+
+   Sequence createTrigger = new Sequence(
+           "CreateTrigger(constraint,,triggerName,whenOption,triggerEvents,,tableName,triggerForOpts,whenCondition,,,funcCall)",
+           optConstraintKeyword, triggerKeyword, sqlIdentifier,
+           new ICMultiSymbolChoice("beforeAfterTypes", 0 , "before", "after", "instead of"),
+           triggerEvents, onKeyword, sqlIdentifier, triggerForOpts, optWhenExpression, executeKeyword, procedureKeyword, functionCall);
+
+   OrderedChoice createChoice = new OrderedChoice("(.,.,.,.,.,.)", createTable, createType, createIndex, createSequence, createFunction, createTrigger);
    Sequence createCommand = new Sequence("(,.,)", new ICKeywordSpace("create"), createChoice, semicolonEOL2);
 
    ICSymbolChoiceSpace dropOptions = new ICSymbolChoiceSpace(OPTIONAL, "cascade", "restrict");
@@ -520,8 +550,10 @@ public class SQLLanguage extends SCLanguage {
                                      sqlIdentifierCommaList, dropOptions);
    Sequence dropSequence = new Sequence("DropSequence(,ifExists,seqNames,dropOptions)", sequenceKeyword, ifExists,
                                      sqlIdentifierCommaList, dropOptions);
+   Sequence dropTrigger = new Sequence("DropTrigger(,ifExists,triggerName,,tableName,dropOptions)", triggerKeyword, ifExists,
+                                      sqlIdentifier, onKeyword, sqlIdentifier, dropOptions);
 
-   OrderedChoice dropChoice = new OrderedChoice("(.,.,.,.,.)", dropTable, dropType, dropIndex, dropFunction, dropSequence);
+   OrderedChoice dropChoice = new OrderedChoice("(.,.,.,.,.,.)", dropTable, dropType, dropIndex, dropFunction, dropSequence, dropTrigger);
 
    Sequence dropCommand = new Sequence("(,.,)", dropKeyword, dropChoice, semicolonEOL2);
 
