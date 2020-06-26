@@ -1069,6 +1069,8 @@ public class Sequence extends NestedParselet  {
                if (nestedValue instanceof IParseNode && oldChildObj != null)
                   ((IParseNode) nestedValue).setSemanticValue(oldChildObj, false, true);
                skipRestore = true;
+               if (arrElement && nestedValue != null) // Because we are not restoring, may need to advance the arrIndex too
+                  rctx.arrIndex++;
             }
             oldChildNode = null;
          }
