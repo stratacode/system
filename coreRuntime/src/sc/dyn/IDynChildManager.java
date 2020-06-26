@@ -5,9 +5,10 @@
 package sc.dyn;
 
 /**
- * This interface is implemented by framework components that want to use the StrataCode Object hierarchy with
- * dynamic types or compiled types that want to manage a dynamic object tree use this interface.  An instanceof this class
- * is attached to a framework-level base class - e.g. sc.lang.html.Element to implement tagObjects.
+ * This interface is implemented by framework components that want to use the StrataCode object keyword in dynamic layers.
+ * For compiled types, frameworks inject hooks using code-generation, but for dynamic layers, frameworks can implement this
+ * interface and register it for a base framework class, e.g. the web framework registers a child manager for sc.lang.html.Element
+ * for dynamic tag objects;
  * The IDynChildManager class performs logic that for transformed generated types exists in the type's objTemplate and newTemplate for
  * managing children - basically the init/add/remove/get operations.  When new instances are added or removed, your IDynChildManager implementation is
  * called.
