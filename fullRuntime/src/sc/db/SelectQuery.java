@@ -340,7 +340,7 @@ public class SelectQuery implements Cloneable {
    public List<IDBObject> matchQuery(DBTransaction transaction, DBObject proto) {
       SelectTableDesc mainTableDesc = selectTables.get(0);
       TableDescriptor mainTable = mainTableDesc.table;
-      StringBuilder qsb = buildTableQueryBase(mainTableDesc);
+      StringBuilder qsb = buildTableQueryBase(mainTableDesc, false);
       ResultSet rs = null;
       StringBuilder logSB = DBUtil.verbose ? new StringBuilder(qsb) : null;
       if (whereSB != null) {
@@ -454,6 +454,67 @@ public class SelectQuery implements Cloneable {
       if (res.size() > 1)
          throw new IllegalArgumentException("Invalid return list for single query: " + res.size());
       return res.size() == 0 ? null : res.get(0);
+   }
+
+   public int countQuery(DBTransaction transaction, DBObject proto) {
+      SelectTableDesc mainTableDesc = selectTables.get(0);
+      TableDescriptor mainTable = mainTableDesc.table;
+      StringBuilder qsb = buildTableQueryBase(mainTableDesc, true);
+      ResultSet rs = null;
+      StringBuilder logSB = DBUtil.verbose ? new StringBuilder(qsb) : null;
+      if (whereSB != null) {
+         DBUtil.append(qsb, logSB, " WHERE ");
+         qsb.append(whereSB);
+      }
+      if (logSB != null)
+         logSB.append(this.logSB);
+
+      PreparedStatement st = null;
+      try {
+         String queryStr = qsb.toString();
+         DBTypeDescriptor dbTypeDesc = mainTable.dbTypeDesc;
+
+         if (!dbTypeDesc.dbDisabled) {
+            Connection conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
+            st = conn.prepareStatement(queryStr);
+            int numParams = paramValues == null ? 0 : paramValues.size();
+            for (int i = 0; i < numParams; i++) {
+               Object paramValue = paramValues.get(i);
+               DBColumnType propType = paramTypes.get(i);
+               DBUtil.setStatementValue(st, i+1, propType, paramValue);
+            }
+
+            rs = st.executeQuery();
+
+            if (logSB != null)
+               logSB.append(" -> ");
+
+            transaction.applyingDBChanges = true;
+
+            if (!rs.next())
+               DBUtil.error("count query returned no results:");
+
+            return rs.getInt(1);
+         }
+         // Just logging the SQL we could do for diagnostic purposes - results for memory queries are merged in later
+         else if (logSB != null) {
+            logSB.append(" (dbDisabled) ");
+         }
+         if (dbTypeDesc.dbReadOnly) {
+            DBUtil.error("- need to implement countQuery against cache");
+         }
+         if (logSB != null) {
+            DBUtil.info(logSB.toString());
+         }
+         return -1;
+      }
+      catch (SQLException exc) {
+         throw new IllegalArgumentException("*** selectProperties failed with SQL error: " + exc);
+      }
+      finally {
+         DBUtil.close(rs);
+         DBUtil.close(st);
+      }
    }
 
    IDBObject processOneRowQueryResults(DBTransaction tx, DBObject dbObj, IDBObject inst, ResultSet rs, StringBuilder logSB) throws SQLException {
@@ -959,7 +1020,7 @@ public class SelectQuery implements Cloneable {
    private StringBuilder buildTableFetchQuery(List<SelectTableDesc> selectTables) {
       SelectTableDesc mainTableDesc = selectTables.get(0);
       TableDescriptor mainTable = mainTableDesc.table;
-      StringBuilder qsb = buildTableQueryBase(mainTableDesc);
+      StringBuilder qsb = buildTableQueryBase(mainTableDesc, false);
       qsb.append(" WHERE ");
       List<IdPropertyDescriptor> idCols = mainTable.getIdColumns();
       int sz = idCols.size();
@@ -974,16 +1035,21 @@ public class SelectQuery implements Cloneable {
       return qsb;
    }
 
-   private StringBuilder buildTableQueryBase(SelectTableDesc mainTableDesc) {
+   private StringBuilder buildTableQueryBase(SelectTableDesc mainTableDesc, boolean countOnly) {
       List<SelectTableDesc> selectTables = this.selectTables;
       TableDescriptor mainTable = mainTableDesc.table;
       StringBuilder res = new StringBuilder();
       res.append("SELECT ");
-      for (int i = 0; i < selectTables.size(); i++) {
-         if (i != 0)
-            res.append(", ");
-         SelectTableDesc selectTable = selectTables.get(i);
-         appendTableSelect(res, selectTable);
+      if (countOnly) {
+         res.append("COUNT(*)");
+      }
+      else {
+         for (int i = 0; i < selectTables.size(); i++) {
+            if (i != 0)
+               res.append(", ");
+            SelectTableDesc selectTable = selectTables.get(i);
+            appendTableSelect(res, selectTable);
+         }
       }
       res.append(" FROM ");
       DBUtil.appendIdent(res, null, mainTable.tableName);

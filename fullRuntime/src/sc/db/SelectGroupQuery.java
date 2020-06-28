@@ -94,6 +94,14 @@ public class SelectGroupQuery extends DBQuery {
       return curQuery.matchQuery(transaction, proto);
    }
 
+   public int countQuery(DBTransaction transaction, DBObject proto) {
+      if (queries.size() > 1)
+         System.err.println("*** Need to do join of queries here");
+      if (curQuery == null)
+         curQuery = queries.get(0);
+      return curQuery.countQuery(transaction, proto);
+   }
+
    public IDBObject matchOne(DBTransaction transaction, DBObject proto) {
       // Here we pick the main query, run it first, look for queries that just select additional properties (i.e. without a 'where clause') and do
       // selectProperties on them.
@@ -141,6 +149,16 @@ public class SelectGroupQuery extends DBQuery {
          for (SelectQuery query:queries)
             query.maxResults = max;
       }
+   }
+
+   public void setQueryAttributes(List<String> orderByProps, int startIx, int max) {
+      if (orderByProps != null) {
+         setOrderBy(orderByProps);
+      }
+      if (startIx != 0)
+         setStartIndex(startIx);
+      if (max > 0)
+         setMaxResults(max);
    }
 
    public void activate() {

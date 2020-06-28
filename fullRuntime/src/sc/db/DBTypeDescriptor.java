@@ -619,16 +619,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return matchQuery((DBObject) proto.getDBObject(), selectGroup, propNames, orderByNames, startIx, maxResults);
    }
 
-   private void appendNext(StringBuilder whereSB, String whereClause) {
-      if (whereSB.length() > 0)
-         whereSB.append(" OR ");
-      whereSB.append(whereClause);
+   private void appendNext(SelectQuery query, String whereClause) {
+      if (query.whereSB != null && query.whereSB.length() > 0)
+         query.whereAppend(" OR ");
+      query.whereAppend(whereClause);
    }
 
-   public List<? extends IDBObject> searchQuery(String selectGroup, String text, List<String> orderByProps, int startIx, int maxResults) {
-      ArrayList<Object> paramValues = new ArrayList<Object>();
-      ArrayList<DBColumnType> paramTypes = new ArrayList<DBColumnType>();
-
+   private void addSearchToQuery(SelectGroupQuery groupQuery, String text) {
       Long longVal = null;
       try {
          longVal = Long.parseLong(text);
@@ -638,7 +635,6 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       String pattern = '%' + text + '%';
 
-      StringBuilder whereSB = new StringBuilder();
       for (DBPropertyDescriptor prop:allDBProps) {
          if (prop.typeIdProperty)
             continue;
@@ -648,27 +644,49 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             case Int:
             case Long:
                if (longVal != null) {
-                  appendNext(whereSB, prop.columnName);
-                  whereSB.append(" = ?");
+                  SelectQuery query = groupQuery.addProperty(null, prop, true);
+                  appendNext(query, prop.columnName);
+                  query.whereAppend(" = ?");
                   if (type == DBColumnType.Int)
-                     paramValues.add(longVal.intValue());
+                     query.paramValues.add(longVal.intValue());
                   else
-                     paramValues.add(longVal);
-                  paramTypes.add(type);
+                     query.paramValues.add(longVal);
+                  query.paramTypes.add(type);
                }
                break;
-            case String:
-               appendNext(whereSB, prop.columnName);
-               whereSB.append(" ILIKE ?");
-               paramValues.add(pattern);
-               paramTypes.add(type);
+            case String: {
+               SelectQuery query = groupQuery.addProperty(null, prop, true);
+               appendNext(query, prop.columnName);
+               query.whereAppend(" ILIKE ?");
+               query.paramValues.add(pattern);
+               query.paramTypes.add(type);
                break;
+            }
             case Boolean:
                break;
          }
       }
+   }
 
-      return execQuery(selectGroup, whereSB.toString(), paramValues, paramTypes, orderByProps, startIx, maxResults);
+   public List<? extends IDBObject> searchQuery(String selectGroup, String text, List<String> orderByProps, int startIx, int maxResults) {
+      SelectGroupQuery groupQuery = initQuery(selectGroup, null, true);
+      addSearchToQuery(groupQuery, text);
+      groupQuery.setQueryAttributes(orderByProps, startIx, maxResults);
+
+      DBTransaction curTx = DBTransaction.getOrCreate();
+
+      return groupQuery.runQuery(curTx, null);
+   }
+
+   public int searchCountQuery(String text) {
+      //List <? extends IDBObject> res = searchQuery(null, text, null, 0, 100);
+      //return res.size();
+      SelectGroupQuery groupQuery =  new SelectGroupQuery(this, null, null);
+      addSearchToQuery(groupQuery, text);
+
+      DBTransaction curTx = DBTransaction.getOrCreate();
+
+      return groupQuery.countQuery(curTx, null);
    }
 
    private void initTypeInstances() {
@@ -1056,7 +1074,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
    }
 
-   private SelectGroupQuery initQuery(DBObject proto, String selectGroup, List<String> props, String whereClause, boolean multiRow) {
+   private SelectGroupQuery initQuery(String selectGroup, List<String> props, boolean multiRow) {
       if (selectGroup == null)
          selectGroup = defaultFetchGroup;
       SelectGroupQuery groupQuery =  new SelectGroupQuery(this, props, selectGroup);
@@ -1064,7 +1082,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       groupQuery.addSelectGroup(selectGroup, multiRow);
       // Because this is a query, need to be sure we select the id property first in the main query
       groupQuery.queries.get(0).insertIdProperty();
+      return groupQuery;
+   }
 
+   private void addPropsToQuery(SelectGroupQuery groupQuery, DBObject proto, List<String> props) {
       int numProps = props == null ? 0 : props.size();
 
       // First pass over the properties to gather the list of data sources and tables for this query.
@@ -1080,12 +1101,6 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (i != 0 && groupQuery.curQuery != null)
             groupQuery.curQuery.whereAppend(" AND ");
          appendPropToWhereClause(groupQuery,  this, proto, CTypeUtil.getPackageName(propName), propName, numProps > 1, true);
-         anyWhere = true;
-      }
-      if (whereClause != null && whereClause.length() > 0) {
-         if (groupQuery.curQuery == null)
-            groupQuery.curQuery = groupQuery.queries.get(0);
-         groupQuery.curQuery.whereAppendClause(whereClause);
          anyWhere = true;
       }
       if (baseType != null) {
@@ -1108,8 +1123,6 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             DBUtil.error("Base type but no concrete types for query on type: " + this);
          // If this is a sub-type, add 'and db_type_id = our-type-id' here
       }
-
-      return groupQuery;
    }
 
    private void addParamValues(SelectGroupQuery groupQuery, DBObject proto, List<String> props) {
@@ -1131,47 +1144,25 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
     * start and max properties for limit/offset in the result list.
     */
    public List<? extends IDBObject> matchQuery(DBObject proto, String selectGroup, List<String> protoProps, List<String> orderByProps, int startIx, int maxResults) {
-      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, protoProps, null, true);
+      SelectGroupQuery groupQuery = initQuery(selectGroup, protoProps, true);
+      addPropsToQuery(groupQuery, proto, protoProps);
       addParamValues(groupQuery, proto, protoProps);
-      if (orderByProps != null) {
-         groupQuery.setOrderBy(orderByProps);
-      }
-      if (startIx != 0)
-         groupQuery.setStartIndex(startIx);
-      if (maxResults > 0)
-         groupQuery.setMaxResults(maxResults);
+
+      groupQuery.setQueryAttributes(orderByProps, startIx, maxResults);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
       return groupQuery.runQuery(curTx, proto.getDBObject());
    }
 
    public IDBObject matchOne(DBObject proto, String selectGroup, List<String> props) {
-      SelectGroupQuery groupQuery = initQuery(proto, selectGroup, props, null, true);
+      SelectGroupQuery groupQuery = initQuery(selectGroup, props,  true);
+      addPropsToQuery(groupQuery, proto, props);
       addParamValues(groupQuery, proto, props);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
       return groupQuery.matchOne(curTx, proto.getDBObject());
    }
 
-   public List<? extends IDBObject> execQuery(String selectGroup, String whereClause, List<Object> paramValues, List<DBColumnType> paramTypes, List<String> orderByProps, int startIx, int maxResults) {
-      SelectGroupQuery groupQuery = initQuery(null, selectGroup, null, whereClause, true);
-      // The passed in paramValues/Types come from the whereClause
-      if (paramValues != null && paramValues.size() > 0) {
-         groupQuery.curQuery.paramValues.addAll(paramValues);
-         groupQuery.curQuery.paramTypes.addAll(paramTypes);
-      }
-      if (orderByProps != null) {
-         groupQuery.setOrderBy(orderByProps);
-      }
-      if (startIx != 0)
-         groupQuery.setStartIndex(startIx);
-      if (maxResults > 0)
-         groupQuery.setMaxResults(maxResults);
-
-      DBTransaction curTx = DBTransaction.getOrCreate();
-
-      return groupQuery.runQuery(curTx, null);
-   }
 
    public List<IDBObject> mergeResultLists(List<IDBObject> primary, List<IDBObject> other) {
       int osz;
