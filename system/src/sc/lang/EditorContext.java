@@ -52,6 +52,8 @@ public class EditorContext extends ClientEditorContext {
 
    public static final int MaxCompletions = 20;
 
+   public final static int MaxInstancesOfType = 100;
+
    /** Global flag set to true when this context should interpret property changes as editing the types, rather than just editing the instances or current instance */
    public boolean edit = true;
 

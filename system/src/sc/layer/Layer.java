@@ -3100,6 +3100,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             else {
                typeName = FileUtil.removeExtension(srcFile).replace(FileUtil.FILE_SEPARATOR, ".");
             }
+            if (typeName.equals("java.math.BigDecimal"))
+               System.out.println("***");
             typeNames.add(typeName);
 
             if (includeInnerTypes) {

@@ -3687,6 +3687,8 @@ public class IdentifierExpression extends ArgumentsExpression {
 
       if (isStatic())
           return false;
+      // TODO: should we use isStaticTarget here so that a static field or final field can be initialized sooner?  Otherwise, work
+      // done in the constructor won't see essentially static/constant field initializations and that can be a real problem
       referenceInitializer = arguments == null || idents.size() > 1 || bindingDirection != null;
       return referenceInitializer;
    }
