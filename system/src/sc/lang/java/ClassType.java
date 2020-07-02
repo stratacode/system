@@ -19,6 +19,12 @@ import sc.util.StringUtil;
 
 import java.util.*;
 
+/**
+ * An instance of ClassType is created for each component in a type name - e.g. if you have a.b, there will be two
+ * of them - one for a and one for b. The ClassType for 'a' will store the 'b' in its chainedTypes list. If there are
+ * type parameters, they are stored on the last one.
+ * It's the top-level ClassType instance that's used and supports all of the behavior for the chain.
+ */
 public class ClassType extends JavaType {
    public String typeName;
    public SemanticNodeList<JavaType> typeArguments;  // Note: only set on the last JavaType in the chain.  We pass around the first on in the chain so use getResolvedTypeArguments not this field.

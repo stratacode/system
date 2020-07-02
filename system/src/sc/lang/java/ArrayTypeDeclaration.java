@@ -154,6 +154,18 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return null;
    }
 
+   public static Class getCompiledArrayClassForType(Object type, int numDims) {
+      Object componentClass = ModelUtil.getCompiledClass(type);
+      if (componentClass instanceof Class) {
+         Class cclass = (Class) componentClass;
+         if (cclass.isPrimitive())
+            return Type.get(cclass).getPrimitiveArrayClass(numDims);
+         else
+            return Type.get(cclass).getArrayClass(cclass, numDims);
+      }
+      throw new IllegalArgumentException("No compiled class for to create array type");
+   }
+
    public String getCompiledClassName() {
       return ModelUtil.getCompiledClassName(componentType);
    }

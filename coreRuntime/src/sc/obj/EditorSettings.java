@@ -26,4 +26,8 @@ public @interface EditorSettings {
    boolean includeStatic() default false;
    /** Comma separated list of method names to use for the 'find' screen. If not set, includes the @FindBy methods */
    //String findMethods() default "";
+   /** Name of the property to use for the display name for an instance of this type */
+   String displayNameProperty() default "";
+   /** Name of the property to use for the url of the thumbnail for this property */
+   String thumbProperty() default "";
 }

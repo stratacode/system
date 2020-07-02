@@ -7410,8 +7410,57 @@ public class ModelUtil {
          return ((Method) method).getParameterTypes();
       else if (method instanceof Constructor)
          return ((Constructor) method).getParameterTypes();
+      else if (method instanceof DynRemoteMethod)
+         return convertParamSigToTypes(((DynRemoteMethod) method).paramSig);
       else
          throw new UnsupportedOperationException();
+   }
+
+   /** Given a signature string in the format used for remote methods, return the list of parameter types to that method */
+   public static Object[] convertParamSigToTypes(String paramSig) {
+      if (paramSig == null || paramSig.length() == 0)
+         return null;
+      String[] typeStrArr = StringUtil.split(paramSig, ';');
+      int num = typeStrArr.length;
+      if (num == 0)
+         return null;
+      num = num - 1; // Ignore the empty ; at the end
+      Object[] res = new Object[num];
+      for (int i = 0; i < num; i++) {
+         String typeStr = typeStrArr[i];
+         Object type;
+         char c = typeStr.charAt(0);
+         int numDims;
+         if (c == '[') {
+            numDims = 1;
+            int j;
+            for (j = 1; typeStr.length() > j && typeStr.charAt(j) == '['; j++)
+               numDims++;
+            c = typeStr.charAt(j);
+         }
+         else
+            numDims = 0;
+         switch (c) {
+            case 'L':
+               String typeName = typeStr.substring(1).replace('/', '.');
+               type = DynUtil.findType(typeName);
+               if (type == null)
+                  throw new IllegalArgumentException("No type for param signature conversion: " + typeName);
+               break;
+            default:
+               String code = String.valueOf(c);
+               sc.type.Type t = sc.type.Type.getArrayType(code);
+               if (t == null)
+                  throw new IllegalArgumentException("Unrecognized type signature code: " + code);
+               type = t.primitiveClass;
+               break;
+         }
+         if (numDims == 0)
+            res[i] = type;
+         else
+            res[i] = ArrayTypeDeclaration.getCompiledArrayClassForType(type, numDims);
+      }
+      return res;
    }
 
    public static Object[] getGenericParameterTypes(Object method, boolean bound) {

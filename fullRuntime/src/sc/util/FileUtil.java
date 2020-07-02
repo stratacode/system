@@ -709,7 +709,7 @@ public class FileUtil {
          in = new FileInputStream(srcFile);
          out = new FileOutputStream(dstFile);
 
-         byte[] buf = new byte[8*1024];
+         byte[] buf = new byte[32*1024];
          int len;
          while ((len = in.read(buf)) > 0){
             out.write(buf, 0, len);
@@ -729,6 +729,21 @@ public class FileUtil {
             try { in.close(); } catch (IOException exc) {}
       }
       return false;
+   }
+
+   public static boolean copyStream(InputStream in, OutputStream out) {
+      try {
+         byte[] buf = new byte[32*1024];
+         int len;
+         while ((len = in.read(buf)) > 0){
+            out.write(buf, 0, len);
+         }
+         return true;
+      }
+      catch (IOException exc) {
+         System.err.println("*** Error copying file from input stream to output stream: " + exc);
+         return false;
+      }
    }
 
    public static URL newFileURL(String fileName) {

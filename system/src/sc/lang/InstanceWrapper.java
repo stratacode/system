@@ -80,8 +80,7 @@ public class InstanceWrapper implements IObjectId {
          return labelName;
       if (theInstance == null)
          return typeName != null ? (selectToCreate ? "<select to create>" : "<type>") : "<type>";
-      String res = DynUtil.getInstanceName(theInstance);
-      return CTypeUtil.getClassName(res);
+      return DynUtil.getDisplayName(theInstance);
    }
 
    public boolean equals(Object other) {

@@ -5,6 +5,7 @@
 package sc.type;
 
 import sc.bind.MethodBinding;
+import sc.dyn.DynRemoteMethod;
 import sc.dyn.IReverseMethodMapper;
 import sc.js.JSSettings;
 import sc.util.WeakIdentityHashMap;
@@ -240,6 +241,13 @@ public class PTypeUtil {
          return ((Member) def).getModifiers();
       else if (def instanceof Class)
          return ((Class) def).getModifiers();
+      else if (def instanceof DynRemoteMethod) {
+         DynRemoteMethod dynMeth = (DynRemoteMethod) def;
+         int res = Modifier.PUBLIC;
+         if (dynMeth.isStatic)
+            res |= Modifier.STATIC;
+         return res;
+      }
       throw new UnsupportedOperationException();
    }
 

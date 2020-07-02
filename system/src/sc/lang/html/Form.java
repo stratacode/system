@@ -16,6 +16,8 @@ import java.util.TreeMap;
 public class Form extends HTMLElement {
    public final static sc.type.IBeanMapper _submitEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitEvent");
    private final static sc.type.IBeanMapper _submitCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitCount");
+   private final static sc.type.IBeanMapper _submitInProgressProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitInProgress");
+   private final static sc.type.IBeanMapper _submitErrorProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitError");
    private final static TreeMap<String,IBeanMapper> formServerTagProps = new TreeMap<String,IBeanMapper>();
    static {
       formServerTagProps.put("submitEvent", _submitEventProp);
@@ -59,9 +61,45 @@ public class Form extends HTMLElement {
       setDOMEvent(EventType.Submit, submitEvent, _submitEventProp);
    }
 
-   /** Implemented on the client to simulate form submit */
+   /**
+    * Implemented on the client to call the DOM 'submit()' method - which will typically navigate the page away.
+    * For test scripts that want to simulate a submitEvent, use sendSubmitEvent below
+    */
    @sc.obj.Exec(clientOnly=true)
    public void submit() {
+   }
+
+   /** Implemented on the client to send the submit event without actually submitting the form */
+   @sc.obj.Exec(clientOnly=true)
+   public void sendSubmitEvent() {
+   }
+
+   /**
+    * Implemented on the client to send the FormData to the given dstURL. Unlike 'submit()' it will not navigate to the action URL.
+    * Most useful for file upload forms that cannot be easily implemented using the sync api.
+    */
+   @sc.obj.Exec(clientOnly=true)
+   public void submitFormData(String dstURL) {
+   }
+
+   private boolean submitInProgress = false;
+   @Bindable(manual=true)
+   public boolean getSubmitInProgress() {
+      return submitInProgress;
+   }
+   public void setSubmitInProgress(boolean val) {
+      submitInProgress = val;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _submitInProgressProp, val);
+   }
+
+   private String submitError = null;
+   @Bindable(manual=true)
+   public String getSubmitError() {
+      return submitError;
+   }
+   public void setSubmitError(String val) {
+      submitError = val;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _submitErrorProp, val);
    }
 
    @sc.obj.EditorSettings(visible=false)

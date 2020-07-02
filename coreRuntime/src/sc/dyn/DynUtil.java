@@ -956,7 +956,7 @@ public class DynUtil {
       if (DynUtil.isType(obj)) {
          // Type declarations put in the layer after the type name.  Need to strip that out.
          String s = DynUtil.getInnerTypeName(obj);
-         // NOTE: sc_type_ is hard-coded elsewhere - search for it to find all usages.  Need to turn this into an id because we may have mroe than one type for the same type name.
+         // NOTE: sc_type_ is hard-coded elsewhere - search for it to find all usages.  Need to turn this into an id because we may have more than one type for the same type name.
          return getObjectId(obj, obj, "sc_type_" + s.replace('.', '_'), idMap, typeIdCounts);
       }
       else {
@@ -1078,6 +1078,31 @@ public class DynUtil {
       else
          typeName = cleanClassName(obj.getClass());
       return CTypeUtil.getClassName(typeName).replace('$', '.') + "__" + getTraceId(obj);
+   }
+
+   public static String getDisplayName(Object obj) {
+      if (!DynUtil.isType(obj)) {
+         Object type = DynUtil.getType(obj);
+         String displayNameProp = (String) DynUtil.getInheritedAnnotationValue(type, "sc.obj.EditorSettings", "displayNameProperty");
+         if (displayNameProp != null) {
+            String res = null;
+            try {
+               Object ores = DynUtil.getProperty(obj, displayNameProp);
+               if (ores != null) {
+                  if (!(ores instanceof CharSequence))
+                     System.err.println("*** Error - display name property: " + displayNameProp + " for: " + type + " returns non string");
+                  else {
+                     res = ores.toString();
+                     return res;
+                  }
+               }
+            }
+            catch (Exception exc) {
+               System.err.println("*** Error retrieving display name property: " + displayNameProp + " for: " + type);
+            }
+         }
+      }
+      return CTypeUtil.getClassName(DynUtil.getInstanceName(obj));
    }
 
    public static String toString(Object obj) {

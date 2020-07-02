@@ -994,21 +994,25 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public String getElementId() {
       Attr idAttr = getAttribute("id");
-      Attr nameAttr = getAttribute("name");
+      //Attr nameAttr = getAttribute("name");
       if (id != null) { // Explicitly named id - for example, the template file will rename the root element to match the file name if there's only one element in some cases
-         if (idAttr != null || nameAttr != null) {
-            Attr attr = idAttr != null ? idAttr : nameAttr;
+         if (idAttr != null /* || nameAttr != null */) {
+            //Attr attr = idAttr != null ? idAttr : nameAttr;
+            Attr attr = idAttr;
             if (PString.isString(attr.value)) {
                if (!attr.value.toString().equals(id))
-                  attr.displayError("Tag " + tagName + " has id/name: " + attr.value + " but a value of: " + id + " is expected for: ");
+                  attr.displayError("Tag " + tagName + " has id: " + attr.value + " but a value of: " + id + " is expected for: ");
             }
          }
          return id;
       }
+      /*
       if (idAttr != null && nameAttr != null)
          nameAttr.displayError("Invalid tag definition: use only one of id or name: " + idAttr.value + " and " + nameAttr.value);
-      else if (idAttr != null || nameAttr != null) {
-         Attr useAttr = idAttr != null ? idAttr : nameAttr;
+       */
+      else if (idAttr != null /* || nameAttr != null */) {
+         //Attr useAttr = idAttr != null ? idAttr : nameAttr;
+         Attr useAttr = idAttr;
          Object val = useAttr.value;
          if (PString.isString(val)) {
             String idStr = val.toString();
@@ -3747,7 +3751,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("td", "element", emptyArgs, null);
       addTagAttributes("th", "element", emptyArgs, null);
       addTagAttributes("hr", "element", emptyArgs, null);
-      addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit"}, new String[] {"action"});
+      addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit", "enctype", "accept-charset", "autocomplete", "rel", "target", "name", "novalidate"}, new String[] {"action"});
       addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex", "download", "target", "hreflang", "media", "rel", "type", "referrerpolicy"}, new String[] {"href"});
       addTagAttributes("script", "element", new String[] {"type", "src"}, new String[] {"src"});
       addTagAttributes("link", "element", new String[] {"rel", "type", "href", "tabindex"}, new String[] {"href"});
