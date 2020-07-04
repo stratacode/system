@@ -3593,7 +3593,7 @@ public class SyncManager {
          else
             scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
 
-         ctx = obj == null ? SyncManager.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
+         ctx = mgr == null ? SyncManager.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
       }
       else {
          ctx = mgr.getSyncContextFromScopeContext(scopeCtx, true);
