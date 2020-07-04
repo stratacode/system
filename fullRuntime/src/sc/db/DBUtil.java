@@ -96,7 +96,6 @@ public class DBUtil {
       }
    }
 
-
    public static Connection createConnection(String dataSourceName, boolean autoCommit) {
       try {
          DBDataSource dbDS = DataSourceManager.getDBDataSource(dataSourceName);
@@ -257,6 +256,8 @@ public class DBUtil {
          case Json:
             StringBuilder jsonSB = JSON.toJSON(val);
             return jsonSB.toString();
+         case ByteArray:
+            return base64Encoder.encodeToString((byte[]) val);
       }
       return val.toString();
    }
@@ -324,6 +325,9 @@ public class DBUtil {
             DynUtil.setProperty(pgo, "type", "jsonb");
             DynUtil.setProperty(pgo, "value", jsonStr);
             st.setObject(index, pgo, Types.OTHER);
+            break;
+         case ByteArray:
+            st.setBytes(index, (byte[]) val);
             break;
          default:
             throw new IllegalArgumentException("unrecognized type in setStatementValue");
@@ -440,6 +444,8 @@ public class DBUtil {
             if (refType == null)
                throw new UnsupportedOperationException("No refType provided for Reference column");
             return getResultSetByName(rs, colName, refType.primaryTable.idColumns.get(0));
+         case ByteArray:
+            return rs.getBytes(colName);
          default:
             throw new UnsupportedOperationException("Unrecognized type from getObject");
       }
@@ -541,6 +547,8 @@ public class DBUtil {
             if (refType == null)
                throw new UnsupportedOperationException("No refType provided for Reference column");
             return getResultSetByIndex(rs, index, refType.primaryTable.idColumns.get(0));
+         case ByteArray:
+            return rs.getBytes(index);
          default:
             throw new UnsupportedOperationException("Unrecognized type from getObject");
       }
@@ -563,7 +571,13 @@ public class DBUtil {
          return "timestamp";
       else if (propertyType == java.math.BigDecimal.class)
          return "numeric";
-      else // TODO: BigDecimal, byte array, char, Character - size limit for strings through an annotation
+      else if (propertyType instanceof Class) {
+         Class propertyClass = (Class) propertyType;
+         if (propertyClass.isArray() && propertyClass.getComponentType() == Byte.TYPE)
+            return "bytea";
+         return null;
+      }
+      else // TODO: BigDecimal, char, Character - size limit for strings through an annotation
          return null;
    }
 
@@ -584,9 +598,12 @@ public class DBUtil {
          return "java.util.Date";
       else if (type.equalsIgnoreCase("numeric"))
          return "java.math.BigDecimal";
+      else if (type.equalsIgnoreCase("bytea"))
+         return "byte[]";
       return null;
    }
 
+   /** The column types that generate their default value */
    public static boolean isDefinedInDBColumnType(String colType) {
       return colType.equals("bigserial") || colType.equals("serial");
    }

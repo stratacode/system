@@ -5,7 +5,7 @@ import sc.dyn.DynUtil;
 import java.sql.Types;
 
 public enum DBColumnType {
-   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId, Numeric, EnumInt, EnumDB;
+   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId, Numeric, EnumInt, EnumDB, ByteArray;
 
    public static DBColumnType fromJavaType(Object propertyType) {
       if (propertyType == java.lang.Integer.class || propertyType == java.lang.Integer.TYPE) {
@@ -33,6 +33,12 @@ public enum DBColumnType {
          if (enumDesc != null)
             return EnumDB;
          return EnumInt;
+      }
+      else if (DynUtil.isArray(propertyType)) {
+         Object compType = DynUtil.getComponentType(propertyType);
+         if (compType == Byte.TYPE)
+            return ByteArray;
+         return null;
       }
       else
          return null;
@@ -64,6 +70,8 @@ public enum DBColumnType {
             return Types.INTEGER;
          case EnumDB:
             return Types.VARCHAR;
+         case ByteArray:
+            return Types.BLOB;
       }
       throw new UnsupportedOperationException("Missing value in getSQLType");
    }
@@ -92,6 +100,8 @@ public enum DBColumnType {
          return Date;
       else if (columnType.equalsIgnoreCase("json") || columnType.equalsIgnoreCase("jsonb"))
          return Json;
+      else if (columnType.equalsIgnoreCase("bytea"))
+         return ByteArray;
       return null;
    }
 }
