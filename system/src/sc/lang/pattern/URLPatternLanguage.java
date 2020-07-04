@@ -46,6 +46,7 @@ public class URLPatternLanguage extends SCLanguage {
 
 
    public Parselet urlString = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, urlSpecialChar);
+   public Parselet urlPath = new OrderedChoice("('','','','')", REPEAT, alphaNumChar, digits, urlSpecialChar, new Symbol("/"));
    public Parselet integer = new OrderedChoice(digits);
    {
       // We want the input/output value to be the integer itself, not an IntegerLiteral like in other languages.  This is the first time we've needed to
