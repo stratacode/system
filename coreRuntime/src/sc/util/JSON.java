@@ -7,6 +7,7 @@ import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 
+import java.lang.reflect.Array;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.util.*;
@@ -48,9 +49,13 @@ public class JSON {
          if (propertyType instanceof Class) {
             Class propCl = (Class) propertyType;
             if (propCl.isArray()) {
-               // Do this to ensure the array returned is String[] instead of just Object[]
-               Object[] arr = (Object[]) PTypeUtil.newArray(propCl.getComponentType(), listVal.size());
-               return listVal.toArray(arr);
+               Class compCl = propCl.getComponentType();
+               int sz = listVal.size();
+               Object arr = PTypeUtil.newArray(compCl, sz);
+               for (int i = 0; i < sz; i++) {
+                  Array.set(arr, i, listVal.get(i));
+               }
+               return arr;
             }
             else if (propCl == List.class)
                return listVal;
