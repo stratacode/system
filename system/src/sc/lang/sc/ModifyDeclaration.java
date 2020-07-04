@@ -1845,7 +1845,7 @@ public class ModifyDeclaration extends TypeDeclaration {
    public boolean hasModifier(String modifier) {
       // Need to at least inherit the static behavior because of usages like addAllFields - where we expect the type
       // to have static set even though we are just modifying a static type
-      if (modifier.equals("static")) {
+      if (modifier.equals("static") || modifier.equals("abstract")) {
          if (modifyTypeDecl != null && modifyTypeDecl.hasModifier(modifier))
             return true;
 
