@@ -711,6 +711,9 @@ public class DBProvider {
                if (!ModelUtil.isWritableProperty(property))
                   continue;
 
+               if (ModelUtil.isReverseBinding(property))
+                  continue;
+
                List<Object> propSettings = ModelUtil.getAllInheritedAnnotations(sys, property, "sc.db.DBPropertySettings", false, refLayer, false);
 
                String propTableName = null;
