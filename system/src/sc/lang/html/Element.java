@@ -5644,7 +5644,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             "mouseUpEvent", "mouseDownMoveUp", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "clientWidth", "clientHeight", "offsetLeft", "offsetTop", "offsetWidth", "offsetHeight"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
-      SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount", "submitInProgress", "submitError"}, Element.class, 0));
+      SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount", "submitInProgress", "submitError", "submitResult"}, Element.class, 0));
       // We sync this value via the Select tag's selectedIndex. The option tag is not like repeat in that it's one instance rendered over and over with different
       // optionData values. TODO: should a child option tag create a class and the select tag manage the replication like repeat?
       //SyncManager.addSyncType(Option.class, new SyncProperties(null, null, new Object[]{"selected"}, Element.class, 0));

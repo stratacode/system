@@ -18,6 +18,7 @@ public class Form extends HTMLElement {
    private final static sc.type.IBeanMapper _submitCountProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitCount");
    private final static sc.type.IBeanMapper _submitInProgressProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitInProgress");
    private final static sc.type.IBeanMapper _submitErrorProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitError");
+   private final static sc.type.IBeanMapper _submitResultProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Form.class, "submitResult");
    private final static TreeMap<String,IBeanMapper> formServerTagProps = new TreeMap<String,IBeanMapper>();
    static {
       formServerTagProps.put("submitEvent", _submitEventProp);
@@ -100,6 +101,16 @@ public class Form extends HTMLElement {
    public void setSubmitError(String val) {
       submitError = val;
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _submitErrorProp, val);
+   }
+
+   private Object submitResult = null;
+   @Bindable(manual=true)
+   public Object getSubmitResult() {
+      return submitResult;
+   }
+   public void setSubmitResult(Object val) {
+      submitResult = val;
+      Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _submitResultProp, val);
    }
 
    @sc.obj.EditorSettings(visible=false)
