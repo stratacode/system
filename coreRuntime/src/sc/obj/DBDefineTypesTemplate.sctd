@@ -24,6 +24,7 @@
    public <%= typeBaseName %>(sc.db.DBObject _dbObj) {
       <% if (dbTypeDescriptor.baseType == null) { %>
        _dbObject = _dbObj;
+       _dbObject.wrapper = this;
        _dbObject.init();
    <% } else { %>
         super(_dbObj);
