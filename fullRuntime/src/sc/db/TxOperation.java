@@ -948,6 +948,7 @@ public abstract class TxOperation {
       }
 
       PreparedStatement st = null;
+      int numDeleted = 0;
       try {
          if (!dbTypeDesc.dbReadOnly) {
             Connection conn = transaction.getConnection(dbTypeDesc.dataSourceName);
@@ -960,7 +961,7 @@ public abstract class TxOperation {
             if (versProp != null)
                DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
 
-            int numDeleted = st.executeUpdate();
+            numDeleted = st.executeUpdate();
 
             if (deleteTable.primary) {
                if (numDeleted != 1) {
@@ -1006,7 +1007,7 @@ public abstract class TxOperation {
       finally {
          DBUtil.close(st);
       }
-      return 1;
+      return numDeleted;
    }
 
    public abstract Map<String, String> validate();

@@ -256,8 +256,11 @@ public class DBUtil {
          case Json:
             StringBuilder jsonSB = JSON.toJSON(val);
             return jsonSB.toString();
-         case ByteArray:
+         case ByteArray: {
+            if (testMode)
+               return "<bytearray>";
             return base64Encoder.encodeToString((byte[]) val);
+         }
       }
       return val.toString();
    }

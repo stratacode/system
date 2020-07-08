@@ -524,6 +524,8 @@ public class DBPropertyDescriptor {
    public String getDataSourceForProp() {
       if (dataSourceName != null)
          return dataSourceName;
+      if (dbTypeDesc == null)
+         return null;
       return dbTypeDesc.dataSourceName;
    }
 

@@ -611,7 +611,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (numVals != numParams)
          throw new IllegalArgumentException("Mismatching numParamValues = " + numVals + " numParamNames: " + numParams);
 
-      IDBObject proto = createPrototype();
+      IDBObject proto = createPrototype(false);
       DBObject protoDB = (DBObject) proto.getDBObject();
       for (int i = 0; i < numVals; i++) {
          protoDB.setPropertyInPath(propNames.get(i), propValues.get(i));
@@ -707,7 +707,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
     */
    public IDBObject lookupInstById(Object id, int typeId, boolean createProto, boolean selectDefault) {
       if (baseType != null) {
-         return baseType.lookupInstById(id, typeId == -1 ? this.typeId : typeId, createProto, selectDefault);
+         return baseType.lookupInstById(id, typeId == DBUnsetTypeId ? this.typeId : typeId, createProto, selectDefault);
       }
 
       if (typeInstances == null) {
@@ -728,7 +728,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       DBObject dbObj;
       synchronized (this) {
-         inst = resTypeDesc.createPrototype();
+         // When typeId is unset, this returns null for abstract types or those with sub-types because we don't really know the
+         // concrete type. In this case, we will create a stub DBObject to store the id properties and manage access to the query
+         // to populate properties on this instance - at which point we learn the type and create the wrapper.
+         inst = resTypeDesc.createPrototype(typeId == DBUnsetTypeId);
          if (inst != null) {
             dbObj = (DBObject) inst.getDBObject();
             dbObj.setDBId(id);
@@ -763,8 +766,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return (IDBObject) DynUtil.createInstance(typeDecl, "Lsc/db/DBObject;", dbObj);
    }
 
-   public IDBObject createPrototype() {
+   public IDBObject createPrototype(boolean concreteOnly) {
       if (typeId == DBAbstractTypeId)
+         return null;
+      if (concreteOnly && subTypes != null && subTypes.size() > 0)
          return null;
       IDBObject inst = createInstance();
       DBObject dbObj = (DBObject) inst.getDBObject();
@@ -809,8 +814,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       // The generated addSyncInst call is not included in the generated code so we do it here
       // TODO: do we need to specify a different value of onDemand here?  Maybe it gets put into SyncProperties so
       // it's available?
-      if (syncProps != null)
+      if (syncProps != null) {
          SyncManager.addSyncInst(inst, true, syncProps.initDefault, null, syncProps);
+      }
 
       if (liveDynTypes)
          sc.dyn.DynUtil.addDynInstance(getTypeName(), inst);
@@ -2029,11 +2035,12 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    public void updateTypeDescriptor(IDBObject newInst, DBObject dbObj) {
-      if (dbObj.wrapper != null) {
-         if (dbObj.wrapper != newInst) {
-            System.err.println("*** Warning - replacing wrapper for instance");
-         }
-      }
+      // We do replace the wrapper when we do a prototype query of a base class and end up returning a subclass
+      //if (dbObj.wrapper != null) {
+         //if (dbObj.wrapper != newInst) {
+         //
+         //}
+      //}
       dbObj.setWrapper(newInst, this);
       dbObj.setDBId(dbObj.dbId);
       dbObj.setPrototype(false);

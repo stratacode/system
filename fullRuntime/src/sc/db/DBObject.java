@@ -55,7 +55,7 @@ public class DBObject implements IDBObject {
     * The object used for storing properties for this DBObject. When null, this instance is used for properties.
     * When not null, this instance is stored as the _dbObject field in a "wrapper" instance where this is our pointer back.
     */
-   IDBObject wrapper;
+   public IDBObject wrapper;
 
    Object dbId;
    boolean unknownType;
@@ -632,7 +632,7 @@ public class DBObject implements IDBObject {
          }
          else {
             if (pdesc.refDBTypeDesc != null) {
-               setPropertyInPath(protoProp, pdesc.refDBTypeDesc.createPrototype());
+               setPropertyInPath(protoProp, pdesc.refDBTypeDesc.createPrototype(false));
             }
             else if (pdesc.getDBColumnType() == DBColumnType.Json) {
                Object inst = DynUtil.createInstance(pdesc.getPropertyMapper().getPropertyType(), null);
