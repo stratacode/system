@@ -1979,4 +1979,8 @@ public class DynUtil {
       }
       return resMap;
    }
+
+   public static boolean isStaticMethod(Object meth) {
+      return hasModifier(meth, "static");
+   }
 }
