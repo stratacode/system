@@ -192,7 +192,7 @@ public class SchemaManager {
                            // This will be more reliable since it's stored next to the data
                            curChange.fromModel = dbModel;
                         }
-                        else {
+                        else if (curChange.toModel.equals(dbModel)) {
                            // we already have this change from the file system cache
                            removeChangedType(typeName);
                         }
