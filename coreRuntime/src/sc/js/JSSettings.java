@@ -41,8 +41,12 @@ public @interface JSSettings {
    String extendsJSFiles() default "";
 
    /**
-    * For a class with jsLibFiles set, specifies a comma separated list of type dependencies that are used by the native class.  Once we see jsLibFiles we stop looking for dependencies in that class but sometimes
-    * the Java and JS classes depend on the same class
+    * Specifies a comma separated list of type dependencies to add in addition to those discovered automatically by references in the code.
+    * It useful for jsLibFiles where important dependencies are implemented in the native JS code, or when you might reference a base class
+    * that can generate instances of a subclass.
+    * An important note is that if a class uses jsLibFiles it stops looking for dependencies in that class (since many may not be resolveable)
+    * but sometimes the Java and JS classes depend on the same class. Currently we require that you provide those overlapping classes manually but
+    * it's possible we could improve this using that info.
     */
    String dependentTypes() default "";
    /** When jsModuleFile/Pattern is used and js.options.disableModules is enabled if this is true, this module is still used.  Set this to true for core modules which have dependencies to/from native js code.  Those that can be split out at compile time for smaller downloads. */

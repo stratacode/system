@@ -1112,6 +1112,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          else {
             addJSLibDeps(type, jsEnt.fullTypeName, typeLibFile, typesInFile);
          }
+         addExtraDependencies(type, jsEnt.fullTypeName, typeLibFile, typesInFile);
 
          // Since MainInit is in src form here, need to skip checking on compiled types or the runtime method barfs
          boolean entryPointAdded = false;
@@ -1238,20 +1239,32 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    private void addJSLibDeps(Object type, String fromTypeName, String typeLibFile, Map<JSFileEntry,Boolean> typesInFile) {
       // TODO: should we recursively process this types dependencies and add any jsLibFiles we find along the way?  That seems safe, just computationally expensive.  Given the small number of lib files, manually adding them for now.
       addAnnotationDeps(type, typeLibFile);
+   }
 
-      // TODO: same thing for type depend
+   private List<Object> getDependentJSTypeList(Object type) {
       String depTypesStr = getDependentJSTypes(type);
       if (depTypesStr != null) {
+         ArrayList<Object> res = new ArrayList<Object>();
          String[] depTypeNames = StringUtil.split(depTypesStr, ',');
          for (String depTypeName:depTypeNames) {
             BodyTypeDeclaration depType = system.getSrcTypeDeclaration(depTypeName, null, true);
             if (depType != null)
-               addDependentType(type, depType, typeLibFile, typesInFile, DepType.Uses);
+               res.add(depType);
             else
                system.error("No src type found for type: " + depTypeName + " in JSSettings annotation on: " + type);
          }
+         return res;
       }
+      return null;
+   }
 
+   private void addExtraDependencies(Object type, String fromTypeName, String typeLibFile, Map<JSFileEntry,Boolean> typesInFile) {
+      List<Object> depTypeList = getDependentJSTypeList(type);
+      if (depTypeList != null) {
+         for (Object depType:depTypeList) {
+            addDependentType(type, depType, typeLibFile, typesInFile, DepType.Uses);
+         }
+      }
    }
 
    private void addDependentType(Object type, Object dependentType, String typeLibFile, Map<JSFileEntry,Boolean> typesInFile, DepType depType) {
@@ -2723,8 +2736,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                System.err.println("*** Warning: no source for Javascript conversion for base class: " + ModelUtil.getTypeName(extType) + " of: " + td);
             }
          }
+         String typeName = ModelUtil.getTypeName(td);
          if (hasLibFile)
-            addJSLibDeps(extType, ModelUtil.getTypeName(td), rootLibFile, typesInFile);
+            addJSLibDeps(extType, typeName, rootLibFile, typesInFile);
+         addExtraDependencies(extType, typeName, rootLibFile, typesInFile);
       }
       Object[] implTypes = td.getImplementsTypeDeclarations();
       if (implTypes != null) {
@@ -2935,6 +2950,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
                   if (depTypes.contains(Bind.class))
                      depTypes.add(system.getSrcTypeDeclaration("sc.js.bind.Bind", null, true, false, false));
+
+                  List<Object> extraDeps = getDependentJSTypeList(type);
+                  if (extraDeps != null)
+                     depTypes.addAll(extraDeps);
 
                   for (Object depType:depTypes) {
                      // This represents a dependency on the @Component types we inject via code gen, not a real dependency on this class.
