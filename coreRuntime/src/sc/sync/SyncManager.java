@@ -489,8 +489,6 @@ public class SyncManager {
          }
          markChanged();
          // When we are processing the initial sync, we are not recording changes.
-         // TODO: do we need to record separate versions when dealing with sync contexts shared by more than one client?
-         // to track versions, so we can respond to sync requests from more than one client
          if (!initialSync) {
             if (scope.getScopeDefinition().supportsChangeEvents) {
                // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the

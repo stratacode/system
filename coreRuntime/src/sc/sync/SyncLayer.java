@@ -41,6 +41,8 @@ public class SyncLayer {
    private TreeMap<String, RemoteResult> pendingMethods = new TreeMap<String, RemoteResult>();
    private ArrayList<RemoteResult> notifyMethods = new ArrayList<RemoteResult>();
 
+   public IdentityHashMap<Object, SyncNewObj> pendingNewObjs = null;
+
    /** Each sync layer stores a list of changes made in that layer - each are a subclass of this abstract class */
    public abstract static class SyncChange {
       Object obj;
@@ -339,6 +341,13 @@ public class SyncLayer {
    public void addNewObj(Object obj, SyncManager.InstInfo instInfo, boolean remoteChange) {
       SyncNewObj change = new SyncNewObj(obj, instInfo, remoteChange);
       addSyncChange(change);
+      addPendingNew(obj, change);
+   }
+
+   private void addPendingNew(Object obj, SyncNewObj newObj) {
+      if (pendingNewObjs == null)
+         pendingNewObjs = new IdentityHashMap<Object,SyncNewObj>();
+      pendingNewObjs.put(obj, newObj);
    }
 
    public static void addDepNewObj(List<SyncChange> depChanges, Object obj, SyncManager.InstInfo instInfo) {
@@ -461,6 +470,9 @@ public class SyncLayer {
                   syncChangeList = cur;
                else
                   prev.next = cur;
+
+               if (cur instanceof SyncNewObj && pendingNewObjs != null)
+                  pendingNewObjs.remove(inst);
             }
             else {
                prev = cur;
@@ -484,6 +496,7 @@ public class SyncLayer {
       pendingChangeList = syncChangeList;
       pendingChangeLast = syncChangeLast;
       syncChangeLast = syncChangeList = null;
+      pendingNewObjs = null;
 
       syncContext.markSyncPending();
    }
@@ -691,12 +704,14 @@ public class SyncLayer {
          String changedObjName = syncHandler.getObjectBaseName(null, this);
          changedObjFullName = syncHandler.getObjectName();
 
+         boolean isNewObj = change instanceof SyncNewObj;
+
          // isNew should not be set for property changes when the current object is set or already serialized.
-         isNew = (syncHandler.isNewInstance() || (initialLayer && change instanceof SyncNewObj)) &&
+         isNew = (syncHandler.isNewInstance() || (initialLayer && isNewObj)) &&
                   (!currentObjNames.contains(changedObjName) || !equalStrings(changedObjPkg, changeCtx.lastPackageName)) &&
                   createdTypes != null && !createdTypes.contains(changedObjFullName) && !(change instanceof SyncMethodResult);
 
-         newArgs = change instanceof SyncNewObj ? ((SyncNewObj) change).instInfo.args : isNew ? parentContext.getNewArgs(changedObj) : null;
+         newArgs = isNewObj ? ((SyncNewObj) change).instInfo.args : isNew ? parentContext.getNewArgs(changedObj) : null;
          Object changedObjType = syncHandler.getObjectType(changedObj);
          objTypeName = DynUtil.getTypeName(changedObjType, false);
 
@@ -714,6 +729,9 @@ public class SyncLayer {
                return;
             }
          }
+
+         if (isNewObj && pendingNewObjs != null)
+            pendingNewObjs.remove(changedObj);
 
          // What object do we need to be current
          Object newObj = changedObj;

@@ -171,22 +171,6 @@ public class SyncSerializer {
       statement.sb.append(Bind.indent(indentSize));
 
       if (propValue != null) {
-         // Which sync context to use for managing synchronization of on-demand references for properties of this component?   When a session scoped component extends or refers to a global scoped component - e.g. EditorFrame's editorModel, typeTreeModel, etc.
-         // how do we keep everything in sync?  Global scoped contexts keep the list of session contexts which are mapping them.  When session scoped extends global, it becomes session - so editorModel/typeTreeModel should be session.  But LayeredSystem,
-         // Layer's etc. should be global - shared.  Information replicated into the sessionSyncContext as needed.
-         // Change listeners - global or session scoped level:
-         //   1) do them at the global level to synchronize event propagation to the session level using the back-event notification.  Theoretically you could generate a single serialized sync layer and broadcast it out to all listeners.  they are
-         //    synchronized and seeing the same thing.  they can ignore any data they get pushed which does not match their criteria.
-         //   2) NO: adding/removing/delivering events is complicated.  We need to sync the add listener with the get intitial sync value.  It's rare that one exact layer applies to everyone so that optimization won't work. - it's likely that application logic has customized it so different users see different things.  It's a security violation to
-         //    violate application logic and broadcast all data to all users.
-         //   ?? What about the property value listener?   That too should be done at the session level.
-         //    simplify by doing event listeners, event propagation at the session scoped level always.  register instances, names etc. globally so those are all shared.
-         //  Need to propagate both contexts - session and global through the createOnDemand calls
-         //  Use global "new names" - never commit to registeredNewNames for global.  Instead put them into session so we keep track of what's registered where.
-         //
-         // Problem with making the global objects full managed at the session level - if there are any changes at the global level which depend on the global object, it's change also must be tracked at the global level.  The depChanges takes
-         // care of that now but currently we are registering the names at the session level which causes the problem.
-         // What changes must be made at the global level?  Any initSyncInsts which are not on-demand and are on global scoped components.  We don't have a session scope then.
          SyncHandler valSyncHandler = parentContext.getSyncHandler(propValue);
          valSyncHandler.appendPropertyUpdateCode(statement, changedObj, propName, propValue, parentContext.getPreviousValue(changedObj, propName), newObjNames, newLastPackageName, preBlockCode, postBlockCode, depChanges, syncLayer);
       }

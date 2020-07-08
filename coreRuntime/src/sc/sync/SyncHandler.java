@@ -173,6 +173,15 @@ public class SyncHandler {
                   String val = syncContext.getObjectName(changedObj, varName, false, false, null, syncLayer);
                   if (val == null)
                      val = syncContext.createOnDemandInst(changedObj, depChanges, varName, syncLayer);
+                  else if (syncLayer.pendingNewObjs != null) {
+                     SyncLayer.SyncNewObj pendingNew = syncLayer.pendingNewObjs.get(changedObj);
+                     if (pendingNew != null) {
+                        // Need to push the NewObj up ahead of this reference and mark the one that's later in the list
+                        // as 'overridden' so we skip it when we process it.
+                        SyncLayer.addDepNewObj(depChanges, changedObj, pendingNew.instInfo);
+                        pendingNew.overridden = true;
+                     }
+                  }
                   ser.formatReference(out, val, currentPackageName);
                }
                break;
