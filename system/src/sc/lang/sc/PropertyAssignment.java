@@ -142,8 +142,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          }
       }
 
-      if (execForRuntime(getLayeredSystem()) == RuntimeStatus.Disabled)
+      if (execForRuntime(getLayeredSystem()) == RuntimeStatus.Disabled) {
          excluded = true;
+         suppressGeneration = true;
+      }
 
       super.start();
    }
@@ -275,7 +277,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       }
    }
 
-   /** The PropertyAssignment defined for .sc is not in Java - we do a simple conversion here to replace x = y by { x = y } */
+   /** The PropertyAssignment defined for .sc is not in Java - we do a conversion here to replace x = y by { x = y } */
    public boolean transform(ILanguageModel.RuntimeType runtime) {
       if (runtime == ILanguageModel.RuntimeType.JAVA) {
          // Skip the list and go to the declaration
@@ -432,6 +434,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       Object var;
       TypeContext ctx = new TypeContext();
       ctx.transformed = true;
+
+      if (suppressGeneration)
+         return this;
+
       if ((var = base.definesMember(propertyName, MemberType.PropertyAnySet, null, ctx, false, inTransformed)) != null) {
 
          // Reverse-only bindings do not replace the underlying assignment, they append to it so if either one is 'reverse only', just add this statement to the base type
