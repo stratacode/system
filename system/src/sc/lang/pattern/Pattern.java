@@ -62,7 +62,7 @@ public class Pattern extends SemanticNode {
    public static Pattern initURLPattern(Object pageType, String pattern) {
       Object res = initPattern(URLPatternLanguage.getURLPatternLanguage(), pageType, pattern);
       if (res instanceof ParseError) {
-         throw new IllegalArgumentException("*** Failed to parse URL pattern: " + pattern + " in: " + pageType);
+         throw new IllegalArgumentException("*** Parse error for URL pattern: " + pattern + " in: " + pageType + ": " + res);
       }
       Pattern pat = (Pattern) res;
       pat.init();
