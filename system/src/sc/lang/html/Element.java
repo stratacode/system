@@ -4273,6 +4273,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
          for (Element et:invisTags)
             et.outputTag(sb, ctx);
+         markBodyValid(true);
          return;
       }
 
@@ -5605,8 +5606,13 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (bodyValid)
          return;
 
-      if (!visible)
+      if (!visible) {
+         if (invisTags != null) {
+            for (Element invisTag:invisTags)
+               invisTag.refreshTags(parentBodyChanged);
+         }
          return;
+      }
 
       Object[] children = getObjChildren(false);
       if (children != null) {
