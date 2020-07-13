@@ -54,8 +54,8 @@ public class TxUpdate extends VersionedOperation {
          ct += listUpd.apply();
       }
 
-      if (ct == 0)
-         System.err.println("*** Warning no properties changed in TxUpdate apply!");
+      //if (ct == 0)
+      //   System.err.println("*** Warning no properties changed in TxUpdate apply!");
 
       return ct;
    }

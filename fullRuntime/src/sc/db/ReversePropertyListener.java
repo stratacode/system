@@ -153,50 +153,59 @@ class ReversePropertyListener extends AbstractListener {
 
             boolean listNeedsSet = false;
             lastValue = newVal;
-
-            List<Object> newList = (List<Object>)omapper.getPropertyValue(newVal, false, false);
-            if (newList == null) {
-               // TODO: create a DBList here?
-               newList = new ArrayList<Object>();
-               listNeedsSet = true;
-            }
-            if (oldVal != null) {
-               int ix = newList.indexOf(oldVal);
-               if (ix != -1) {
-                  newList.remove(ix);
-                  numRemoved++;
+            if (newVal == null) {
+               List<Object> oldList = (List<Object>) omapper.getPropertyValue(oldVal, false, false);
+               if (oldList != null) {
+                  if (oldList.remove(inst))
+                     numRemoved++;
                }
             }
-            if (newVal != null) {
+            else {
+               List<Object> newList = (List<Object>)omapper.getPropertyValue(newVal, false, false);
+               if (newList == null) {
+                  // TODO: create a DBList here?
+                  newList = new ArrayList<Object>();
+                  listNeedsSet = true;
+               }
+               if (oldVal != null) {
+                  IDBObject oldObj = (IDBObject) oldVal;
+                  if (oldObj.getDBObject() != null && (((DBObject)oldObj.getDBObject()).isActive())) {
+                     List<Object> oldList = (List<Object>) omapper.getPropertyValue(oldVal, false, false);
+                     if (oldList != null) {
+                        oldList.remove(inst);
+                        numRemoved++;
+                     }
+                  }
+               }
                int ix = newList.indexOf(inst);
                if (ix == -1) {
                   newList.add(inst);
                   numUpdated++;
                }
-            }
 
-            if (listNeedsSet && newList.size() > 0) {
-               // Update the cached value in the reverse direction so that the sendEvent does not
-               // try to apply this change again for this listener.
-               ReversePropertyListener oListener = getReverseListener(newVal, omapper);
-               if (oListener != null)
-                  oListener.lastValue = newList;
+               if (listNeedsSet && newList.size() > 0) {
+                  // Update the cached value in the reverse direction so that the sendEvent does not
+                  // try to apply this change again for this listener.
+                  ReversePropertyListener oListener = getReverseListener(newVal, omapper);
+                  if (oListener != null)
+                     oListener.lastValue = newList;
 
-               // Because we do not have the complete value for this list just because one reverse property was set
-               // do not update the pending status for this property.
-               DBTransaction curTx = DBTransaction.getCurrent();
-               boolean oldSelectedState = false;
-               if (curTx != null) {
-                  oldSelectedState = curTx.updateSelectState;
-                  curTx.updateSelectState = false;
-               }
+                  // Because we do not have the complete value for this list just because one reverse property was set
+                  // do not update the pending status for this property.
+                  DBTransaction curTx = DBTransaction.getCurrent();
+                  boolean oldSelectedState = false;
+                  if (curTx != null) {
+                     oldSelectedState = curTx.updateSelectState;
+                     curTx.updateSelectState = false;
+                  }
 
-               try {
-                  omapper.setPropertyValue(newVal, newList);
-               }
-               finally {
-                  if (curTx !=null)
-                     curTx.updateSelectState = oldSelectedState;
+                  try {
+                     omapper.setPropertyValue(newVal, newList);
+                  }
+                  finally {
+                     if (curTx !=null)
+                        curTx.updateSelectState = oldSelectedState;
+                  }
                }
             }
          }

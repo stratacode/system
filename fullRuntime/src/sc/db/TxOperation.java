@@ -759,6 +759,14 @@ public abstract class TxOperation {
                                ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
                                ArrayList<DBTypeDescriptor> columnRefTypes) {
       for (DBPropertyDescriptor col:cols) {
+         DBTypeDescriptor instTypeDesc = ((DBObject)arrInst.getDBObject()).dbTypeDesc;
+         if (col.typeIdProperty) {
+            columnTypes.add(col.getDBColumnType());
+            columnValues.add(instTypeDesc.typeId);
+            columnRefTypes.add(null);
+            continue;
+         }
+
          int numCols = col.getNumColumns();
          IBeanMapper mapper = col.getPropertyMapper();
          DBColumnType dbColumnType = col.getDBColumnType();
@@ -778,6 +786,8 @@ public abstract class TxOperation {
                      refType = col.dbTypeDesc;
                   }
                   else {
+                     if (col.ownedByOtherType(instTypeDesc))
+                        continue;
                      val = mapper.getPropertyValue(arrInst, false, false);
                      colType = dbColumnType;
                      refType = col.refDBTypeDesc;

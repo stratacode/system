@@ -68,6 +68,8 @@ public class DBObject implements IDBObject {
     *  because an instance was deserialized using the existing version. */
    public IDBObject replacedBy = null;
 
+   private String objectId = null;
+
    public DBObject(DBTypeDescriptor dbType) {
       this.dbTypeDesc = dbType;
       this.unknownType = true;
@@ -205,9 +207,21 @@ public class DBObject implements IDBObject {
                   remove = true;
                   apply = true;
                }
-               if (createDelete && c instanceof TxDelete) {
-                  remove = true;
-                  apply = true;
+               if (createDelete) {
+                  if (c instanceof TxDelete) {
+                     remove = true;
+                     apply = true;
+                  }
+                  else if (c instanceof TxUpdate || c instanceof TxInsert || c instanceof TxListUpdate) {
+                     // TODO: for TxInsert, should we skip the DELETE call since the row is not there
+                     curr.removeOp(c);
+                     pendingOps.remove(i);
+                     txSz--;
+                     i--;
+                     continue;
+                  }
+                  else
+                     System.err.println("*** Unhandled case in dbDelete");
                }
                if (createUpdateProp) { // TODO: Remove this if statement
                   if (c instanceof TxListUpdate) {
@@ -708,28 +722,36 @@ public class DBObject implements IDBObject {
    }
 
    public String getObjectId() {
+      if (objectId != null)
+         return objectId;
+
       StringBuilder sb = new StringBuilder();
       Object inst = getInst();
       String typeName = CTypeUtil.getClassName(DynUtil.getTypeName(dbTypeDesc.typeDecl, false));
-      if (isTransient()) {
-         sb.append(DynUtil.getObjectId(inst, dbTypeDesc.typeDecl, typeName + "-transient"));
+      sb.append(typeName);
+      sb.append("__");
+      if (isTransient() || isPrototype()) {
+         appendTransientId(sb);
       }
       else {
-         sb.append(typeName);
-         sb.append("__");
          for (int i = 0; i < dbTypeDesc.primaryTable.idColumns.size(); i++) {
             if (i != 0)
                sb.append("__");
             IdPropertyDescriptor idProp = dbTypeDesc.primaryTable.idColumns.get(i);
             Object idVal = idProp.getPropertyMapper().getPropertyValue(inst, false, false);
-            if (idVal == null) // TODO: not sure what to do here since the object won't have an id until it's actually persisted and getObjectId has no way to change the id for the same instance (would require some changes to the sync system?)
-               idVal = "null_id";
-            if (idVal instanceof Long && ((Long) idVal) == 0)
-               System.out.println("*** Warning - allocating object id with no real id");
+            if (idVal == null || (idVal instanceof Long && ((Long) idVal) == 0)) {
+               appendTransientId(sb);
+            }
             sb.append(idVal);
          }
       }
-      return sb.toString();
+      objectId = sb.toString();
+      return objectId;
+   }
+
+   private void appendTransientId(StringBuilder sb) {
+      sb.append(dbTypeDesc.transientIdCount++);
+      sb.append("t");
    }
 
    public String toString() {
@@ -877,6 +899,10 @@ public class DBObject implements IDBObject {
          return;
       if (!dbTypeDesc.removeInstance(this, false))
          DBUtil.error("DBObject.stop: instance not found: " + this);
+   }
+
+   public boolean isActive() {
+      return (flags & (REMOVED | STOPPED)) == 0;
    }
 
    public String getStateString() {
