@@ -14651,15 +14651,25 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                else {
                   if (refLayer == null)
                      System.err.println("*** Error type without a ref layer");
-                  if (refLayer != null && refLayer.layeredSystem != this)
-                     refLayer = getPeerLayerFromRemote(refLayer);
-                  // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
-                  TypeDeclaration res = cachedOnly ?
-                                       getCachedTypeDeclaration(subTypeName, null, null, false, false, refLayer, true) :
-                                       (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
-                  // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
-                  if (res != null && res.getFullTypeName().equals(subTypeName))
-                     result.add(res);
+                  boolean invalidRes = false;
+                  if (refLayer != null && refLayer.layeredSystem != this) {
+                     Layer newRefLayer = getPeerLayerFromRemote(refLayer);
+                     if (newRefLayer.layeredSystem != null)
+                        refLayer = newRefLayer;
+                     else {
+                        System.err.println("*** getPeerLayerFromRemote returns invalid newRefLayer with null layeredSystem for: " + refLayer);
+                        invalidRes = true;
+                     }
+                  }
+                  if (!invalidRes) {
+                     // For the cachedOnly case, we do not want to load a type which is not yet loaded - i.e. we are invalidating caches for that type
+                     TypeDeclaration res = cachedOnly ?
+                                          getCachedTypeDeclaration(subTypeName, null, null, false, false, refLayer, true) :
+                                          (TypeDeclaration) getSrcTypeDeclaration(subTypeName, null, true, false, true, refLayer, type.isLayerType);
+                     // Check the resulting class name.  getSrcTypeDeclaration may find the base-type of an inner type as it looks for inherited inner types under the parent type's name
+                     if (res != null && res.getFullTypeName().equals(subTypeName))
+                        result.add(res);
+                  }
                }
             }
          }
@@ -15800,6 +15810,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       Layer res = getSameLayerFromRemote(layer);
       if (res != null)
          return res;
+      if (layer.layeredSystem == null)
+         return null;
       for (Layer nextLayer = layer.getNextLayer(); nextLayer != null; nextLayer = nextLayer.getNextLayer()) {
          res = getLayerByName(nextLayer.getLayerUniqueName());
          if (res != null)
