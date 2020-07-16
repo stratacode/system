@@ -2644,6 +2644,9 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (super.transform(runtime))
         any = true;
 
+      if (replacedByStatement != null)
+         return false;
+
       // If we are transforming a template into an interpreted StrataCode type, just return at this point.
       // The types won't have the getTypedProperty etc. methods needed for at least the dynamic transformation
       // and we interpret the StrataCode code.
