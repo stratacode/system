@@ -29,6 +29,10 @@ public class ServerTag implements IObjectId {
    /** Set to the number of millis to pause */
    public int liveEditDelay = 0;
 
+   public String initScript = null;
+
+   public String stopScript = null;
+
    public String toString() {
       return "id=" + id + "(" + props + ")";
    }

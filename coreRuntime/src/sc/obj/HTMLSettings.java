@@ -17,4 +17,6 @@ import java.lang.annotation.Target;
 public @interface HTMLSettings {
    /** Advice not to escape the return value of this method. */
    boolean returnsHTML() default false;
+   // TODO: add allowedTags filter so that we can auto-validate and secure these properties from injection
+   // add a default whitelist for just the formatting tags we already set
 }

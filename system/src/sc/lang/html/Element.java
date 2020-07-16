@@ -138,7 +138,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient boolean stopped = false;
 
-   // TODO: we probably should support wrap or probably bodyOnly for normal tags - i.e. when it's set to false, we render just the body, without the start/end tag.
    /**
     * For repeat tags, with wrap=true, the body repeats without a wrapper tag.  Instead a wrapper tag based using this element's tag name wraps all of the repeated content without
     * a separate tag wrapping each element.
@@ -148,8 +147,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public transient boolean wrap;
 
    /**
-    * For tags which are created by a repeat tag where 'wrap=true' do not output the start/end tag - just the body.  You can also set this to true explicitly
-    * as an attribute to represents content hiding the outer start/end tag.
+    * This is used both when you set the bodyOnly attribute and for tags which are created by a repeat tag where 'wrap=true'. In the latter case,
+    * the repeated element has bodyOnly=true and the repeat wrapper itself renders the tag with the repeat attribute.
     */
    private transient boolean bodyOnly;
 
@@ -220,6 +219,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       setRepeatIndex(repeatIx);
    }
 
+   /* TODO: could we use a method like this one in tags.js?
+   public boolean isVisibleInView() {
+      if (!visible)
+         return false;
+      Element enclTag = getEnclosingTag();
+      if (enclTag != null && !enclTag.isTagVisible())
+         return false;
+      return true;
+   }
+   */
+
    @Bindable(manual=true)
    public void setVisible(boolean vis) {
       if (vis == visible)
@@ -229,6 +239,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // our parent will have marked itself as valid which can trigger an invalidation at this point.
       if (startTagValid) {
          invalidateStartTag();
+         invalidateBody(); // Needed in case there's an alt tag but probably a good idea in general?
          Element enclTag = getEnclosingTag();
          if (enclTag != null) {
             enclTag.bodyTxtValid = false;
@@ -243,6 +254,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             enclTag.bodyTxtValid = false;
             enclTag.invalidateBody();
          }
+         // Also re-render any children of this tag since they might be invalid
+         markBodyValid(false);
       }
       Bind.sendChangedEvent(this, "visible");
    }
@@ -3753,8 +3766,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("hr", "element", emptyArgs, null);
       addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit", "enctype", "accept-charset", "autocomplete", "rel", "target", "name", "novalidate"}, new String[] {"action"});
       addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex", "download", "target", "hreflang", "media", "rel", "type", "referrerpolicy"}, new String[] {"href"});
-      addTagAttributes("script", "element", new String[] {"type", "src"}, new String[] {"src"});
-      addTagAttributes("link", "element", new String[] {"rel", "type", "href", "tabindex"}, new String[] {"href"});
+      addTagAttributes("script", "element", new String[] {"type", "src", "integrity", "crossorigin", "charset", "async", "defer"}, new String[] {"src"});
+      addTagAttributes("link", "element", new String[] {"rel", "type", "href", "tabindex", "integrity", "crossorigin", "hreflang", "media", "referrerpolicy", "sizes", "title"}, new String[] {"href"});
       addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt"}, new String[] {"src"});
       addTagAttributes("style", "element", new String[] {"type"}, null);
       addTagAttributes("pre", "element", emptyArgs, null);
@@ -5384,6 +5397,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          stag = new ServerTag();
          stag.id = id;
          stag.eventSource = isEventSource();
+         stag.initScript = initScript;
+         stag.stopScript = stopScript;
          addServerTagFlags(stag);
       }
       if (listeners != null) {
@@ -5450,7 +5465,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             ServerTag serverTagInfo = getServerTagInfo(tagId);
             if (serverTagInfo != null) {
                // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
-               if (serverTagInfo.eventSource) {
+               if (serverTagInfo.eventSource || serverTagInfo.initScript != null || serverTagInfo.stopScript != null) {
 
                   if (stCtx.firstTime) {
                      if (stCtx.serverTags == null)
@@ -5755,5 +5770,21 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public CacheMode getCache() {
       return cache;
+   }
+
+   String initScript;
+   public String getInitScript() {
+      return initScript;
+   }
+   public void setInitScript(String is) {
+      initScript = is;
+   }
+
+   String stopScript;
+   public String getStopScript() {
+      return stopScript;
+   }
+   public void setStopScript(String is) {
+      stopScript = is;
    }
 }
