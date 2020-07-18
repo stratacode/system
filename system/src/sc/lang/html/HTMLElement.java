@@ -6,14 +6,20 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.lang.HTMLLanguage;
 import sc.lang.java.TypeDeclaration;
+import sc.lang.template.Template;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
+import sc.parser.ParseError;
+import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Set;
+import java.util.TreeSet;
 
 /** The base class for all HTML elements.
  *
@@ -248,5 +254,78 @@ public class HTMLElement<RE> extends Element<RE> {
    // To be called on the client only where it calls the DOM focus element
    @sc.obj.Exec(clientOnly=true)
    public void focus() {
+   }
+
+   public static Set<String> formattingTags = new TreeSet<String>();
+   static {
+      formattingTags.add("b");
+      formattingTags.add("i");
+      formattingTags.add("p");
+      formattingTags.add("li");
+      formattingTags.add("ul");
+      formattingTags.add("ol");
+      formattingTags.add("br");
+      formattingTags.add("span");
+      formattingTags.add("div");
+      formattingTags.add("table");
+      formattingTags.add("tbody");
+      formattingTags.add("tr");
+      formattingTags.add("u");
+      formattingTags.add("td");
+      formattingTags.add("th");
+      formattingTags.add("a");
+      formattingTags.add("img");
+   }
+
+   /** Parses and validates the HTML provided in htmlStr. If allowedTags is not null, only tags with those names are allowed  */
+   public static String validateClientHTML(String htmlStr, Set<String> allowedTags) {
+      HTMLLanguage lang = HTMLLanguage.getHTMLLanguage();
+
+      Object parseRes = lang.parseString(htmlStr);
+      if (parseRes instanceof ParseError) {
+         return parseRes.toString();
+      }
+      else {
+         Object semNode = ParseUtil.nodeToSemanticValue(parseRes);
+         if (!(semNode instanceof Template))
+            return "Invalid parse result";
+         Template templ = (Template) semNode;
+         if (templ.templateDeclarations == null)
+            return null;
+         for (Object decl:templ.templateDeclarations) {
+            if (decl instanceof CharSequence)
+               continue;
+            if (decl instanceof Element) {
+               Element tag = (Element) decl;
+
+               String childRes = validateTagTree(tag, allowedTags);
+               if (childRes != null)
+                  return childRes;
+            }
+            else
+               return "Invalid contents in template";
+         }
+      }
+      return null;
+   }
+
+   public static String validateTagTree(Element tag, Set<String> allowedTags) {
+      String tagName = tag.tagName;
+      if (tagName == null || (allowedTags != null && !(allowedTags.contains(tagName.toLowerCase()))))
+         return "Html tag: " + tagName + " not allowed";
+      if (tag.children != null) {
+         for (Object child:tag.children) {
+            if (child instanceof CharSequence)
+               continue;
+            if (child instanceof Element) {
+               String res = validateTagTree((Element) child, allowedTags);
+               if (res != null)
+                  return res;
+            }
+            else if (child != null)
+               return "Invalid child element for client HTML";
+         }
+      }
+      return null;
    }
 }
