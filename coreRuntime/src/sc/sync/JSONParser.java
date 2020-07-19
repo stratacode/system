@@ -102,8 +102,9 @@ public class JSONParser {
       // For sync, this will be JSONDeserializer that resolves named object references in the sync stream
       // For DB types it will resolve a reference to either DB object or a rooted object in the tree
       Object obj = resolver.resolveRef(objName, null);
-      if (obj == null)
+      if (obj == null) {
          System.err.println("No object: " + objName + " for reference in JSON: " + this);
+      }
       return obj;
    }
 

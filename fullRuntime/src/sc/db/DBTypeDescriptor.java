@@ -738,6 +738,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             dbObj = (DBObject) inst.getDBObject();
             dbObj.setDBId(id);
             typeInstances.put(id, inst);
+
+            initSyncForInst(inst);
          }
          // Don't know the concrete type so create a DBObject without the instance and register that instead
          else if (selectDefault) {
@@ -766,6 +768,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    public IDBObject createInstance(DBObject dbObj) {
       return (IDBObject) DynUtil.createInstance(typeDecl, "Lsc/db/DBObject;", dbObj);
+   }
+
+   public IDBObject createInstanceOfType(int typeId) {
+      DBTypeDescriptor subType = getSubTypeByTypeId(typeId);
+      if (subType == null)
+         throw new IllegalArgumentException("No subType of: " + this + ": for typeId: " + typeId + " to create");
+      return subType.createInstance();
    }
 
    public IDBObject createPrototype(boolean concreteOnly) {

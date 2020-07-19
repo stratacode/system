@@ -279,6 +279,8 @@ public class HTMLElement<RE> extends Element<RE> {
 
    /** Parses and validates the HTML provided in htmlStr. If allowedTags is not null, only tags with those names are allowed  */
    public static String validateClientHTML(String htmlStr, Set<String> allowedTags) {
+      if (htmlStr == null)
+         return null;
       HTMLLanguage lang = HTMLLanguage.getHTMLLanguage();
 
       Object parseRes = lang.parseString(htmlStr);
