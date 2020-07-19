@@ -55,5 +55,12 @@ public abstract class BaseTypeDescriptor {
       activated = true;
    }
 
+   void startAndActivate() {
+      if (!started)
+         start();
+      if (!activated)
+         activate();
+   }
+
    public abstract StringBuilder getMetadataString();
 }

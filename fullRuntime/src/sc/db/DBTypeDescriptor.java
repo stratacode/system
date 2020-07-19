@@ -67,13 +67,12 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return null;
    }
 
+
    public static BaseTypeDescriptor getBaseByType(Object type, boolean start) {
       BaseTypeDescriptor res = typeDescriptorsByType.get(type);
       if (res != null) {
-         if (start && !res.started)
-            res.start();
-         if (start && !res.activated)
-            res.activate();
+         if (start)
+            res.startAndActivate();
          return res;
       }
       Object superType = DynUtil.getExtendsType(type);
@@ -96,10 +95,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
       if (!(res instanceof DBTypeDescriptor))
          return null;
-      if (start && !res.started)
-         res.start();
-      if (start && !res.activated)
-         res.activate();
+      if (start)
+         res.startAndActivate();
       return (DBTypeDescriptor) res;
    }
 
@@ -486,6 +483,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    public SelectGroupQuery getFetchQueryForProperty(String propName) {
+      if (!started)
+         startAndActivate();
       SelectGroupQuery query = propQueriesIndex.get(propName);
       if (query == null) {
          System.err.println("*** No select query for property: " + propName);
