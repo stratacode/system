@@ -1923,6 +1923,10 @@ public class DynUtil {
 
    /** Parse dates in 8601 format (there's a Javascript version of this method for client/server code) */
    public static Date parseDate(String dateStr) {
+      int tix = dateStr.indexOf('T');
+      if (tix == -1) {
+         return Date.from(Instant.parse(dateStr + "T00:00:00.000Z"));
+      }
       return Date.from(Instant.parse(dateStr));
    }
 

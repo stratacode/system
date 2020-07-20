@@ -277,8 +277,18 @@ public class HTMLElement<RE> extends Element<RE> {
       formattingTags.add("img");
    }
 
+   public static Set<String> formattingAtts = new TreeSet<String>();
+   static {
+      formattingAtts.add("class");
+      formattingAtts.add("href");
+      formattingAtts.add("src");
+      formattingAtts.add("style");
+      formattingAtts.add("target");
+      formattingAtts.add("data-filename");
+   }
+
    /** Parses and validates the HTML provided in htmlStr. If allowedTags is not null, only tags with those names are allowed  */
-   public static String validateClientHTML(String htmlStr, Set<String> allowedTags) {
+   public static String validateClientHTML(String htmlStr, Set<String> allowedTags, Set<String> allowedAtts) {
       if (htmlStr == null)
          return null;
       HTMLLanguage lang = HTMLLanguage.getHTMLLanguage();
@@ -300,7 +310,7 @@ public class HTMLElement<RE> extends Element<RE> {
             if (decl instanceof Element) {
                Element tag = (Element) decl;
 
-               String childRes = validateTagTree(tag, allowedTags);
+               String childRes = validateTagTree(tag, allowedTags, allowedAtts);
                if (childRes != null)
                   return childRes;
             }
@@ -311,16 +321,29 @@ public class HTMLElement<RE> extends Element<RE> {
       return null;
    }
 
-   public static String validateTagTree(Element tag, Set<String> allowedTags) {
+   public static String validateTagTree(Element tag, Set<String> allowedTags, Set<String> allowedAtts) {
       String tagName = tag.tagName;
       if (tagName == null || (allowedTags != null && !(allowedTags.contains(tagName.toLowerCase()))))
          return "Html tag: " + tagName + " not allowed";
+      if (tag.attributeList != null) {
+         for (int i = 0; i < tag.attributeList.size(); i++) {
+            Attr att = (Attr) tag.attributeList.get(i);
+            if (att.name == null || !allowedAtts.contains(att.name))
+               return "Invalid attribute for client HTML: " + att.name;
+            if (!(att.value instanceof CharSequence))
+               return "Invalid attribute value";
+            String attValue = att.value.toString();
+            if (attValue.startsWith("javascript:"))
+               return "Invalid attribute containing javascript";
+         }
+      }
       if (tag.children != null) {
          for (Object child:tag.children) {
             if (child instanceof CharSequence)
                continue;
             if (child instanceof Element) {
-               String res = validateTagTree((Element) child, allowedTags);
+               Element childTag = (Element) child;
+               String res = validateTagTree(childTag, allowedTags, allowedAtts);
                if (res != null)
                   return res;
             }
