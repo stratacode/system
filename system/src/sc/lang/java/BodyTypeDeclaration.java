@@ -2042,15 +2042,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * Returns the list of methods with the given name or null if there aren't any.  Does not look for constructors
     */
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
-      if (body == null)
+      if (body == null && hiddenBody == null)
          return null;
 
       List<Object> methods = new ArrayList<Object>();
-      for (int i = 0; i < body.size(); i++) {
-         Definition member = body.get(i);
-         if (member instanceof MethodDefinition && StringUtil.equalStrings(((MethodDefinition) member).name, methodName) &&
-                 (modifier == null || member.hasModifier(modifier)))
-            methods.add(member);
+      if (body != null) {
+         for (int i = 0; i < body.size(); i++) {
+            Definition member = body.get(i);
+            if (member instanceof MethodDefinition && StringUtil.equalStrings(((MethodDefinition) member).name, methodName) &&
+                    (modifier == null || member.hasModifier(modifier)))
+               methods.add(member);
+         }
       }
       if (hiddenBody != null) {
          for (int i = 0; i < hiddenBody.size(); i++) {
