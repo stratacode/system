@@ -705,6 +705,10 @@ public class DBProvider {
                if (ModelUtil.hasModifier(property, "transient"))
                   continue;
 
+               // Skip private fields
+               if (ModelUtil.hasModifier(property, "private"))
+                  continue;
+
                if (ModelUtil.hasModifier(property, "static"))
                   continue;
 
