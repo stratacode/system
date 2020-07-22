@@ -5584,6 +5584,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    // Run this after default (priority 0) 'doLater' operations.
    public final static int REFRESH_TAG_PRIORITY = -5;
+   public final static int AFTER_REFRESH_TAG_PRIORITY = -6;
 
    public void scheduleRefreshTags() {
       if (refreshTagsScheduled)
