@@ -11,6 +11,7 @@ import sc.obj.*;
 import sc.sync.SyncDestination;
 import sc.sync.SyncManager;
 import sc.type.*;
+import sc.util.BindableTreeMap;
 import sc.util.IdentityWrapper;
 
 import java.lang.reflect.Modifier;
@@ -1976,12 +1977,43 @@ public class DynUtil {
             }
             if(res != null) {
                if (resMap == null)
-                  resMap = new TreeMap<String,String>();
+                  resMap = new BindableTreeMap<String,String>();
                resMap.put(propName, res.toString());
             }
          }
       }
       return resMap;
+   }
+
+   private static String callValidateMethod(Object obj, Object validateMethod, String propName) {
+      Object[] paramTypes = DynUtil.getParameterTypes(validateMethod);
+      Object res;
+      if (paramTypes.length == 0) {
+         res = DynUtil.invokeMethod(obj, validateMethod);
+      }
+      else if (paramTypes.length == 1) {
+         res = DynUtil.invokeMethod(obj, validateMethod, DynUtil.getProperty(obj, propName));
+      }
+      else {
+         throw new IllegalArgumentException("Invalid validator: " + validateMethod + " - should have zero or one parameter");
+      }
+      return res == null ? null : res.toString();
+   }
+
+   public static String validateProperty(IPropValidator obj, String propName) {
+      IBeanMapper mapper = getPropertyMapping(DynUtil.getType(obj), propName);
+      if (mapper == null)
+         throw new IllegalArgumentException("No property: " + propName + " for validateProperty");
+      Object validateMethod = mapper.getValidateMethod();
+      if (validateMethod == null)
+         throw new IllegalArgumentException("No validate method for property: " + propName);
+      String error = callValidateMethod(obj, validateMethod, propName);
+      if (error == null) {
+         obj.removePropError(propName);
+      }
+      else
+         obj.addPropError(propName, error);
+      return error;
    }
 
    public static boolean isStaticMethod(Object meth) {
