@@ -139,9 +139,11 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          return;
       super.start();
 
+      Definition def = getDefinition();
+
       Object annot = null;
       TypeDeclaration enclType = getEnclosingType();
-      if (enclType != null && variableName != null) {
+      if (enclType != null && variableName != null && def instanceof FieldDefinition) {
          Object getMethod = enclType.declaresMember(variableName, JavaSemanticNode.MemberType.GetMethodSet, null, null);
          if (getMethod != null) {
             annot = ModelUtil.getBindableAnnotation(getMethod);
@@ -153,8 +155,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          }
          if (annot != null) {
             // If we are marked with manual=true we are already bindable - don't do convertGetSet
-            if (!ModelUtil.isAutomaticBindingAnnotation(annot))
+            if (!ModelUtil.isAutomaticBindingAnnotation(annot)) {
                bindable = true;
+            }
          }
       }
 
@@ -207,8 +210,9 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
          if (dbProvider != null && dbProvider.getNeedsGetSet()) {
             enableConvertGetSet();
             // Need to be able to listen to events on the property to keep the reverse side in sync
-            if (prop.reverseProperty != null || prop.reversePropDesc != null)
+            if (prop.reverseProperty != null || prop.reversePropDesc != null) {
                bindable = true;
+            }
          }
          if (dbPropDesc == null)
             dbPropDesc = prop;
