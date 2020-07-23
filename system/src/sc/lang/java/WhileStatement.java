@@ -102,7 +102,8 @@ public class WhileStatement extends ExpressionStatement implements IStatementWra
    }
 
    public void addReturnStatements(List<Statement> res, boolean incThrow) {
-      statement.addReturnStatements(res, incThrow);
+      if (statement != null)
+         statement.addReturnStatements(res, incThrow);
    }
 
    public Statement findStatement(Statement in) {
