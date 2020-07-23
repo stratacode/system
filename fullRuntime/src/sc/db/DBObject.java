@@ -730,7 +730,7 @@ public class DBObject implements IDBObject {
       String typeName = CTypeUtil.getClassName(DynUtil.getTypeName(dbTypeDesc.typeDecl, false));
       sb.append(typeName);
       sb.append("__");
-      if (isTransient() || isPrototype()) {
+      if (isTransient()) {
          appendTransientId(sb);
       }
       else {
@@ -742,7 +742,8 @@ public class DBObject implements IDBObject {
             if (idVal == null || (idVal instanceof Long && ((Long) idVal) == 0)) {
                appendTransientId(sb);
             }
-            sb.append(idVal);
+            else
+               sb.append(idVal);
          }
       }
       objectId = sb.toString();
