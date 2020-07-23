@@ -6,13 +6,16 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.dyn.DynUtil;
 import sc.lang.HTMLLanguage;
 import sc.lang.java.TypeDeclaration;
 import sc.lang.template.Template;
+import sc.obj.ScopeContext;
 import sc.obj.Sync;
 import sc.obj.SyncMode;
 import sc.parser.ParseError;
 import sc.parser.ParseUtil;
+import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 
@@ -254,6 +257,13 @@ public class HTMLElement<RE> extends Element<RE> {
    // To be called on the client only where it calls the DOM focus element
    @sc.obj.Exec(clientOnly=true)
    public void focus() {
+      Element root = getRootTag();
+      if (root instanceof IPage) {
+         IPageDispatcher dispatcher = ((IPage) root).getPageDispatcher();
+         dispatcher.invokeRemote(this, HTMLElement.class, "focus", Void.class, null, null);
+         return;
+      }
+      System.err.println("*** No sync context for remote focus method");
    }
 
    public static Set<String> formattingTags = new TreeSet<String>();
