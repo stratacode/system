@@ -72,12 +72,22 @@ public class Select<RE> extends HTMLElement<RE> {
 
    @Bindable(manual=true)
    public void setOptionDataSource(List values) {
+      Object oldds = optionDataSource;
       optionDataSource = values;
-      if (values != optionDataSource) {
+      if (values != oldds) {
          if (values != null && selectedIndex != -1 && selectedIndex < values.size() && selectedValue == null) {
             setSelectedValue(values.get(selectedIndex));
          }
          Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _optionDataSourceProp, values);
+         //invalidateStartTag();
+         //invalidateBody();
+         Element enclTag = getEnclosingTag();
+         if (enclTag != null) {
+            enclTag.bodyTxtValid = false;
+            enclTag.invalidateBody();
+         }
+         // Also re-render any children of this tag since they might be invalid
+         markBodyValid(false);
       }
    }
 
