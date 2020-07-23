@@ -10,10 +10,19 @@ package sc.bind;
 public class BindOptions {
    /** Run the binding after waiting for the specified number of milliseconds */
    public int delay = -1;
+   public int priority = 0;
 
-   public static BindOptions delay(int val) {
-      BindOptions opts = new BindOptions();
+   public static BindOptions delay(int val, BindOptions opts) {
+      if (opts == null)
+         opts = new BindOptions();
       opts.delay = val;
+      return opts;
+   }
+
+   public static BindOptions priority(int p, BindOptions opts) {
+      if (opts == null)
+         opts = new BindOptions();
+      opts.priority = p;
       return opts;
    }
 }

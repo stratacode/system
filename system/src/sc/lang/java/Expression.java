@@ -499,8 +499,11 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       bindingExpr.transform(runtime);
    }
 
-   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope", "skipNull"};
-   private final static String [] bindFlagConstNames = {"sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY", "sc.bind.Bind.ORIGIN", "sc.bind.Bind.CROSS_SCOPE", "sc.bind.Bind.SKIP_NULL"};
+   private final static String[] bindFlagAnnotNames = {"inactive", "trace", "verbose", "queued", "immediate", "history",
+                                                       "origin", "crossScope", "skipNull", "doLater"};
+   private final static String [] bindFlagConstNames = {
+      "sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY",
+      "sc.bind.Bind.ORIGIN", "sc.bind.Bind.CROSS_SCOPE", "sc.bind.Bind.SKIP_NULL", "sc.bind.Bind.DO_LATER"};
 
    void addBindFlagsAndOptionsExpr(SemanticNodeList<Expression> bindArgs) {
       Expression flagsExpr = null;
@@ -512,6 +515,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
          if (model != null) {
             int foundFlags = 0;
             List<Object> annotObjs = ModelUtil.getAllInheritedAnnotations(model.layeredSystem, bindingStatement, "sc.bind.Bindable", false, model.getLayer(), model.isLayerModel);
+            Integer delay = null;
+            Integer priority = null;
             if (annotObjs != null) {
                for (Object annotObj:annotObjs) {
                   if (annotObj != null) {
@@ -521,7 +526,30 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                         if ((foundFlags & (1 << i)) == 0)
                            foundFlags = addFlagConstName(flagConstNames, annotObj, annotName, constName, foundFlags, i);
                      }
-                     // TODO: set optsExpr here
+                     if (delay == null) {
+                        delay = (Integer) ModelUtil.getAnnotationValue(annotObj, "delay");
+                        if (delay != null) {
+                           SemanticNodeList<Expression> args = new SemanticNodeList<Expression>(2);
+                           args.add(IntegerLiteral.create(delay));
+                           if (optsExpr == null)
+                              args.add(NullLiteral.create());
+                           else
+                              args.add(optsExpr);
+                           optsExpr = IdentifierExpression.createMethodCall(args, "sc.bind.BindOptions.delay");
+                        }
+                     }
+                     if (priority == null) {
+                        priority = (Integer) ModelUtil.getAnnotationValue(annotObj, "priority");
+                        if (priority != null) {
+                           SemanticNodeList<Expression> args = new SemanticNodeList<Expression>(2);
+                           args.add(IntegerLiteral.create(priority));
+                           if (optsExpr == null)
+                              args.add(NullLiteral.create());
+                           else
+                              args.add(optsExpr);
+                           optsExpr = IdentifierExpression.createMethodCall(args, "sc.bind.BindOptions.priority");
+                        }
+                     }
                   }
                }
             }
@@ -562,6 +590,8 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
             List<Object> annotObjs = ModelUtil.getAllInheritedAnnotations(model.layeredSystem, bindingStatement, "sc.bind.Bindable", false, model.getLayer(), model.isLayerModel);
             int foundFlags = 0;
             if (annotObjs != null) {
+               Integer delay = null;
+               Integer priority = null;
                for (Object annotObj: annotObjs) {
                   String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope", "skipNull"};
                   int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN, sc.bind.Bind.CROSS_SCOPE, Bind.SKIP_NULL};
@@ -577,7 +607,17 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                            flags |= currentFlag;
                      }
                   }
-                  // TODO: set BindSettings opts argument here
+                  if (delay == null) {
+                     delay = (Integer) ModelUtil.getAnnotationValue(annotObj, "delay");
+                     if (delay != null)
+                        opts = BindOptions.delay((int) delay, opts);
+                  }
+                  if (priority == null) {
+                     priority = (Integer) ModelUtil.getAnnotationValue(annotObj, "priority");
+                     if (priority != null) {
+                        opts = BindOptions.priority((int) priority, opts);
+                     }
+                  }
                }
             }
          }

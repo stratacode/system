@@ -7,6 +7,7 @@ package sc.bind;
 import sc.dyn.DynUtil;
 import sc.sync.SyncManager;
 import sc.type.IBeanMapper;
+import sc.type.PTypeUtil;
 import sc.util.CoalescedHashSet;
 import sc.util.ISet;
 import sc.util.SingleElementSet;
@@ -569,8 +570,18 @@ public class VariableBinding extends DestinationListener {
       return DynUtil.equalObjects(newValue, boundValues[index]);
    }
 
-   boolean applyBinding(boolean onlyIfChanged) {
+   private class RunLater implements Runnable {
+      Object newVal;
 
+      RunLater(Object newVal) {
+         this.newVal = newVal;
+      }
+      public void run() {
+         doApplyBinding(newVal);
+      }
+   }
+
+   boolean applyBinding(boolean onlyIfChanged) {
       boolean changed = false;
       if (!valid)
          changed = validateBinding();
@@ -595,16 +606,26 @@ public class VariableBinding extends DestinationListener {
       }
 
       if (!onlyIfChanged || changed) {
-         if (dstProp instanceof IBinding) {
-            ((IBinding) dstProp).applyBinding(dstProp == dstObj ? null : dstObj, newValue, this, false, false);
+         if ((flags & Bind.DO_LATER) != 0) {
+            DynUtil.invokeLater(new RunLater(newValue), opts == null ? 0 : opts.priority);
          }
-         else {
-            if (dstObj != dstProp && newValue != PENDING_VALUE_SENTINEL)
-               PBindUtil.setPropertyValue(dstObj, dstProp, newValue);
+         else if (opts != null && opts.delay != -1) {
+            PTypeUtil.addScheduledJob(new RunLater(newValue), opts.delay, false);
          }
+         else
+            doApplyBinding(newValue);
       }
-
       return changed;
+   }
+
+   private void doApplyBinding(Object newValue) {
+      if (dstProp instanceof IBinding) {
+         ((IBinding) dstProp).applyBinding(dstProp == dstObj ? null : dstObj, newValue, this, false, false);
+      }
+      else {
+         if (dstObj != dstProp && newValue != PENDING_VALUE_SENTINEL)
+            PBindUtil.setPropertyValue(dstObj, dstProp, newValue);
+      }
    }
 
    protected boolean applyReverseBinding() {

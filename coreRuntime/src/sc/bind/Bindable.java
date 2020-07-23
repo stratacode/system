@@ -43,10 +43,12 @@ public @interface Bindable {
    boolean history() default false;
    /** For trace or history include the origin - the stack trace and bindings leading up to this change.  If neither are set, both are enabled by default so origin=true by itself will provide the most diagnostics on this property. TODO: not implemented */
    boolean origin() default false;
-   /** Set to 0 does the same thing as doLater=true.  Set to some number of milliseconds to run this binding with a delay. - TODO not implemented */
+   /** Set to 0 does the same thing as doLater=true.  Set to some number of milliseconds to run this binding with a delay. */
    int delay() default -1;
-   /** Set to true to run this binding in a doLater - TODO not implemented */
+   /** Set to true to run this binding in a doLater */
    boolean doLater() default false;
+   /** For doLater=true, the priority to pass to the invokeLater call - 0 is the default that runs before refresh */
+   int priority() default 0;
    // disabled? - to force an error
    /** Should this binding not send a change event when setX is called with the same value. */
    boolean sameValueCheck() default false;
