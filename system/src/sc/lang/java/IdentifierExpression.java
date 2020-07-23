@@ -4292,7 +4292,13 @@ public class IdentifierExpression extends ArgumentsExpression {
          case BoundObjectName:
          case EnumName:
             srcType = boundTypes[0];
-            srcObj = IdentifierExpression.create(idents.get(0).toString());
+            String firstIdent = idents.get(0).toString();
+
+            // Workaround a problem where if you define a binding inside of an object that refers to 'this'
+            // using it's object name, the code tries to call getX() in the constructor that infinite loops.
+            if (ModelUtil.sameTypes(srcType, type) && ModelUtil.isObjectType(type))
+               firstIdent = "this";
+            srcObj = IdentifierExpression.create(firstIdent);
             // ConstantBinding
             if (idTypes[0] == IdentifierType.EnumName && idents.size() == 1) {
                bindArgs.add(srcObj);
