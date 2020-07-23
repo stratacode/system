@@ -3572,6 +3572,21 @@ public class SyncManager {
       ctx.addMethodResult(curObj, type, callId, retValue, exceptionStr);
    }
 
+/*
+ * This version was helpful for retrieving the sync context for a remote call for a page object
+ * but ultimately moved the remote call into PageDispatcher so it could use the same scope as
+ * the sync
+   public static SyncContext getSyncContextForScopeInst(Object inst) {
+      int scopeId = getScopeIdForSyncInst(inst);
+      if (scopeId == -1)
+         scopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
+      SyncManager mgr = getSyncManager(null);
+      if (mgr == null)
+         mgr = SyncManager.getDefaultSyncManager();
+      return mgr.getSyncContext(scopeId, true);
+   }
+*/
+
    /**
     * Called either with a scopeDefinition (to choose the current context in that scope), or an explicit ScopeContext as the target of the call,
     * or pass null for both to choose the default scope, default context.
@@ -3594,6 +3609,8 @@ public class SyncManager {
          ctx = mgr == null ? SyncManager.getDefaultSyncContext() : mgr.getSyncContext(scopeId, true);
       }
       else {
+         if (mgr == null)
+            mgr = SyncManager.getDefaultSyncManager();
          ctx = mgr.getSyncContextFromScopeContext(scopeCtx, true);
       }
       if (ctx == null) {
