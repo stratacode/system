@@ -8274,7 +8274,8 @@ public class ModelUtil {
    }
 
    public static boolean isAbstractMethod(Object meth) {
-      return (hasModifier(meth, "abstract") || isInterface(getEnclosingType(meth)));
+      return hasModifier(meth, "abstract") ||
+             (isInterface(getEnclosingType(meth)) && !hasModifier(meth, "static") && !hasModifier(meth, "default"));
    }
 
    public static Object getReverseBindingMethod(Object method) {
