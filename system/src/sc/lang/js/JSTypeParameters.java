@@ -620,8 +620,12 @@ public class JSTypeParameters extends ObjectTypeParameters {
 
    public String getExtendsClass() {
       JavaType extType = type.getExtendsType();
-      if (extType == null)
-         return "jv_Object";
+      if (extType == null) {
+         if (type.getDeclarationType() == DeclarationType.INTERFACE)
+            return "null";
+         else
+            return "jv_Object";
+      }
       return JSUtil.convertTypeName(type.getLayeredSystem(), ModelUtil.getTypeName(extType.getTypeDeclaration()));
    }
 
