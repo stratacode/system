@@ -273,14 +273,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (bodyOnly == nbo)
          return;
       bodyOnly = nbo;
-      if (startTagValid)
+      if (startTagValid) {
          invalidateStartTag();
-      else {
-         Element enclTag = getEnclosingTag();
-         if (enclTag != null) {
-            enclTag.bodyTxtValid = false;
-            enclTag.invalidateBody();
-         }
+         invalidateBody(); // Needed in case there's an alt tag but probably a good idea in general?
+      }
+      Element enclTag = getEnclosingTag();
+      if (enclTag != null) {
+         enclTag.bodyTxtValid = false;
+         enclTag.invalidateBody();
       }
       Bind.sendChangedEvent(this, "bodyOnly");
    }
