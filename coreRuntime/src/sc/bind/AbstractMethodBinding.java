@@ -547,6 +547,10 @@ public abstract class AbstractMethodBinding extends DestinationListener {
 
    // A method nested inside of this one has a pending result.
    protected void applyPendingChildValue(Object pendingResult, IBinding src) {
+      // For a =: b ? c() : null  this is called with the return value for c(c) and for ternary expressions that are reversible, we don't propagate the
+      // method return value to re-evaluate the method (since it leads to a recursive call)
+      if (direction.doReverse() && isReversible())
+         return;
       for (int i = 0; i < paramValues.length; i++) {
          if (boundParams[i] == src) {
             // assert paramValues[i] == PENDING_VALUE_SENTINEL
