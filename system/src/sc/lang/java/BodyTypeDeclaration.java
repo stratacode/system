@@ -246,6 +246,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     */
    private transient boolean syncInitDefault = false;
 
+   private transient boolean syncResetState = false;
+
    /**
     * For sync types which are immutable - i.e. no need for listeners or state to be maintained for them.
     */
@@ -1279,12 +1281,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
          res.add(SyncAnnotationProcessor.getSyncAnnotationProcessor());
       }
-      if (!hasDB && getDBTypeDescriptor() != null) {
-         if (res == null)
-            res = new ArrayList<IDefinitionProcessor>();
+      //if (!hasDB && getDBTypeDescriptor() != null) {
+      //   System.out.println("***");
+         //if (res == null)
+         //   res = new ArrayList<IDefinitionProcessor>();
 
-         res.add(DBAnnotationProcessor.getDBAnnotationProcessor());
-      }
+         //res.add(DBAnnotationProcessor.getDBAnnotationProcessor());
+      //}
       return res;
    }
 
@@ -2101,15 +2104,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     * Returns the list of properties with the given modifiers or null if there aren't any.
     */
    public List<Object> getDeclaredProperties(String modifier, boolean includeAssigns, boolean includeModified, boolean editorProperties) {
-      if (body == null)
-         return null;
-
       Layer layer = getLayer();
       if (editorProperties && layer != null && layer.hidden)
          return null;
 
+      if (body == null && hiddenBody == null)
+         return null;
+
       List<Object> props = new ArrayList<Object>();
-      addAllProperties(body, props, modifier, includeAssigns, editorProperties);
+      if (body != null)
+         addAllProperties(body, props, modifier, includeAssigns, editorProperties);
       if (hiddenBody != null)
          addAllProperties(hiddenBody, props, modifier, includeAssigns, editorProperties);
       return props.size() > 0 ? props : null;
@@ -8424,8 +8428,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    void initMixinTemplates(boolean doDefineTypes) {
+      if (isLayerType || isLayerComponent())
+         return;
       JavaModel model = getJavaModel();
-      if (replacedByType == null && model != null && model.mergeDeclaration && model.layer != null) {
+      if (model != null && model.mergeDeclaration && model.layer != null) {
          ArrayList<IDefinitionProcessor> defProcs = getAllDefinitionProcessors(doDefineTypes);
          if (defProcs != null) {
             for (IDefinitionProcessor defProc : defProcs) {
@@ -9308,6 +9314,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          flags |= SyncPropOptions.SYNC_INIT;
       if (syncConstant)
          flags |= SyncPropOptions.SYNC_CONSTANT;
+      if (syncResetState)
+         flags |= SyncPropOptions.SYNC_RESET_STATE;
       return flags;
    }
 
@@ -9392,6 +9400,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          if (syncConstantBool != null)
             syncConstant = syncConstantBool;
 
+         Boolean syncResetStateBool = (Boolean) ModelUtil.getAnnotationValue(syncAnnot, "resetState");
+         if (syncResetStateBool != null)
+            syncResetState = syncResetStateBool;
+
          flags = getSyncFlags();
       }
       //else // If there's no Sync annotation defined for this type, we do want to inherit the default sync state for subclasses
@@ -9470,6 +9482,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   boolean propOnDemand;
                   boolean propInitDefault;
                   boolean propConstant;
+                  boolean propResetState;
                   propSyncMode = (SyncMode) ModelUtil.getAnnotationValue(propSyncAnnot, "syncMode");
                   if (propSyncMode == null)
                      propSyncMode = SyncMode.Enabled; // @Sync with no explicit mode turns it on.
@@ -9485,6 +9498,11 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   propConstant = constDefaultObj != null && constDefaultObj;
                   if (propConstant)
                      propFlags |= SyncPropOptions.SYNC_CONSTANT;
+
+                  Boolean resetStateDefaultObj = (Boolean) ModelUtil.getAnnotationValue(propSyncAnnot, "resetState");
+                  propResetState = resetStateDefaultObj != null && resetStateDefaultObj;
+                  if (propResetState)
+                     propFlags |= SyncPropOptions.SYNC_RESET_STATE;
                }
                else {
                   propSyncMode = null;

@@ -402,16 +402,31 @@ public class SyncManager {
                System.out.println("Sync updating " + updateType + " value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val) + " (from=" + DynUtil.getInstanceName(old) + ")");
          }
 
-         SyncProperties syncProps = ii.props == null ? getSyncPropertiesForInst(obj) : ii.props;
-         SyncState state = getSyncState();
-         // Needs to be added as a change to the initialSyncLayer.  For the server (recordInitial=true), this records all changes so we can do an accurate "refresh" using the initial layer.  For the client (recordInitial = false), this only
-         // includes the changes made while recording changes.  These are the changes made locally on the client, the only ones we need to resync back to the server when the session is lost.
          // If ii.inherited is true, we've been propagated this event from a parent context.  Do not record it in the initial layer in this case since the initial layer is already inherited.
-         if (addToInitialLayer && state != SyncState.Disabled && syncProps != null && syncProps.isSynced(propName) && ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges)) && !ii.inherited)
+         if (!addToInitialLayer || ii.inherited)
+            return;
+
+         SyncProperties syncProps = ii.props == null ? getSyncPropertiesForInst(obj) : ii.props;
+         if (syncProps == null)
+            return;
+         int syncFlags = syncProps.getSyncFlags(propName);
+         if (syncFlags == -1)
+            return;
+
+         SyncState state = getSyncState();
+         if (state == SyncState.Disabled)
+            return;
+         // Needs to be added as a change to the initialSyncLayer, it is maintained on the client and server but for
+         // different purposes.
+         // For the server (recordInitial=true), this records all changes so we can do an accurate "refresh" using the initial layer.
+         // For the client (recordInitial = false), includes changes required to reset the server's session when it is lost.
+         // It's not all state since the server can reproduce much of the state that it sends to the client initially.
+         // It does include changes made on the client - i.e. those made with SyncState.RecordingChanges.
+         // It also includes properties explicitly marked as 'reset state'. That must be set manually to include properties
+         // the server needs returned to it, typically properties it sets in response to some button clicked in the UI
+         // where the client change does not include all of the info produced by the operation.
+         if ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges))
             initialSyncLayer.addChangedValue(obj, propName, val, recordInitial && state == SyncState.ApplyingChanges);
-         //else if (trace) {
-         //   System.out.println("Not sync'ing back change to: " + propName + " that is sync'd us");
-         //}
       }
 
       public Object getPreviousValue(Object obj, String propName) {

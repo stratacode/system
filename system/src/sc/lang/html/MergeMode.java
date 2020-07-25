@@ -18,17 +18,18 @@ import java.util.Set;
  * <p>
  * For the replace tagMerge mode, this tag replaces the matching tag in the previous document.  So if you replace one document with a copy of itself, the result would be unchanged.
  * <p>
+ * TODO: remove tagMerge append/prepend modes since they do not seem useful.  Use bodyMerge for append/prepend
  * For the append tagMerge mode, the matched tag is itself not changed.  The new tag creates a new object with a new name that is appended to the body of the previous tag's body.
  * (? Question: should this append to the parent's body after the last matched tag?  Same with prepend)
  * </p>
  * For the prepend tagMerge mode, the matched dynamic tag is also not changed.  The new tag creates a new object with a new name that is prepended to the body of the previous tag's body.
  * </p>
- * When you've chosen the tagMerge mode of Merge, by default the dynamic tags in the body of this tag will be merged with any matching tags in the previous matched tag's body.  Commonly, this default
+ * When you've chosen the tagMerge mode of Merge, by default the tag objects in the body of this tag will be merged with any matching tag objects in the previous matched tag's body.  Commonly, this default
  * is what you want.  But in some cases you may want to put this tag's body in front of or after the previous tag's body.  You also might want to keep the tag's attributes but replace the tag's body.
  * In these cases you can set the bodyMerge attribute to "append", "prepend", or "replace" to override the default.
  * <p>
- * Almost all of the time, if you are merging a dynamic tag, you want to merge the sub-tags of that tag as well.  In the rare case where you might want to append, prepend, or replace those sub-tags, you can
- * set the subTagMerge attribute to one of these values.
+ * Almost all of the time, if you are merging a tag object, you want to merge the sub-tags of that tag as well.  In the rare case where you might want to append, prepend, or replace those sub-tags, you can
+ * set the subTagMerge attribute to one of these values. TODO: remove subTagMerge? It does not seem helpful
  * </p>
  * Some examples of how this can be used.
  *

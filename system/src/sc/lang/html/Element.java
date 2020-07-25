@@ -2195,7 +2195,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   // This element may not be derived in the type hierarchy if it's 'replace=true' so getDerivedElement will not work.  Still that should not count as a unique child since we are replacing a previous object
                   Element childElement = (Element) child;
                   int childElementIx = -1;
-                  // TODO: this is the logic which determines whether we by default 'merge' a child tag with the previous version or append it.  For simple content tags, we should
+                  // This is the logic which determines whether we by default 'merge' a child tag with the previous version or append it.  For simple content tags, we should
                   // not ever merge because content tags just get appended. Thinking we might have some logic which says we only merge singleton tags (body, and head) or tags with
                   // an explicit id.
                   // Using needsObjectDef here, not needsObject because otherwise we initialize the extends type too soon as part of execOmitObject() which calls getDefinedExecFlags.
@@ -2213,7 +2213,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      res.add(childElement); // Do not copy because this child is part of children already
                   }
                   else if (!canInherit) {
-                     // Since we've already copied the derived elements into res in the non-inherit case, need to replace the derived element's child with the overridding element's child
+                     // Since we've already copied the derived elements into res in the non-inherit case, need to replace the derived element's child with the overriding element's child
                      res.set(childElementIx, childElement);
                   }
                }
@@ -2746,6 +2746,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return getObjectName() + (wrap ? "_WrapRepeat" : "_Repeat");
    }
 
+   private boolean modifyInheritedChild(TypeDeclaration parentType, Object existingType) {
+      if (parentType == null)
+         return false;
+      Object enclType = ModelUtil.getEnclosingType(existingType);
+      if (enclType == null)
+         return false;
+      return !ModelUtil.sameTypes(parentType, enclType);
+   }
+
    public TypeDeclaration convertToObject(Template template, TypeDeclaration parentType, Object existing, SemanticNodeList<Object> templateModifiers, StringBuilder preTagContent) {
       if (tagObject != null)
          return tagObject;
@@ -2879,7 +2888,14 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             repeatWrapper.fromStatement = this;
          }
 
-         modifyType = tagMerge == MergeMode.Replace ? null : existing;
+         boolean modifyInherited = existing != null && modifyInheritedChild(parentType, existing);
+
+         if (tagMerge == MergeMode.Replace && modifyInherited)
+            bodyMerge = MergeMode.Replace;
+
+         // If the modify type will have the same type name, no need to extend existing but if it's a new type
+         // we need it to extend the base type so this type can override it in the type system
+         modifyType = tagMerge == MergeMode.Replace && !modifyInherited ? null : existing;
 
          /* TODO: probably should remove this ExecProcess phase altogether.  It was an attempt to generate a minimal .html file from the process phase based on a template by not inheriting any elements, stripping out functionality.  It's a mess.  Now we just added the postBuild phase so that we can use the generated code to generate the initial template */
          /* Also, exec="process" just doesn't work because we only generate client and server versions of the object.  We'd have to go back to an older mode where we did not generate the Java class, and process the template directly (or generate a 3rd class) but that was ugly for it's own reasons. */
@@ -2978,9 +2994,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            }
                         }
                      }
-                     // Do not set an extends type here - we need to inherit it from the modified type
-                     else
-                        extendsType = null;
+                     else {
+                        // For tagMerge = replace, if it's a separate class need to inherit from it to override it in the Java type system
+                        if (tagMerge == MergeMode.Replace && modifyInherited) {
+                           extTypeDecl = modifyType;
+                           extendsType = JavaType.createTypeFromTypeParams(extTypeDecl, null, getJavaModel());
+                           modifyType = null;
+                        }
+                        // Do not set an extends type here - we need to inherit it from the modified type
+                        else
+                           extendsType = null;
+                     }
                   }
                }
             }
@@ -4654,6 +4678,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          return null;
    }
 
+   // TODO: should we remove this? I think it might have been added to deal with 'body' and 'head' but we now use
+   // the singleton tags for that purpose. Leaving it in for now since there has not been much code written using
+   // the tagMerge and bodyMerge attributes.
    public MergeMode getSubTagMerge() {
       MergeMode mode = getRawSubTagMerge();
       if (mode == null) {

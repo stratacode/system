@@ -32,6 +32,8 @@ public class SyncPropOptions {
    /** A static property */
    public final static int SYNC_STATIC = 64;
 
+   public final static int SYNC_RESET_STATE = 128;
+
    public String propName;
    public int flags;
    public boolean hasDefault;
@@ -65,6 +67,8 @@ public class SyncPropOptions {
          sb.append(" (constant)");
       if ((flags & SYNC_STATIC) != 0)
          sb.append(" (static)");
+      if ((flags & SYNC_RESET_STATE) != 0)
+         sb.append(" (resetState)");
       if (hasDefault)
          sb.append(" fixed default: " + defaultValue);
       return sb.toString();

@@ -51,6 +51,9 @@ public @interface Sync {
     */
    boolean constant() default false;
 
+   /** Set this to true for a synchronized property to include it in the state used to restore a session */
+   boolean resetState() default false;
+
    /**
     * An internal property set in serialized layers in the 'scn' format where @Sync is used as a marker attribute annotation.
     * Don't set this in normal source code.  It signals a switch to marking content as originating from the remote side (the client),
