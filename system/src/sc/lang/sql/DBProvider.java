@@ -286,9 +286,8 @@ public class DBProvider {
             if (properties != null) {
                for (Object property:properties) {
                   String propName = ModelUtil.getPropertyName(property);
-                  Object propType = ModelUtil.getPropertyType(property);
 
-                  if (propName == null || propType == null)
+                  if (propName == null)
                      continue;
 
                   if (ModelUtil.hasModifier(property, "static"))
@@ -385,6 +384,9 @@ public class DBProvider {
                      if (idColumnName == null)
                         idColumnName = SQLUtil.getSQLName(propName);
                      if (idColumnType == null) {
+                        Object propType = ModelUtil.getPropertyType(property);
+                        if (propType == null)
+                           System.err.println("*** Failed to resolve property type for id property");
                         idColumnType = DBUtil.getDefaultSQLType(propType, definedByDB);
                         if (idColumnType == null)
                            throw new IllegalArgumentException("Invalid property type: " + propType + " for id: " + idColumnName);
@@ -404,6 +406,9 @@ public class DBProvider {
                      else {
                         IdPropertyDescriptor idDesc = new IdPropertyDescriptor(propName, idColumnName, idColumnType, definedByDB, null);
                         primaryTable.addIdColumnProperty(idDesc);
+                        Object propType = ModelUtil.getPropertyType(property);
+                        if (propType == null)
+                           System.err.println("*** Failed to resolve property type for id property");
                         idDesc.propertyType = propType;
                      }
                   }
