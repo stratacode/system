@@ -2016,7 +2016,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyObj == null)
             modProps = declProps;
          else {
-            Object[] props = ModelUtil.getProperties(modifyObj, modifier, includeAssigns);
+            Object[] props = ModelUtil.getDeclaredProperties(modifyObj, modifier, includeAssigns, true, editorProperties);
             if (props != null)
                modProps = Arrays.asList(props);
             else
