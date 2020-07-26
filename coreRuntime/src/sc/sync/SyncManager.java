@@ -425,7 +425,7 @@ public class SyncManager {
          // It also includes properties explicitly marked as 'reset state'. That must be set manually to include properties
          // the server needs returned to it, typically properties it sets in response to some button clicked in the UI
          // where the client change does not include all of the info produced by the operation.
-         if ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges))
+         if ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges) || (syncFlags & SyncPropOptions.SYNC_RESET_STATE) != 0)
             initialSyncLayer.addChangedValue(obj, propName, val, recordInitial && state == SyncState.ApplyingChanges);
       }
 
@@ -2510,7 +2510,7 @@ public class SyncManager {
       destinationName = dest.name;
    }
 
-   public static void addSyncDestination(SyncDestination syncDest) {
+   public static SyncManager addSyncDestination(SyncDestination syncDest) {
       if (syncDest.name == null)
          throw new IllegalArgumentException("Must set the name property on the SyncDestination class: " + syncDest);
       syncDest.initSyncManager();
@@ -2518,6 +2518,7 @@ public class SyncManager {
       syncManagersByDest.put(syncDest.name, mgr);
       syncManagers.add(mgr);
       mgr.syncTypes.putAll(globalSyncTypes);
+      return mgr;
    }
 
    public static SyncManager getSyncManager(String destName) {

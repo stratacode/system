@@ -146,7 +146,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    public boolean syncPropsInited = false;
    public boolean liveDynTypes = false;
 
-   int transientIdCount = 0; // Incremented each time we need to allocate an object id for a transient object (i.e. when it's used in synchronization before being persisted)
+   long transientIdCount = 0; // Incremented each time we need to allocate an object id for a transient object (i.e. when it's used in synchronization before being persisted)
 
    public DBTypeDescriptor findSubType(String subTypeName) {
       // During code-processing time, this is not set yet
@@ -815,7 +815,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return res;
    }
 
-   private void initSyncForInst(Object inst) {
+   public void initSyncForInst(Object inst) {
       if (!syncPropsInited) {
          syncProps = SyncManager.getSyncProperties(typeDecl, null);
          syncPropsInited = true;

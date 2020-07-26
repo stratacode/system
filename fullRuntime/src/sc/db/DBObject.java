@@ -30,6 +30,8 @@ import java.util.*;
 @sc.js.JSSettings(prefixAlias="sc_", jsLibFiles="js/db.js")
 public class DBObject implements IDBObject {
    final static int MAX_FETCH_ERROR_COUNT = 3;
+   final static String ObjectIdSeparator = "__";
+   final static String TransientSuffix = "t";
 
    // 2 Bits per each queryIndex in 'fstate' - for the queries needed to populate this instance - by default the primaryTable is index 0
    // then followed by aux-tables, or multi-tables. If two queries come in for the same batch, only one is executed - the rest wait and they
@@ -721,15 +723,19 @@ public class DBObject implements IDBObject {
       flags = REMOVED;
    }
 
+   public void setObjectId(String str) {
+      objectId = str;
+   }
+
    public String getObjectId() {
       if (objectId != null)
          return objectId;
 
       StringBuilder sb = new StringBuilder();
       Object inst = getInst();
-      String typeName = CTypeUtil.getClassName(DynUtil.getTypeName(dbTypeDesc.typeDecl, false));
+      String typeName = DynUtil.getTypeName(dbTypeDesc.typeDecl, false);
       sb.append(typeName);
-      sb.append("__");
+      sb.append(DBObject.ObjectIdSeparator);
       if (isTransient()) {
          appendTransientId(sb);
       }
@@ -752,7 +758,7 @@ public class DBObject implements IDBObject {
 
    private void appendTransientId(StringBuilder sb) {
       sb.append(dbTypeDesc.transientIdCount++);
-      sb.append("t");
+      sb.append(DBObject.TransientSuffix);
    }
 
    public String toString() {
