@@ -2484,7 +2484,7 @@ public class SyncManager {
          return globalSyncTypeNames != null && globalSyncTypeNames.contains(typeName);
       }
 
-      public void changeInstName(Object inst, String oldName, String newName) {
+      public void changeInstName(Object inst, String oldName, String newName, boolean queueEvent) {
          InstInfo ii = syncInsts.get(inst);
          if (ii == null)
             return;
@@ -2501,16 +2501,18 @@ public class SyncManager {
             System.err.println("*** Warning - changeInstName - replaced other object in index");
          }
 
-         SyncLayer useLayer = getChangedSyncLayer(ii.props.syncGroup);
-         useLayer.addNameChange(inst, oldName, newName);
+         if (queueEvent) {
+            SyncLayer useLayer = getChangedSyncLayer(ii.props.syncGroup);
+            useLayer.addNameChange(inst, oldName, newName);
 
-         if (trace || verbose || verboseValues) {
-            System.out.println("Change name of: " + DynUtil.getInstanceName(inst) + " from: " + oldName + " to: " + newName + (!needsSync ? " *** first change in sync" : ""));
+            if (trace || verbose || verboseValues) {
+               System.out.println("Change name of: " + DynUtil.getInstanceName(inst) + " from: " + oldName + " to: " + newName + (!needsSync ? " *** first change in sync" : ""));
+            }
+            markChanged();
          }
-         markChanged();
       }
 
-      public void setResetStateEnabled(Object inst, boolean enabled) {
+      public void setResetStateEnabled(Object inst, boolean enabled, boolean queueChange) {
          InstInfo ii = syncInsts.get(inst);
          if (ii == null)
             return;
@@ -2518,17 +2520,19 @@ public class SyncManager {
          if (ii.resetState == enabled)
             return;
 
-         if (!enabled) {
+         if (!enabled && queueChange) {
             SyncLayer useLayer = getChangedSyncLayer(ii.props == null ? null : ii.props.syncGroup);
             useLayer.addClearResetState(inst, ii.name);
          }
 
          ii.resetState = enabled;
 
-         if (trace || verbose || verboseValues) {
-            System.out.println((enabled ? "Enable" : "Disable") + " reset state for: " + DynUtil.getInstanceName(inst));
+         if (queueChange) {
+            if (trace || verbose || verboseValues) {
+               System.out.println((enabled ? "Enable" : "Disable") + " reset state for: " + DynUtil.getInstanceName(inst) + " for scope: " + this);
+            }
+            markChanged();
          }
-         markChanged();
       }
 
       /**
@@ -3068,7 +3072,7 @@ public class SyncManager {
             continue;
          SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
          if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
-            syncCtx.changeInstName(inst, oldName, newName);
+            syncCtx.changeInstName(inst, oldName, newName, scopeDef.supportsChangeEvents);
          }
       }
    }
@@ -3086,7 +3090,7 @@ public class SyncManager {
             continue;
          SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
          if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
-            syncCtx.setResetStateEnabled(inst, enabled);
+            syncCtx.setResetStateEnabled(inst, enabled, scopeDef.supportsChangeEvents);
          }
       }
    }
