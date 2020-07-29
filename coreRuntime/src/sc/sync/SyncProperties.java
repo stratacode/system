@@ -12,6 +12,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+import static sc.sync.SyncPropOptions.SYNC_RESET_STATE;
+
 /** Represents a set of properties which are synchronized to a specific destination. */
 @sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
 public class SyncProperties {
@@ -51,6 +53,8 @@ public class SyncProperties {
    Object[] staticProps;
 
    HashMap<String,Object> defaultValueMap = null;
+
+   public boolean hasResetState = false;
 
    public SyncProperties(String destName, String syncGroup, Object[] props, int defaultPropOptions) {
       this(destName, syncGroup, props, null, defaultPropOptions, -1);
@@ -96,6 +100,9 @@ public class SyncProperties {
                */
                options = opt.flags;
                propName = opt.propName;
+
+               if ((options & SYNC_RESET_STATE) != 0 )
+                  hasResetState = true;
 
                if (opt.hasDefault) {
                   if (defaultValueMap == null)

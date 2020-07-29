@@ -738,7 +738,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             dbObj.setDBId(id);
             typeInstances.put(id, inst);
 
-            initSyncForInst(inst);
+            initSyncForInst(inst, true);
          }
          // Don't know the concrete type so create a DBObject without the instance and register that instead
          else if (selectDefault) {
@@ -797,8 +797,26 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (res != null)
             return res;
          typeInstances.put(id, inst);
-         if (clearTransient)
-            ((DBObject) inst.getDBObject()).setTransient(false);
+         if (clearTransient) {
+            DBObject dbObj = (DBObject) inst.getDBObject();
+
+            // Do this before we've changed the objectId by clearing transient
+            SyncManager.setResetStateEnabled(inst, false);
+
+            String oldName = null;
+            if (dbObj.objectId != null)
+               oldName = dbObj.objectId;
+
+            dbObj.setTransient(false);
+
+            // Possible that we've been synchronized already as a transient object - change the id now that it's been assigned
+            if (oldName != null) {
+               dbObj.objectId = null;
+               String newName = dbObj.getObjectId();
+               // Now that the object is transient, the database will hold the state for this instance so don't need the sync system to manage it
+               SyncManager.changeInstName(inst, oldName, newName);
+            }
+         }
       }
       return null;
    }
@@ -811,11 +829,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          res = registerInstanceInternal(inst, clearTransient);
 
       DBUtil.mapTestInstance(inst);
-      initSyncForInst(inst);
+      initSyncForInst(inst, true);
       return res;
    }
 
-   public void initSyncForInst(Object inst) {
+   public void initSyncForInst(Object inst, boolean onDemand) {
       if (!syncPropsInited) {
          syncProps = SyncManager.getSyncProperties(typeDecl, null);
          syncPropsInited = true;
@@ -825,7 +843,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       // TODO: do we need to specify a different value of onDemand here?  Maybe it gets put into SyncProperties so
       // it's available?
       if (syncProps != null) {
-         SyncManager.addSyncInst(inst, true, syncProps.initDefault, null, syncProps);
+         SyncManager.addSyncInst(inst, onDemand, syncProps.initDefault, null, syncProps);
       }
 
       if (liveDynTypes)
@@ -855,7 +873,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          return;
       }
       replaceInstanceInternal(inst);
-      initSyncForInst(inst);
+      initSyncForInst(inst, true);
    }
 
    public boolean removeInstance(DBObject dbObj, boolean remove) {

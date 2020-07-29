@@ -319,6 +319,26 @@ public class JSONSerializer extends SyncSerializer {
          appendObjEnd();
    }
 
+   public void appendNameChange(String oldName, String newName, int indent) {
+      appendCommandStart(Commands.cn, oldName, indent);
+      appendName("newName");
+      appendString(newName);
+      if (indent == 0)
+         appendObjEnd();
+   }
+
+   public void appendNameChangeAck(String oldName, String newName, int indent) {
+      appendCommandStart(Commands.nc, oldName, indent);
+      appendName("newName");
+      appendString(newName);
+      if (indent == 0)
+         appendObjEnd();
+   }
+
+   public void appendClearResetState(String objName, int indentSize) {
+      appendSimpleCommand(Commands.clearResetState, objName, indentSize);
+   }
+
    enum MethodReturnArgs {
       callId, retType
    }

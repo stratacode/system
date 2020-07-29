@@ -44,7 +44,8 @@ public class BasicScopeProcessor extends DefinitionProcessor implements IScopePr
    }
 
    public void addDependentTypes(BodyTypeDeclaration td, Set<Object> types, JavaSemanticNode.DepTypeCtx mode) {
-      if (dependentTypes != null && mode.mode != JavaSemanticNode.DepTypeMode.SyncTypes)
+      if (dependentTypes != null && (mode.mode != JavaSemanticNode.DepTypeMode.SyncTypes &&
+                                     mode.mode != JavaSemanticNode.DepTypeMode.ResetSyncTypes))
          types.addAll(dependentTypes);
       /*
         TODO: this does not work because we'd have to evaluate the template in order to get the dependencies for JS conversion.

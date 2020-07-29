@@ -84,6 +84,7 @@ public abstract class JavaSemanticNode extends SemanticNode {
    public enum DepTypeMode {
       All, // Return all dependent types for this type
       SyncTypes, // Return only the synchronized types this type depends on
+      ResetSyncTypes, // The subset of sync'd types that have 'resetState' set on them
       RemoteMethodTypes // Return only the remoteMethod types this type depends on
    }
 
@@ -690,6 +691,10 @@ public abstract class JavaSemanticNode extends SemanticNode {
          if (!(type instanceof BodyTypeDeclaration)) {
             ModelUtil.addSyncTypeFilterTypes(type, types);
          }
+      }
+      else if (ctx.mode == DepTypeMode.ResetSyncTypes) {
+         if (ModelUtil.isResetSyncEnabled(type))
+            types.add(type);
       }
       // The remote method types are added from the AbstractMethodDefinition which is remote
       else if (ctx.mode == DepTypeMode.RemoteMethodTypes)

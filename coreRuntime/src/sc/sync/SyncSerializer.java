@@ -364,6 +364,43 @@ public class SyncSerializer {
       sb.append(";\n");
    }
 
+   public void appendNameChange(String oldName, String newName, int indentSize) {
+      sb.append(Bind.indent(indentSize));
+      sb.append("{\n");
+      sb.append(Bind.indent(indentSize+1));
+      sb.append("sc.sync.SyncManager.receiveNameChange(");
+      sb.append(CTypeUtil.escapeJavaString(oldName, '"', false));
+      sb.append(", ");
+      sb.append(CTypeUtil.escapeJavaString(newName, '"', false));
+      sb.append(");\n");
+      sb.append(Bind.indent(indentSize));
+      sb.append("}\n");
+   }
+
+   public void appendNameChangeAck(String oldName, String newName, int indentSize) {
+      sb.append(Bind.indent(indentSize));
+      sb.append("{\n");
+      sb.append(Bind.indent(indentSize+1));
+      sb.append("sc.sync.SyncManager.nameChangeAck(");
+      sb.append(CTypeUtil.escapeJavaString(oldName, '"', false));
+      sb.append(", ");
+      sb.append(CTypeUtil.escapeJavaString(newName, '"', false));
+      sb.append(");\n");
+      sb.append(Bind.indent(indentSize));
+      sb.append("}\n");
+   }
+
+   public void appendClearResetState(String objName, int indentSize) {
+      sb.append(Bind.indent(indentSize));
+      sb.append("{\n");
+      sb.append(Bind.indent(indentSize+1));
+      sb.append("sc.sync.SyncManager.clearResetState(");
+      sb.append(CTypeUtil.escapeJavaString(objName, '"', false));
+      sb.append(");\n");
+      sb.append(Bind.indent(indentSize));
+      sb.append("}\n");
+   }
+
    public void formatMap(StringBuilder out, SyncManager.SyncContext syncContext, Map changedMap, String typeName, ArrayList<String> currentObjNames, String currentPackageName, SyncSerializer preBlockCode, SyncSerializer postBlockCode,
                          String varName, boolean inBlock, String uniqueId, List<SyncLayer.SyncChange> depChanges, SyncLayer syncLayer) {
       int numLevels = currentObjNames.size();

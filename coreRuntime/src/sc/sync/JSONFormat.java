@@ -123,6 +123,24 @@ public class JSONFormat extends SerializerFormat {
                throw new IllegalArgumentException("Invalid fetch property in JSON: " + dser.parser);
          }
       },
+      cn {
+         // { "cn": "oldName", "newName": "newName"}
+         public void apply(JSONDeserializer dser, boolean topLevel) {
+            Object oldName = dser.parser.parseJSONValue();
+            dser.parser.expectNextName("newName");
+            CharSequence newName = dser.parser.parseString(false);
+            dser.receiveNameChange(oldName.toString(), newName.toString());
+         }
+      },
+      nc {
+         // { "cn": "oldName", "newName": "newName"}
+         public void apply(JSONDeserializer dser, boolean topLevel) {
+            Object oldName = dser.parser.parseJSONValue();
+            dser.parser.expectNextName("newName");
+            CharSequence newName = dser.parser.parseString(false);
+            dser.nameChangeAck(oldName.toString(), newName.toString());
+         }
+      },
       syncState {
          public void apply(JSONDeserializer dser, boolean topLevel) {
             CharSequence stateName = dser.parser.parseString(false);
@@ -135,6 +153,14 @@ public class JSONFormat extends SerializerFormat {
                else
                   throw new IllegalArgumentException("Invalid syncState: " + stateName);
                SyncManager.setSyncState(state);
+            }
+         }
+      },
+      clearResetState {
+         public void apply(JSONDeserializer dser, boolean topLevel) {
+            CharSequence objName = dser.parser.parseString(false);
+            if (objName != null) {
+               SyncManager.clearResetState(objName.toString());
             }
          }
       };
@@ -156,7 +182,9 @@ public class JSONFormat extends SerializerFormat {
             case 's':
                return syncState;
             case 'n':
-               return newCmd;
+               return len == 3 ? nc : newCmd;
+            case 'c':
+               return len == 3 ? cn : clearResetState;
          }
          return null;
       }

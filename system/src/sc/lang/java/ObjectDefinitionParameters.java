@@ -1045,6 +1045,33 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       }
    }
 
+   public String getResetSyncTypeNames() {
+      LayeredSystem sys = objType.getLayeredSystem();
+      Set<String> syncTypeNames = sys.options.syncTypeFilter ? ModelUtil.getResetSyncTypes(sys, objType) : null;
+      if (syncTypeNames == null)
+         return "null";
+      else {
+         StringBuilder sb = new StringBuilder();
+         if (syncTypeNames.size() == 0) {
+            sb.append("java.util.Collections.emptySet()");
+         }
+         else {
+            sb.append("new java.util.HashSet<String>(java.util.Arrays.asList(");
+            int i = 0;
+            for (String syncTypeName:syncTypeNames) {
+               if (i != 0)
+                  sb.append(", ");
+               sb.append('"');
+               sb.append(syncTypeName);
+               sb.append('"');
+               i++;
+            }
+            sb.append("))");
+         }
+         return sb.toString();
+      }
+   }
+
    public String getBeforeNewObject() {
       return beforeNewObject;
    }

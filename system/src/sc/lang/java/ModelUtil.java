@@ -22,6 +22,7 @@ import sc.layer.*;
 import sc.obj.*;
 import sc.sync.SyncDestination;
 import sc.sync.SyncManager;
+import sc.sync.SyncProperties;
 import sc.type.*;
 import sc.util.*;
 import sc.bind.BindingDirection;
@@ -9544,38 +9545,36 @@ public class ModelUtil {
       return SyncManager.globalSyncTypeNames.contains(typeName);
    }
 
+   public static boolean isResetSyncEnabled(Object type) {
+      if (type instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
+         List<SyncProperties> props = typeDecl.getInheritedSyncProperties();
+         if (props != null) {
+            for (SyncProperties prop:props)
+               if (prop.hasResetState)
+                  return true;
+         }
+      }
+      return false;
+   }
+
    public static Set<String> getJSSyncTypes(LayeredSystem sys, Object type) {
       if (!(type instanceof BodyTypeDeclaration))
          System.err.println("*** Unable to get sync types from compiled class!");
       else {
-         LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
-         if (!sys.hasActiveRuntime("js"))
-            return Collections.emptySet();
-         if (jsSys == null)
-            System.out.println("*** getJSSyncTypes called on wrong system: " + sys.getProcessIdent()); // Happens if we call it from the JS system itself
-         Object jsType = jsSys.getRuntimeTypeDeclaration(ModelUtil.getTypeName(type));
          HashSet<String> syncTypeNames = null;
-         if (jsType instanceof BodyTypeDeclaration) {
-            BodyTypeDeclaration jsTypeDecl = (BodyTypeDeclaration) jsType;
-            JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
-            ctx.mode = JavaSemanticNode.DepTypeMode.SyncTypes;
-            ctx.recursive = true;
-            ctx.visited = new IdentityHashSet<Object>();
-            Set<Object> syncTypes = jsTypeDecl.getDependentTypes(ctx);
-            if (syncTypes.size() > 0) {
-               if (syncTypeNames == null)
-                  syncTypeNames = new HashSet<String>(syncTypes.size());
-               for (Object syncType:syncTypes) {
-                  if (syncType instanceof String)
-                     syncTypeNames.add((String) syncType);
-                  else
-                     syncTypeNames.add(ModelUtil.getTypeName(syncType));
-               }
-            }
-            if (jsTypeDecl.getSyncProperties() != null) {
-               if (syncTypeNames == null)
-                  syncTypeNames = new HashSet<String>(syncTypes.size());
-               syncTypeNames.add(jsTypeDecl.getFullTypeName());
+         LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
+         if (!sys.hasActiveRuntime("js")) {
+            // This is the server tags case - TODO: should we only include resetState in this list?
+            //syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) type);
+            return Collections.emptySet();
+         }
+         else {
+            if (jsSys == null)
+               System.out.println("*** getJSSyncTypes called on wrong system: " + sys.getProcessIdent()); // Happens if we call it from the JS system itself
+            Object jsType = jsSys.getRuntimeTypeDeclaration(ModelUtil.getTypeName(type));
+            if (jsType instanceof BodyTypeDeclaration) {
+               syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) jsType, false);
             }
          }
          BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
@@ -9596,6 +9595,43 @@ public class ModelUtil {
       }
       // Returning the empty set here - which means no sync types at all, not null which means to disable the filter
       return Collections.emptySet();
+   }
+
+   public static Set<String> getResetSyncTypes(LayeredSystem sys, Object type) {
+      if (!(type instanceof BodyTypeDeclaration))
+         System.err.println("*** Unable to get sync types from compiled class!");
+      else {
+         HashSet<String> syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) type, true);
+         return syncTypeNames;
+      }
+      // Returning the empty set here - which means no sync types at all, not null which means to disable the filter
+      return Collections.emptySet();
+   }
+
+   private static HashSet<String> getSyncTypeNamesForType(BodyTypeDeclaration typeDecl, boolean resetSync) {
+      HashSet<String> syncTypeNames = null;
+      BodyTypeDeclaration jsTypeDecl = (BodyTypeDeclaration) typeDecl;
+      JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
+      ctx.mode = resetSync ? JavaSemanticNode.DepTypeMode.ResetSyncTypes : JavaSemanticNode.DepTypeMode.SyncTypes;
+      ctx.recursive = true;
+      ctx.visited = new IdentityHashSet<Object>();
+      Set<Object> syncTypes = jsTypeDecl.getDependentTypes(ctx);
+      if (syncTypes.size() > 0) {
+         if (syncTypeNames == null)
+            syncTypeNames = new HashSet<String>(syncTypes.size());
+         for (Object syncType:syncTypes) {
+            if (syncType instanceof String)
+               syncTypeNames.add((String) syncType);
+            else
+               syncTypeNames.add(ModelUtil.getTypeName(syncType));
+         }
+      }
+      if (jsTypeDecl.getSyncProperties() != null) {
+         if (syncTypeNames == null)
+            syncTypeNames = new HashSet<String>(syncTypes.size());
+         syncTypeNames.add(jsTypeDecl.getFullTypeName());
+      }
+      return syncTypeNames;
    }
 
    public static Object getEditorCreateMethod(LayeredSystem sys, Object typeObj) {

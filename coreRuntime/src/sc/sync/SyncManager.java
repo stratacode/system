@@ -130,6 +130,7 @@ public class SyncManager {
       public Object[] args;       // Any argument values used in the constructor to construct this instance?
       public boolean initDefault;
       public String name;
+      public String oldName; // Name change pending - we keep the old name so that we can satisfy requests using it until the ack of the name change is received
       // TODO: turn this into bitflags for efficiency (or better yet, build an SC plugin that can do that transformation automatically in code-gen!)
       public boolean registered;  // Has this object's name been sent to the client
       public boolean nameQueued;  // Has this object's name been at least queued to send to he client
@@ -137,6 +138,7 @@ public class SyncManager {
       public boolean fixedObject; // True if this is an object with a fixed name in the global name-space
       public boolean initialized;
       public boolean inherited; // Set to true when the instance in this SyncContext is inherited from the parentContext.
+      public boolean resetState = true;
       public SyncProperties props;
       public TreeMap<String,Boolean> onDemandProps; // The list of on-demand properties which have been fetched for this instance - stores true when the prop has been initialized, false for when it's been requested before the object has been initialized.
 
@@ -425,7 +427,7 @@ public class SyncManager {
          // It also includes properties explicitly marked as 'reset state'. That must be set manually to include properties
          // the server needs returned to it, typically properties it sets in response to some button clicked in the UI
          // where the client change does not include all of the info produced by the operation.
-         if ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges) || (syncFlags & SyncPropOptions.SYNC_RESET_STATE) != 0)
+         if ((recordInitial || state == SyncState.InitializingLocal) || (state != SyncState.Initializing && state != SyncState.ApplyingChanges) || (ii.resetState && ((syncFlags & SyncPropOptions.SYNC_RESET_STATE) != 0)))
             initialSyncLayer.addChangedValue(obj, propName, val, recordInitial && state == SyncState.ApplyingChanges);
       }
 
@@ -1131,11 +1133,13 @@ public class SyncManager {
          }
       }
 
+      /*
       private boolean changedInitValue(HashMap<String,Object> initMap, String propName, Object propVal) {
          boolean initValSet = initMap.containsKey(propName);
          Object initVal = initMap.get(propName);
          return (!initValSet || (initVal != propVal && (initVal == null || !DynUtil.equalObjects(initVal, propVal))));
       }
+      */
 
       public SyncLayer getInitialSyncLayer() {
          return initialSyncLayer;
@@ -2479,6 +2483,117 @@ public class SyncManager {
             return true;
          return globalSyncTypeNames != null && globalSyncTypeNames.contains(typeName);
       }
+
+      public void changeInstName(Object inst, String oldName, String newName) {
+         InstInfo ii = syncInsts.get(inst);
+         if (ii == null)
+            return;
+         // Don't change the name here - instead, wait until we actually serialize this change so that refs before
+         // the change use the old name and refs after use the new.
+         //ii.name = newName;
+         //ii.oldName = oldName;
+         Object oldInst = objectIndex.put(newName, inst);
+         if (oldInst != null) {
+            if (oldInst == inst) {
+               System.err.println("*** Warning - changeInstName - object already found with name in index");
+               return;
+            }
+            System.err.println("*** Warning - changeInstName - replaced other object in index");
+         }
+
+         SyncLayer useLayer = getChangedSyncLayer(ii.props.syncGroup);
+         useLayer.addNameChange(inst, oldName, newName);
+
+         if (trace || verbose || verboseValues) {
+            System.out.println("Change name of: " + DynUtil.getInstanceName(inst) + " from: " + oldName + " to: " + newName + (!needsSync ? " *** first change in sync" : ""));
+         }
+         markChanged();
+      }
+
+      public void setResetStateEnabled(Object inst, boolean enabled) {
+         InstInfo ii = syncInsts.get(inst);
+         if (ii == null)
+            return;
+
+         if (ii.resetState == enabled)
+            return;
+
+         if (!enabled) {
+            SyncLayer useLayer = getChangedSyncLayer(ii.props == null ? null : ii.props.syncGroup);
+            useLayer.addClearResetState(inst, ii.name);
+         }
+
+         ii.resetState = enabled;
+
+         if (trace || verbose || verboseValues) {
+            System.out.println((enabled ? "Enable" : "Disable") + " reset state for: " + DynUtil.getInstanceName(inst));
+         }
+         markChanged();
+      }
+
+      /**
+       * Called from the deserializer when we receive a name change from the remote side. It will apply it to the
+       * local sync data structure and send back the ack
+       */
+      public void receiveNameChange(String oldName, String newName) {
+         Object inst = objectIndex.get(oldName);
+         if (inst == null)
+            System.err.println("*** receiveNameChange - object not found to change name from: " + oldName + " to: " + newName);
+         else {
+            InstInfo ii = syncInsts.get(inst);
+            if (ii == null) {
+               System.err.println("*** receiveNameChange - index out of sync");
+               return;
+            }
+            ii.name = newName;
+            objectIndex.put(newName, inst);
+            objectIndex.remove(oldName);
+
+            SyncProperties props = getSyncPropertiesForInst(inst);
+
+            SyncLayer useLayer = getChangedSyncLayer(props == null ? null : props.syncGroup);
+            useLayer.addNameChangeAck(inst, oldName, newName);
+
+            if (trace || verbose || verboseValues) {
+               System.out.println("Acknowledging name change of: " + DynUtil.getInstanceName(inst) + " from: " + oldName + " to: " + newName + (!needsSync ? " *** first change in sync" : ""));
+            }
+            markChanged();
+         }
+      }
+
+      /** Called from the deserializer when we receive the name change ack */
+      public void nameChangeAck(String oldName, String newName) {
+         Object inst = objectIndex.get(oldName);
+         if (inst == null)
+            System.err.println("*** receiveNameChange - object not found to change name from: " + oldName + " to: " + newName);
+         else {
+            InstInfo ii = syncInsts.get(inst);
+            if (ii == null)
+               return;
+            if (ii.name != null && ii.name.equals(newName) && ii.oldName != null && ii.oldName.equals(oldName)) {
+               objectIndex.remove(oldName);
+               ii.oldName = null;
+               if (trace || verbose || verboseValues) {
+                  System.out.println("Completed name change of: " + DynUtil.getInstanceName(inst) + " from: " + oldName + " to: " + newName);
+               }
+            }
+            else
+               System.err.println("*** confirmNameChange for instance out of sync");
+         }
+      }
+
+      public void updateInstName(Object inst, String oldName, String newName) {
+         InstInfo ii = syncInsts.get(inst);
+         if (ii == null)
+            return;
+         ii.name = newName;
+         ii.oldName = oldName;
+      }
+
+      public void clearResetState(Object inst) {
+         if (initialSyncLayer != null)
+            initialSyncLayer.removeSyncInst(inst);
+      }
    }
 
    public boolean allowCreate(Object type) {
@@ -2940,6 +3055,42 @@ public class SyncManager {
          System.out.println("*** Warning: SyncManager.addSyncInst called with type not registered to any destination " + DynUtil.getTypeName(type, false));
    }
 
+   public static void changeInstName(Object inst, String oldName, String newName) {
+      List<ScopeDefinition> scopeDefs = ScopeDefinition.getActiveScopes();
+      if (scopeDefs == null)
+         return;
+
+      // We do not know the app ids which this instance is registered under right now so we have to do a bit of searching to find
+      // the sync contexts (if any) which have it registered.
+      for (ScopeDefinition scopeDef:scopeDefs) {
+         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+         if (scopeCtx == null)
+            continue;
+         SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
+            syncCtx.changeInstName(inst, oldName, newName);
+         }
+      }
+   }
+
+   public static void setResetStateEnabled(Object inst, boolean enabled) {
+      List<ScopeDefinition> scopeDefs = ScopeDefinition.getActiveScopes();
+      if (scopeDefs == null)
+         return;
+
+      // We do not know the app ids which this instance is registered under right now so we have to do a bit of searching to find
+      // the sync contexts (if any) which have it registered.
+      for (ScopeDefinition scopeDef:scopeDefs) {
+         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+         if (scopeCtx == null)
+            continue;
+         SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         if (syncCtx != null && syncCtx.hasSyncInst(inst)) {
+            syncCtx.setResetStateEnabled(inst, enabled);
+         }
+      }
+   }
+
    public SyncContext newSyncContext(String name) {
       return new SyncContext(name);
    }
@@ -3348,10 +3499,11 @@ public class SyncManager {
       return anyChanges;
    }
 
-   public static CharSequence getInitialSync(String destName, int scopeId, boolean resetSync, String outputLanguage, Set<String> syncTypeFilter) {
+   public static CharSequence getInitialSync(String destName, int scopeId, boolean resetSync, String outputLanguage,
+                                             Set<String> syncTypeFilter, Set<String> resetTypeFilter) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
 
-      return syncMgr.getInitialSync(scopeId, resetSync, outputLanguage, syncTypeFilter);
+      return syncMgr.getInitialSync(scopeId, resetSync, outputLanguage, syncTypeFilter, resetTypeFilter);
    }
 
    /**
@@ -3368,7 +3520,11 @@ public class SyncManager {
       ctx.setInitialSync(val);
    }
 
-   public CharSequence getInitialSync(int scopeId, boolean resetSync, String outputLanguage, Set<String> syncTypeFilter) { // TODO: comment: Returns the stratacode snippet that will initialize the provided scope from a clean state perspective.  Used for the first time page load, or if a client-session is disconnected and needs to refresh itself from the initial state.
+  /**
+   * Called to retrieve the sync state for a new client for a new client. If resetSync is true, it's the client calling this
+   * method to receive the resetState for resetting the server when the server's session is lost.
+   */
+   public CharSequence getInitialSync(int scopeId, boolean resetSync, String outputLanguage, Set<String> syncTypeFilter, Set<String> resetTypeFilter) {
       SyncContext ctx = getSyncContext(scopeId, true); // Need to create it here since the initial sync will record lazy obj names we have to clear on reload
       if (ctx == null)
          return null;
@@ -3383,7 +3539,7 @@ public class SyncManager {
          // Start at the root parent context and work down the chain
          for (int i = 0; i < parCtxList.size(); i++) {
             SyncContext parentCtx = parCtxList.get(i);
-            SyncSerializer parentSer = parentCtx.getInitialSyncLayer().serialize(ctx, createdTypes, false, syncTypeFilter);
+            SyncSerializer parentSer = parentCtx.getInitialSyncLayer().serialize(ctx, createdTypes, false, syncTypeFilter, resetTypeFilter);
             if (parentSer != null) {
                if (lastSer == null)
                   lastSer = parentSer;
@@ -3392,7 +3548,7 @@ public class SyncManager {
             }
          }
 
-         SyncSerializer thisSer = layer.serialize(ctx, createdTypes, false, syncTypeFilter);
+         SyncSerializer thisSer = layer.serialize(ctx, createdTypes, false, syncTypeFilter, resetTypeFilter);
          if (thisSer != null) {
             if (lastSer == null)
                lastSer = thisSer;
@@ -3456,7 +3612,7 @@ public class SyncManager {
       boolean anyChanges = false;
       String errorMessage = null;
       for (String destName:syncManagersByDest.keySet()) {
-         SyncResult res = sendSync(destName, syncGroup, sendReset, markAsSentOnly, null, null);
+         SyncResult res = sendSync(destName, syncGroup, sendReset, markAsSentOnly, null, null, null);
          anyChanges = anyChanges || res.anyChanges;
          if (errorMessage == null)
             errorMessage = res.errorMessage;
@@ -3478,17 +3634,17 @@ public class SyncManager {
       return syncScope;
    }
 
-   public static SyncResult sendSync(String destName, String syncGroup, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public static SyncResult sendSync(String destName, String syncGroup, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter, Set<String> resetTypeFilter) {
       ScopeDefinition syncScope = getDefaultScope();
       if (syncScope == null)
          throw new IllegalArgumentException("*** No active scopes to sync");
       else
-         return sendSync(destName, syncGroup, syncScope.scopeId, sendReset, markAsSentOnly, codeUpdates, syncTypeFilter);
+         return sendSync(destName, syncGroup, syncScope.scopeId, sendReset, markAsSentOnly, codeUpdates, syncTypeFilter, resetTypeFilter);
    }
 
-   public static SyncResult sendSync(String destName, String syncGroup, int scopeId, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public static SyncResult sendSync(String destName, String syncGroup, int scopeId, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter, Set<String> resetTypeFilter) {
       SyncManager syncMgr = syncManagersByDest.get(destName);
-      return syncMgr.sendSync(syncGroup, scopeId, sendReset, markAsSentOnly, codeUpdates, syncTypeFilter);
+      return syncMgr.sendSync(syncGroup, scopeId, sendReset, markAsSentOnly, codeUpdates, syncTypeFilter, resetTypeFilter);
    }
 
    private SyncContext getFirstParentSyncContext(int scopeId, boolean create) {
@@ -3511,7 +3667,7 @@ public class SyncManager {
       return null;
    }
 
-   public SyncResult sendSync(String syncGroup, int scopeId, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public SyncResult sendSync(String syncGroup, int scopeId, boolean sendReset, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter, Set<String> resetTypeFilter) {
       SyncContext ctx = getSyncContext(scopeId, false);
       if (ctx == null) {  // If the default scope does not have a context, check for a sync context on the parent scope
          ctx = getFirstParentSyncContext(scopeId, false);
@@ -3523,7 +3679,7 @@ public class SyncManager {
          if (sendReset) // On the client this happens when the server has lost the session or never kept the info in the first place
             return syncDestination.sendResetSync(ctx, toSend);
 
-         return syncDestination.sendSync(ctx, toSend, syncGroup, markAsSentOnly, codeUpdates, syncTypeFilter);
+         return syncDestination.sendSync(ctx, toSend, syncGroup, markAsSentOnly, codeUpdates, syncTypeFilter, resetTypeFilter);
       }
       else if (verbose) {
          System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));
@@ -3586,6 +3742,16 @@ public class SyncManager {
    public static void addMethodResult(Object curObj, Object type, String callId, Object retValue, String exceptionStr) {
       SyncContext ctx  = getDefaultSyncContext();
       ctx.addMethodResult(curObj, type, callId, retValue, exceptionStr);
+   }
+
+   public static void receiveNameChange(String oldName, String newName) {
+      SyncContext ctx  = getDefaultSyncContext();
+      ctx.receiveNameChange(oldName, newName);
+   }
+
+   public static void nameChangeAck(String oldName, String newName) {
+      SyncContext ctx  = getDefaultSyncContext();
+      ctx.nameChangeAck(oldName, newName);
    }
 
 /*
@@ -3762,6 +3928,30 @@ public class SyncManager {
       if (globalSyncTypeNames == null)
          globalSyncTypeNames = new HashSet<String>();
       globalSyncTypeNames.add(typeName);
+   }
+
+   public static void clearResetState(String objName) {
+      List<ScopeDefinition> scopeDefs = ScopeDefinition.getActiveScopes();
+      if (scopeDefs == null)
+         return;
+
+      Object inst = null;
+      // We do not know the app ids which this instance is registered under right now so we have to do a bit of searching to find
+      // the sync contexts (if any) which have it registered.
+      for (ScopeDefinition scopeDef:scopeDefs) {
+         ScopeContext scopeCtx = scopeDef.getScopeContext(false);
+         if (scopeCtx == null)
+            continue;
+         SyncContext syncCtx = (SyncContext) scopeCtx.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
+         if (syncCtx == null)
+            continue;
+         if (inst == null)
+            inst = syncCtx.getObjectByName(objName);
+         if (inst != null && syncCtx.hasSyncInst(inst)) {
+            syncCtx.clearResetState(inst);
+         }
+      }
+
    }
 
 }

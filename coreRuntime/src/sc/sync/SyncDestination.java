@@ -113,7 +113,7 @@ public abstract class SyncDestination {
       // TODO: maybe the client should send two different layers during a reset - for the committed and uncommitted changes.
       // That way, all of the committed changes would be applied before the resetSync.  As it is now, those changes will be applied after this sendSync call.
       if (applyingRemoteReset) {
-         SyncManager.sendSync(name, null, false, true, null, null);
+         SyncManager.sendSync(name, null, false, true, null, null, null);
       }
 
       // We'll queue only the validate events. That way, listeners still receive invalidate events while deserializing the stream.
@@ -321,7 +321,7 @@ public abstract class SyncDestination {
             layer.markSyncPending();
          }
 
-         CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null, null);
+         CharSequence initSync = SyncManager.getInitialSync(name, clientContext.scope.getScopeDefinition().scopeId, false, null, null, null);
          if (SyncManager.trace) {
             if (initSync.length() == 0) {
                System.out.println("No initial sync for reset");
@@ -379,14 +379,15 @@ public abstract class SyncDestination {
     * during the client-side 'reset' to avoid resending changes queued up during page initialization - since, the client
     * will have received those changes on it's initial request.
     */
-   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean markAsSentOnly, CharSequence codeUpdates, Set<String> syncTypeFilter) {
+   public SyncResult sendSync(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String syncGroup, boolean markAsSentOnly,
+                              CharSequence codeUpdates, Set<String> syncTypeFilter, Set<String> resetTypeFilter) {
       SyncSerializer lastSer = null;
       HashSet<String> createdTypes = new HashSet<String>();
       // Going in sorted order - e.g. global, then session.
       // Changes found during the traversal of the global graph adds changes to the session so we miss these if we go in the reverse order.
       for (int i = 0; i < layers.size(); i++) {
          SyncLayer layer = layers.get(i);
-         SyncSerializer nextSer = layer.serialize(parentContext, createdTypes, false, syncTypeFilter);
+         SyncSerializer nextSer = layer.serialize(parentContext, createdTypes, false, syncTypeFilter, resetTypeFilter);
          layer.markSyncPending();
          if (lastSer == null)
             lastSer = nextSer;

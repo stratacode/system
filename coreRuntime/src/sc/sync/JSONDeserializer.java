@@ -375,6 +375,14 @@ public class JSONDeserializer implements JSONResolver {
       syncCtx.updateProperty(obj, propName, false, true);
    }
 
+   public void receiveNameChange(String oldName, String newName) {
+      syncCtx.receiveNameChange(oldName, newName);
+   }
+
+   public void nameChangeAck(String oldName, String newName) {
+      syncCtx.nameChangeAck(oldName, newName);
+   }
+
    public void invokeRemoteMethod() {
       CharSequence methName = parseMethName();
       parser.expectNextName(JSONFormat.MethodArgs.typeSig.name());

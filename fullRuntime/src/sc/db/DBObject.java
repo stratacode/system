@@ -70,7 +70,7 @@ public class DBObject implements IDBObject {
     *  because an instance was deserialized using the existing version. */
    public IDBObject replacedBy = null;
 
-   private String objectId = null;
+   String objectId = null;
 
    public DBObject(DBTypeDescriptor dbType) {
       this.dbTypeDesc = dbType;

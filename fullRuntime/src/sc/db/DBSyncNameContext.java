@@ -26,7 +26,10 @@ public class DBSyncNameContext implements INameContext {
                   IDBObject tinst = desc.createInstance();
                   ((DBObject) tinst.getDBObject()).setObjectId(name);
 
-                  desc.initSyncForInst(tinst);
+                  // Passing onDemand=false here because we need to init the sync for any reference received from
+                  // the other side since it's already referenced. Other references are onDemand so that we init them
+                  // the first time a reference gets serialized.
+                  desc.initSyncForInst(tinst, false);
 
                   return tinst; // Just create it and register under the id provided
                }
