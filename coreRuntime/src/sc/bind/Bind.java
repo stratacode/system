@@ -693,11 +693,13 @@ public class Bind {
          // set up downstream listeners.  E.g. the JS tag objects do this so they only register for DOM events which
          // are being listened too.  The Sync system uses this to lazily pull objects into scopes the first time
          // a listener is added in a given scope.
-         BindingListener objListener = newListeners[0];
-         while (objListener != null) {
-            if ((objListener.eventMask & IListener.LISTENER_ADDED) != 0)
-               objListener.listener.listenerAdded(obj, propObj, listener, eventMask, priority);
-            objListener = objListener.next;
+         if (((eventMask & ~IListener.LISTENER_ADDED) != 0)) {
+            BindingListener objListener = newListeners[0];
+            while (objListener != null) {
+               if ((objListener.eventMask & IListener.LISTENER_ADDED) != 0)
+                  objListener.listener.listenerAdded(obj, propObj, listener, eventMask, priority);
+               objListener = objListener.next;
+            }
          }
       }
       else {
