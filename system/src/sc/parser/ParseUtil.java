@@ -1088,6 +1088,8 @@ public class ParseUtil  {
    }
 
    public static int getLineNumberForNode(IParseNode rootNode, IParseNode toFindPN) {
+      if (rootNode == null)
+         return -1;
       LineFormatContext ctx = new LineFormatContext();
       rootNode.computeLineNumberForNode(ctx, toFindPN);
       if (ctx.found)
