@@ -88,7 +88,7 @@ public class HTMLElement<RE> extends Element<RE> {
       domAttributes.put("scrollHeight", HTMLElement._scrollHeightProp);
       domAttributes.put("offsetTop", HTMLElement._offsetTopProp);
       domAttributes.put("offsetLeft", HTMLElement._offsetLeftProp);
-      domAttributes.put("offsetWith", HTMLElement._offsetWidthProp);
+      domAttributes.put("offsetWidth", HTMLElement._offsetWidthProp);
       domAttributes.put("offsetHeight", HTMLElement._offsetHeightProp);
 
       domAttributes.put("mouseDownMoveUp", HTMLElement._mouseDownMoveUpProp);
