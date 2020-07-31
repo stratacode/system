@@ -2660,10 +2660,18 @@ public class SyncManager {
    }
 
    public boolean isSynced(Object type, String propName) {
-      SyncProperties props = getSyncProperties(type);
-      if (props != null && props.isSynced(propName)) {
-         return true;
-      }
+      do {
+         SyncProperties props = getSyncProperties(type);
+         if (props != null && props.isSynced(propName)) {
+            return true;
+         }
+         // Need to check the extends type here for cases like when sync'ing properties in a sub-class of a tag object.
+         // Right now, the SyncProperties created for the subclass (e.g. FormView.visible) will not include a reference to
+         // the base type as a chainedType and so doesn't see all of the properties. We register the sync properties for the
+         // Element.class base class manually so they are not visible to the code gen.
+         // TODO: It might be faster to figure this out  at compile time?
+         type = DynUtil.getExtendsType(type);
+      } while (type != null);
       return false;
    }
 
@@ -2853,7 +2861,7 @@ public class SyncManager {
     * in the "initial sync layer" - which records the current state of the system for a client state refresh.
     */
    @Sync(syncMode= SyncMode.Disabled, includeSuper=true)
-   class SyncChangeListener extends AbstractListener {
+   public class SyncChangeListener extends AbstractListener {
       public String syncGroup;
       public SyncContext ctx;
 

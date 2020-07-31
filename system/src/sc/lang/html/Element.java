@@ -5201,6 +5201,28 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       Bind.sendChange(this, "clientHeight", ih);
    }
 
+   private int scrollWidth = -1;
+   @Bindable(manual=true)
+   public int getScrollWidth() {
+      return scrollWidth;
+   }
+   @Bindable(manual=true)
+   public void setScrollWidth(int iw) {
+      this.scrollWidth = iw;
+      Bind.sendChange(this, "scrollWidth", iw);
+   }
+
+   private int scrollHeight = -1;
+   @Bindable(manual=true)
+   public int getScrollHeight() {
+      return scrollHeight;
+   }
+   @Bindable(manual=true)
+   public void setScrollHeight(int ih) {
+      this.scrollHeight = ih;
+      Bind.sendChange(this, "scrollHeight", ih);
+   }
+
    public Element getPreviousElementSibling() {
       if (parentNode == null)
          return null;
@@ -5414,6 +5436,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void addServerTagFlags(ServerTag st) {
    }
 
+   /** Listens for new bindings to be added to the tag object and checks if any new server tag props need to be added for these new listeners */
+   private class STagBindingListener extends AbstractListener {
+      ServerTag serverTag;
+      private STagBindingListener(ServerTag serverTag) {
+         this.serverTag = serverTag;
+      }
+      public boolean listenerAdded(Object obj, Object prop, Object listener, int eventMask, int priority) {
+         serverTag.listenersValid = false;
+         return true;
+      }
+   }
+
    public ServerTag getServerTagInfo(String id) {
       if (serverTagInfo != null)
          return serverTagInfo;
@@ -5437,6 +5471,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       if (stag != null) {
          serverTagInfo = stag;
+         Bind.addListener(this, null, new STagBindingListener(stag), IListener.LISTENER_ADDED);
       }
 
       return stag;
@@ -5447,7 +5482,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          return stag;
       for (Map.Entry<String,IBeanMapper> domProp:propsMap.entrySet()) {
          BindingListener listener = Bind.getPropListeners(this, listeners, domProp.getValue());
-         if (listener != null) {
+
+         // There will always be a sync change listener for these events but they are not generated on the server, we
+         // are looking for listeners that need the events sent from the client.
+         if (listener != null && !(listener.listener instanceof SyncManager.SyncChangeListener)) {
             if (stag == null) {
                stag = new ServerTag();
                stag.id = getId();
@@ -5460,7 +5498,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             //stag.immediate = true;
             // TODO also add SyncPropOption here if we want to control immediate or other flags we add to how
             // to synchronize these properties from client to server?
-            stag.props.add(domProp.getKey());
+            String propName = domProp.getKey();
+            if (!stag.props.contains(propName))
+               stag.props.add(propName);
          }
       }
       return stag;
@@ -5494,20 +5534,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                // This call only returns the server tags which need to be sent to the client.  All server tags though will be registered in the sync system
                if (serverTagInfo.eventSource || serverTagInfo.initScript != null || serverTagInfo.stopScript != null) {
 
-                  if (stCtx.firstTime) {
-                     if (stCtx.serverTags == null)
-                        stCtx.serverTags = new LinkedHashMap<String,ServerTag>();
-
-                     stCtx.serverTags.put(tagId, serverTagInfo);
-                  }
-                  else {
-                     ServerTag oldSt = stCtx.serverTags.get(tagId);
-                     if (oldSt != null)
-                        oldSt.marked = true;
-                     else {
-                        stCtx.addNewServerTag(tagId, serverTagInfo);
-                     }
-                  }
+                  stCtx.addServerTagInfo(tagId, serverTagInfo);
                }
 
                if (stCtx.serverTagTypes != null) {
@@ -5558,6 +5585,24 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          for (Object child:children) {
             if (child instanceof Element) {
                ((Element) child).addServerTags(scopeDef, stCtx, defaultServerTag);
+            }
+         }
+      }
+   }
+
+   public void validateServerTags(ScopeDefinition scopeDef, ServerTagContext stCtx, boolean defaultServerTag) {
+      if (serverTagInfo != null && !serverTagInfo.listenersValid) {
+         BindingListener[] listeners = Bind.getBindingListeners(this);
+         boolean eventSource = serverTagInfo.eventSource;
+         addServerTagProps(listeners, serverTagInfo, HTMLElement.domAttributes);
+         if (serverTagInfo.eventSource && !eventSource)
+            stCtx.addServerTagInfo(getServerTagId(), serverTagInfo);
+      }
+      Object[] children = getObjChildren(false);
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Element) {
+               ((Element) child).validateServerTags(scopeDef, stCtx, defaultServerTag);
             }
          }
       }
@@ -5690,7 +5735,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // Specific DOM type subclasses (e.g. input) have custom attributes that are sync'd for server tags we
       SyncManager.addSyncType(Element.class, new SyncProperties(null, null, new Object[]{
             "startTagTxt", "innerHTML", "style", "class", "clickEvent", "dblClickEvent", "mouseDownEvent", "mouseOutEvent", "mouseMoveEvent",
-            "mouseUpEvent", "mouseDownMoveUp", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "clientWidth", "clientHeight", "offsetLeft", "offsetTop", "offsetWidth", "offsetHeight"}, 0));
+            "mouseUpEvent", "mouseDownMoveUp", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "clientWidth", "clientHeight", "offsetLeft", "offsetTop", "offsetWidth", "offsetHeight", "scrollWidth", "scrollHeight"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount", "submitInProgress", "submitError", "submitResult"}, Element.class, 0));

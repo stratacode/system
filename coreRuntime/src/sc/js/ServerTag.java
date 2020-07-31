@@ -33,6 +33,8 @@ public class ServerTag implements IObjectId {
 
    public String stopScript = null;
 
+   public boolean listenersValid = true;
+
    public String toString() {
       return "id=" + id + "(" + props + ")";
    }

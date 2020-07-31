@@ -1,5 +1,8 @@
 package sc.js;
 
+import sc.bind.Bind;
+import sc.bind.BindingListener;
+
 import java.util.*;
 
 /** Used to gather up the changes in the serverTags for a given server request (does not run in the client) */
@@ -83,5 +86,23 @@ public class ServerTagContext {
             }
          }
       }
+   }
+
+   public void addServerTagInfo(String tagId, ServerTag serverTagInfo) {
+      if (firstTime) {
+         if (serverTags == null)
+            serverTags = new LinkedHashMap<String,ServerTag>();
+
+         serverTags.put(tagId, serverTagInfo);
+      }
+      else {
+         ServerTag oldSt = serverTags.get(tagId);
+         if (oldSt != null)
+            oldSt.marked = true;
+         else {
+            addNewServerTag(tagId, serverTagInfo);
+         }
+      }
+
    }
 }

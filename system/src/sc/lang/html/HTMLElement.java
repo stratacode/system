@@ -60,6 +60,8 @@ public class HTMLElement<RE> extends Element<RE> {
    public final static sc.type.IBeanMapper _blurEventProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "blurEvent");
    public final static sc.type.IBeanMapper _clientWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "clientWidth");
    public final static sc.type.IBeanMapper _clientHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "clientHeight");
+   public final static sc.type.IBeanMapper _scrollWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "scrollWidth");
+   public final static sc.type.IBeanMapper _scrollHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "scrollHeight");
    public final static sc.type.IBeanMapper _offsetLeftProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetLeft");
    public final static sc.type.IBeanMapper _offsetTopProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetTop");
    public final static sc.type.IBeanMapper _offsetWidthProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HTMLElement.class, "offsetWidth");
@@ -82,6 +84,8 @@ public class HTMLElement<RE> extends Element<RE> {
       domAttributes.put("blurEvent", HTMLElement._blurEventProp);
       domAttributes.put("clientWidth", HTMLElement._clientWidthProp);
       domAttributes.put("clientHeight", HTMLElement._clientHeightProp);
+      domAttributes.put("scrollWidth", HTMLElement._scrollWidthProp);
+      domAttributes.put("scrollHeight", HTMLElement._scrollHeightProp);
       domAttributes.put("offsetTop", HTMLElement._offsetTopProp);
       domAttributes.put("offsetLeft", HTMLElement._offsetLeftProp);
       domAttributes.put("offsetWith", HTMLElement._offsetWidthProp);
