@@ -507,7 +507,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                String propVarName = propPathName.replace(".", "_");
                propVarNames.add(propVarName);
 
-               Object propType = fbDesc.propTypes.get(j);
+               // The IDE during index init had propTypes of size 0 here - just want to avoid the exception
+               Object propType = j < fbDesc.propTypes.size() ? fbDesc.propTypes.get(j) : Object.class;
                sb.append(getTypeName(propType));
                sb.append(" ");
                sb.append(propVarName);
@@ -521,7 +522,7 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                   String optName = fbDesc.optionNames.get(j);
                   String optVarName = optName.replace(".","_");
                   optVarNames.add(optVarName);
-                  Object propType = fbDesc.optionTypes.get(j);
+                  Object propType = j < fbDesc.optionTypes.size() ? fbDesc.optionTypes.get(j) : Object.class;
                   sb.append("boolean _opt");
                   sb.append(j);
                   sb.append("_");
