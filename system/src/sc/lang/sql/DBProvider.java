@@ -130,6 +130,10 @@ public class DBProvider {
 
    public static BaseTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, boolean initTables) {
       if (typeDecl instanceof ITypeDeclaration) {
+         // Make sure we have the most specific type before returning the dbTypeDescriptor
+         if (typeDecl instanceof BodyTypeDeclaration) {
+            typeDecl = ((BodyTypeDeclaration) typeDecl).resolve(true); // Make sure we have the most specific type before gett
+         }
          BaseTypeDescriptor res = ((ITypeDeclaration) typeDecl).getDBTypeDescriptor();
          if (res != null && initTables && !res.tablesInitialized)
             completeDBTypeDescriptor(res, sys, refLayer, typeDecl);
