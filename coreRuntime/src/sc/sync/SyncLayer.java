@@ -943,6 +943,8 @@ public class SyncLayer {
 
       String newPackageName = useObjNameForPackage ? changedObjPkg : CTypeUtil.getPackageName(objTypeName);
       boolean packagesMatch = !(changeCtx.lastPackageName != newPackageName && (changeCtx.lastPackageName == null || !changeCtx.lastPackageName.equals(newPackageName)));
+      if (isCommand) // commands always are put at the top level
+         packagesMatch = false;
 
       boolean switchedPackage = false;
       boolean pushName = true;
