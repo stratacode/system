@@ -627,9 +627,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
                sb.append("matchQuery(");
             else
                sb.append("matchOne(");
-            sb.append("proto.getDBObject(),");
+            sb.append("proto.getDBObject(), propList, ");
             appendString(sb, fbDesc.selectGroup, false);
-            sb.append(", propList");
             if (fbDesc.multiRow && !fbDesc.findOne) {
                if (fbDesc.orderByOption || fbDesc.orderByProps != null)
                   sb.append(", orderBy");

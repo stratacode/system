@@ -697,7 +697,7 @@ public class SelectQuery implements Cloneable {
             SelectTableDesc selectTable = selectTables.get(fi);
             Object refId = null;
 
-            DBPropertyDescriptor refProp = selectTable.refProp;
+            //DBPropertyDescriptor refProp = selectTable.refProp;
             Map<String,Object> tableDynProps = null;
 
             if (selectTable.selectDynColumn) {
@@ -1007,6 +1007,18 @@ public class SelectQuery implements Cloneable {
             if (logSB != null)
                logSB.append(")");
          }
+      }
+      if (resList == null) {
+         if (rowCt != 0)
+            System.err.println("*** Invalid case for processMultiResults");
+         SelectTableDesc mainTableDesc = selectTables.get(0);
+         if (mainTableDesc.revColumns != null) {
+            listProp = mainTableDesc.revProps.get(0);
+         }
+         else {
+            listProp = mainTableDesc.props.get(0);
+         }
+         resList = new DBList(10, dbObj, listProp);
       }
       if (listProp != null) {
          // TODO: handle arrays, incremental update of existing destination list for incremental 'refresh' when the list is
