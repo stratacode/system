@@ -570,6 +570,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    private void addMethodByName(String name, Statement st) {
+      if (methodsByName == null) // The index has not been initialized for some reason or maybe was just cleared?
+         return;
       List<Statement> sts = methodsByName.get(name);
       if (sts == null) {
          sts = new ArrayList<Statement>();
