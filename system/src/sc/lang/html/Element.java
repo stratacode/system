@@ -4592,12 +4592,20 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return res.toArray(new Element[res.size()]);
    }
 
+   private boolean isAltId(String id) {
+      int len = id.length();
+      int suffLen = ALT_SUFFIX.length();
+      int ix = id.indexOf(ALT_SUFFIX);
+      // Might be name__alt_n or name__alt
+      return ix != -1 && (ix + suffLen == len || id.charAt(ix+suffLen) == '_');
+   }
+
    public Element[] getAltChildren() {
       ArrayList<Element> res = null;
       Object[] childList = getObjChildren(true);
       if (childList != null) {
          for (Object child:childList) {
-            if (child instanceof Element && ((Element) child).getElementId().endsWith(ALT_SUFFIX)) {
+            if (child instanceof Element && isAltId(((Element) child).getElementId())) {
                if (res == null)
                   res = new ArrayList<Element>();
                res.add((Element) child);
