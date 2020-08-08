@@ -3746,60 +3746,79 @@ public class ModelUtil {
 
       if (sb == null)
          throw new IllegalArgumentException("template output method called with null value for the 'out' StringBuilder parameter");
-      
+
+      Object def = null;
       for (int i = 0; i < declarations.size(); i++) {
-         Object def = declarations.get(i);
-         if (def instanceof IString)
-            sb.append(def.toString());
-         else if (def instanceof IValueNode) {
-            do {
-               // A glue expression can evaluate into a Template.  Need to use eval again instead of explicitly
-               Object val = ((IValueNode )def).eval(null, ctx);
-               if (val != null) {
-                  if (val instanceof IValueNode)
-                     def = val;
-                  else {
-                     sb.append(val.toString());
+         try {
+            def = declarations.get(i);
+            if (def instanceof IString)
+               sb.append(def.toString());
+            else if (def instanceof IValueNode) {
+               do {
+                  // A glue expression can evaluate into a Template.  Need to use eval again instead of explicitly
+                  Object val = ((IValueNode )def).eval(null, ctx);
+                  if (val != null) {
+                     if (val instanceof IValueNode)
+                        def = val;
+                     else {
+                        sb.append(val.toString());
+                        break;
+                     }
+                  }
+                  else
                      break;
+               } while (true);
+            }
+            else if (def instanceof TemplateStatement) {
+               ModelUtil.execStatements(ctx, ((TemplateStatement) def).statements);
+            }
+            else if (def instanceof Element) {
+               // In dynamic model, a glue expression may not have been transformed so it will still have references to Elements.  We'll get the output expression here which creates the tag type
+               // if needed.  TODO: maybe we should split GlueExpression.transformTemplate into two steps - one to produce the expression and the other to replace and then we would skip the eval here?
+               Element elem = (Element) def;
+               Expression outExpr = elem.getOutputExpression();
+               Object exprRes = outExpr.eval(String.class, ctx);
+               if (exprRes != null)
+                  sb.append(exprRes.toString());
+
+               /*
+               sb.append("<");
+               sb.append(elem.tagName);
+               if (elem.attributeList != null) {
+                  for (int ai = 0; ai < elem.attributeList.size(); ai++) {
+                     Attr att = (Attr) elem.attributeList.get(ai);
+                     sb.append(" ");
+                     sb.append(att.name);
+                     if (att.value != null) {
+
+                     }
+
                   }
                }
-               else
-                  break;
-            } while (true);
-         }
-         else if (def instanceof TemplateStatement) {
-            ModelUtil.execStatements(ctx, ((TemplateStatement) def).statements);
-         }
-         else if (def instanceof Element) {
-            // In dynamic model, a glue expression may not have been transformed so it will still have references to Elements.  We'll get the output expression here which creates the tag type
-            // if needed.  TODO: maybe we should split GlueExpression.transformTemplate into two steps - one to produce the expression and the other to replace and then we would skip the eval here?
-            Element elem = (Element) def;
-            Expression outExpr = elem.getOutputExpression();
-            Object exprRes = outExpr.eval(String.class, ctx);
-            if (exprRes != null)
-               sb.append(exprRes.toString());
-
-            /*
-            sb.append("<");
-            sb.append(elem.tagName);
-            if (elem.attributeList != null) {
-               for (int ai = 0; ai < elem.attributeList.size(); ai++) {
-                  Attr att = (Attr) elem.attributeList.get(ai);
-                  sb.append(" ");
-                  sb.append(att.name);
-                  if (att.value != null) {
-
-                  }
+               if (elem.selfClose != null)
+                  sb.append("/");
+               sb.append(">");
+               if (elem.children != null) {
 
                }
+               */
             }
-            if (elem.selfClose != null)
-               sb.append("/");
-            sb.append(">");
-            if (elem.children != null) {
-
+         }
+         catch (RuntimeException exc) {
+            if (def instanceof Statement)
+               throw (RuntimeException) wrapRuntimeException((Statement) def, exc);
+            else {
+               System.err.println("*** Runtime exception: " + exc + " executing dyn statement: " + def);
+               throw exc;
             }
-            */
+         }
+         catch (Error exc) {
+            if (def instanceof Statement)
+               throw (Error) wrapRuntimeException((Statement) def, exc);
+            else {
+               System.err.println("*** Runtime error: " + exc + " executing dyn statement: " + def);
+               throw exc;
+            }
          }
       }
    }
