@@ -188,11 +188,28 @@ public class Pattern extends SemanticNode {
    }
 
    public boolean matchString(String fromStr) {
-      ReplaceResult res = doMatch(fromStr, false, null);
+      ReplaceResult res = doMatch(fromStr, false, null, false);
       if (res == null)
          return false;
       // Should be a match with nothing left over
       return res.matchedLen == fromStr.length();
+   }
+
+   /** Do the match and store matched values in resultMap. If the match fails, the map is cleared. */
+   public boolean updateMap(String fromStr, Map<String,Object> resultMap) {
+      ReplaceResult res = doMatch(fromStr, false, resultMap, true);
+      if (res == null) {
+         if (resultMap != null)
+            resultMap.clear();
+         return false;
+      }
+      // Should be a match with nothing left over
+      boolean stat = res.matchedLen == fromStr.length();
+      if (!stat) {
+         if (resultMap != null)
+            resultMap.clear();
+      }
+      return stat;
    }
 
    // TODO: this does the match via the parselet which can use any parselet defined in the language. For the URLs we moved to
@@ -211,7 +228,7 @@ public class Pattern extends SemanticNode {
 
    public boolean updateInstance(String fromStr, Object inst) {
       if (matchString(fromStr)) {
-         ReplaceResult matchRes = doMatch(fromStr, false, inst);
+         ReplaceResult matchRes = doMatch(fromStr, false, inst, false);
          // This should return true because we did the simple match first - unless we fail to set the instance for some reason
          boolean res = matchRes != null && matchRes.matchedLen == fromStr.length();
          if (!res)
@@ -280,7 +297,7 @@ public class Pattern extends SemanticNode {
       int fromLen = fromStr.length();
       String curStr = fromStr;
       while (matchedLen < fromLen) {
-         ReplaceResult res = doMatch(curStr, true, null);
+         ReplaceResult res = doMatch(curStr, true, null, false);
          if (res == null || res.matchedLen == 0) {
             matchedLen++;
             cres.append(curStr.charAt(0));
@@ -303,7 +320,7 @@ public class Pattern extends SemanticNode {
     * log file and replace matched values with the data type name matched - when those values are not consistent
     * from one run to the other.
     */
-   public ReplaceResult doMatch(String fromStr, boolean doReplace, Object inst) {
+   public ReplaceResult doMatch(String fromStr, boolean doReplace, Object inst, boolean isMap) {
       int len = 0;
       String matchStr = fromStr;
       StringBuilder res = new StringBuilder();
@@ -360,7 +377,7 @@ public class Pattern extends SemanticNode {
             }
             else if (elem instanceof Pattern) {
                Pattern pattern = (Pattern) elem;
-               ReplaceResult subMatch = pattern.doMatch(matchStr, doReplace, inst);
+               ReplaceResult subMatch = pattern.doMatch(matchStr, doReplace, inst, isMap);
                if (subMatch == null) {
                   if (negated) {
                      nextRes.append(pendingNeg);
@@ -430,7 +447,7 @@ public class Pattern extends SemanticNode {
                            int intVal = Integer.parseInt(intStr); // validate that this string is an integer
                            // TODO: should we add an option to return the values?
                            if (propName != null && inst != null) {
-                              DynUtil.setProperty(inst, propName, intVal);
+                              setPatternProperty(inst, propName, intVal, isMap);
                            }
                         }
                         catch (NumberFormatException exc) {
@@ -469,7 +486,9 @@ public class Pattern extends SemanticNode {
                         }
                      }
                   }
-                  else if (typeName.equals("urlString") || typeName.equals("identifier") || typeName.equals("alphaNumString") || typeName.equals("escapedString")) {
+                  // TODO: speed this up with a hash table or something
+                  else if (typeName.equals("urlString") || typeName.equals("identifier") || typeName.equals("alphaNumString") ||
+                           typeName.equals("escapedString") || typeName.equals("urlPath")) {
                      int strLen = 0;
                      while (strLen < matchLen) {
                         char c = matchStr.charAt(strLen);
@@ -493,6 +512,10 @@ public class Pattern extends SemanticNode {
                         }
                         else if (typeName.equals("escapedString")) {
                            if (c == '"' || c == 0 || c == '\n')
+                              break;
+                        }
+                        else if (typeName.equals("urlPath")) {
+                           if (!URLUtil.isURLCharacter(c) || c == '/')
                               break;
                         }
                         strLen++;
@@ -533,7 +556,7 @@ public class Pattern extends SemanticNode {
                                  appendSubstitute(nextRes, propName);
                               else {
                                  if (inst != null) {
-                                    DynUtil.setProperty(inst, propName, strVal);
+                                    setPatternProperty(inst, propName, strVal, isMap);
                                  }
                               }
                            }
@@ -622,6 +645,13 @@ public class Pattern extends SemanticNode {
          }
       }
       return new ReplaceResult(res.toString(), len);
+   }
+
+   private void setPatternProperty(Object inst, String propName, Object val, boolean isMap) {
+      if (isMap)
+         ((Map) inst).put(propName, val);
+      else
+         DynUtil.setProperty(inst, propName, val);
    }
 
    private void appendSubstitute(StringBuilder res, String propName) {

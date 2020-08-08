@@ -868,6 +868,11 @@ public class DBObject implements IDBObject {
       List<IdPropertyDescriptor> idProps = dbTypeDesc.primaryTable.idColumns;
       int num = idProps.size();
       if (num == 1) {
+         if (unknownType) {
+            if (dbId != null)
+               return dbId;
+            System.err.println("*** getDBId() on DBObject with unknown type and no id");
+         }
          IdPropertyDescriptor idProp = idProps.get(0);
          return idProp.getPropertyMapper().getPropertyValue(getInst(), false, false);
       }

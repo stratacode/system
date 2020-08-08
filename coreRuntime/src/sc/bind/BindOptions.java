@@ -4,9 +4,12 @@
 
 package sc.bind;
 
+import sc.js.JSSettings;
+
 /**
  * Can be specified as null in a call to create a binding, but provides parameters that alter the behavior of the binding
  */
+@JSSettings(jsLibFiles = "js/scbind.js", prefixAlias="sc_")
 public class BindOptions {
    /** Run the binding after waiting for the specified number of milliseconds */
    public int delay = -1;

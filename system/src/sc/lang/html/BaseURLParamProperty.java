@@ -10,6 +10,7 @@ import sc.type.PTypeUtil;
 public abstract class BaseURLParamProperty {
    public String propName;
    public boolean required;
+   public boolean constructor;
    public Object enclType;
    public Object propType;
    public IBeanMapper mapper;
@@ -17,11 +18,12 @@ public abstract class BaseURLParamProperty {
    public BaseURLParamProperty() {
    }
 
-   public BaseURLParamProperty(Object enclType, String propName, Object propType, boolean req) {
+   public BaseURLParamProperty(Object enclType, String propName, Object propType, boolean req, boolean constructor) {
       this.enclType = enclType;
       this.propName = propName;
       this.propType = propType;
       this.required = req;
+      this.constructor = constructor;
    }
 
    public IBeanMapper getMapper() {

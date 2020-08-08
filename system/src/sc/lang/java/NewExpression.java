@@ -254,7 +254,10 @@ public class NewExpression extends IdentifierExpression {
          anonType.transform(runtime);
       }
 
-      /* We are creating a component.  To get the right semantics, we use the newX method on the enclosing class */
+      /*
+       * We are creating a component.  To get the right semantics, we use the newX method on the enclosing class. For binding expressions,
+       * we'll let the binding system handle the component creation since it uses APIs that can make the right call at runtime
+       */
       if (needsTransform()) {
          if (ModelUtil.isDynamicNew(boundType)) {
             SemanticNodeList<Expression> newArgs = new SemanticNodeList<Expression>();
@@ -323,7 +326,8 @@ public class NewExpression extends IdentifierExpression {
                ie = IdentifierExpression.create(identifiers);
             }
             ie.setProperty("arguments", arguments);
-            parentNode.replaceChild(this, ie);
+            if (parentNode.replaceChild(this, ie) == -1)
+               System.err.println("*** Failed to find child to replace for NewExpression conversion to component method");
             int last = ie.identifiers.size() - 1;
             // If we are not able to resolve the newX method, it's because the component has not been transformed yet.  We store the enclosing type
             // so that when we transformToJS this identifier expression, we know the type for property 'this' and 'outer' generation.
@@ -342,10 +346,13 @@ public class NewExpression extends IdentifierExpression {
    }
 
    public boolean needsTransform() {
-      return boundType != null &&
+      boolean res = boundType != null &&
               ((ModelUtil.transformNewExpression(getLayeredSystem(), boundType) &&
                 !inNamedPropertyMethod(classPropertyName) && !inObjectGetMethod(boundType) && !inNewMethod() && arrayDimensions == null) ||
                ModelUtil.isDynamicNew(boundType));
+      if (res && bindingDirection != null)
+         return false;
+      return res;
    }
 
    public Object getTypeDeclaration() {

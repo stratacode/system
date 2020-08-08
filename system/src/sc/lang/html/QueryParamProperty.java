@@ -18,8 +18,8 @@ public class QueryParamProperty extends BaseURLParamProperty {
    public QueryParamProperty() {
    }
 
-   public QueryParamProperty(Object enclType, String propName, String paramName, Object propType, boolean req) {
-      super(enclType, propName, propType, req);
+   public QueryParamProperty(Object enclType, String propName, String paramName, Object propType, boolean req, boolean constructor) {
+      super(enclType, propName, propType, req, constructor);
       this.paramName = paramName;
    }
 
@@ -51,7 +51,7 @@ public class QueryParamProperty extends BaseURLParamProperty {
 
    // Returns the string we need to compile for representing the list of a given type's query params.
    // new QueryParamProperty[] { new QueryParamProperty("x", true), .. }
-   public static String toValueString(Object type) {
+   public static String toValueString(Object type, List<String> constructorProperties) {
       List<QueryParamProperty> props = getQueryParamProperties(type);
       if (props == null || props.size() == 0)
          return "null";
@@ -63,7 +63,11 @@ public class QueryParamProperty extends BaseURLParamProperty {
             if (!first)
                sb.append(", ");
             first = false;
-            sb.append("new sc.lang.html.QueryParamProperty(sc.dyn.DynUtil.findType(\"" + DynUtil.getTypeName(type, false) + "\"), \"" + prop.propName + "\", \"" + prop.paramName + "\", " + DynUtil.getTypeName(prop.propType, false) + ".class, " + prop.required + ")");
+            String propName = prop.propName;
+            boolean constructor = constructorProperties != null && constructorProperties.contains(propName);
+            sb.append("new sc.lang.html.QueryParamProperty(sc.dyn.DynUtil.findType(\"" + DynUtil.getTypeName(type, false) + "\"), \"" +
+                     propName + "\", \"" + prop.paramName + "\", " +
+                    DynUtil.getTypeName(prop.propType, false) + ".class, " + prop.required + ", " + constructor + ")");
          }
          sb.append("})");
          return sb.toString();

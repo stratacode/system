@@ -1083,4 +1083,19 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          return "      " + lowerClassName + " = _" + lowerClassName + ";\n";
    }
 
+   public List<String> getConstructorProperties() {
+      LayeredSystem sys = objType.getLayeredSystem();
+      Layer typeLayer = objType.getLayer();
+      return ClassDeclaration.getConstructorPropNamesForType(sys, objType, typeLayer);
+   }
+
+   public String getConstructorPropInit() {
+      List<String> constructorProps = getConstructorProperties();
+      if (constructorProps != null && constructorProps.size() > 0) {
+         StringBuilder sb = new StringBuilder();
+         appendStringList(sb, constructorProps);
+         return sb.toString();
+      }
+      return "null";
+   }
 }
