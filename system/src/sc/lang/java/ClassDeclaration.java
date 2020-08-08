@@ -1333,6 +1333,7 @@ public class ClassDeclaration extends TypeDeclaration {
                   }
                }
                if (constrObj == null) {
+                  JavaModel model = getJavaModel();
                   ConstructorDefinition constr = ConstructorDefinition.create(this,
                           cpi.propJavaTypes.toArray(),
                           cpi.propNames.toArray(new String[sz]));
@@ -1347,6 +1348,13 @@ public class ClassDeclaration extends TypeDeclaration {
                   // constr.addBodyStatementAt(0, ...);
                   for (int i = 0; i < sz; i++) {
                      String propName = cpi.propNames.get(i);
+                     JavaType propJavaType = cpi.propJavaTypes.get(i);
+                     String javaTypeName = propJavaType.getFullBaseTypeName();
+
+                     // Need this to get it registered in autoImports in case we need it for resolving this type since
+                     // we took the javaType from the base-class.
+                     String importedTypeName = model.getImportedName(javaTypeName); // Don't remove!!
+
                      if (extPropNames != null) {
                         boolean found = false;
                         for (int j = 0; j < extPropNames.size(); j++) {
