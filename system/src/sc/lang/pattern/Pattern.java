@@ -515,7 +515,7 @@ public class Pattern extends SemanticNode {
                               break;
                         }
                         else if (typeName.equals("urlPath")) {
-                           if (!URLUtil.isURLCharacter(c) || c == '/')
+                           if (!URLUtil.isURLCharacter(c) && c != '/')
                               break;
                         }
                         strLen++;

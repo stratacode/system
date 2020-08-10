@@ -183,6 +183,7 @@ public class URLUtil {
                   break;
                case '-':
                case '_':
+               case '/':
                   break;
                default:
                   skip = true;
