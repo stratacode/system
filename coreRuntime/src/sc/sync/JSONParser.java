@@ -4,12 +4,11 @@
 
 package sc.sync;
 
-import sc.dyn.INameContext;
 import sc.type.CTypeUtil;
+import sc.util.BArrayList;
+import sc.util.BHashMap;
 import sc.util.JSONResolver;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -131,7 +130,7 @@ public class JSONParser {
 
    public Map parseObject() {
       if (parseCharToken('{')) {
-         HashMap map = new HashMap();
+         BHashMap map = new BHashMap();
          boolean first = true;
          while (!parseCharToken('}')) {
             CharSequence name = first ? parseName() : parseNextName();
@@ -150,7 +149,7 @@ public class JSONParser {
 
    public List parseArray() {
       if (parseCharToken('[')) {
-         ArrayList res = new ArrayList();
+         BArrayList res = new BArrayList();
 
          boolean first = true;
          while (!parseCharToken(']')) {

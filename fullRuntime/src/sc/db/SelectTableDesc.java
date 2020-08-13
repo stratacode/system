@@ -31,20 +31,21 @@ class SelectTableDesc {
 
    boolean selectDynColumn = false;
 
+   SelectTableDesc(TableDescriptor table, List<DBPropertyDescriptor> props) {
+      this.table = table;
+      this.props = props;
+   }
+
    SelectTableDesc copyForRef(DBPropertyDescriptor refProp) {
-      SelectTableDesc res = new SelectTableDesc();
-      res.table = table;
+      SelectTableDesc res = new SelectTableDesc(table, new ArrayList<DBPropertyDescriptor>(props));
       // Always put the id and typeId property for references in the select list for references even if they are not there for
       // the normal 'select property' query when you have the id already
-      DBTypeDescriptor refType = refProp.dbTypeDesc;
       /*
       res.props = new ArrayList<DBPropertyDescriptor>(table.idColumns);
       DBPropertyDescriptor typeIdProp = table.dbTypeDesc.getTypeIdProperty();
       if (typeIdProp != null)
          res.props.add(typeIdProp);
       */
-      res.props = new ArrayList<DBPropertyDescriptor>();
-      res.props.addAll(props);
       res.refProp = refProp;
       res.alias = alias;
       res.joinedFrom = joinedFrom;
@@ -76,9 +77,7 @@ class SelectTableDesc {
    }
 
    public SelectTableDesc clone() {
-      SelectTableDesc res = new SelectTableDesc();
-      res.table = table;
-      res.props = new ArrayList<DBPropertyDescriptor>(props);
+      SelectTableDesc res = new SelectTableDesc(table, new ArrayList<DBPropertyDescriptor>(props));
       if (res.revProps != null)
          res.revProps = new ArrayList<DBPropertyDescriptor>(revProps);
       if (res.revColumns != null)

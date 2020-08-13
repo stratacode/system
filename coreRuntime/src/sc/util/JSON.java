@@ -33,7 +33,7 @@ public class JSON {
          Object compType = DynUtil.getComponentType(propertyType);
          if (compType instanceof Class && !Map.class.isAssignableFrom((Class) compType)) {
             int listSz = listVal.size();
-            ArrayList<Object> newListVal = new ArrayList<Object>(listSz);
+            ArrayList<Object> newListVal = new BArrayList<Object>(listSz);
             for (int i = 0; i < listSz; i++) {
                Object listElem = listVal.get(i);
                if (listElem instanceof Map || listElem instanceof CharSequence) {
@@ -59,8 +59,8 @@ public class JSON {
             }
             else if (propCl == List.class)
                return listVal;
-            else if (propCl == ArrayList.class)
-               return new ArrayList(listVal);
+            else if (propCl == ArrayList.class || propCl == BArrayList.class)
+               return new BArrayList(listVal);
          }
          // TODO: look for List or Collection constructor and use that with createInstance
          throw new UnsupportedOperationException("Unsupported array property type: " + propertyType);

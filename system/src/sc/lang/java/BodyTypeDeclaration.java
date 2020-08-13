@@ -7,7 +7,6 @@ package sc.lang.java;
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
 import sc.db.BaseTypeDescriptor;
-import sc.db.DBTypeDescriptor;
 import sc.dyn.*;
 import sc.lang.*;
 import sc.lang.html.Element;
@@ -24,11 +23,9 @@ import sc.sync.SyncPropOptions;
 import sc.sync.SyncProperties;
 import sc.type.*;
 import sc.util.*;
-import sun.reflect.generics.tree.BaseType;
 
 import java.io.File;
 import java.io.Serializable;
-import java.lang.reflect.Modifier;
 import java.util.*;
 
 /**
@@ -7524,7 +7521,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          int len = argValues.length;
          if (getEnclosingInstType() != null && len >= 1)
             plainArgValues = Arrays.asList(argValues).subList(1, len).toArray();
-         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null, plainArgValues);
+         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, true, getScopeName(), null, plainArgValues);
       }
       initServerTag(inst);
    }
@@ -7537,7 +7534,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          ((BodyTypeDeclaration) extType).initDynSyncInst(inst, params);
       }
       if (getSyncProperties() != null) {
-         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, getScopeName(), null, params);
+         SyncManager.addSyncInst(inst, syncOnDemand, syncInitDefault, true, getScopeName(), null, params);
       }
       initServerTag(inst);
    }

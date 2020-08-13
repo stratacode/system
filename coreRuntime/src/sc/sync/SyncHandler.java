@@ -30,7 +30,7 @@ public class SyncHandler {
    protected Object replaceInstance(Object inst) {
       if (inst instanceof Class) {
          ClassSyncWrapper classWrap = new ClassSyncWrapper(((Class) inst).getName());
-         SyncManager.addSyncInst(classWrap, true, false, null, null, classWrap.className);
+         SyncManager.addSyncInst(classWrap, true, false, true, null, null, classWrap.className);
          return classWrap;
       }
       return inst;

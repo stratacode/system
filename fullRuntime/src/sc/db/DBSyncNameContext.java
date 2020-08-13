@@ -29,7 +29,7 @@ public class DBSyncNameContext implements INameContext {
                   // Passing onDemand=false here because we need to init the sync for any reference received from
                   // the other side since it's already referenced. Other references are onDemand so that we init them
                   // the first time a reference gets serialized.
-                  desc.initSyncForInst(tinst, false);
+                  desc.initSyncForInst(tinst, false, true);
 
                   return tinst; // Just create it and register under the id provided
                }

@@ -1989,7 +1989,7 @@ public class EditorContext extends ClientEditorContext {
       SyncManager.addSyncHandler(getClass(), LayerSyncHandler.class);
       SyncManager.addSyncType(MemoryEditSession.class, new sc.sync.SyncProperties(null, null,
               new Object[] {"origText", "text", "model", "saved", "caretPosition", "cancelled"}, null, SyncPropOptions.SYNC_INIT, globalScopeId));
-      SyncManager.addSyncInst(this, true, true, null, null);
+      SyncManager.addSyncInst(this, true, true, true, null, null);
 
       SyncManager.addSyncType(InstanceWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));
       SyncManager.addSyncType(ModelError.class, new SyncProperties(null, null, new Object[] {"error", "startIndex", "endIndex", "notFound"}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, globalScopeId));

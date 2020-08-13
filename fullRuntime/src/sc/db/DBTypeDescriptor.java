@@ -701,11 +701,16 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       //List <? extends IDBObject> res = searchQuery(null, text, null, 0, 100);
       //return res.size();
       SelectGroupQuery groupQuery =  new SelectGroupQuery(this, null, null);
-      addSearchToQuery(groupQuery, text);
+      if (text != null)
+         addSearchToQuery(groupQuery, text);
 
       DBTransaction curTx = DBTransaction.getOrCreate();
 
       return groupQuery.countQuery(curTx, null);
+   }
+
+   public int countAll() {
+      return searchCountQuery(null);
    }
 
    private void initTypeInstances() {
@@ -756,7 +761,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             dbObj.setDBId(id);
             typeInstances.put(id, inst);
 
-            initSyncForInst(inst, true);
+            initSyncForInst(inst, true, false);
          }
          // Don't know the concrete type so create a DBObject without the instance and register that instead
          else if (selectDefault) {
@@ -847,11 +852,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          res = registerInstanceInternal(inst, clearTransient);
 
       DBUtil.mapTestInstance(inst);
-      initSyncForInst(inst, true);
+      initSyncForInst(inst, true, false);
       return res;
    }
 
-   public void initSyncForInst(Object inst, boolean onDemand) {
+   public void initSyncForInst(Object inst, boolean onDemand, boolean resetState) {
       if (!syncPropsInited) {
          syncProps = SyncManager.getSyncProperties(typeDecl, null);
          syncPropsInited = true;
@@ -861,7 +866,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       // TODO: do we need to specify a different value of onDemand here?  Maybe it gets put into SyncProperties so
       // it's available?
       if (syncProps != null) {
-         SyncManager.addSyncInst(inst, onDemand, syncProps.initDefault, null, syncProps);
+         SyncManager.addSyncInst(inst, onDemand, syncProps.initDefault, resetState, null, syncProps);
       }
 
       if (liveDynTypes)
@@ -891,7 +896,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          return;
       }
       replaceInstanceInternal(inst);
-      initSyncForInst(inst, true);
+      initSyncForInst(inst, true, ((DBObject) inst.getDBObject()).isTransient());
    }
 
    public boolean removeInstance(DBObject dbObj, boolean remove) {

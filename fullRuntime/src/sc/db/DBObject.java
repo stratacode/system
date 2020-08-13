@@ -2,6 +2,8 @@ package sc.db;
 
 
 import sc.bind.Bind;
+import sc.bind.IChangeable;
+import sc.bind.IListener;
 import sc.dyn.DynUtil;
 import sc.dyn.IPropValidator;
 import sc.type.CTypeUtil;
@@ -71,6 +73,8 @@ public class DBObject implements IDBObject {
    public IDBObject replacedBy = null;
 
    String objectId = null;
+
+   private TreeMap<String,DBChangeableListener> changeableListeners;
 
    public DBObject(DBTypeDescriptor dbType) {
       this.dbTypeDesc = dbType;
@@ -449,6 +453,27 @@ public class DBObject implements IDBObject {
       if ((flags & (REMOVED | STOPPED)) != 0)
          throw new IllegalStateException("setProperty on: " + getStateString() + " dbObject: " + this);
 
+      boolean changed = false;
+      if (propertyValue != oldValue) {
+         changed = true;
+         if (oldValue instanceof IChangeable) {
+            if (changeableListeners != null) {
+               DBChangeableListener oldListener = changeableListeners.get(propertyName);
+               if (oldListener != null)
+                  Bind.removeListener(oldValue, null, oldListener, IListener.VALUE_INVALIDATED);
+            }
+         }
+         if (propertyValue instanceof IChangeable) {
+            if (changeableListeners == null)
+               changeableListeners = new TreeMap<String,DBChangeableListener>();
+            DBChangeableListener newListener = new DBChangeableListener(this, propertyName, (IChangeable) propertyValue);
+            Bind.addListener(propertyValue, null, newListener, IListener.VALUE_INVALIDATED);
+            changeableListeners.put(propertyName, newListener);
+         }
+      }
+      else if (propertyValue instanceof IChangeable)
+         changed = true;
+
       if ((flags & TRANSIENT) != 0)
          return null;
       DBTransaction curr = DBTransaction.getOrCreate();
@@ -485,9 +510,8 @@ public class DBObject implements IDBObject {
 
       // If we are setting the value to the same value that's in the cache don't create a new DB update. A common case is
       // setting a property that's been fetched to null that's already null.
-      boolean createUpdate = propertyValue != oldValue;
-
-      PropUpdate pu = getPendingUpdate(curr, propertyName, createUpdate, propertyValue);
+      // but for IChangeable, the value may have changed particularly if this called from DBChangeableListener
+      PropUpdate pu = getPendingUpdate(curr, propertyName, changed, propertyValue);
       if (pu == null)
          return null;
       pu.value = propertyValue;
@@ -714,13 +738,27 @@ public class DBObject implements IDBObject {
    public synchronized void markStopped() {
       if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | REMOVED)) != 0)
          throw new IllegalArgumentException("Invalid state for markStopped: " + getStateString());
+      if (changeableListeners != null)
+         clearChangeableListeners();
       flags = STOPPED;
    }
 
    public synchronized void markRemoved() {
       if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | STOPPED)) != 0)
          throw new IllegalArgumentException("Invalid state for markRemoved: " + getStateString());
+      if (changeableListeners != null)
+         clearChangeableListeners();
       flags = REMOVED;
+   }
+
+   private void clearChangeableListeners() {
+      if (changeableListeners != null) {
+         for (Map.Entry<String,DBChangeableListener> ent: changeableListeners.entrySet()) {
+            DBChangeableListener listener = ent.getValue();
+            Bind.removeListener(listener.value, null, listener, IListener.VALUE_INVALIDATED);
+         }
+         changeableListeners = null;
+      }
    }
 
    public void setObjectId(String str) {

@@ -1,7 +1,7 @@
 package sc.dyn;
 
 import sc.bind.Bind;
-import sc.util.BindableTreeMap;
+import sc.util.BTreeMap;
 
 import java.util.Map;
 
@@ -17,7 +17,7 @@ public interface IPropValidator {
       Map<String,String> propErrors = getPropErrors();
       boolean doSet = false;
       if (propErrors == null) {
-         propErrors = new BindableTreeMap<String,String>();
+         propErrors = new BTreeMap<String,String>();
          doSet = true;
       }
       propErrors.put(propName, errorMessage);

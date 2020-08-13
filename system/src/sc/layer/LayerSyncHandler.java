@@ -74,7 +74,7 @@ public class LayerSyncHandler extends SyncHandler {
       // implemented right when it's registered in the map.
       if (inst instanceof SrcEntry) {
          SrcEntry ent = (SrcEntry) inst;
-         SyncManager.addSyncInst(ent, true, true, null, null, ent.layer, ent.absFileName, ent.relFileName);
+         SyncManager.addSyncInst(ent, true, true, true, null, null, ent.layer, ent.absFileName, ent.relFileName);
          return inst;
       }
 

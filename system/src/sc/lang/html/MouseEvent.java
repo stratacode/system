@@ -4,6 +4,8 @@
 
 package sc.lang.html;
 
+import sc.obj.Scope;
+
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js")
 public class MouseEvent extends Event {
    public boolean altKey;

@@ -11,15 +11,12 @@ import sc.obj.*;
 import sc.sync.SyncDestination;
 import sc.sync.SyncManager;
 import sc.type.*;
-import sc.util.BindableTreeMap;
+import sc.util.BTreeMap;
 import sc.util.IdentityWrapper;
 
 import java.lang.reflect.Modifier;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -1977,7 +1974,7 @@ public class DynUtil {
             }
             if(res != null) {
                if (resMap == null)
-                  resMap = new BindableTreeMap<String,String>();
+                  resMap = new BTreeMap<String,String>();
                resMap.put(propName, res.toString());
             }
          }

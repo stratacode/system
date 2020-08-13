@@ -138,7 +138,7 @@ public class SyncManager {
       public boolean fixedObject; // True if this is an object with a fixed name in the global name-space
       public boolean initialized;
       public boolean inherited; // Set to true when the instance in this SyncContext is inherited from the parentContext.
-      public boolean resetState = true;
+      public boolean resetState;
       public SyncProperties props;
       public TreeMap<String,Boolean> onDemandProps; // The list of on-demand properties which have been fetched for this instance - stores true when the prop has been initialized, false for when it's been requested before the object has been initialized.
 
@@ -152,10 +152,11 @@ public class SyncManager {
 
       SyncContext parContext;
 
-      InstInfo(SyncContext syncCtx, Object[] args, boolean initDef, boolean onDemand) {
+      InstInfo(SyncContext syncCtx, Object[] args, boolean initDef, boolean resetState, boolean onDemand) {
          this.syncContext = syncCtx;
          this.args = args;
          this.initDefault = initDef;
+         this.resetState = resetState;
          this.onDemand = onDemand;
       }
 
@@ -653,7 +654,7 @@ public class SyncManager {
                ii = createAndRegisterInheritedInstInfo(inst, ii);
             }
             else {
-               ii = new InstInfo(this, null, false, false);
+               ii = new InstInfo(this, null, false, true, false);
                putInstInfo(inst, ii);
             }
 
@@ -712,7 +713,7 @@ public class SyncManager {
       public boolean registerSyncInst(Object inst) {
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
-            ii = new InstInfo(this, null, false, false);
+            ii = new InstInfo(this, null, false, true, false);
             ii.registered = true;
             ii.nameQueued = true;
             ii.fixedObject = true;
@@ -932,7 +933,7 @@ public class SyncManager {
                ii = createInheritedInstInfo(changedObj, parentII);
             }
             else {
-               ii = new InstInfo(this, null, false, false);
+               ii = new InstInfo(this, null, false, true, false);
             }
             ii.setName(parentName);
             putInstInfo(changedObj, ii);
@@ -1240,7 +1241,7 @@ public class SyncManager {
        * Note that it's possible the parent context has already registered this instance due to a super-type call to addSyncInst (when queuing is disabled).
        * We'll add the instance to this sync context, then unless it's on-demand, we initialize it in all child-contexts so they sync it as well.
        */
-      public void addSyncInst(List<SyncLayer.SyncChange> depChanges, Object inst, boolean initInst, boolean onDemand, boolean initDefault, boolean queueNewObj, boolean addPropChanges, int scopeId, SyncProperties syncProps, Object...args) {
+      public void addSyncInst(List<SyncLayer.SyncChange> depChanges, Object inst, boolean initInst, boolean onDemand, boolean initDefault, boolean resetState, boolean queueNewObj, boolean addPropChanges, int scopeId, SyncProperties syncProps, Object...args) {
          // We may have already registered this object with a parent scope cause the outer instance was not set when the object was created.
          clearParentSyncInst(inst, syncProps);
 
@@ -1249,7 +1250,7 @@ public class SyncManager {
 
          InstInfo ii = syncInsts.get(inst);
          if (ii == null) {
-            ii = new InstInfo(this, args, initDefault, onDemand);
+            ii = new InstInfo(this, args, initDefault, resetState, onDemand);
             putInstInfo(inst, ii);
          }
          else {
@@ -1262,6 +1263,8 @@ public class SyncManager {
             ii.initDefault = ii.initDefault || initDefault;
             ii.onDemand = ii.onDemand || onDemand;
             ii.inherited = false;
+            if (!resetState)
+               ii.resetState = false;
          }
          ii.props = syncProps;
 
@@ -1875,7 +1878,7 @@ public class SyncManager {
       }
 
       private InstInfo createInheritedInstInfo(Object inst, InstInfo ii) {
-         InstInfo newInstInfo = new InstInfo(this, ii.args, ii.initDefault, ii.onDemand);
+         InstInfo newInstInfo = new InstInfo(this, ii.args, ii.initDefault, ii.resetState, ii.onDemand);
          newInstInfo.setName(ii.name);
          newInstInfo.fixedObject = ii.fixedObject;
          // TODO: Do we reuse the change maps or should we clone them so we can track the changes for each session, etc.
@@ -1991,7 +1994,7 @@ public class SyncManager {
                   System.err.println("*** Unable to find SyncContext with scopeId: " + newScopeId + " for on-demand instance creation of: " + DynUtil.getInstanceName(changedObj));
                   return null;
                }
-               newCtx.addSyncInst(depChanges, changedObj, true, true, props.initDefault, false, newCtx == curContext, newScopeId, props);
+               newCtx.addSyncInst(depChanges, changedObj, true, true, props.initDefault, true, false, newCtx == curContext, newScopeId, props);
                // If we just added the object to a shared sync context, we still need to initialize it here as inherited.
 
                if (newCtx != this) {
@@ -2991,7 +2994,7 @@ public class SyncManager {
 
       // Process the original addSyncInst calls now in order
       for (AddSyncInfo asi:queue) {
-         addSyncInst(asi.inst, asi.onDemand, asi.initDefault, asi.scopeName, asi.props, asi.args);
+         addSyncInst(asi.inst, asi.onDemand, asi.initDefault, asi.resetState, asi.scopeName, asi.props, asi.args);
       }
       return true;
    }
@@ -3000,14 +3003,16 @@ public class SyncManager {
       Object inst;
       boolean onDemand;
       boolean initDefault;
+      boolean resetState;
       String scopeName;
       Object[] args;
       SyncProperties props;
 
-      AddSyncInfo(Object i, boolean od, boolean initDef, String scopeName, SyncProperties props, Object[] args) {
+      AddSyncInfo(Object i, boolean od, boolean initDef, boolean resetState, String scopeName, SyncProperties props, Object[] args) {
          this.inst = i;
          this.onDemand = od;
          this.initDefault = initDef;
+         this.resetState = resetState;
          this.scopeName = scopeName;
          this.props = props;
          this.args = args;
@@ -3027,19 +3032,24 @@ public class SyncManager {
     * If onDemand is true, this object is not immediately serialized to the other side - instead it's only serialized
     * the first time it is fetched or referenced by another object which is serialized.
     * <p>
+    * If initDefault is true, the remote side is initialized with properties from this side even with no property change
+    * <p>
+    * If resetState is false, this instance is not treated as resetState even if it has 'resetState' properties. Persistent
+    * instances set resetState=false, transient set it to true (the default) so that resetState flags are used.
+    * <p>
     * If props is null, the SyncProperties registered using addSyncType for this instances type are used to determine which properties are synchronized
     * along with any property specific options.
     * <p>
     * Any constructor args needed to rebuild the instance should be provided here and those objects must also
     * be manageable by the sync system (e.g. primitives or that have a SyncProperties registered via addSyncType).
     */
-   public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, String scopeName, SyncProperties props, Object ...args) {
+   public static void addSyncInst(Object inst, boolean onDemand, boolean initDefault, boolean resetState, String scopeName, SyncProperties props, Object ...args) {
       // TODO: should we use a linked-map for the sync so we can replace a previous entry for the same instance.
       // If a base class is synchronized on a different scope than the sub-class and a sync queue is enabled, this prevents
       // us from temporarily initializing the instance in the wrong scope which is not a safe thing to do
       LinkedHashSet<AddSyncInfo> syncQueue = (LinkedHashSet<AddSyncInfo>) PTypeUtil.getThreadLocal("syncAddQueue");
       if (syncQueue != null) {
-         syncQueue.add(new AddSyncInfo(inst, onDemand, initDefault, scopeName, props, args));
+         syncQueue.add(new AddSyncInfo(inst, onDemand, initDefault, resetState, scopeName, props, args));
          return;
       }
 
@@ -3048,10 +3058,10 @@ public class SyncManager {
       if (scopeName == null)
          scopeName = DynUtil.getScopeName(inst);
       ScopeDefinition def = getScopeDefinitionByName(scopeName);
-      addSyncInstInternal(inst, onDemand, initDefault, def.scopeId, props, args);
+      addSyncInstInternal(inst, onDemand, initDefault, resetState, def.scopeId, props, args);
    }
 
-   private static void addSyncInstInternal(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties props, Object...args) {
+   private static void addSyncInstInternal(Object inst, boolean onDemand, boolean initDefault, boolean resetState, int scopeId, SyncProperties props, Object...args) {
       Object type = DynUtil.getType(inst);
 
       boolean found = false;
@@ -3059,7 +3069,7 @@ public class SyncManager {
       for (SyncManager syncMgr:syncManagers) {
          SyncProperties syncProps = props != null ? props : syncMgr.getSyncProperties(type);
          if (syncProps != null) {
-            syncMgr.addSyncInstCtx(inst, onDemand, initDefault, scopeId, syncProps, args);
+            syncMgr.addSyncInstCtx(inst, onDemand, initDefault, resetState, scopeId, syncProps, args);
             found = true;
          }
       }
@@ -3227,7 +3237,7 @@ public class SyncManager {
 
    public final static String SC_SYNC_CONTEXT_SCOPE_KEY = "sc.SyncContext";
 
-   private void addSyncInstCtx(Object inst, boolean onDemand, boolean initDefault, int scopeId, SyncProperties syncProps, Object...args) {
+   private void addSyncInstCtx(Object inst, boolean onDemand, boolean initDefault, boolean resetState, int scopeId, SyncProperties syncProps, Object...args) {
       SyncContext ctx;
 
       ctx = getSyncContext(scopeId, true);
@@ -3247,7 +3257,7 @@ public class SyncManager {
          }
          */
 
-         ctx.addSyncInst(null, inst, !onDemand, onDemand, initDefault, true, true, scopeId, syncProps, args);
+         ctx.addSyncInst(null, inst, !onDemand, onDemand, initDefault, resetState, true, true, scopeId, syncProps, args);
       }
       else {
          if (trace)

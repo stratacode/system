@@ -363,6 +363,14 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
       return objType.getSyncInitDefault();
    }
 
+
+   public boolean getSyncResetState() {
+      // Note: not returning the Sync(resetState=true/false) because
+      // we turn this resetState flag for the addSyncInst call at runtime for persistent instances. This goes into
+      // the compile time addSyncInst call that's not made for persistent instances.
+      return true;
+   }
+
    public int getSyncFlags() {
       return objType.getSyncFlags();
    }

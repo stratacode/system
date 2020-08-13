@@ -61,9 +61,7 @@ public class SelectQuery implements Cloneable {
       ftd = getSelectTableForProperty(curRefProp, prop);
 
       if (ftd == null) {
-         ftd = new SelectTableDesc();
-         ftd.table = table;
-         ftd.props = new ArrayList<DBPropertyDescriptor>();
+         ftd = new SelectTableDesc(table, new ArrayList<DBPropertyDescriptor>());
 
          addTableToSelectQuery(ftd, null);
 
@@ -100,9 +98,7 @@ public class SelectQuery implements Cloneable {
                if (!revTable.tableName.equals(tableName)) {
                   revTableDesc = getSelectTableForRevProperty(prop.reversePropDesc);
                   if (revTableDesc == null) {
-                     revTableDesc = new SelectTableDesc();
-                     revTableDesc.table = revTable;
-                     revTableDesc.props = Collections.emptyList();
+                     revTableDesc = new SelectTableDesc(revTable, Collections.emptyList());
                      revTableDesc.revProps = new ArrayList<DBPropertyDescriptor>();
                      revTableDesc.revColumns = new ArrayList<DBPropertyDescriptor>(revTable.columns);
                      for (int i = 0; i < revTable.columns.size(); i++) {

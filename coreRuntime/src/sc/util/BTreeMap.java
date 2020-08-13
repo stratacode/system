@@ -7,7 +7,7 @@ import sc.bind.BindSettings;
 import sc.bind.IListener;
 
 @sc.obj.Sync(syncMode= sc.obj.SyncMode.Disabled)
-public class BindableTreeMap<K,V> extends java.util.TreeMap<K,V> implements sc.bind.IChangeable {
+public class BTreeMap<K,V> extends java.util.TreeMap<K,V> implements sc.bind.IChangeable {
    @BindSettings(reverseMethod="putNoEvent", reverseSlot=1)
    public V get(Object key) {
       return super.get(key);

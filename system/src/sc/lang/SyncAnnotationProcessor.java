@@ -9,7 +9,7 @@ public class SyncAnnotationProcessor extends DefaultAnnotationProcessor {
       // This is the name of the template to use for generating 'static init' code for this scope
       staticMixinTemplate = "sc.obj.SyncTemplate";
       // Here's code that gets added for each synchronized instance.  This code is run after an object member variable is assigned to support recursive references.
-      postAssignment = "<% if (needsAddSyncInst) { %>\n      sc.sync.SyncManager.addSyncInst(<%=instanceVariableName%>, <%=syncOnDemand%>, <%=syncInitDefault%>, <%=formatString(derivedScopeName)%>, null<%=nextConstructorParams%>);\n<% } %>";
+      postAssignment = "<% if (needsAddSyncInst) { %>\n      sc.sync.SyncManager.addSyncInst(<%=instanceVariableName%>, <%=syncOnDemand%>, <%=syncInitDefault%>, <%=syncResetState%>, <%=formatString(derivedScopeName)%>, null<%=nextConstructorParams%>);\n<% } %>";
       accessHook = "<% if (needsSyncAccessHook) { %>\n       sc.sync.SyncManager.accessSyncInst(<%=instanceVariableName%>, <%=formatString(derivedScopeName)%>);\n<% } %>";
    }
 

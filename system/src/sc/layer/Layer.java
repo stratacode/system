@@ -616,11 +616,21 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
                return -Integer.compare(o1.layerPosition, o2.layerPosition);
             }
          });
+         SrcEntry lastRes = null;
          for (Layer base:sortedBaseLayers) {
             res = base.getInheritedSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, proc, layerResolve);
-            if (res != null)
-               return res;
+            if (res != null) {
+               // Since we sorted our dependencies, if we find a type in the layer itself just return it. But if we
+               // find an inherited type, need to figure out which one is the most specific.
+               if (res.layer == base)
+                  return res;
+               if (lastRes == null)
+                  lastRes = res;
+               else if (lastRes.layer.layerPosition < res.layer.layerPosition)
+                  lastRes = res;
+            }
          }
+         return lastRes;
       }
       return res;
    }
@@ -4245,7 +4255,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void initSync() {
       int globalScopeId = GlobalScopeDefinition.getGlobalScopeDefinition().scopeId;
-      SyncManager.addSyncInst(this, true, true, null, null);
+      SyncManager.addSyncInst(this, true, true, true, null, null);
    }
 
    public String toDetailString() {

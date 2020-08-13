@@ -1,6 +1,7 @@
 package sc.db;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /** Managed a list of SelectQuery instances - each one against a separate dataSource */
@@ -97,8 +98,15 @@ public class SelectGroupQuery extends DBQuery {
    public int countQuery(DBTransaction transaction, DBObject proto) {
       if (queries.size() > 1)
          System.err.println("*** Need to do join of queries here");
-      if (curQuery == null)
-         curQuery = queries.get(0);
+      if (curQuery == null) {
+         if (queries.size() != 0)
+            curQuery = queries.get(0);
+         else {// For countAll, no properties so need to just use the main table
+            curQuery = getSelectQuery(dbTypeDesc.dataSourceName, true);
+            SelectTableDesc selTableDesc = new SelectTableDesc(dbTypeDesc.primaryTable, Collections.emptyList());
+            curQuery.addTableToSelectQuery(selTableDesc, null);
+         }
+      }
       return curQuery.countQuery(transaction, proto);
    }
 

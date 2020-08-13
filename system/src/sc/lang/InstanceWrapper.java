@@ -61,7 +61,7 @@ public class InstanceWrapper implements IObjectId {
       this.labelName = labelName;
       this.selectToCreate = selectToCreate;
       // Because this class is not compiled with SC, we need to include this call by hand
-      SyncManager.addSyncInst(this, true, true, null, null, ctx, inst, typeName);
+      SyncManager.addSyncInst(this, true, true, true, null, null, ctx, inst, typeName);
    }
 
    public Object getInstance() {
