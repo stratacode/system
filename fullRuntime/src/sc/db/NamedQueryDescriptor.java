@@ -188,6 +188,11 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
 
                      resProp.getPropertyMapper().setPropertyValue(rowInst, propVal);
 
+                     // Clear out the refId property once we have the value itself because otherwise we'll make an extra lookupId each time (since
+                     // there's no null check in dbGetPropertyWithRefId and we would need to keep it in sync if we change them value.
+                     if (resProp.getNeedsRefId() && propVal != null)
+                        resProp.setRefIdProperty(rowInst, null);
+
                      if (logSB != null) {
                         logSB.append(colName);
                         logSB.append("=");

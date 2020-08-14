@@ -586,6 +586,11 @@ public class SelectQuery implements Cloneable {
                propDesc.updateReferenceForPropValue(selectInst, val);
                tx.updateSelectState = true;
                propMapper.setPropertyValue(selectInst, val);
+
+               // Clear out the refId property once we have the value itself because otherwise we'll make an extra lookupId each time (since
+               // there's no null check in dbGetPropertyWithRefId and we would need to keep it in sync if we change them value.
+               if (propDesc.getNeedsRefId() && val != null && selectInst instanceof IDBObject)
+                  propDesc.setRefIdProperty((IDBObject) selectInst, null);
             }
             else {
                if (val == null)

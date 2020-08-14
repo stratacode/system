@@ -316,7 +316,8 @@ public class DBObject implements IDBObject {
       if (res == null) {
          DBPropertyDescriptor prop = dbTypeDesc.getPropertyDescriptor(property);
          if (prop.getNeedsRefId()) {
-            Object idVal = prop.getRefIdProperty(getInst());
+            IDBObject inst = getInst();
+            Object idVal = prop.getRefIdProperty(inst);
             if (idVal != null) {
                IDBObject refInst = prop.refDBTypeDesc.findById(idVal);
                if (refInst == null)
@@ -330,6 +331,7 @@ public class DBObject implements IDBObject {
 
                   curTx.applyingDBChanges = true;
                   try {
+                     prop.setRefIdProperty(inst, null);
                      mapper.setPropertyValue(getInst(), refInst);
                   }
                   finally {
