@@ -460,7 +460,7 @@ public class DBObject implements IDBObject {
          changed = true;
          if (oldValue instanceof IChangeable) {
             if (changeableListeners != null) {
-               DBChangeableListener oldListener = changeableListeners.get(propertyName);
+               DBChangeableListener oldListener = changeableListeners.remove(propertyName);
                if (oldListener != null)
                   Bind.removeListener(oldValue, null, oldListener, IListener.VALUE_INVALIDATED);
             }
