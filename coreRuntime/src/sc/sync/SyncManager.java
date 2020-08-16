@@ -2169,15 +2169,30 @@ public class SyncManager {
       }
 
       public void disposeContext() {
-         ArrayList<Object> disposeList = new ArrayList<Object>();
+         ArrayList<InstInfo> disposeInfoList = new ArrayList<InstInfo>();
+         ArrayList<Object> disposeInstList = new ArrayList<Object>();
          for (Map.Entry<Object,InstInfo> nameEnt: syncInsts.entrySet()) {
             InstInfo instInfo = nameEnt.getValue();
             Object inst = nameEnt.getKey();
-            if (!instInfo.inherited)
-               disposeList.add(inst);
+            if (!instInfo.inherited) {
+               disposeInfoList.add(instInfo);
+               disposeInstList.add(inst);
+            }
          }
-         for (Object toDispose:disposeList) {
+         for (int i = 0; i < disposeInfoList.size(); i++) {
+            InstInfo instInfo = disposeInfoList.get(i);
+            Object toDispose = disposeInstList.get(i);
+            if (instInfo.props == null) {
+               if (!instInfo.initialized)
+                  continue;
+               System.err.println("*** No sync props for initialized sync inst");
+            }
+            removeSyncInstInternal(instInfo, toDispose, instInfo.props, true, false);
+            // Another problem here is that DB objects can be shared by peer sync contexts - i.e. in a session
+            // so disposing of them here is wrong. We really should be just removing the sync inst listeners here
+            // I think and maybe only disposing instances that are registered that way in the addSyncInst call.
             // Some elements may recursively dispose others
+            /*
             if (syncInsts.get(toDispose) != null) {
                // TODO: Problems with disposing children here:
                // #1 - we might hit the child multiple times - since they might be sync insts
@@ -2187,6 +2202,7 @@ public class SyncManager {
                // anything that's not reachable from the page.
                DynUtil.dispose(toDispose, false);
             }
+            */
          }
          syncInsts.clear();
       }
