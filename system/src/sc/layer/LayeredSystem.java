@@ -13168,16 +13168,19 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (searchInactiveTypesForLayer(refLayer) || (fromLayer != null && !fromLayer.activated)) {
          startIx = inactiveLayers.size() - 1;
          if (fromLayer != null && !fromLayer.activated && fromLayer.layerPosition - 1 < inactiveLayers.size()) {
+            /*
             if (!layerResolve) {
                // First we are going to check the baseLayers of the fromLayer - rather than just picking up the next layer in the stack.  That way, the type reference here is
-               // the one specified in the code dependencies.  Right now we are facing a problem where inserting 'unitConverter.coreui' inbetween unitConverter.extendedModel and model
+               // the one specified in the code dependencies.  Right now we are facing a problem where inserting 'unitConverter.coreui' in between unitConverter.extendedModel and model
                // does not cause the UC in extendedModel to refresh it's modified type and so the jsui layer that's inserted after gets the extendedModel without the coreui layer
                // in the stack.
                SrcEntry ent = fromLayer.getBaseLayerSrcFileFromTypeName(typeName, srcOnly, prependPackage, subPath, processDefinition, layerResolve);
                if (ent != null)
                   return ent;
             }
-            startIx = fromLayer.layerPosition - 1;
+             */
+            if (!fromLayer.disabled)
+               startIx = fromLayer.layerPosition - 1;
          }
          for (int i = startIx; i >= 0; i--) {
             Layer inactiveLayer = inactiveLayers.get(i);
