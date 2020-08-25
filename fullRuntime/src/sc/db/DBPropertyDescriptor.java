@@ -389,7 +389,7 @@ public class DBPropertyDescriptor {
             if (getNeedsRefId() && inst != null && val != null) {
                if (!ownedByOtherType(((DBObject) inst.getDBObject()).dbTypeDesc)) {
                   if (logRefIdResult != null)
-                     logRefIdResult.result = DBUtil.formatValue(val, DBColumnType.LongId, refDBTypeDesc);
+                     logRefIdResult.result = DBUtil.formatValue(val, DBColumnType.LongId, refDBTypeDesc, null);
                   setRefIdProperty(inst, val);
                }
             }

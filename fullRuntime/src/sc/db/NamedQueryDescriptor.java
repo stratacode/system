@@ -90,9 +90,9 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                Object paramType = paramTypes.get(aix);
                DBColumnType colType = DBColumnType.fromJavaType(paramType);
                Object paramVal = paramValues[aix];
-               DBUtil.setStatementValue(st, col++, colType, paramVal);
+               DBUtil.setStatementValue(st, col++, colType, paramVal, paramType);
                if (logSB != null) {
-                  DBUtil.appendVal(logSB, paramVal, DBColumnType.fromJavaType(paramTypes.get(aix)), null);
+                  DBUtil.appendVal(logSB, paramVal, colType, null);
                }
             }
             if (logSB != null) {

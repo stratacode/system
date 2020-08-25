@@ -288,7 +288,7 @@ public class SelectQuery implements Cloneable {
                   colVal = propMapper.getPropertyValue(inst, false, false);
                }
                DBColumnType colType = propDesc.getDBColumnType();
-               DBUtil.setStatementValue(st, i+1, colType, colVal);
+               DBUtil.setStatementValue(st, i+1, colType, colVal, propDesc.getPropertyType());
                if (logStr != null)
                   logStr = DBUtil.replaceNextParam(logStr, colVal, DBColumnType.LongId, mainTable.dbTypeDesc);
             }
@@ -384,7 +384,7 @@ public class SelectQuery implements Cloneable {
             for (int i = 0; i < numParams; i++) {
                Object paramValue = paramValues.get(i);
                DBColumnType propType = paramTypes.get(i);
-               DBUtil.setStatementValue(st, i+1, propType, paramValue);
+               DBUtil.setStatementValue(st, i+1, propType, paramValue, null);
             }
 
             rs = st.executeQuery();
@@ -477,7 +477,7 @@ public class SelectQuery implements Cloneable {
             for (int i = 0; i < numParams; i++) {
                Object paramValue = paramValues.get(i);
                DBColumnType propType = paramTypes.get(i);
-               DBUtil.setStatementValue(st, i+1, propType, paramValue);
+               DBUtil.setStatementValue(st, i+1, propType, paramValue, null);
             }
 
             rs = st.executeQuery();

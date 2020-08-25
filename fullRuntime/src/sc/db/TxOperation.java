@@ -62,6 +62,7 @@ public abstract class TxOperation {
       StringBuilder logSB = DBUtil.verbose ? new StringBuilder() : null;
 
       ArrayList<DBTypeDescriptor> columnRefTypes = logSB != null ? new ArrayList<DBTypeDescriptor>() : null;
+      ArrayList<Object> columnPTypes = new ArrayList<Object>();
 
       ArrayList<DBPropertyDescriptor> dbIdCols = null;
 
@@ -87,6 +88,7 @@ public abstract class TxOperation {
             columnTypes.add(idCol.getDBColumnType());
             if (columnRefTypes != null)
                columnRefTypes.add(null);
+            columnPTypes.add(idCol.getPropertyType());
             //columnTypes.add(idCol.getPropertyMapper().getPropertyType());
          }
       }
@@ -95,7 +97,7 @@ public abstract class TxOperation {
          throw new IllegalArgumentException("Null id properties for DBObject in insert: " + nullProps);
 
       int idSize = columnNames.size();
-      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols, columnRefTypes);
+      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols, columnRefTypes, columnPTypes);
 
       int numCols = columnNames.size();
 
@@ -109,6 +111,7 @@ public abstract class TxOperation {
          columnValues.add(lmtValue = new Date());
          if (columnRefTypes != null)
             columnRefTypes.add(null);
+         columnPTypes.add(null);
          numCols++;
       }
 
@@ -145,7 +148,7 @@ public abstract class TxOperation {
                DBColumnType colType = columnTypes.get(i);
                if (colRefType != null && colType != DBColumnType.Json)
                   colType = DBColumnType.LongId;
-               logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType));
+               logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType, columnPTypes.get(i)));
             }
          }
          rest.append(")");
@@ -175,7 +178,7 @@ public abstract class TxOperation {
             st = conn.prepareStatement(statementStr);
 
             for (int i = 0; i < numCols; i++) {
-               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
+               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i), columnPTypes.get(i));
             }
 
             if (dbIdCols != null) {
@@ -325,7 +328,7 @@ public abstract class TxOperation {
          sb.append(" = ?");
          if (logSB != null) {
             logSB.append(" = ");
-            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), dbTypeDesc));
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), dbTypeDesc, null));
          }
       }
 
@@ -364,7 +367,7 @@ public abstract class TxOperation {
          sb.append(" = ?");
          if (logSB != null) {
             logSB.append(" = ");
-            logSB.append(DBUtil.formatValue(version, versProp.getDBColumnType(), null));
+            logSB.append(DBUtil.formatValue(version, versProp.getDBColumnType(), null, null));
          }
       }
 
@@ -376,10 +379,10 @@ public abstract class TxOperation {
             st = conn.prepareStatement(statementStr);
 
             for (int i = 0; i < numCols; i++) {
-               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
+               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i), null);
             }
             if (versProp != null)
-               DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
+               DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version, null);
 
             int numDeleted = st.executeUpdate();
 
@@ -474,6 +477,7 @@ public abstract class TxOperation {
       ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
       ArrayList<Object> columnValues = new ArrayList<Object>();
       ArrayList<DBTypeDescriptor> columnRefTypes = new ArrayList<DBTypeDescriptor>();
+      ArrayList<Object> columnPTypes = new ArrayList<Object>();
 
       ArrayList<Object> idVals = new ArrayList<Object>();
 
@@ -502,12 +506,13 @@ public abstract class TxOperation {
                columnNames.add(idCol.columnName);
                columnTypes.add(idCol.getDBColumnType());
                columnRefTypes.add(dbTypeDesc);
+               columnPTypes.add(idCol.getPropertyType());
             }
 
             if (nullProps != null)
                throw new IllegalArgumentException("Null id properties for DBObject in insert: " + nullProps);
 
-            addArrayValues(dbTypeDesc, arrInst, insertTable.columns, columnNames, columnTypes, columnValues, columnRefTypes);
+            addArrayValues(dbTypeDesc, arrInst, insertTable.columns, columnNames, columnTypes, columnValues, columnRefTypes, columnPTypes);
 
             numCols = columnNames.size();
 
@@ -534,8 +539,9 @@ public abstract class TxOperation {
                columnTypes.add(idCol.getDBColumnType());
                columnValues.add(idVals.get(ci));
                columnRefTypes.add(dbTypeDesc);
+               columnPTypes.add(idCol.getPropertyType());
             }
-            addArrayValues(dbTypeDesc, arrInst, insertTable.columns, null, columnTypes, columnValues, columnRefTypes);
+            addArrayValues(dbTypeDesc, arrInst, insertTable.columns, null, columnTypes, columnValues, columnRefTypes, columnPTypes);
          }
 
          if (ix != 0) {
@@ -550,7 +556,7 @@ public abstract class TxOperation {
             sb.append("?");
             if (logSB != null) {
                int colIx = ci+toInsert*numCols;
-               logSB.append(DBUtil.formatValue(columnValues.get(colIx), columnTypes.get(colIx), columnRefTypes.get(colIx)));
+               logSB.append(DBUtil.formatValue(columnValues.get(colIx), columnTypes.get(colIx), columnRefTypes.get(colIx), columnPTypes.get(colIx)));
             }
          }
          DBUtil.append(sb, logSB, ")");
@@ -592,7 +598,7 @@ public abstract class TxOperation {
             st = conn.prepareStatement(insertStr);
 
             for (int ci = 0; ci < columnValues.size(); ci++) {
-               DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci));
+               DBUtil.setStatementValue(st, ci+1, columnTypes.get(ci), columnValues.get(ci), columnPTypes.get(ci));
             }
             int numInserted;
 
@@ -683,7 +689,7 @@ public abstract class TxOperation {
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
                                     ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
-                                    List<DBPropertyDescriptor> dbReturnCols, List<DBTypeDescriptor> columnRefTypes) {
+                                    List<DBPropertyDescriptor> dbReturnCols, List<DBTypeDescriptor> columnRefTypes, List<Object> columnPTypes) {
       Object inst = dbObject.getInst();
 
       Map<String,Object> tableDynProps = null;
@@ -725,6 +731,7 @@ public abstract class TxOperation {
                   columnValues.add(val);
                   if (columnRefTypes != null)
                      columnRefTypes.add(col.refDBTypeDesc);
+                  columnPTypes.add(col.getPropertyType());
                }
 
                if (col.dbDefault != null && col.dbDefault.length() > 0) {
@@ -739,6 +746,7 @@ public abstract class TxOperation {
                      columnValues.add(col.refDBTypeDesc.getIdColumnValue(val, ci));
                      if (columnRefTypes != null)
                         columnRefTypes.add(col.refDBTypeDesc);
+                     columnPTypes.add(col.refDBTypeDesc.getIdPropertyType(ci));
                   }
                }
                else
@@ -752,18 +760,20 @@ public abstract class TxOperation {
          columnTypes.add(DBColumnType.Json);
          if (columnRefTypes != null)
             columnRefTypes.add(null);
+         columnPTypes.add(null);
       }
    }
 
    private void addArrayValues(DBTypeDescriptor dbTypeDesc, IDBObject arrInst, List<? extends DBPropertyDescriptor> cols,
                                ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
-                               ArrayList<DBTypeDescriptor> columnRefTypes) {
+                               ArrayList<DBTypeDescriptor> columnRefTypes, ArrayList<Object> columnPTypes) {
       for (DBPropertyDescriptor col:cols) {
          DBTypeDescriptor instTypeDesc = ((DBObject)arrInst.getDBObject()).dbTypeDesc;
          if (col.typeIdProperty) {
             columnTypes.add(col.getDBColumnType());
             columnValues.add(instTypeDesc.typeId);
             columnRefTypes.add(null);
+            columnPTypes.add(col.getPropertyType());
             continue;
          }
 
@@ -808,6 +818,7 @@ public abstract class TxOperation {
                columnTypes.add(colType);
                columnValues.add(val);
                columnRefTypes.add(refType);
+               columnPTypes.add(col.getPropertyType());
             }
          }
          else {
@@ -827,6 +838,7 @@ public abstract class TxOperation {
                   columnTypes.add(arrDesc.getIdDBColumnType(ci));
                   columnValues.add(arrDesc.getIdColumnValue(val, ci));
                   columnRefTypes.add(arrDesc);
+                  columnPTypes.add(arrDesc.getIdPropertyType(ci));
                }
             }
             else
@@ -943,7 +955,7 @@ public abstract class TxOperation {
          sb.append(" = ?");
          if (logSB != null) {
             logSB.append(" = ");
-            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), dbTypeDesc));
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), dbTypeDesc, null));
          }
       }
 
@@ -953,7 +965,7 @@ public abstract class TxOperation {
          sb.append(" = ?");
          if (logSB != null) {
             logSB.append(" = ");
-            logSB.append(DBUtil.formatValue(version, versProp.getDBColumnType(), null));
+            logSB.append(DBUtil.formatValue(version, versProp.getDBColumnType(), null, null));
          }
       }
 
@@ -966,10 +978,10 @@ public abstract class TxOperation {
             st = conn.prepareStatement(statementStr);
 
             for (int i = 0; i < numCols; i++) {
-               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i));
+               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i), null);
             }
             if (versProp != null)
-               DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version);
+               DBUtil.setStatementValue(st, numCols+1, versProp.getDBColumnType(), version, null);
 
             numDeleted = st.executeUpdate();
 

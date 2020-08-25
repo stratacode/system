@@ -211,7 +211,7 @@ public class DBUtil {
    private static final long epsilonMillis = 60*60*1000L; // less than one hour ago
    private static final long monthMillis = 30*24*60*60*1000L; // 30 days ago
 
-   public static String formatValue(Object val, DBColumnType type, DBTypeDescriptor refType) {
+   public static String formatValue(Object val, DBColumnType type, DBTypeDescriptor refType, Object pType) {
       if (val == null)
          return "null";
       switch (type) {
@@ -254,7 +254,7 @@ public class DBUtil {
             }
             break;
          case Json:
-            StringBuilder jsonSB = JSON.toJSON(val);
+            StringBuilder jsonSB = JSON.toJSON(val, pType);
             return jsonSB.toString();
          case ByteArray: {
             if (testMode)
@@ -267,7 +267,7 @@ public class DBUtil {
 
    private static Class pgObject = null;
 
-   public static void setStatementValue(PreparedStatement st, int index, DBColumnType dbColumnType, Object val) throws SQLException {
+   public static void setStatementValue(PreparedStatement st, int index, DBColumnType dbColumnType, Object val, Object pType) throws SQLException {
       if (val == null) {
          st.setNull(index, dbColumnType.getSQLType());
          return;
@@ -316,7 +316,7 @@ public class DBUtil {
             st.setObject(index, ((IDBObject) val).getDBId());
             break;
          case Json:
-            String jsonStr = JSON.toJSON(val).toString();
+            String jsonStr = JSON.toJSON(val, pType).toString();
             // TODO: using reflection here because we don't want this dependency unless using the postgresql driver.
             // We should add a general 'value converter' interface and register an implementation from the pgsql layer
             if (pgObject == null) {
@@ -644,7 +644,7 @@ public class DBUtil {
       }
       StringBuilder res = new StringBuilder();
       res.append(logStr.substring(0, ix));
-      res.append(DBUtil.formatValue(colVal, colType, refType));
+      res.append(DBUtil.formatValue(colVal, colType, refType, null));
       res.append(logStr.substring(ix+1));
       return res.toString();
    }
@@ -665,7 +665,7 @@ public class DBUtil {
         logSB.append("'");
      }
      else if (colType != null) {
-        logSB.append(formatValue(val, colType, refType));
+        logSB.append(formatValue(val, colType, refType, null));
      }
      else
         logSB.append(val);

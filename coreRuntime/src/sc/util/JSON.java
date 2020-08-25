@@ -66,14 +66,22 @@ public class JSON {
          throw new UnsupportedOperationException("Unsupported array property type: " + propertyType);
       }
       else if (value instanceof Map) {
-         Object inst = DynUtil.createInstance(propertyType, null);
          Map<String,Object> map = (Map<String,Object>) value;
+         Object instType = propertyType;
+
+         String className = (String) map.get("class");
+         if (className != null) {
+            instType = DynUtil.findType(className);
+         }
+         Object inst = DynUtil.createInstance(instType, null);
          for (Map.Entry<String,Object> ent:map.entrySet()) {
             String propName = ent.getKey();
             Object propVal = ent.getValue();
-            IBeanMapper mapper = DynUtil.getPropertyMapping(propertyType, propName);
+            if (propName.equals("class"))
+               continue;
+            IBeanMapper mapper = DynUtil.getPropertyMapping(instType, propName);
             if (mapper == null) {
-               System.err.println("*** No property: " + propName + " in propertyType: " + DynUtil.getTypeName(propertyType, false) + " for JSON deserialization");
+               System.err.println("*** No property: " + propName + " in propertyType: " + DynUtil.getTypeName(instType, false) + " for JSON deserialization");
                continue;
             }
             Object newPropVal = convertTo(mapper.getGenericType(), propVal, resolver);
@@ -102,8 +110,13 @@ public class JSON {
          }
          return res;
       }
-      else if (value instanceof Number)
+      else if (value instanceof Number) {
+         if (propertyType == Byte.class || propertyType == Byte.TYPE)
+            value = ((Number) value).byteValue();
+         else if (propertyType == Short.class || propertyType == Short.TYPE)
+            value = ((Number) value).shortValue();
          return value;
+      }
       else if (value instanceof Boolean)
          return value;
       else
@@ -113,29 +126,38 @@ public class JSON {
    private static class JSONContext {
       IdentityHashMap<Object,Boolean> addedObjs = new IdentityHashMap<Object,Boolean>();
    }
-   public static StringBuilder toJSON(Object o) {
+   public static StringBuilder toJSON(Object o, Object ptype) {
       StringBuilder sb = new StringBuilder();
       JSONContext ctx = new JSONContext();
-      appendValue(ctx, sb, o);
+      appendValue(ctx, sb, o, ptype);
       return sb;
    }
 
-   private static void appendObject(JSONContext ctx, StringBuilder sb, Object o) {
+   private static void appendObject(JSONContext ctx, StringBuilder sb, Object o, Object compType) {
       if (o instanceof IDBObject) {
          sb.append("\"ref:db:");
-         appendValue(ctx, sb, ((IDBObject) o).getDBId());
+         appendValue(ctx, sb, ((IDBObject) o).getDBId(), null);
          sb.append('"');
       }
       else if (DynUtil.isRootedObject(o)) {
          sb.append("\"ref:");
-         appendValue(ctx, sb, DynUtil.getObjectName(o));
+         appendValue(ctx, sb, DynUtil.getObjectName(o), null);
          sb.append('"');
       }
       else {
          ctx.addedObjs.put(o, Boolean.TRUE);
          sb.append("{");
-         IBeanMapper[] props = DynUtil.getProperties(DynUtil.getType(o));
+         Object instType = DynUtil.getType(o);
          boolean any = false;
+         // For array elements only right now, we pass in compType to avoid the 'class' when the array is homogeneous
+         if (compType != null && instType != compType) {
+            appendString(sb, "class");
+            sb.append(":");
+            appendValue(ctx, sb, DynUtil.getTypeName(instType, false), null);
+            any = true;
+         }
+
+         IBeanMapper[] props = DynUtil.getProperties(instType);
          for (int i = 0; i < props.length; i++) {
             IBeanMapper prop = props[i];
 
@@ -143,7 +165,11 @@ public class JSON {
                continue;
             }
             Object member = prop.getPropertyMember();
-            if (member == null || DynUtil.hasModifier(member, "transient") || DynUtil.hasModifier(member, "static"))
+            if (member == null || DynUtil.hasModifier(member, "static") || DynUtil.hasModifier(member, "protected") || DynUtil.hasModifier(member, "private"))
+               continue;
+            // Only the field can be transient but it's a signal to skip the property in the serialization
+            Object field = prop.getField();
+            if (field != null && DynUtil.hasModifier(field, "transient"))
                continue;
 
             Object val = prop.getPropertyValue(o, false, false);
@@ -152,7 +178,7 @@ public class JSON {
                   sb.append(", ");
                appendString(sb, prop.getPropertyName());
                sb.append(":");
-               appendValue(ctx, sb, val);
+               appendValue(ctx, sb, val, prop.getGenericType());
                any = true;
             }
          }
@@ -161,7 +187,7 @@ public class JSON {
       }
    }
 
-   static void appendValue(JSONContext ctx, StringBuilder sb, Object val) {
+   static void appendValue(JSONContext ctx, StringBuilder sb, Object val, Object pType) {
       if (val == null)
          sb.append("null");
       else if (val instanceof CharSequence)
@@ -173,10 +199,11 @@ public class JSON {
       else if (val instanceof Collection || val.getClass().isArray()) {
          sb.append("[");
          int sz = DynUtil.getArrayLength(val);
+         Object arrCompType = DynUtil.getComponentType(pType);
          for (int i = 0; i < sz; i++) {
             if (i != 0)
                sb.append(", ");
-            appendValue(ctx, sb, DynUtil.getArrayElement(val, i));
+            appendValue(ctx, sb, DynUtil.getArrayElement(val, i), arrCompType);
          }
          sb.append("]");
       }
@@ -197,14 +224,14 @@ public class JSON {
                   sb.append(", ");
                appendString(sb, key.toString());
                sb.append(":");
-               appendValue(ctx, sb, entVal);
+               appendValue(ctx, sb, entVal, null);
                any = true;
             }
          }
          sb.append("}");
       }
       else {
-         appendObject(ctx, sb, val);
+         appendObject(ctx, sb, val, pType);
       }
       // TODO: enums here?
    }

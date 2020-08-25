@@ -93,9 +93,10 @@ public class TxUpdate extends VersionedOperation {
       ArrayList<Object> columnValues = new ArrayList<Object>();
       ArrayList<DBColumnType> columnTypes = new ArrayList<DBColumnType>();
       ArrayList<DBTypeDescriptor> columnRefTypes = new ArrayList<DBTypeDescriptor>();
+      ArrayList<Object> columnPTypes = new ArrayList<Object>();
 
       // Goes through the updateList property for this update adding the names and values of changed columns
-      addUpdatedColumns(updateTable, columnNames, columnTypes, columnValues, columnRefTypes);
+      addUpdatedColumns(updateTable, columnNames, columnTypes, columnValues, columnRefTypes, columnPTypes);
 
       // No changes for this table
       if (columnNames.size() == 0)
@@ -108,12 +109,14 @@ public class TxUpdate extends VersionedOperation {
          newVersion = version + 1;
          columnValues.add(newVersion);
          columnRefTypes.add(null);
+         columnPTypes.add(null);
       }
       if (lmtProp != null && !columnNames.contains(lmtProp.columnName)) {
          columnNames.add(lmtProp.columnName);
          columnTypes.add(lmtProp.getDBColumnType());
          columnValues.add(lmtValue = new Date());
          columnRefTypes.add(null);
+         columnPTypes.add(null);
       }
 
       StringBuilder sb = new StringBuilder();
@@ -132,7 +135,7 @@ public class TxUpdate extends VersionedOperation {
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), columnRefTypes.get(i)));
+            logSB.append(DBUtil.formatValue(columnValues.get(i), columnTypes.get(i), columnRefTypes.get(i), columnPTypes.get(i)));
       }
       DBUtil.append(sb, logSB, " WHERE ");
 
@@ -144,7 +147,7 @@ public class TxUpdate extends VersionedOperation {
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(idVals.get(i), DBColumnType.LongId, dbTypeDesc));
+            logSB.append(DBUtil.formatValue(idVals.get(i), DBColumnType.LongId, dbTypeDesc, null));
       }
       if (versProp != null) {
          long opVersion = version;
@@ -153,7 +156,7 @@ public class TxUpdate extends VersionedOperation {
          DBUtil.append(sb, logSB, " = ");
          sb.append("?");
          if (logSB != null)
-            logSB.append(DBUtil.formatValue(opVersion, versProp.getDBColumnType(), null));
+            logSB.append(DBUtil.formatValue(opVersion, versProp.getDBColumnType(), null, null));
       }
 
       PreparedStatement st = null;
@@ -165,14 +168,14 @@ public class TxUpdate extends VersionedOperation {
             int pos = 1;
             for (int i = 0; i < numCols; i++) {
                DBColumnType colType = columnTypes.get(i);
-               DBUtil.setStatementValue(st,  pos++, colType, columnValues.get(i));
+               DBUtil.setStatementValue(st,  pos++, colType, columnValues.get(i), columnPTypes.get(i));
             }
             for (int i = 0; i < numIdCols; i++) {
                IdPropertyDescriptor idProp = idCols.get(i);
-               DBUtil.setStatementValue(st,  pos++, idProp.getDBColumnType(), idVals.get(i));
+               DBUtil.setStatementValue(st,  pos++, idProp.getDBColumnType(), idVals.get(i), null);
             }
             if (versProp != null) {
-               DBUtil.setStatementValue(st,  pos++, versProp.getDBColumnType(), version);
+               DBUtil.setStatementValue(st,  pos++, versProp.getDBColumnType(), version, null);
             }
 
             int ct = st.executeUpdate();
@@ -220,7 +223,8 @@ public class TxUpdate extends VersionedOperation {
    }
 
    private void addUpdatedColumns(TableDescriptor tableDesc, ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes,
-                                  ArrayList<Object> columnValues, ArrayList<DBTypeDescriptor> columnRefTypes) {
+                                  ArrayList<Object> columnValues, ArrayList<DBTypeDescriptor> columnRefTypes,
+                                  ArrayList<Object> columnPTypes) {
       Map<String,Object> tableDynProps = null;
 
       for (PropUpdate propUpdate:updateList) {
@@ -248,6 +252,7 @@ public class TxUpdate extends VersionedOperation {
                   columnTypes.add(prop.getDBColumnType());
                columnValues.add(value);
                columnRefTypes.add(prop.refDBTypeDesc);
+               columnPTypes.add(prop.getPropertyType());
             }
          }
       }
@@ -262,6 +267,7 @@ public class TxUpdate extends VersionedOperation {
          columnTypes.add(DBColumnType.Json);
          columnValues.add(tableDynProps);
          columnRefTypes.add(null);
+         columnPTypes.add(null);
       }
    }
 

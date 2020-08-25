@@ -43,4 +43,8 @@ public class ScopeModifier extends ErrorSemanticNode {
       }
       return true;
    }
+
+   public String toString() {
+      return "scope<" + scopeName + ">";
+   }
 }

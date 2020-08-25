@@ -170,7 +170,7 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
    public void validate(Definition def) {
       // This check needs to be done after we've definitely started 'def'.  We might be in the midst of starting it when we run the 'start' method
       if (createOnStartup || initOnStartup)
-         checkForPublicAccess((BodyTypeDeclaration) def);
+         checkForPublicAccess(def);
    }
 
    protected void typeGroupMemberStarted(TypeDeclaration td) {
@@ -206,10 +206,10 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
       }
    }
 
-   private void checkForPublicAccess(BodyTypeDeclaration td) {
-      if (!td.hasModifier("public")) {
-         td.displayError(toErrorString() + " must be public for: ");
-         boolean res = td.hasModifier("public");
+   private void checkForPublicAccess(Definition def) {
+      if (!def.hasModifier("public")) {
+         def.displayError(toErrorString() + " must be public for: ");
+         boolean res = def.hasModifier("public");
       }
    }
 

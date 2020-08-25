@@ -955,6 +955,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return primaryTable.idColumns.get(ci).getDBColumnType();
    }
 
+   public Object getIdPropertyType(int ci) {
+      return primaryTable.idColumns.get(ci).getPropertyType();
+   }
+
    public List<IdPropertyDescriptor> getIdProperties() {
       if (baseType != null)
          return baseType.getIdProperties();
