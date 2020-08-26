@@ -73,7 +73,7 @@ public class JSON {
          if (className != null) {
             instType = DynUtil.findType(className);
          }
-         Object inst = DynUtil.createInstance(instType, null);
+         Object inst = DynUtil.newInnerInstance(instType, null, null);
          for (Map.Entry<String,Object> ent:map.entrySet()) {
             String propName = ent.getKey();
             Object propVal = ent.getValue();
