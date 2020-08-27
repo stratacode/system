@@ -36,11 +36,11 @@ public class Input extends HTMLElement {
    public Input(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public Input(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
-      super(concreteType, parent, repeatVar, repeatIx);
+   public Input(TypeDeclaration concreteType, Element parent, String id, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, id, repeatVar, repeatIx);
    }
-   public Input(Element parent, Object repeatVar, int repeatIx) {
-      super(parent, repeatVar, repeatIx);
+   public Input(Element parent, String id, Object repeatVar, int repeatIx) {
+      super(parent, id, repeatVar, repeatIx);
    }
    {
       tagName = "input";

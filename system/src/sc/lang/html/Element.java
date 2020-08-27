@@ -198,8 +198,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // stores that references so we can find the original source Statement.
    public transient Element fromElement;
 
-   static String[] repeatConstrNames = {"_parent", "_repeatVar", "_repeatIx"};
-   static List<?> repeatConstrParams = Arrays.asList(new Object[] {Element.class, Object.class, Integer.TYPE});
+   static String[] repeatConstrNames = {"_parent", "_id", "_repeatVar", "_repeatIx"};
+   static List<?> repeatConstrParams = Arrays.asList(new Object[] {Element.class, String.class, Object.class, Integer.TYPE});
 
    public Element() {
    }
@@ -207,14 +207,18 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       super(concreteType);
    }
 
-   public Element(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
+   public Element(TypeDeclaration concreteType, Element parent, String id, Object repeatVar, int repeatIx) {
       super(concreteType);
       parentNode = parent;
+      if (id != null)
+         this.id = id;
       setRepeatVar((RE) repeatVar);
       setRepeatIndex(repeatIx);
    }
-   public Element(Element parent, Object repeatVar, int repeatIx) {
+   public Element(Element parent, String id, Object repeatVar, int repeatIx) {
       parentNode = parent;
+      if (id != null)
+         this.id = id;
       setRepeatVar((RE) repeatVar);
       setRepeatIndex(repeatIx);
    }
@@ -1081,8 +1085,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             ParseUtil.initComponent(templ);
          }
          // Eliminate redundant setId calls in the generated code.  Look for the first tag in our hierarchy which specified the id
-         // If it matches, return it.  This is particularly important now because unique elements like head, body need to have a fixed id so if you
-         // allocate two of them with the same tag name, you end up with the wrong id.
+         // If it matches, return it.
          if (cur != null && cur.specifiedId) {
             elemId = cur.tagObject.typeName;
             if (elemId != null)
@@ -1337,6 +1340,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                str.append(lowerTagName());
             }
 
+            boolean idFound = false;
+
             ArrayList<Attr> attList = getInheritedAttributes();
             if (attList != null) {
                for (Attr att:attList) {
@@ -1357,6 +1362,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            strExprs.add(boolExpr);
                         }
                         else if (att.value != null) {
+                           if (att.name.equals("id"))
+                              idFound = true;
                            str.append(" ");
                            str.append(att.name);
                            str.append("=");
@@ -1436,7 +1443,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   addInvalidateListener(parentType, "selected");
                }
                Expression texpr;
-               if (needsId() && !isSingletonTag()) {
+               if (!idFound && tagObject != null && !isSingletonTag()) {
                   str.append(" id='");
                   texpr = StringLiteral.create(str.toString());
                   texpr.fromStatement = this;
@@ -2866,7 +2873,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                        "   public sc.lang.html.Element createElement(Object val, int ix, sc.lang.html.Element oldTag) {\n " +
                                "      if (oldTag != null)\n" +
                                "         return oldTag;\n " +
-                               "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)enclosingTag, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
+                               "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)enclosingTag, null, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
                                "      return elem;\n" +
                                "   }",
                        SCLanguage.INSTANCE.classBodySnippet, false);
@@ -3227,10 +3234,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   hasDefaultConstructor = false;
             }
             Object propConstr = ModelUtil.getPropagatedConstructor(sys, compiledExtTypeDecl, this, refLayer);
-            Object[] repeatConstrTypes = new Object[3];
+            Object[] repeatConstrTypes = new Object[4];
             repeatConstrTypes[0] = Element.class;
-            repeatConstrTypes[1] = repeatElementType;
-            repeatConstrTypes[2] = Integer.TYPE;
+            repeatConstrTypes[1] = String.class;
+            repeatConstrTypes[2] = repeatElementType;
+            repeatConstrTypes[3] = Integer.TYPE;
             ConstructorDefinition repeatConst = ConstructorDefinition.create(tagType, repeatConstrTypes, repeatConstrNames);
             repeatConst.addModifier("public");
             boolean needsConstructor = false;
@@ -3249,10 +3257,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   parArgs.add(IdentifierExpression.create(repeatConstrNames[0]));
                   repeatConst.addBodyStatementAt(0, IdentifierExpression.createMethodCall(parArgs, "setParentNode"));
                   SemanticNodeList<Expression> srvArgs = new SemanticNodeList<Expression>();
-                  srvArgs.add(IdentifierExpression.create(repeatConstrNames[1]));
+                  srvArgs.add(IdentifierExpression.create(repeatConstrNames[2]));
                   repeatConst.addBodyStatementAt(1, IdentifierExpression.createMethodCall(srvArgs, "setRepeatVar"));
                   SemanticNodeList<Expression> ixArgs = new SemanticNodeList<Expression>();
-                  ixArgs.add(IdentifierExpression.create(repeatConstrNames[2]));
+                  ixArgs.add(IdentifierExpression.create(repeatConstrNames[3]));
                   repeatConst.addBodyStatementAt(2, IdentifierExpression.createMethodCall(ixArgs, "setRepeatIndex"));
                   needsConstructor = true;
                }
@@ -5117,6 +5125,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void setStyle(String s) {
       style = s;
       Bind.sendChangedEvent(this, "style");
+      invalidateStartTag();
    }
 
    // No need to transform the element and it's children since it did it's work in convertToObject.

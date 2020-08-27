@@ -34,11 +34,11 @@ public class Form extends HTMLElement {
    public Form(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public Form(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
-      super(concreteType, parent, repeatVar, repeatIx);
+   public Form(TypeDeclaration concreteType, Element parent, String id, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, id, repeatVar, repeatIx);
    }
-   public Form(Element parent, Object repeatVar, int repeatIx) {
-      super(parent, repeatVar, repeatIx);
+   public Form(Element parent, String id, Object repeatVar, int repeatIx) {
+      super(parent, id, repeatVar, repeatIx);
    }
 
    private int submitCount;

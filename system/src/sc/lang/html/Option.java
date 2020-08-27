@@ -31,11 +31,11 @@ public class Option<T> extends HTMLElement {
    public Option(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public Option(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
-      super(concreteType, parent, repeatVar, repeatIx);
+   public Option(TypeDeclaration concreteType, Element parent, String id, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, id, repeatVar, repeatIx);
    }
-   public Option(Element parent, Object repeatVar, int repeatIx) {
-      super(parent, repeatVar, repeatIx);
+   public Option(Element parent, String id, Object repeatVar, int repeatIx) {
+      super(parent, id, repeatVar, repeatIx);
    }
 
    private boolean selected;

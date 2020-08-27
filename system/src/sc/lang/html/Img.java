@@ -19,11 +19,11 @@ public class Img extends HTMLElement {
    public Img(sc.lang.java.TypeDeclaration concreteType)  {
       super(concreteType);
    }
-   public Img(TypeDeclaration concreteType, Element parent, Object repeatVar, int repeatIx) {
-      super(concreteType, parent, repeatVar, repeatIx);
+   public Img(TypeDeclaration concreteType, Element parent, String id, Object repeatVar, int repeatIx) {
+      super(concreteType, parent, id, repeatVar, repeatIx);
    }
-   public Img(Element parent, Object repeatVar, int repeatIx) {
-      super(parent, repeatVar, repeatIx);
+   public Img(Element parent, String id, Object repeatVar, int repeatIx) {
+      super(parent, id, repeatVar, repeatIx);
    }
 
    private Object src;
