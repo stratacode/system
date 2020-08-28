@@ -5590,9 +5590,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
          }
          else {
-            // No id is normal for the 'repeat wrapper' class
-            if (!(this instanceof IRepeatWrapper))
-               System.out.println("*** null id for server tag");
+            // No id is normal for the 'repeat wrapper' class. We also get here for an object that is subclasses from Element
+            // but that is not actually used as a tag object so in that case we also want to just skip this.
+            //if (!(this instanceof IRepeatWrapper))
+            //   System.out.println("*** null id for server tag");
             // else - TODO: is this a case we want to handle?
          }
          defaultServerTag = true;
