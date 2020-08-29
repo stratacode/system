@@ -3982,8 +3982,8 @@ public class ModelUtil {
       else if (srcMember instanceof Member) {
          return ((Member) srcMember).getDeclaringClass();
       }
-      else if (srcMember instanceof BeanMapper) {
-         return ((BeanMapper) srcMember).getPropertyMember().getDeclaringClass();
+      else if (srcMember instanceof IBeanMapper) {
+         return getEnclosingType(((IBeanMapper) srcMember).getPropertyMember());
       }
       else if (srcMember instanceof VariableDefinition) {
          return ((VariableDefinition) srcMember).getEnclosingType();

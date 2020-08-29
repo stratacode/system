@@ -4601,6 +4601,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    private boolean isAltId(String id) {
+      if (id == null)
+         return false;
       int len = id.length();
       int suffLen = ALT_SUFFIX.length();
       int ix = id.indexOf(ALT_SUFFIX);
