@@ -1360,6 +1360,7 @@ public class ClassDeclaration extends TypeDeclaration {
                         for (int j = 0; j < extPropNames.size(); j++) {
                            if (extPropNames.get(j).equals(propName)) {
                               found = true;
+                              start = start - 1;
                               break;
                            }
                         }
@@ -1733,5 +1734,10 @@ public class ClassDeclaration extends TypeDeclaration {
          ((TypeDeclaration) extendsBoundType).addConstructorProps(cpi);
       }
       super.addConstructorProps(cpi);
+   }
+
+   public void stop() {
+      super.stop();
+      constructorPropInfo = null;
    }
 }
