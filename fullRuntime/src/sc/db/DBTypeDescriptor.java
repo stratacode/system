@@ -684,10 +684,12 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          DBObject protoDB = (DBObject) proto.getDBObject();
          addPropsToQuery(groupQuery, protoDB, propNames);
          addParamValues(groupQuery, protoDB, propNames);
-         groupQuery.curQuery.whereAppend(" AND (");
+         if (text != null)
+            groupQuery.curQuery.whereAppend(" AND (");
       }
-      addSearchToQuery(groupQuery, text);
-      if (proto != null) {
+      if (text != null)
+         addSearchToQuery(groupQuery, text);
+      if (proto != null && text != null) {
          groupQuery.curQuery.whereAppend(")");
       }
       groupQuery.setQueryAttributes(orderByProps, startIx, maxResults);
@@ -697,6 +699,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return groupQuery.runQuery(curTx, null);
    }
 
+   /*
    public int searchCountQuery(String text) {
       //List <? extends IDBObject> res = searchQuery(null, text, null, 0, 100);
       //return res.size();
@@ -708,9 +711,34 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       return groupQuery.countQuery(curTx, null);
    }
+   */
+
+   public int searchCountQuery(String text, List<String> propNames, List<Object> propValues) {
+      IDBObject proto = propNames == null ? null : initPrototypeForQuery(propNames, propValues);
+      //List <? extends IDBObject> res = searchQuery(null, text, null, 0, 100);
+      //return res.size();
+      SelectGroupQuery groupQuery =  new SelectGroupQuery(this, null, null);
+      DBObject protoDB = null;
+      if (proto != null) {
+         protoDB = (DBObject) proto.getDBObject();
+         addPropsToQuery(groupQuery, protoDB, propNames);
+         addParamValues(groupQuery, protoDB, propNames);
+         if (text != null)
+            groupQuery.curQuery.whereAppend(" AND (");
+      }
+      if (text != null)
+         addSearchToQuery(groupQuery, text);
+      if (proto != null && text != null) {
+         groupQuery.curQuery.whereAppend(")");
+      }
+
+      DBTransaction curTx = DBTransaction.getOrCreate();
+
+      return groupQuery.countQuery(curTx, protoDB);
+   }
 
    public int countAll() {
-      return searchCountQuery(null);
+      return searchCountQuery(null, null, null);
    }
 
    private void initTypeInstances() {
