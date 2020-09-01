@@ -776,10 +776,17 @@ public class DBUtil {
       return res;
    }
 
+   /** Used for logs to identify sessions without using part of the authToken or sessionId */
+   public static String createMarkerToken() {
+      byte[] buf = new byte[8];
+      randGen.nextBytes(buf);
+      String res = base64Encoder.encodeToString(buf);
+      return res;
+   }
+
    public static String createSalt() {
-      SecureRandom random = new SecureRandom();
       byte[] salt = new byte[16];
-      random.nextBytes(salt);
+      randGen.nextBytes(salt);
       String res = base64Encoder.encodeToString(salt);
       if (testMode)
          addTestToken(res, "secure-salt");

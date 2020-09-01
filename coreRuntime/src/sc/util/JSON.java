@@ -90,25 +90,31 @@ public class JSON {
          return inst;
       }
       else if (value instanceof CharSequence) {
-         String res = value.toString();
-         int len = res.length();
-         if (len > 4 && res.charAt(3) == ':' && res.charAt(0) == 'r' && res.charAt(1) == 'e' && res.charAt(2) == 'f') {
-            String refName = res.substring(4);
-            if (propertyType == null) {
-               System.err.println("*** Expected property type for JSON reference");
-               res = null;
-            }
-            else if (resolver == null) {
-               System.err.println("*** No resolver for JSON reference");
-               res = null;
-            }
-            else
-               return resolver.resolveRef(refName, propertyType);
+         if (propertyType == Date.class) {
+            Date res = DynUtil.parseDate(((CharSequence) value).toString());
+            return res;
          }
-         else if (len > 5 && res.charAt(0) == '\\' && res.charAt(4) == ':' && res.charAt(1) == 'r' && res.charAt(2) == 'e' & res.charAt(3) == 'f') {
-            res = res.substring(1);
+         else {
+            String res = value.toString();
+            int len = res.length();
+            if (len > 4 && res.charAt(3) == ':' && res.charAt(0) == 'r' && res.charAt(1) == 'e' && res.charAt(2) == 'f') {
+               String refName = res.substring(4);
+               if (propertyType == null) {
+                  System.err.println("*** Expected property type for JSON reference");
+                  res = null;
+               }
+               else if (resolver == null) {
+                  System.err.println("*** No resolver for JSON reference");
+                  res = null;
+               }
+               else
+                  return resolver.resolveRef(refName, propertyType);
+            }
+            else if (len > 5 && res.charAt(0) == '\\' && res.charAt(4) == ':' && res.charAt(1) == 'r' && res.charAt(2) == 'e' & res.charAt(3) == 'f') {
+               res = res.substring(1);
+            }
+            return res;
          }
-         return res;
       }
       else if (value instanceof Number) {
          if (propertyType == Byte.class || propertyType == Byte.TYPE)
@@ -229,6 +235,11 @@ public class JSON {
             }
          }
          sb.append("}");
+      }
+      else if (val instanceof Date) {
+         sb.append('"');
+         sb.append(DynUtil.formatDate((Date) val));
+         sb.append('"');
       }
       else {
          appendObject(ctx, sb, val, pType);
