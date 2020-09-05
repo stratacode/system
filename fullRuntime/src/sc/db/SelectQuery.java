@@ -63,6 +63,8 @@ public class SelectQuery implements Cloneable {
       if (ftd == null) {
          ftd = new SelectTableDesc(table, new ArrayList<DBPropertyDescriptor>());
 
+         ftd.refProp = curRefProp;
+
          addTableToSelectQuery(ftd, null);
 
          if (table.primary)
@@ -1354,14 +1356,6 @@ public class SelectQuery implements Cloneable {
    public void whereAppend(String s) {
       initWhereQuery();
       whereSB.append(s);
-   }
-
-   public void whereAppendClause(String clause) {
-      if (whereSB != null && whereSB.length() > 0)
-         whereSB.append(" AND ");
-      else
-         initWhereQuery();
-      whereSB.append(clause);
    }
 
    public void whereAppendIdent(String ident) {
