@@ -2663,25 +2663,25 @@ public class SyncManager {
       return syncManagersByDest.get(destName);
    }
 
-   public static boolean isSyncedPropertyForTypeName(String typeName, String propName) {
+   public static boolean isSyncedPropertyForTypeName(String typeName, String propName, boolean forClient) {
       Object type = DynUtil.resolveName(typeName, false, true);
       if (type != null)
-         return isSyncedProperty(type, propName);
+         return isSyncedProperty(type, propName, forClient);
       return false;
    }
 
-   public static boolean isSyncedProperty(Object type, String propName) {
+   public static boolean isSyncedProperty(Object type, String propName, boolean forClient) {
       for (SyncManager mgr:syncManagers) {
-         if (mgr.isSynced(type, propName))
+         if (mgr.isSynced(type, propName, forClient))
             return true;
       }
       return false;
    }
 
-   public boolean isSynced(Object type, String propName) {
+   public boolean isSynced(Object type, String propName, boolean forClient) {
       do {
          SyncProperties props = getSyncProperties(type);
-         if (props != null && props.isSynced(propName)) {
+         if (props != null && props.isSynced(propName, forClient)) {
             return true;
          }
          // Need to check the extends type here for cases like when sync'ing properties in a sub-class of a tag object.

@@ -9178,7 +9178,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
-   public boolean isSynced(String prop) {
+   public boolean isSynced(String prop, boolean forClient) {
       JavaModel model = getJavaModel();
       // At runtime...
       if (!model.mergeDeclaration) {
@@ -9187,17 +9187,17 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             Class locClass = (Class) type;
             String typeName = locClass.getName();
 
-            return SyncManager.isSyncedPropertyForTypeName(typeName, prop);
+            return SyncManager.isSyncedPropertyForTypeName(typeName, prop, forClient);
          }
          else
-            return ((BodyTypeDeclaration)type).isSynced(prop);
+            return ((BodyTypeDeclaration)type).isSynced(prop, forClient);
       }
 
       List<SyncProperties> syncPropList = getSyncProperties();
       if (syncPropList == null)
          return false;
       for (SyncProperties syncProps:syncPropList)
-         if (syncProps.isSynced(prop))
+         if (syncProps.isSynced(prop, forClient))
             return true;
       return false;
    }
@@ -9614,14 +9614,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                      if ((!inheritedSync || thisIsWritable)) {
                         addSyncProp = true;
                         // On the server, we still need to add the property for authorization purposes but don't add a SyncListener
-                        if (!(sys.runtimeProcessor instanceof JSRuntimeProcessor)) {
+                        if (sys.runtimeProcessor == null || sys.runtimeProcessor.getExecMode() != Element.ExecClient ) {
                            propFlags |= SyncPropOptions.SYNC_RECEIVE_ONLY;
                         }
                      }
                      break;
                   case ServerToClient:
-                     if ((!inheritedSync || thisIsWritable) && sys.runtimeProcessor == null)
+                     if ((!inheritedSync || thisIsWritable) && (sys.runtimeProcessor == null || sys.runtimeProcessor.getExecMode() != Element.ExecClient)) {
                         addSyncProp = true;
+                        propFlags |= SyncPropOptions.SYNC_SEND_ONLY;
+                     }
                      break;
                   case Enabled:
                      if (!inheritedSync || thisIsWritable)

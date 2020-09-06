@@ -248,9 +248,9 @@ public class JSONDeserializer implements JSONResolver {
                      boolean skipSet = false;
                      if (!mgr.syncDestination.clientDestination) {
                         objType = DynUtil.getSType(curObj);
-                        if (!isMap && !mgr.isSynced(objType, nextNameStr)) {
+                        if (!isMap && !mgr.isSynced(objType, nextNameStr, false)) {
                            System.err.println("Not allowed to set unsynchronized property from json: " + DynUtil.getTypeName(objType, true) + "." + nextNameStr);
-                           boolean isSynced = !mgr.isSynced(objType, nextNameStr);
+                           boolean isSynced = !mgr.isSynced(objType, nextNameStr, false);
                            skipSet = true;
                         }
                      }

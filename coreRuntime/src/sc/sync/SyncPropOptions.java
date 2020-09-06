@@ -34,6 +34,10 @@ public class SyncPropOptions {
 
    public final static int SYNC_RESET_STATE = 128;
 
+   /** For serverToClient properties on the server, indicates that these properties are not settable from the client. Do add
+    * a sync listener and do send changes to the client as normal. */
+   public final static int SYNC_SEND_ONLY = 256;
+
    public String propName;
    public int flags;
    public boolean hasDefault;
@@ -63,6 +67,8 @@ public class SyncPropOptions {
          sb.append(" (client)");
       if ((flags & SYNC_RECEIVE_ONLY) != 0)
          sb.append(" (receive only)");
+      if ((flags & SYNC_SEND_ONLY) != 0)
+         sb.append(" (send only)");
       if ((flags & SYNC_CONSTANT) != 0)
          sb.append(" (constant)");
       if ((flags & SYNC_STATIC) != 0)

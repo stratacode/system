@@ -30,7 +30,7 @@ public class SyncExecutionContext extends ExecutionContext {
    }
 
    public boolean allowSetProperty(Object type, String propName) {
-      return mgr.isSynced(type, propName);
+      return mgr.isSynced(type, propName, false);
    }
 
    public boolean allowInvoke(Object method) {

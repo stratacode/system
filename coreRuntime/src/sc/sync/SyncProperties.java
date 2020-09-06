@@ -146,8 +146,16 @@ public class SyncProperties {
       staticProps = newStaticProps == null ? null : newStaticProps.toArray();
    }
 
-   public boolean isSynced(String prop) {
-      return propIndex == null ? false : propIndex.containsKey(prop);
+   /** Is this property sync'd - when forClient is true, returns true when we receive these values from the server.
+    *  When it's false, its called for the server's perspective if this value is settable from the client */
+   public boolean isSynced(String prop, boolean forClient) {
+      int flags = getSyncFlags(prop);
+      if (flags == -1)
+         return false;
+      if (forClient)
+         return true;
+      // In the server case, if ServerToClient is set this is not sync'd for setting values from the client
+      return (flags & SyncPropOptions.SYNC_SEND_ONLY) == 0;
    }
 
    public int getSyncFlags(String prop) {

@@ -1049,11 +1049,11 @@ public class JSTypeParameters extends ObjectTypeParameters {
          for (Object prop:props) {
             String propName = ModelUtil.getPropertyName(prop);
             Object propType = ModelUtil.getPropertyType(prop);
-            if (propType != null && needsJSMetadata(propType) && type.isSynced(propName)) {
+            if (propType != null && needsJSMetadata(propType) && type.isSynced(propName, true)) {
                // getDeclaredProperties returns more than one representation for the same property
                if (visited.contains(propName))
                   continue;
-               JSRuntimeProcessor proc = getJSRuntimeProcessor();
+               //JSRuntimeProcessor proc = getJSRuntimeProcessor();
                visited.add(propName);
                if (sb == null) {
                   sb = new StringBuilder();
@@ -1344,7 +1344,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
          if (propertyType != null)
             propName = ModelUtil.getPropertyName(propertyType);
       }
-      if (propName != null && type.isSynced(propName))
+      if (propName != null && type.isSynced(propName, true))
          return "_ctx.pendingSyncProp = \"" + propName + "\";\n   ";
       return "";
    }

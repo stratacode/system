@@ -951,6 +951,29 @@ public class DBObject implements IDBObject {
          return;
       if (!dbTypeDesc.removeInstance(this, false))
          DBUtil.error("DBObject.stop: instance not found: " + this);
+      else {
+         /*
+         for (DBPropertyDescriptor prop:dbTypeDesc.allDBProps) {
+            // Need to dispose children that might reference back to us, or any child owned by this instance
+            // Need to figure out how to update one-to-many properties that point back to this instance - e.g.
+            // if we are disposing a userProfile, how do we update the siteAdmins that point back?
+            if (prop.refDBTypeDesc != null && prop.childProperty) {
+               if (!prop.multiRow) {
+                  Object propVal = prop.getPropertyMapper().getPropertyValue(getInst(), false, false);
+                  if (propVal != null)
+                     DynUtil.dispose(propVal);
+               }
+               else {
+                  List propVals = (List) prop.getPropertyMapper().getPropertyValue(getInst(), false, false);
+                  if (propVals != null) {
+                     for (Object propVal:propVals)
+                        DynUtil.dispose(propVal);
+                  }
+               }
+            }
+         }
+         */
+      }
    }
 
    public boolean isActive() {
