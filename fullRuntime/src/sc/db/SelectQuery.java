@@ -487,8 +487,6 @@ public class SelectQuery implements Cloneable {
             if (logSB != null)
                logSB.append(" -> ");
 
-            transaction.applyingDBChanges = true;
-
             if (!rs.next())
                DBUtil.error("count query returned no results:");
 
