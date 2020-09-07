@@ -2779,9 +2779,23 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
          String scopeName = getFixedAttribute("scope");
 
+         Object existingRepeatWrapper = null;
+
          if (existing == null) {
-            if (parentType != null)
+            if (parentType != null) {
                existing = parentType.getInnerType(objName, null);
+
+               if (existing == null) {
+                  existingRepeatWrapper = parentType.getInnerType(getRepeatObjectName(), null);
+                  if (existingRepeatWrapper != null) {
+                     existing = ModelUtil.getInnerType(existingRepeatWrapper, objName, null);
+                     if (existing == null) {
+                        displayWarning("Found modified repeat wrapper without inner repeat type: ");
+                        existingRepeatWrapper = null;
+                     }
+                  }
+               }
+            }
             // else - no existing type - this must be passed in from the template
          }
 
@@ -2819,7 +2833,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          // from the transformed layer.
          boolean remoteContent = oldExecTag ? isRemoteContent() : false;
 
-         boolean isRepeatElement = isRepeatElement();
+         boolean isRepeatElement = isRepeatElement() || existingRepeatWrapper != null;
          boolean isRepeatWrap = false;
          boolean isDefaultWrap = false;
          Object repeatWrapperType = null;
@@ -2858,12 +2872,20 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             }
             if (isRepeatWrap)
                wrap = true; // Set this before we call getRepeatObjectName so it returns the proper name
-            repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(getLayeredSystem(), repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
-            if (needsWrapperInterface)
-               repeatWrapper.addImplements(JavaType.createJavaType(getLayeredSystem(), IRepeatWrapper.class));
+            if (existingRepeatWrapper != null) {
+               if (repeatWrapperType != null)
+                  displayError("Unable to override repeatWrapper in modified repeat tag: ");
+               repeatWrapper = ModifyDeclaration.create(getRepeatObjectName());
+               needsWrapperInterface = false;
+            }
+            else {
+               repeatWrapper = ClassDeclaration.create(isAbstract() ? "class" : "object", getRepeatObjectName(), JavaType.createJavaType(getLayeredSystem(), repeatWrapperType == null ? HTMLElement.class : repeatWrapperType));
+               if (needsWrapperInterface)
+                  repeatWrapper.addImplements(JavaType.createJavaType(getLayeredSystem(), IRepeatWrapper.class));
+               repeatWrapper.addModifier("public");
+            }
             repeatWrapper.element = this;
             repeatWrapper.layer = tagLayer;
-            repeatWrapper.addModifier("public");
 
             if (needsWrapperInterface) {
                // TODO: cache this to avoid reparsing it each time?
