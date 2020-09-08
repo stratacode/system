@@ -591,7 +591,7 @@ public class Parser implements IString {
       Object value;
 
       if (parselet == null) {
-         System.err.println("*** Error restoring parse node: " + oldModel);
+         System.err.println("*** Error restoring parse node "); // Don't toString oldModel here or it will infinite loop because we do the restore in the toSafeLanguageString method in some cases
          throw new IllegalArgumentException("Error restoring parse node - null parselet");
       }
 
