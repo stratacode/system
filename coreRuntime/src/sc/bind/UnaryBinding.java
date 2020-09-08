@@ -80,4 +80,8 @@ public class UnaryBinding extends AbstractMethodBinding {
          sb.append(" = " + boundValue);
       return sb.toString();
    }
+
+   public String getOperator() {
+      return operator;
+   }
 }

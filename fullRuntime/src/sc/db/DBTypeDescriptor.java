@@ -794,7 +794,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
          String propName = opquery.propName;
 
-         appendPropToWhereClause(groupQuery,  this, protoDB, CTypeUtil.getPackageName(propName), propName, false, opquery.comparator);
+         appendPropToWhereClause(groupQuery,  this, protoDB, CTypeUtil.getPackageName(propName), propName, false, opquery.comparator, true);
 
          first = false;
       }
@@ -1314,7 +1314,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          String propName = props.get(i);
          if (!first)
             groupQuery.curQuery.whereAppend(" " + operator.getSQLOperator() + " ");
-         appendPropToWhereClause(groupQuery,  this, proto, CTypeUtil.getPackageName(propName), propName, numProps > 1, QCompare.Equals);
+         appendPropToWhereClause(groupQuery,  this, proto, CTypeUtil.getPackageName(propName), propName, numProps > 1, QCompare.Equals, true);
          first = false;
       }
    }
@@ -1694,6 +1694,29 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          else
             throw new IllegalArgumentException("Unsupported arithmetic binding for appendParams");
       }
+      else if (binding instanceof UnaryBinding) {
+         SelectQuery curQuery = groupQuery.curQuery;
+         UnaryBinding ubind = (UnaryBinding) binding;
+         String op = ubind.getOperator();
+         StringBuilder logSB = curQuery.logSB;
+         IBinding param = ubind.getBoundParams()[0];
+         if (op.equals("!")) {
+            if (logSB != null)
+               logSB.append(" NOT(");
+
+            appendParamValues(groupQuery, curTypeDesc, curObj, param);
+
+            if (logSB != null)
+               logSB.append(")");
+         }
+         else if (op.equals("-") || op.equals("+")) {
+            if (logSB != null)
+               logSB.append(op);
+            appendParamValues(groupQuery, curTypeDesc, curObj, param);
+         }
+         else
+            throw new IllegalArgumentException("Unsupported unary binding operator: " + op);
+      }
       else
          throw new IllegalArgumentException("Unsupported binding type for appendParams");
    }
@@ -1897,7 +1920,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (binding instanceof IBeanMapper) {
          IBeanMapper propMapper = (IBeanMapper) binding;
          String propName = propMapper.getPropertyName();
-         appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, propName, true, null);
+         appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, propName, true, null, false);
       }
       else if (binding instanceof ConditionalBinding) {
          ConditionalBinding cond = (ConditionalBinding) binding;
@@ -1938,7 +1961,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          SelectQuery curQuery = groupQuery.curQuery;
          DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
          if (queryProp != null) {
-            appendPropToWhereClause(groupQuery, queryProp.dbTypeDesc, curObj, getParentPropertyName(varBind), queryProp.propertyName, false, null);
+            appendPropToWhereClause(groupQuery, queryProp.dbTypeDesc, curObj, getParentPropertyName(varBind), queryProp.propertyName, false, null, false);
          }
          else {
             if (numInChain == 2) {
@@ -1949,7 +1972,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   String methName = DynUtil.getMethodName(methBind.getMethod());
                   IBinding[] boundParams = methBind.getBoundParams();
                   if (methName.equals("equals") && boundParams.length == 1) {
-                     appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, getPathPropertyName(varBind, 0), false, null);
+                     appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, getPathPropertyName(varBind, 0), false, null, false);
                      curQuery.whereAppend(" = ");
                      appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, boundParams[0]);
                      return;
@@ -1973,6 +1996,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                         curQuery.appendJSONWhereColumn(nextPropDesc.getTableName(), nextPropDesc.columnName, propPath.toString());
                         return;
                      }
+                  }
+                  else {
+                     // For numInChain == 1, this could just be a property that has another rule we need to translate into a query
+                     if (numInChain == 1)
+                        appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, nextProp);
+                     else
+                        throw new IllegalArgumentException("Unsupported binding in query");
                   }
                }
                else if (chainProp instanceof IBinding)
@@ -2008,6 +2038,31 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          else
             throw new IllegalArgumentException("Unsupported arithmetic binding for query");
       }
+      else if (binding instanceof UnaryBinding) {
+         UnaryBinding ubind = (UnaryBinding) binding;
+         String op = ubind.getOperator();
+         if (op.equals("++") || op.equals("--"))
+            throw new IllegalArgumentException("Unsupported operator for query: " + op);
+         SelectQuery curQuery = groupQuery.curQuery;
+         IBinding param = ubind.getBoundParams()[0];
+
+         if (op.equals("!")) {
+            curQuery.whereAppend(" NOT(");
+
+            appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, param);
+
+            curQuery.whereAppend(")");
+         }
+         else if (op.equals("-")) {
+            curQuery.whereAppend(" -");
+            appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, param);
+         }
+         else if (op.equals("+")) {
+            appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, param);
+         }
+         else
+            throw new IllegalArgumentException("Unsupported operator for query: " + op);
+      }
       else
          throw new IllegalArgumentException("Unsupported binding type for query");
    }
@@ -2026,7 +2081,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    private void appendPropToWhereClause(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj,
-                                        String parentPropPath, String propNamePath, boolean needsParens, QCompare comparator) {
+                                        String parentPropPath, String propNamePath, boolean needsParens, QCompare comparator,
+                                        boolean topLevelQueryProp) {
       SelectQuery curQuery = groupQuery.curQuery;
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
@@ -2043,8 +2099,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             }
          }
 
-         Object propValue = curObj.getPropertyInPath(propNamePath);
-         if (comparator != null && propValue == null && parentPropPath == null) {
+         // If this is a top-level property used in the original query, the value in the protoType is used as the
+         // argument. For boolean properties, a false value will negate the query for example. But for nested properties
+         // we ignore the property value.
+         Object propValue = topLevelQueryProp ? curObj.getPropertyInPath(propNamePath) : null;
+         if (comparator != null && propValue == null && parentPropPath == null && topLevelQueryProp) {
             // TODO: this should add the table name if parentPropPath is not null right?
             curQuery.whereAppend(dbProp.columnName + " IS NULL");
          }
@@ -2094,7 +2153,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
                Object inst = curObj.getInst();
 
-               Object propVal = DynUtil.getPropertyValue(inst, propName);
+               Object propVal = topLevelQueryProp ? DynUtil.getPropertyValue(inst, propName) : null;
                Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
                boolean needsInnerParen = false;
                if ((propType == Boolean.class || propType == Boolean.TYPE)) {
