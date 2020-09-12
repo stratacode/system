@@ -4730,8 +4730,6 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
 
       JavaModel model = getJavaModel();
-      if (model == null)
-         return pos;
       boolean includeGlobals = idSize == 1 && !emptyDotName;
       if (obj != null)
          ModelUtil.suggestMembers(model, obj, lastIdent, candidates, includeGlobals, true, true, false, max);

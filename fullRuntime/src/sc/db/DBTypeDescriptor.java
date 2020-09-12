@@ -794,7 +794,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
          String propName = opquery.propName;
 
-         appendPropToWhereClause(groupQuery,  this, protoDB, CTypeUtil.getPackageName(propName), propName, false, opquery.comparator, true);
+         appendPropToWhereClause(groupQuery,  this, protoDB, CTypeUtil.getPackageName(propName), propName,
+                     false, opquery.comparator, true, false, opquery.propValue);
 
          first = false;
       }
@@ -816,9 +817,19 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       else if (query instanceof OpQuery) {
          OpQuery opquery = (OpQuery) query;
 
+         if (!first) {
+            SelectQuery curQuery = groupQuery.curQuery;
+            StringBuilder logSB = curQuery.logSB;
+            if (logSB != null) {
+               logSB.append(" ");
+               logSB.append(operator.getSQLOperator());
+               logSB.append(" ");
+            }
+         }
+
          String propName = opquery.propName;
 
-         appendPropParamValues(groupQuery, this, protoDB, propName, false, opquery.comparator);
+         appendPropParamValues(groupQuery, this, protoDB, propName, false, opquery.comparator, false, opquery.propValue);
          first = false;
       }
       return first;
@@ -1314,7 +1325,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          String propName = props.get(i);
          if (!first)
             groupQuery.curQuery.whereAppend(" " + operator.getSQLOperator() + " ");
-         appendPropToWhereClause(groupQuery,  this, proto, CTypeUtil.getPackageName(propName), propName, numProps > 1, QCompare.Equals, true);
+         appendPropToWhereClause(groupQuery,  this, proto, CTypeUtil.getPackageName(propName), propName, numProps > 1, QCompare.Equals, true, true, null);
          first = false;
       }
    }
@@ -1349,7 +1360,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          String prop = props.get(i);
          if (i != 0 && groupQuery.curQuery.logSB != null)
             groupQuery.curQuery.logSB.append(" " + operator.getSQLOperator() + " ");
-         appendPropParamValues(groupQuery, this, proto, prop, numProps > 1, QCompare.Equals);
+         appendPropParamValues(groupQuery, this, proto, prop, numProps > 1, QCompare.Equals, true, null);
       }
    }
 
@@ -1458,13 +1469,19 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    private void appendDBPropParamValue(SelectQuery curQuery, String parentProp, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue) {
       if (logSB != null) {
          if (compareOp != null) {
-            if (compareOp == QCompare.Equals || propValue == null) {
+            if (compareOp == QCompare.Equals || compareOp == QCompare.NotEquals || propValue == null) {
                if (propValue == null) {
-                  logSB.append(dbProp.columnName + " IS NULL");
+                  if (compareOp == QCompare.NotEquals)
+                     logSB.append(dbProp.columnName + " IS NOT NULL");
+                  else
+                     logSB.append(dbProp.columnName + " IS NULL");
                }
                else {
                   DBUtil.appendVal(logSB, propValue, null, null);
-                  logSB.append(" = ");
+                  if (compareOp == QCompare.NotEquals)
+                     logSB.append(" != ");
+                  else
+                     logSB.append(" = ");
                }
             }
          }
@@ -1487,9 +1504,12 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    private void appendJSONPropParamValue(SelectQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue, String propPath) {
       if (logSB != null) {
-         if (compareOp == QCompare.Equals) {
+         if (compareOp == QCompare.Equals || compareOp == QCompare.NotEquals) {
             DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType(), dbProp.refDBTypeDesc);
-            logSB.append(" = ");
+            if (compareOp == QCompare.NotEquals)
+               logSB.append(" != ");
+            else
+               logSB.append(" = ");
          }
          curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName, propPath);
       }
@@ -1503,7 +1523,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
    }
 
-   private void appendPropParamValues(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj, String propNamePath, boolean needsParens, QCompare compareOp) {
+   private void appendPropParamValues(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj,
+                                      String propNamePath, boolean needsParens, QCompare compareOp, boolean useProtoVal, Object compareVal) {
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       Object propValue = curObj.getPropertyInPath(propNamePath);
       SelectQuery curQuery = groupQuery.curQuery;
@@ -1538,16 +1559,20 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
                Object inst = curObj.getInst();
 
-               Object propVal = curObj.getPropertyInPath(propName);
+               Object propVal = useProtoVal ? curObj.getPropertyInPath(propName) : compareVal;
                Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
                boolean needsInnerParen = false;
                if ((propType == Boolean.class || propType == Boolean.TYPE)) {
-                  if (propVal == null)
-                     propVal = Boolean.TRUE;
+                  boolean boolVal = (Boolean) propVal;
+                  if ((binding instanceof UnaryBinding && ((UnaryBinding) binding).getOperator().equals("!")))
+                     boolVal = !boolVal; // TODO: is this right?
+
+                  if (compareOp == QCompare.NotEquals)
+                     boolVal = !boolVal;
 
                   // For boolean properties we could write it out as: TRUE = (a > b) but we can simplify that
                   // to just the RHS. For
-                  if (logSB != null && !((Boolean)propVal)) {
+                  if (logSB != null && !boolVal) {
                      logSB.append("NOT ");
                      needsInnerParen = true;
                   }
@@ -1583,20 +1608,33 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (binding instanceof IBeanMapper) {
          IBeanMapper propMapper = (IBeanMapper) binding;
          String propName = propMapper.getPropertyName();
-         appendPropParamValues(groupQuery, curTypeDesc, curObj, propName, true, null);
+         appendPropParamValues(groupQuery, curTypeDesc, curObj, propName, true, null, true, null);
       }
       else if (binding instanceof ConditionalBinding) {
          ConditionalBinding cond = (ConditionalBinding) binding;
          IBinding[] paramBindings = cond.getBoundParams();
+         String operator = cond.operator;
          for (int i = 0; i < paramBindings.length; i++) {
             IBinding paramBinding = paramBindings[i];
             if (i != 0) {
                SelectQuery curQuery = groupQuery.curQuery;
-               StringBuilder logSB = curQuery.logSB;
-               if (logSB != null) {
-                  logSB.append(" ");
-                  logSB.append(DBUtil.cvtJavaToSQLOperator(cond.operator).toString());
-                  logSB.append(" ");
+               if (paramBinding instanceof ConstantBinding && ((ConstantBinding) paramBinding).getConstantValue() == null) {
+                  StringBuilder logSB = curQuery.logSB;
+                  if (logSB != null) {
+                     if (operator.equals("=="))
+                        logSB.append(" IS NULL");
+                     else if (operator.equals("!="))
+                        logSB.append(" IS NOT NULL");
+                  }
+                  continue;
+               }
+               else {
+                  StringBuilder logSB = curQuery.logSB;
+                  if (logSB != null) {
+                     logSB.append(" ");
+                     logSB.append(DBUtil.cvtJavaToSQLOperator(cond.operator).toString());
+                     logSB.append(" ");
+                  }
                }
             }
             appendParamValues(groupQuery, curTypeDesc, curObj, paramBinding);
@@ -1609,7 +1647,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
          // This is an a.b.c that corresponds to a column in the DB
          if (queryProp != null) {
-            Object propValue = DynUtil.getPropertyValue(curObj.getInst(), queryProp.propertyName);
+            //Object propValue = DynUtil.getPropertyValue(curObj.getInst(), queryProp.propertyName);
+            Object propValue = null; // Do we need this at all with compareOp == null - if it.s an a.b it might not be defined since we don't set 'a' in this case
             appendDBPropParamValue(curQuery, getParentPropertyName(varBind), queryProp, curQuery.logSB, null, propValue);
          }
          else {
@@ -1622,7 +1661,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   IBinding[] boundParams = methBind.getBoundParams();
                   // var.equals(...)
                   if (methName.equals("equals") && boundParams.length == 1) {
-                     appendPropParamValues(groupQuery, curTypeDesc, curObj, getPathPropertyName(varBind, 0), false, null);
+                     appendPropParamValues(groupQuery, curTypeDesc, curObj, getPathPropertyName(varBind, 0), false, null, true, null);
                      if (curQuery.logSB != null)
                         curQuery.logSB.append(" = ");
                      appendParamValues(groupQuery, curTypeDesc, curObj, boundParams[0]);
@@ -1668,8 +1707,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          StringBuilder logSB = curQuery.logSB;
          if (logSB != null) {
             Object cval = cbind.getConstantValue();
-            if (cval == null)
+            if (cval == null) {
                logSB.append(" IS NULL");
+            }
             else if (cval instanceof CharSequence) {
                logSB.append("'");
                logSB.append(cval.toString());
@@ -1920,7 +1960,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (binding instanceof IBeanMapper) {
          IBeanMapper propMapper = (IBeanMapper) binding;
          String propName = propMapper.getPropertyName();
-         appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, propName, true, null, false);
+         appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, propName, true, null, false, true, null);
       }
       else if (binding instanceof ConditionalBinding) {
          ConditionalBinding cond = (ConditionalBinding) binding;
@@ -1961,7 +2001,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          SelectQuery curQuery = groupQuery.curQuery;
          DBPropertyDescriptor queryProp = getDBColumnProperty(varBind);
          if (queryProp != null) {
-            appendPropToWhereClause(groupQuery, queryProp.dbTypeDesc, curObj, getParentPropertyName(varBind), queryProp.propertyName, false, null, false);
+            appendPropToWhereClause(groupQuery, queryProp.dbTypeDesc, curObj, getParentPropertyName(varBind), queryProp.propertyName, false, null, false, true, null);
          }
          else {
             if (numInChain == 2) {
@@ -1972,7 +2012,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   String methName = DynUtil.getMethodName(methBind.getMethod());
                   IBinding[] boundParams = methBind.getBoundParams();
                   if (methName.equals("equals") && boundParams.length == 1) {
-                     appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, getPathPropertyName(varBind, 0), false, null, false);
+                     appendPropToWhereClause(groupQuery, curTypeDesc, curObj, null, getPathPropertyName(varBind, 0), false, null, false, true, null);
                      curQuery.whereAppend(" = ");
                      appendBindingToWhereClause(groupQuery, curTypeDesc, curObj, boundParams[0]);
                      return;
@@ -2082,7 +2122,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    private void appendPropToWhereClause(SelectGroupQuery groupQuery, DBTypeDescriptor curTypeDesc, DBObject curObj,
                                         String parentPropPath, String propNamePath, boolean needsParens, QCompare comparator,
-                                        boolean topLevelQueryProp) {
+                                        boolean topLevelQueryProp, boolean useProtoValue, Object compareVal) {
       SelectQuery curQuery = groupQuery.curQuery;
       DBPropertyDescriptor dbProp = curTypeDesc.getPropertyDescriptor(propNamePath);
       if (dbProp != null) {
@@ -2102,7 +2142,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          // If this is a top-level property used in the original query, the value in the protoType is used as the
          // argument. For boolean properties, a false value will negate the query for example. But for nested properties
          // we ignore the property value.
-         Object propValue = topLevelQueryProp ? curObj.getPropertyInPath(propNamePath) : null;
+         Object propValue = useProtoValue ? (topLevelQueryProp ? curObj.getPropertyInPath(propNamePath) : null) : compareVal;
          if (comparator != null && propValue == null && parentPropPath == null && topLevelQueryProp) {
             // TODO: this should add the table name if parentPropPath is not null right?
             curQuery.whereAppend(dbProp.columnName + " IS NULL");
@@ -2113,6 +2153,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             if (comparator != null) {
                if (comparator == QCompare.Equals)
                   curQuery.whereAppend("? = ");
+               else if (comparator == QCompare.NotEquals)
+                  curQuery.whereAppend("? != ");
             }
             curQuery.appendWhereColumn(parentPropPath, dbProp);
             if (comparator == QCompare.Match)
@@ -2130,6 +2172,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   if (comparator != null) {
                      if (comparator == QCompare.Equals)
                         curQuery.whereAppend("? = ");
+                     else if (comparator == QCompare.NotEquals)
+                        curQuery.whereAppend("? != ");
                   }
                   StringBuilder pathRes = getPathRes(propNames, i+1);
                   curQuery.appendJSONWhereColumn(pathProp.getTableName(), pathProp.columnName, pathRes.toString());
@@ -2153,16 +2197,17 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
                Object inst = curObj.getInst();
 
-               Object propVal = topLevelQueryProp ? DynUtil.getPropertyValue(inst, propName) : null;
+               Object propVal = useProtoValue ? (topLevelQueryProp ? DynUtil.getPropertyValue(inst, propName) : null) : compareVal;
                Object propType = DynUtil.getPropertyType(DynUtil.getType(inst), propName);
                boolean needsInnerParen = false;
                if ((propType == Boolean.class || propType == Boolean.TYPE)) {
-                  if (propVal == null)
-                     propVal = Boolean.TRUE;
+                  boolean boolVal = propVal == null ? Boolean.TRUE : (Boolean) propVal;
 
+                  if (comparator == QCompare.NotEquals)
+                     boolVal = !boolVal;
                   // For boolean properties we could write it out as: TRUE = (a > b) but we can simplify that
                   // to just the RHS. For
-                  if (!((Boolean)propVal)) {
+                  if (!boolVal) {
                      curQuery.whereAppend("NOT ");
                      needsInnerParen = true;
                   }

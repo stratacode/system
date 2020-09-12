@@ -17,6 +17,10 @@ public abstract class Query {
       return new OpQuery(propName, QCompare.Equals, value);
    }
 
+   public static Query neq(String propName, Object value) {
+      return new OpQuery(propName, QCompare.NotEquals, value);
+   }
+
    public static Query match(String propName, Object value) {
       return new OpQuery(propName, QCompare.Match, value);
    }
@@ -37,4 +41,6 @@ public abstract class Query {
    }
    public abstract void addAllPropertyNames(List<String> res);
    public abstract void addAllPropertyValues(List<Object> res);
+
+   public abstract String toString();
 }
