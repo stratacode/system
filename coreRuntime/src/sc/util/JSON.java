@@ -94,6 +94,10 @@ public class JSON {
             Date res = DynUtil.parseDate(((CharSequence) value).toString());
             return res;
          }
+         else if (DynUtil.isEnumType(propertyType)) {
+            String enumConstName = ((CharSequence) value).toString();
+            return DynUtil.getEnumConstant(propertyType, enumConstName);
+         }
          else {
             String res = value.toString();
             int len = res.length();
@@ -239,6 +243,11 @@ public class JSON {
       else if (val instanceof Date) {
          sb.append('"');
          sb.append(DynUtil.formatDate((Date) val));
+         sb.append('"');
+      }
+      else if (val instanceof Enum) {
+         sb.append('"');
+         sb.append(((Enum) val).name());
          sb.append('"');
       }
       else {
