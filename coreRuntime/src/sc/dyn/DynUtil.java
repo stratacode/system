@@ -1539,6 +1539,8 @@ public class DynUtil {
    public static boolean isEnumType(Object type) {
       if (type instanceof Class) {
          Class cl = (Class) type;
+         if (cl == Object.class)
+            return false;
          if (cl.isEnum())
             return true;
          boolean res = ((Class<?>) type).isAssignableFrom(Enum.class);
