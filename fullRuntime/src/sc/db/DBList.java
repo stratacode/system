@@ -266,6 +266,9 @@ public class DBList<E extends IDBObject> extends java.util.ArrayList<E> implemen
             }
          }
       }
+      TxListUpdate<E> listUpdate = dbObject == null ? null : dbObject.getListUpdate(this, false, false);
+      if (listUpdate != null)
+         return listUpdate.newList.toArray();
       return super.toArray();
    }
 
