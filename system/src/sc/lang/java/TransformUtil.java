@@ -761,6 +761,13 @@ public class TransformUtil {
            "<% if (sameValueCheck) { %>" +
            "      boolean _valChanged = !sc.dyn.DynUtil.equalObjects(_<%=lowerPropertyName%>, <%=lowerPropertyName%>);\n" +
            "<% }\n" +
+                   /*
+           "if (onDemand) { %>" +
+           "      <%=bindClass%>.refreshBinding(this, \"<%= lowerPropertyName %>\");\n" +
+           "<% }\n" +
+           "if (lazy) { %>" +
+           "      <%=bindClass%>.sendEvent(sc.bind.IListener.VALUE_REQUESTED, <%=!isStatic ? \"this\" : enclosingTypeName + \".class\"%>, <%=propertyMappingName%>, _<%= lowerPropertyName %>);\n" +
+           "<% }\n" + */
            "if (overrideGetSet) { %>\n" +
            "      <%=superSetName%>(_<%=lowerPropertyName%>);\n" +
            "<% }\n" +
@@ -994,6 +1001,13 @@ public class TransformUtil {
          else
             params.sameValueCheck = false;
       }
+      /*
+      Object lazyObj = ModelUtil.getAnnotationValue(field, BINDABLE_ANNOTATION, "lazy");
+      if (lazyObj != null)
+         params.lazy = (Boolean) lazyObj;
+      else
+         params.lazy = false;
+      */
 
       if (variableDefinition.initializer == null)
          params.initializer = "";
