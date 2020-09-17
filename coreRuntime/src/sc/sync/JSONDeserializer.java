@@ -294,6 +294,10 @@ public class JSONDeserializer implements JSONResolver {
 
    public void invokeMethod(CharSequence methName, CharSequence typeSig, List args, CharSequence callIdSeq) {
       Object curObj = getCurObj();
+      if (curObj == null) {
+         System.err.println("*** Null current object/type for invocation of method: " + methName);
+         return;
+      }
       boolean isType = DynUtil.isSType(curObj);
       Object curType = isType ? curObj : DynUtil.getSType(curObj);
       String callId = callIdSeq.toString();
