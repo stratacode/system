@@ -52,5 +52,8 @@ public @interface Bindable {
    // disabled? - to force an error
    /** Should this binding not send a change event when setX is called with the same value. */
    boolean sameValueCheck() default false;
-   // TODO: add lazy=true that does a 'refreshBinding(obj,prop)' in the getX call before returning the value.
+   /** Set on a property that does not send change events. Instead, a VALUE_REQUESTED (or refresh binding?) event is sent in the getX method that triggers the binding to be refreshed. */
+   // TODO: the idea behind lazy is for it to not need the sendEvent calls in properties used in bindings on this property
+   // Instead, when the getX method is called we'll check if those properties have changed and update the bindings
+   //boolean lazy() default false;
 }
