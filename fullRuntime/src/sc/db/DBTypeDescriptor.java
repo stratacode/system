@@ -1024,7 +1024,6 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    private void replaceInstanceInternal(IDBObject inst) {
-
       if (typeInstances == null) {
          initTypeInstances();
       }
@@ -1037,7 +1036,6 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          }
       }
       DBUtil.mapTestInstance(inst);
-
    }
 
    public void replaceInstance(IDBObject inst) {
