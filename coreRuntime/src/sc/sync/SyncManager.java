@@ -1126,6 +1126,7 @@ public class SyncManager {
          for (Map.Entry<String,Object> pendingPropEnt:pendingMap.entrySet()) {
             String propName = pendingPropEnt.getKey();
             Object propVal = pendingPropEnt.getValue();
+            propVal = copyMutableValue(propVal);
             prevMap.put(propName, propVal);
 
             //if (trace) {
@@ -2064,6 +2065,9 @@ public class SyncManager {
             propName = (String) prop;
             flags = syncProps.getSyncFlags(propName);
          }
+         if ((flags & SyncPropOptions.SYNC_RECEIVE_ONLY) != 0)
+            return;
+
          if ((flags & SyncPropOptions.SYNC_ON_DEMAND) == 0 || toRemove.isFetchedOnDemand(propName))
             Bind.removeListener(inst, propName, syncListener, IListener.VALUE_CHANGED_MASK);
       }
