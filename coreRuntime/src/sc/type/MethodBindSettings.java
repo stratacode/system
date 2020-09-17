@@ -29,6 +29,6 @@ public class MethodBindSettings {
 
 
    public String getReverseMethodName() {
-      return DynUtil.getMethodName(reverseMethod);
+      return reverseMethod == null ? "<invalid-reverse-method>" : DynUtil.getMethodName(reverseMethod);
    }
 }
