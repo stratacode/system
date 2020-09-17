@@ -876,7 +876,7 @@ public class Bind {
    /** Sends the specified event, e.g. value changed to the property of the given object.  The event property contains a bit mask of the events to send, constants on the IListener interface, e.g. IListener.VALUE_CHANGED
     * The event mask can contain more than one event.   ValueChanged for example sends both value-invalidated and value-validated events.
     * This two pass approach can greatly reduce the number of bindings in complex situations and improves the consistency, getting rid of "validates" that occur with stale values.
-    * This variant does not send a "detail value" but that's helepful for logging.  For array element changes, you need the location as the detail but the value typically is computed from the binding.
+    * This variant does not send a "detail value" (used mainly for logging when it's present)  For array element changes, you need the location as the detail but the value typically is computed from the binding.
     * */
    public static void sendEvent(int event, Object obj, Object prop) {
       if (prop instanceof String)
