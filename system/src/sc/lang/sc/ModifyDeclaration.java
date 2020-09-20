@@ -8,6 +8,7 @@ import sc.classfile.CFClass;
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
 import sc.lang.*;
+import sc.lang.js.JSRuntimeProcessor;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.layer.SrcEntry;
@@ -2154,8 +2155,12 @@ public class ModifyDeclaration extends TypeDeclaration {
       List<Object> modProps;
       if (!modifyInherited || (!thisClassOnly || (includeInherited && getInheritProperties()))) {
 
-         // Need to start this type here because we are about to get the modify object
-         ModelUtil.ensureStarted(this, false);
+         // Need to init the type info here because we are about to get the modify object - don't call start here because
+         // we call this in the process of starting the type and sub-types won't be excluded yet
+         if (!typeInfoInitialized)
+            initTypeInfo();
+
+         //ModelUtil.ensureStarted(this, false);
 
          Object modifyObj = getModifyObj();
          if (modifyObj == null)

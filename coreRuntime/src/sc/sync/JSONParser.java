@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static sc.sync.JSONFormat.ExprPrefixes.isRefPrefix;
 
+@sc.js.JSSettings(jsModuleFile="js/sync.js", prefixAlias="sc_")
 public class JSONParser {
    CharSequence input;
    int len;

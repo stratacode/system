@@ -34,4 +34,7 @@ public interface IRepeatWrapper {
     * In this method, set the repeat index for all elements after fromIx in the list.
     */
    void updateElementIndexes(int fromIx);
+
+   /** Called when refreshing after a repeat value change for each slot where the value is still the same.  */
+   //Element validateElement(Object value, int ix, Element oldTag);
 }

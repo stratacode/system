@@ -70,6 +70,13 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return;
       }
 
+      if (encType.excluded) {
+         started = true;
+         validated = true;
+         processed = true;
+         return;
+      }
+
       EnumSet<MemberType> mtype;
       if (initializer == null)
          mtype = MemberType.PropertyGetSet;
@@ -158,6 +165,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
 
    public void validate() {
       if (validated) return;
+
+      TypeDeclaration typeDecl = getEnclosingType();
+      if (typeDecl != null && typeDecl.excluded) {
+         validated = true;
+         return;
+      }
 
       super.validate();
 
@@ -260,6 +273,10 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return;
 
       super.process();
+
+      TypeDeclaration enclType = getEnclosingType();
+      if (enclType != null && enclType.excluded)
+         return;
 
       // Need this done late enough so that all of the JS files and other state like that commonly used in this expressions
       // have been set but don't put it in transform because then it won't run for dynamic types.
@@ -609,7 +626,8 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          cpi.propTypes.set(ix, getTypeDeclaration());
 
          // Always use "=" for the operator since we just want the initial value of the expression.
-         VariableStatement varSt = VariableStatement.create(propType, propertyName, "=", init.deepCopy(ISemanticNode.CopyNormal, null));
+         VariableStatement varSt = VariableStatement.create(propType, propertyName, "=",
+                 cpi.wrapInitExpr(propertyName, init.deepCopy(ISemanticNode.CopyNormal, null)));
          cpi.initStatements.set(ix, varSt);
 
          // If this is a simple assignment, we can suppress the generation. If it's a data binding expression, we'll duplicate the initialization when we set up the

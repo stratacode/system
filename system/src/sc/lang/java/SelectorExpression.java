@@ -131,6 +131,10 @@ public class SelectorExpression extends ChainedExpression {
 
       super.validate();
 
+      TypeDeclaration typeDecl = getEnclosingType();
+      if (typeDecl != null && typeDecl.excluded)
+         return;
+
       if (bindingDirection != null) {
          Object referenceType;
          int numSelectors = selectors.size();

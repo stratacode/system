@@ -518,6 +518,19 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    public void start() {
       try {
+         if (tagObject != null && !tagObject.isStarted())
+            tagObject.initExcluded();
+         if (tagObject != null && tagObject.excluded) {
+            started = true;
+            /*
+            if (tagObject.excludedStub != null && !tagObject.excludedStub.isStarted())
+               tagObject.excludedStub.start();
+            else if (!tagObject.isStarted())
+               tagObject.start();
+            */
+            return;
+         }
+
          super.start();
          if (tagObject != null && !tagObject.isStarted())
             tagObject.start();
@@ -3822,7 +3835,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex", "download", "target", "hreflang", "media", "rel", "type", "referrerpolicy"}, new String[] {"href"});
       addTagAttributes("script", "element", new String[] {"type", "src", "integrity", "crossorigin", "charset", "async", "defer"}, new String[] {"src"});
       addTagAttributes("link", "element", new String[] {"rel", "type", "href", "tabindex", "integrity", "crossorigin", "hreflang", "media", "referrerpolicy", "sizes", "title"}, new String[] {"href"});
-      addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt"}, new String[] {"src"});
+      addTagAttributes("img", "element", new String[] {"src", "width", "height", "alt", "srcset", "sizes"}, new String[] {"src"});
       addTagAttributes("style", "element", new String[] {"type"}, null);
       addTagAttributes("pre", "element", emptyArgs, null);
       addTagAttributes("code", "element", emptyArgs, null);

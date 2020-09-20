@@ -290,4 +290,8 @@ public class DefaultRuntimeProcessor implements IRuntimeProcessor, Serializable 
    public boolean supportsTagCaching() {
       return true;
    }
+
+   public boolean hasDefinitionForType(String typeName) {
+      return system.getSrcTypeDeclaration(typeName, system.buildLayer, true, false, true, system.buildLayer, false) != null;
+   }
 }

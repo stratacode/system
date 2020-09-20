@@ -1,5 +1,7 @@
 package sc.util;
 
+import sc.js.JSSettings;
+
 import java.util.Collection;
 
 /** 
@@ -9,6 +11,7 @@ import java.util.Collection;
   Because it is synchronizable as a property and sends change events we disable the auto-sync stuff for it.  
   */
 @sc.obj.Sync(syncMode=sc.obj.SyncMode.Disabled)
+@JSSettings(jsModuleFile="js/scutil.js", prefixAlias="sc_")
 public class BArrayList<E> extends java.util.ArrayList<E> implements sc.bind.IChangeable {
 
     public BArrayList(int initialCapacity) {

@@ -873,6 +873,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       if (!td.isRealType())
          return;
 
+      // It's been excluded from this process
+      if (!td.needsCompile())
+         return;
+
       //if (verboseJS && td.getEnclosingType() == null)
       //   system.verbose("Starting for JS: " + td.getFullTypeName());
 
@@ -1676,12 +1680,10 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // for example when there's an annotation set on the annotation layer for java.lang.Object.
       if (resolve)
          type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, true, null);
-      Object settingsObj = inherited ? ModelUtil.getInheritedAnnotation(system, type, "sc.js.JSSettings") : ModelUtil.getAnnotation(type, "sc.js.JSSettings");
-      if (settingsObj != null) {
-         String jsFilesStr = (String) ModelUtil.getAnnotationValue(settingsObj, attribute);
-         if (jsFilesStr != null && jsFilesStr.length() > 0) {
-            return jsFilesStr;
-         }
+      String jsFilesStr = (String) (inherited ? ModelUtil.getInheritedAnnotationValue(system, type, "sc.js.JSSettings", attribute) :
+                                                ModelUtil.getAnnotationValue(type, "sc.js.JSSettings", attribute));
+      if (jsFilesStr != null && jsFilesStr.length() > 0) {
+         return jsFilesStr;
       }
       return null;
    }
@@ -3318,13 +3320,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       ArrayList<String> resFiles = new ArrayList<String>();
       resFiles.add(modFile);
 
-      for (int i = startIx-1; i >= 0; i--) {
-         String curFile = jsBuildInfo.jsFiles.get(i);
-         for (int j = 0; j < resFiles.size(); j++) {
-            // Returns any dependency between the files - uses or extends
-            if (hasDependency(resFiles.get(j), curFile, null)) {
-               resFiles.add(0, curFile);
-               break;
+      if (startIx == -1) {
+         System.err.println("*** Module file: " + modFile + " not in list of jsFiles - not able to determine JS dependencies");
+      }
+      else {
+         for (int i = startIx-1; i >= 0; i--) {
+            String curFile = jsBuildInfo.jsFiles.get(i);
+            for (int j = 0; j < resFiles.size(); j++) {
+               // Returns any dependency between the files - uses or extends
+               if (hasDependency(resFiles.get(j), curFile, null)) {
+                  resFiles.add(0, curFile);
+                  break;
+               }
             }
          }
       }
@@ -3653,5 +3660,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public boolean supportsTagCaching() {
       return false;
+   }
+
+   public boolean hasDefinitionForType(String typeName) {
+      return getCachedJSModuleFile(typeName) != null;
    }
 }

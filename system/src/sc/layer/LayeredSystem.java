@@ -12136,8 +12136,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
             // If we have searched from this position before we can use the cache entry.
             if (fromPosition == -1 || decls.fromPosition >= fromPosition) {
-               if (fromLayer == null)
-                  return decls.get(0);
+               if (fromLayer == null) {
+                  TypeDeclaration retDecl = decls.get(0);
+                  if (srcLayer == null || retDecl.layer.layerPosition >= srcLayer.layerPosition)
+                     return decls.get(0);
+               }
                else {
                   for (int i = 0; i < decls.size(); i++) {
                      TypeDeclaration ldec = decls.get(i);
@@ -16078,7 +16081,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    /** This method is used by BuildInit hooks to inject the set of compile files into generated script tags or other similar patterns for other languages */
    public List<String> getCompiledFiles(String lang, String typeName) {
       IRuntimeProcessor langRT = hasActiveRuntime(lang) ? getRuntime(lang) : null;
-      if (langRT == null) {
+      if (langRT == null || !langRT.hasDefinitionForType(typeName)) {
          // No javascript runtime - do we need to include the server tags Javascript files? - TODO: should this be moved into a hook that's specific to the HTML framework
          if (lang.equals("js")) {
             Object type = getTypeDeclaration(typeName);

@@ -41,4 +41,11 @@ public class PageInfo {
       return pattern + (pageType == null ? " <no type>" : "(" + pageTypeName + ")");
    }
 
+   /**
+    * This is used on the client side to fetch constructor properties from the URL. The server code in PageDispatcher
+    * will retrieve these values and use them to construct the page object skipping the object's getX method
+    */
+   public static Object getURLProperty(String className, String propName, Object defaultValue) {
+      return defaultValue;
+   }
 }

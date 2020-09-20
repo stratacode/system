@@ -81,6 +81,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
     */
    transient public TypeDeclaration excludedStub = null;
    transient public boolean isExcludedStub = false; // Set to true for the excludedStub type itself
+   transient private boolean excludedInited = false;
 
    /**
     * Set to true for types which are modified dynamically.  Either because they have the dynamic keyword or because they're in or modified by a dynamic layer
@@ -8377,23 +8378,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          hiddenBody.init();
    }
 
-   public void start() {
-      if (!initialized)
-         System.err.println("*** Error - starting uninitialized type!");
-      if (started)
+   public void initExcluded() {
+      if (excludedInited)
          return;
+      excludedInited = true;
 
-      // Don't start the model types for excluded layers - they'll be started in other runtimes
+      startModifiers();
+
       LayeredSystem sys = getLayeredSystem();
-
-      if (isLayerType && layer != null && layer.excluded) {
-         markExcluded(true);
-      }
-
-      if (!excluded)
-         super.start();
-
-      // Need to do this after we start the @Exec annotation
+      // Need to do this after the modifiers have started but before we try to start any expressions in here that might
+      // not resolve properly because they refer to identifiers not in this process
       if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && ModelUtil.execForRuntime(sys, layer, this, sys) == RuntimeStatus.Disabled) {
          if (!excluded) {
             if (sys.options.verbose || sys.options.verboseExec)
@@ -8404,10 +8398,29 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             markExcluded(enclType == null || !enclType.excluded);
          }
       }
+   }
+
+   public void start() {
+      if (!initialized)
+         System.err.println("*** Error - starting uninitialized type!");
+      if (started)
+         return;
+
+
+      if (isLayerType && layer != null && layer.excluded) {
+         markExcluded(true);
+      }
+
+      initExcluded();
+
+      if (!excluded)
+         super.start();
 
       if (!excluded) {
          if (hiddenBody != null)
             hiddenBody.start();
+
+         LayeredSystem sys = getLayeredSystem();
 
          if (sys != null) {
             Layer layer = getLayer();
@@ -9976,6 +9989,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             res.excludedStub = excludedStub.deepCopy(options, oldNewMap);
          }
          res.isExcludedStub = isExcludedStub;
+         res.excludedInited = excludedInited;
 
          res.innerObjs = innerObjs;
 
@@ -10001,6 +10015,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          res.syncPropertiesInited = syncPropertiesInited;
          res.autoComponent = autoComponent;
          res.anonIdsAllocated = anonIdsAllocated;
+
          //res.clientModifiers = clientModifiers;
       }
 
@@ -10482,6 +10497,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    /** An excluded type can have an excludedStub that's inserted in it's place */
    public boolean needsCompile() {
+      if (!excludedInited)
+         initExcluded();
       return !excluded || excludedStub != null;
    }
 

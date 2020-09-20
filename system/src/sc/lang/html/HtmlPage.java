@@ -26,7 +26,9 @@ import java.util.List;
 // TODO: on the client, this uses the js_Page_c constructor which we can't easily replicate in Java.  But maybe it should extend Page
 // and have it just set tagName to 'html'?
 @Sync(syncMode= SyncMode.Default) // Turn back on sync mode for user defined page types so that any fields they defined will be synchronized by default. - TODO call this SyncMode.Unset?
-@CompilerSettings(liveDynamicTypes=true) // An important component - nice to track instances for the command line editor
+// Set liveDynamicTypes here since this an important set of types that are nice to track instances for the command line editor
+// Set initConstructorPropertyMethod so that @URL constructor properties can be used to override the default value of constructor properties.
+@CompilerSettings(liveDynamicTypes=true,initConstructorPropertyMethod="sc.lang.html.PageInfo.getURLProperty")
 public class HtmlPage extends Html implements IPage {
    private final static sc.type.IBeanMapper _pageVisitProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HtmlPage.class, "pageVisitCount");
 

@@ -375,7 +375,6 @@ public class ClassDeclaration extends TypeDeclaration {
       boolean isOverrideField = false;
       boolean typeIsComponentClass;
 
-
       // If our parent type was excluded, we should not be here.  So this must be the case where we are an inner type
       // that's excluded from it's outer type in this runtime - just remove this code from the parent.
       if (excluded) {
@@ -1253,17 +1252,21 @@ public class ClassDeclaration extends TypeDeclaration {
             constructorPropInfo = cpi;
             List<String> propNames = cpi.propNames = Arrays.asList(StringUtil.split(constrPropStr, ","));
 
+            String initConstructorPropertyMethod = (String) ModelUtil.getAnnotationValueFromList(compilerSettingsList, "initConstructorPropertyMethod");
+
             LayeredSystem sys = getLayeredSystem();
 
             int sz = propNames.size();
             cpi.initStatements = new SemanticNodeList<Statement>(sz);
             cpi.propJavaTypes = new ArrayList<JavaType>(sz);
             cpi.propTypes = new ArrayList<Object>(sz);
+            cpi.getMethodName = initConstructorPropertyMethod;
             for (int i = 0; i < sz; i++) {
                cpi.initStatements.add(null);
                cpi.propJavaTypes.add(null);
                cpi.propTypes.add(null);
             }
+            cpi.typeName = getFullTypeName(false, false);
 
             // Now gather up the current type's definitions for these properties
             modType.addConstructorProps(cpi);

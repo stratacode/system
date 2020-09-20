@@ -114,4 +114,6 @@ public interface IRuntimeProcessor {
     * the cache is the DOM itself so no need to set the cache property in the generated tag object
     */
    public boolean supportsTagCaching();
+
+   boolean hasDefinitionForType(String typeName);
 }

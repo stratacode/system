@@ -122,6 +122,12 @@ public @interface CompilerSettings { // TODO: rename to GeneratorSettings?
     */
    String constructorProperties() default "";
 
+   /**
+    * When constructorProperties is defined for a class, the initConstructorPropertyMethod specifies a static fully qualified method name like:
+    * "sc.lang.html.PageInfo.getURLProperty" to call the method: Object sc.lang.html.PageInfo.getURLProperty(String className, String propName, Object defaultValue)
+    */
+   String initConstructorPropertyMethod() default "";
+
    /** Set to false on a type, or a base-type so that properties in the base-type are inherited by sub-classes in the editor's view of the type */
    boolean inheritProperties() default true;
 

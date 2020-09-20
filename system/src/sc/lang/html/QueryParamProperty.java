@@ -113,4 +113,5 @@ public class QueryParamProperty extends BaseURLParamProperty {
       else
          throw new UnsupportedOperationException("No converter for query parameter type: " + propType);
    }
+
 }

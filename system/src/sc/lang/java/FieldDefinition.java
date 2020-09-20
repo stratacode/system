@@ -908,7 +908,8 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
 
    public void collectConstructorPropInit(ConstructorPropInfo cpi) {
       for (VariableDefinition varDef:variableDefinitions) {
-         int ix = cpi.propNames.indexOf(varDef.variableName);
+         String propName = varDef.variableName;
+         int ix = cpi.propNames.indexOf(propName);
          if (ix != -1) {
             // Create an assignment statement of the form:
             //     propType propName = initializer;
@@ -920,14 +921,19 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
             cpi.propTypes.set(ix, propType);
 
             VariableStatement varSt;
-            if (init == null)
-               varSt = VariableStatement.create(propJavaType, varDef.variableName, "=",
-                       ModelUtil.isPrimitive(propJavaType) ?
-                               AbstractLiteral.createFromValue(Type.get((Class) propType).getDefaultObjectValue(), false) :
-                               NullLiteral.create());
-            else
-               varSt = VariableStatement.create(propJavaType, varDef.variableName, varDef.operator,
-                        init.deepCopy(ISemanticNode.CopyNormal, null));
+            String operator;
+            if (init == null) {
+               init = ModelUtil.isPrimitive(propJavaType) ?
+                       AbstractLiteral.createFromValue(Type.get((Class) propType).getDefaultObjectValue(), false) :
+                       NullLiteral.create();
+               operator = "=";
+            }
+            else {
+               init = init.deepCopy(ISemanticNode.CopyNormal, null);
+               operator = varDef.operator;
+            }
+            init = cpi.wrapInitExpr(propName, init);
+            varSt = VariableStatement.create(propJavaType, propName, operator, init);
             cpi.initStatements.set(ix, varSt);
             // TODO: mark this variable definition to remove the initializer during transform. Otherwise
             // we'll do it twice - once before the constructor is called and again when the field is initialized.

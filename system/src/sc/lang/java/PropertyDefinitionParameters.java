@@ -38,6 +38,7 @@ public class PropertyDefinitionParameters {
    public String preReturn;
    public String postReturn;
    public boolean sameValueCheck;
+   //public boolean lazy;
    public boolean useIndexSetForArrays = true;
 
    public String dbObjPrefix ="";

@@ -76,11 +76,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       */
    }
 
-   public void start() {
-      if (started)
-         return;
-      super.start();
-
+   public void startModifiers() {
       LayeredSystem sys = null;
       boolean hasDefault = false;
       if (modifiers != null) {
@@ -133,6 +129,14 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       if (!hasDefault) {
          defaultModifier = getDefaultModifier();
       }
+   }
+
+   public void start() {
+      if (started)
+         return;
+      super.start();
+
+      startModifiers();
    }
 
    public void validate() {

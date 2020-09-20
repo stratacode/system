@@ -54,4 +54,36 @@ public abstract class BaseURLParamProperty {
       */
    }
 
+   public Object convertToPropertyValue(String strVal) {
+      IBeanMapper localMapper = getMapper();
+      if (ModelUtil.isInteger(propType)) {
+         // Don't set int properties which are not set. For strings, we'll set 'null' as the value
+         if (strVal == null)
+            return null;
+
+         int intVal;
+         try {
+            intVal = Integer.parseInt(strVal);
+         }
+         catch (NumberFormatException exc) {
+            throw new IllegalArgumentException("Illegal value for integer property: " + strVal);
+         }
+         return intVal;
+      }
+      else if (ModelUtil.isBoolean(propType)) {
+         boolean boolVal = false;
+         if (strVal != null) {
+            if (strVal.equals("") || strVal.equalsIgnoreCase("true"))
+               boolVal = true;
+            else if (!strVal.equalsIgnoreCase("false"))
+               throw new IllegalArgumentException("Invalid value for boolean query parameter: " + strVal + " - must be null, empty, true, or false");
+         }
+
+         return boolVal;
+      }
+      else if (ModelUtil.isString(propType))
+         return strVal;
+      else
+         throw new UnsupportedOperationException("No converter for query parameter type: " + propType);
+   }
 }
