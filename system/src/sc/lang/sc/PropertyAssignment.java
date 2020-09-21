@@ -77,15 +77,7 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
          return;
       }
 
-      EnumSet<MemberType> mtype;
-      if (initializer == null)
-         mtype = MemberType.PropertyGetSet;
-      else if (bindingDirection == null || bindingDirection.doForward())
-         mtype = MemberType.PropertySetSet;
-      else {
-         // Reverse only bindings - anything that's binding which includes a getX method with no setX.
-         mtype = MemberType.PropertyGetSetSet;
-      }
+      EnumSet<MemberType> mtype = getMemberTypeForLookup();
 
       // Sometimes happens during code-completion parsing
       if (propertyName == null) {
@@ -155,6 +147,28 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       }
 
       super.start();
+   }
+
+   EnumSet<MemberType> getMemberTypeForLookup() {
+      EnumSet<MemberType> mtype;
+      if (initializer == null)
+         mtype = MemberType.PropertyGetSet;
+      else if (bindingDirection == null || bindingDirection.doForward())
+         mtype = MemberType.PropertySetSet;
+      else {
+         // Reverse only bindings - anything that's binding which includes a getX method with no setX.
+         mtype = MemberType.PropertyGetSetSet;
+      }
+      return mtype;
+   }
+
+   private void initAssignedProperty() {
+      // Using "defines" here, not "find" as we do not want to inherit property assignments.  Why?  It's too easy to pick up a parent's property when a child's is not defined.  Get no error
+      // and wonder why things are not working.  Secondly, we don't handle all of the cases for when the property is not in the type.  For example, when the type gets optimized away, we do not
+      // implement the binding correctly.  So simpler is better.  Make sure the property is defined in the enclosing type.
+      if (assignedProperty == null) {
+         assignedProperty = getEnclosingType().definesMember(propertyName, getMemberTypeForLookup(), getEnclosingIType(), null);
+      }
    }
 
    public Object getPropertyTypeDeclaration() {
@@ -789,8 +803,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
       if (internal != null)
          return internal;
 
-      if (!isStarted())
-         ParseUtil.realInitAndStartComponent(this);
+      if (!isStarted()) {
+         initAssignedProperty();
+         // Don't want to call initializer.setInferredType(..) here since that will resolve the value of the assignment
+         // and we might be in the midst of a definesMember call looking for the type of a repeat element
+         //ParseUtil.realInitAndStartComponent(this);
+      }
       if (assignedProperty != null)
          return ModelUtil.getAccessLevel(assignedProperty, explicitOnly);
       return null;
