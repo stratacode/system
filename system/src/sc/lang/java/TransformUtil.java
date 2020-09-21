@@ -1237,7 +1237,7 @@ public class TransformUtil {
       if (params.getNeedsIndexedSetter()) // Not including annotations here because for JPA and datanucleus in particular, @Lob and other annotations on an array will cause it to try and enhance the setIndexed method which leads to a verify error
          params.setIndexedModifiers = removeModifiers(ModelUtil.modifiersToString(setMethod == null ? definition : setMethod, false, true, false, false, false, JavaSemanticNode.MemberType.SetMethod), fieldOnlyModifiers);
 
-      if (bindable && ModelUtil.getBindableAnnotation(variableDef == null ? definition : variableDef) == null) {
+      if (bindable && ModelUtil.getBindableAnnotation(variableDef == null ? definition : variableDef) == null && (getMethod == null || ModelUtil.getBindableAnnotation(getMethod) == null)) {
          // TODO: eliminate two of these?
          params.setModifiers = "@" + params.bindableClass + "(manual=true) " + removeModifiers(params.setModifiers, bindableModifiers);
          params.getModifiers = "@" + params.bindableClass + "(manual=true) " + removeModifiers(params.getModifiers, bindableModifiers);
