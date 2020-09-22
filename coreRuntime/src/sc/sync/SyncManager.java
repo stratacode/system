@@ -1742,11 +1742,25 @@ public class SyncManager {
                break;
          }
 
+         /*
          if (childContexts != null) {
             synchronized (this) {
                for (SyncContext childCtx:childContexts) {
                   if (childCtx.syncInsts.get(syncObj) != null)
                      childCtx.recordChange(syncObj, syncProp, value, syncGroup);
+               }
+            }
+         }
+         */
+         if (childSyncInsts != null) {
+            Set<InstInfo> childInstInfos = childSyncInsts.get(syncObj);
+            if (childInstInfos != null) {
+               for (InstInfo childInstInfo:childInstInfos) {
+                  if (childInstInfo.syncContext == this)
+                     System.err.println("*** Invalid childInstInfo!");
+                  else {
+                     childInstInfo.syncContext.valueInvalidatedInternal(syncObj, syncProp, value, syncGroup, action);
+                  }
                }
             }
          }
