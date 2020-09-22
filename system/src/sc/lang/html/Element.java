@@ -4286,8 +4286,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void removeElement(Element elem, int ix) {
+      removeRepeatElement(elem);
+   }
+
+   public void removeRepeatElement(Element oldTag) {
       // Remove all of the bindings on all of the children when we remove the tag.  ?? Do we need to queue these up and do them later for some reason?
-      DynUtil.dispose(elem, true);
+      DynUtil.dispose(oldTag, true);
    }
 
    public void moveElement(Element elem, int fromIx, int toIx) {
@@ -4307,7 +4311,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (repeatTags != null) {
          for (int i = 0; i < repeatTags.size(); i++) {
             Element elem = repeatTags.get(i);
-            DynUtil.dispose(elem, true);
+            removeRepeatElement(elem);
          }
          repeatTags = null;
       }
