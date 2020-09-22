@@ -1065,6 +1065,8 @@ public class SyncLayer {
       SyncSerializer newSB = ser.createTempSerializer(false, newObjNames.size());
 
       boolean newSBPushed = false;
+      boolean newRemoteChange = false;
+      boolean newRemoteChangeSet = false;
       if (isNew) {
          NewObjResult newObjRes = newSB.appendNewObj(changedObj, objName, objTypeName, newArgs, newObjNames, newLastPackageName, syncHandler, parentContext, this, depChanges, change instanceof SyncPropChange);
          if (newObjRes != null) {
@@ -1098,6 +1100,14 @@ public class SyncLayer {
                }
                if ((syncProps.getSyncFlags(propName) & SyncPropOptions.SYNC_RESET_STATE) == 0 || !instInfo.resetState)
                   return;
+            }
+
+            // Need to add this in the context of a current object - before the property change
+            boolean remoteChange = change.remoteChange;
+            if (changeCtx.remoteChange != remoteChange) {
+               newRemoteChange = remoteChange;
+               newRemoteChangeSet = true;
+               newSB.appendRemoteChanges(remoteChange, false, newObjNames.size());
             }
 
             newSB.appendProp(changedObj, propName, propValue, newObjNames, newLastPackageName, parentContext, this, depChanges);
@@ -1211,12 +1221,10 @@ public class SyncLayer {
          ser.appendSerializer(switchSB);
       }
 
-      // TODO: perhaps there won't be an object in context at this time so we need to add "SyncManager {" just so we are in the right code type
-      boolean remoteChange = change.remoteChange;
-      if (changeCtx.remoteChange != remoteChange) {
-         changeCtx.remoteChange = remoteChange;
-         ser.appendRemoteChanges(remoteChange, topLevel, newObjNames.size());
-      }
+      // We had to change the init/initLocal flag as part of the new buffer which starts right after we append this
+      // here in the newSB so update changeCtx here
+      if (newRemoteChangeSet)
+         changeCtx.remoteChange = newRemoteChange;
 
       ser.appendSerializer(newSB);
 
