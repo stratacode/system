@@ -180,6 +180,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    /** Set to false to prevent the page from being re-drawn in JS during the initial page load  */
    public transient boolean refreshOnLoad = true;
 
+   public transient boolean repeatSync = false;
+
    private transient String cachedObjectName = null;
    private transient Element origTypeElem = null;
 
@@ -412,7 +414,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (res != null) {
          res.setParentNode(this);
          //res.initUniqueId();
-         SyncManager.registerSyncTree(res);
+         if (repeatSync)
+            SyncManager.registerSyncTree(res);
          if (wrap)
             res.bodyOnly = true;
       }
@@ -468,6 +471,17 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // TODO: there are cases where we have no sub-classes of this tag and it's a child of a singleton tag where we could use the normal id.
       // It's too bad because it's a pain to support id CSS mappings when they keep changing.
       return (tagName != null && singletonTagNames.contains(tagName));
+   }
+
+   public void enableRepeatSync() {
+      if (!repeatSync) {
+         repeatSync = true;
+
+         if (repeatTags != null) {
+            for (Object repeatTag:repeatTags)
+               SyncManager.registerSyncTree(repeatTag);
+         }
+      }
    }
 
    /*
@@ -3353,7 +3367,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                             Object valuePropType =  ModelUtil.getEnclosingType(att.valueProp);
                             // The repeat and wrap attributes are set on the tag but are applied to the repeatWrapper class, not the tag class
                             // Also look for attributes that resolve to the repeatWrapper class only.
-                            if (att.name.equals("repeat") || att.name.equals("wrap") || att.name.equals("changedCount") ||
+                            if (att.name.equals("repeat") || att.name.equals("wrap") || att.name.equals("changedCount") || att.name.equals("repeatSync") ||
                                 (!ModelUtil.isAssignableFrom(valuePropType, tagType) && ModelUtil.isAssignableFrom(valuePropType, repeatWrapper)))
                                repeatWrapper.addBodyStatementIndent(pa);
                             else
@@ -3931,6 +3945,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       behaviorAttributes.add("wrap");
       behaviorAttributes.add("bodyOnly");
       behaviorAttributes.add("changedCount");
+      behaviorAttributes.add("repeatSync");
       behaviorAttributes.add(ALT_ID);
 
       // For select only
