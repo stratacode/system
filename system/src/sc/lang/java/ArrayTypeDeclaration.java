@@ -513,4 +513,12 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    public BaseTypeDescriptor getDBTypeDescriptor() {
       return null;
    }
+
+   public ArrayTypeDeclaration resolveTypeParameters() {
+      if (ModelUtil.isTypeVariable(componentType)) {
+         Object resCompType = ModelUtil.getTypeParameterDefault(componentType);
+         return new ArrayTypeDeclaration(system, definedInType, resCompType, arrayDimensions);
+      }
+      return this;
+   }
 }

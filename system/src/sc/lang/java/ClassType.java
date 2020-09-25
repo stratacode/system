@@ -319,6 +319,14 @@ public class ClassType extends JavaType {
       if (resolve && ModelUtil.isTypeVariable(res))
          return ModelUtil.getTypeParameterDefault(res);
 
+      if (resolve && arrayDimensions != null) {
+         if (res instanceof ArrayTypeDeclaration) {
+            ArrayTypeDeclaration resArray = (ArrayTypeDeclaration) res;
+            if (resArray.isTypeParameter())
+               return resArray.resolveTypeParameters();
+         }
+      }
+
       if (refreshParams && res instanceof ParamTypeDeclaration) {
          ParamTypeDeclaration ptd = (ParamTypeDeclaration) res;
          List<JavaType> typeArgs = getResolvedTypeArguments();
