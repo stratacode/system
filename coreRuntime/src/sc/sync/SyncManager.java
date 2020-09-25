@@ -626,7 +626,7 @@ public class SyncManager {
          if (useCtx == null)
             System.err.println("Unable to resolve sync context for scope: " + scopeName + " to register inst: " + objName);
          else {
-            useCtx.registerObjNameOnScope(inst, objName, fixedName, initInst, false, false);
+            useCtx.registerObjNameOnScope(inst, objName, fixedName, initInst, false, false, false);
             InstInfo ii = getInstInfo(inst);
             if (ii == null) {
                ii = getInheritedInstInfo(inst);
@@ -644,7 +644,7 @@ public class SyncManager {
          syncInsts.put(inst, ii);
       }
 
-      InstInfo registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued, boolean registered) {
+      InstInfo registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued, boolean registered, boolean addOnDemandChanges) {
          if (objName == null)
             throw new IllegalArgumentException("Invalid null object name for instance: " + inst);
          InstInfo ii = syncInsts.get(inst);
@@ -663,7 +663,7 @@ public class SyncManager {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
                   ii.setName(objName);
-                  initOnDemandInst(null, inst, ii, false, false, null);
+                  initOnDemandInst(null, inst, ii, false, ii.onDemand && addOnDemandChanges, null);
                }
             }
          }
@@ -734,7 +734,7 @@ public class SyncManager {
          }
          else {
             if (ii.name != null && ii.initialized) {
-               initChildContexts(ii, inst, ii.args, ii.props);
+               initChildContexts(ii, inst, ii.args, ii.props, true);
             }
             return true;
          }
@@ -1282,11 +1282,11 @@ public class SyncManager {
 
          // When adding a new global object which is not marked as on-demand, go and add it to all of the child contexts.  This is the "push new record" operation and so must be synchronized against adding new sessions (though maybe change this to an
          if (!onDemand) {
-            initChildContexts(ii, inst, args, syncProps);
+            initChildContexts(ii, inst, args, syncProps, false);
          }
       }
 
-      private void initChildContexts(InstInfo ii, Object inst, Object[] args, SyncProperties syncProps) {
+      private void initChildContexts(InstInfo ii, Object inst, Object[] args, SyncProperties syncProps, boolean addOnDemandChanges) {
          if (childContexts != null) {
             InstInfo childII = null;
             ArrayList<SyncContext> initChildContexts = null;
@@ -1309,7 +1309,7 @@ public class SyncManager {
                         //childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
                         //childII.nameQueued = true;
                         //childII.initialized = true;
-                        childII = childCtx.registerObjNameOnScope(inst, ii.name, ii.fixedObject, true, true, ii.registered);
+                        childII = childCtx.registerObjNameOnScope(inst, ii.name, ii.fixedObject, true, true, ii.registered, addOnDemandChanges);
                      }
                      if (initChildContexts == null) {
                         initChildContexts = new ArrayList<SyncContext>();
@@ -1325,7 +1325,7 @@ public class SyncManager {
                for (int i = 0; i < initChildContexts.size(); i++) {
                   SyncContext initCtx = initChildContexts.get(i);
                   InstInfo initChildII = childInstInfos.get(i);
-                  initCtx.initChildContexts(initChildII, inst, args, syncProps);
+                  initCtx.initChildContexts(initChildII, inst, args, syncProps, addOnDemandChanges);
                }
             }
          }
@@ -1989,8 +1989,9 @@ public class SyncManager {
             // Always need to make sure the window ctx is marked with the queued flag
             if (instCtx != this) {
                InstInfo thisInfo = getInstInfo(changedObj);
-               if (!thisInfo.nameQueued)
+               if (!thisInfo.nameQueued) {
                   thisInfo.nameQueued = true;
+               }
             }
 
             String objName = getObjectName(changedObj, varName, false, false, null, syncLayer);
@@ -3310,7 +3311,7 @@ public class SyncManager {
          SyncContext ctx = syncMgr.getSyncContext(scopeId, true);
          if (ctx != null) {
             // Here we've already been given the scope for the syncInst so just put it into that one.
-            ctx.registerObjNameOnScope(inst, instName, fixedName, initInst, true, true);
+            ctx.registerObjNameOnScope(inst, instName, fixedName, initInst, true, true, false);
          }
       }
    }
