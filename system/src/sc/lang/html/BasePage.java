@@ -1,10 +1,16 @@
 package sc.lang.html;
 
+import sc.obj.CurrentScopeContext;
+import sc.obj.ScopeContext;
+
+import java.util.List;
+
 public abstract class BasePage implements IPage {
    private IPageDispatcher pageDispatcher;
    private int pageVisitCount = 0;
    private boolean cacheEnabled = false;
    private CacheMode cache;
+   private List<CurrentScopeContext> currentScopeContexts;
 
    public void setPageDispatcher(IPageDispatcher dispatcher) {
       this.pageDispatcher = dispatcher;
@@ -12,6 +18,13 @@ public abstract class BasePage implements IPage {
 
    public IPageDispatcher getPageDispatcher() {
       return pageDispatcher;
+   }
+
+   public void setCurrentScopeContexts(List<CurrentScopeContext> ctxs) {
+      currentScopeContexts = ctxs;
+   }
+   public List<CurrentScopeContext> getCurrentScopeContexts() {
+      return currentScopeContexts;
    }
 
    @Override

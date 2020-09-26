@@ -7,9 +7,7 @@ package sc.lang.html;
 import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.IListener;
-import sc.obj.CompilerSettings;
-import sc.obj.Sync;
-import sc.obj.SyncMode;
+import sc.obj.*;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -50,6 +48,16 @@ public class HtmlPage extends Html implements IPage {
    }
    public IPageDispatcher getPageDispatcher() {
       return pageDispatcher;
+   }
+
+   private List<CurrentScopeContext> currentScopeContexts;
+
+   @sc.obj.EditorSettings(visible=false)
+   public void setCurrentScopeContexts(List<CurrentScopeContext> ctxs) {
+      currentScopeContexts = ctxs;
+   }
+   public List<CurrentScopeContext> getCurrentScopeContexts() {
+      return currentScopeContexts;
    }
 
    @sc.obj.EditorSettings(visible=false)
@@ -139,4 +147,27 @@ public class HtmlPage extends Html implements IPage {
    }
    */
 
+   public void refreshTags(boolean parentBodyChanged) {
+      CurrentScopeContext curScopeCtx = CurrentScopeContext.getThreadScopeContext();
+      // If the context for the current thread is part of this page, just run the refresh tags now. Otherwise, mark
+      // all of the elements as needing refresh and notify them to wake up.
+      int ix = -1;
+      if (curScopeCtx == null || currentScopeContexts == null || (ix = curScopeCtx.indexInList(currentScopeContexts)) != -1) {
+         super.refreshTags(parentBodyChanged);
+      }
+      if (currentScopeContexts != null) {
+         for (int i = 0; i < currentScopeContexts.size(); i++) {
+            if (i == ix)
+               continue;
+
+            // For any non-current contexts built off this page add a job for another thread to refresh this page there too
+            CurrentScopeContext otherCtx = currentScopeContexts.get(i);
+            otherCtx.getEventScopeContext().addInvokeLater(new Runnable() {
+                  public void run() {
+                     refreshTags(false);
+                  }
+               }, Element.REFRESH_TAG_PRIORITY, otherCtx);
+         }
+      }
+   }
 }

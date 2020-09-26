@@ -309,4 +309,12 @@ public class SyncProperties {
       }
       return res.toArray();
    }
+
+   public static SyncProperties appendProps(SyncProperties p1, SyncProperties p2) {
+      ArrayList<Object> props = new ArrayList<Object>(p1.allProps.length + p2.allProps.length);
+      props.addAll(Arrays.asList(p1.allProps));
+      props.addAll(Arrays.asList(p2.allProps));
+
+      return new SyncProperties(p1.destName, p1.syncGroup, props.toArray(), p1.defaultPropOptions);
+   }
 }

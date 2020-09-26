@@ -1,5 +1,10 @@
 package sc.lang.html;
 
+import sc.obj.CurrentScopeContext;
+import sc.obj.ScopeContext;
+
+import java.util.List;
+
 /**
  * This is a lightweight interface used like Servlet implemented by the Element interface but
  * supporting scopes, properties, caching and most features independent of HTTP
@@ -31,4 +36,7 @@ public interface IPage {
 
    CacheMode getCache();
    void setCache(CacheMode mode);
+
+   void setCurrentScopeContexts(List<CurrentScopeContext> ctxs);
+   List<CurrentScopeContext> getCurrentScopeContexts();
 }

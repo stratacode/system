@@ -5,6 +5,7 @@
 package sc.obj;
 
 import sc.dyn.DynUtil;
+import sc.dyn.ScheduledJob;
 import sc.sync.SyncManager;
 import sc.util.PerfMon;
 
@@ -30,6 +31,8 @@ public abstract class ScopeContext {
    HashSet<ScopeContext> childContexts;
 
    ArrayList<IScopeChangeListener> changeListeners;
+
+   public ArrayList<ScheduledJob> toRunLater = new ArrayList<ScheduledJob>();
 
    /** Adds a value to the scope context that will be disposed when the scope is destroyed */
    public abstract void setValue(String name, Object value);
@@ -226,4 +229,14 @@ public abstract class ScopeContext {
       }
       return sb.toString();
    }
+
+   public void addInvokeLater(Runnable r, int priority, CurrentScopeContext curScopeCtx) {
+      ScheduledJob job = new ScheduledJob();
+      job.toInvoke = r;
+      job.priority = priority;
+      job.curScopeCtx = curScopeCtx;
+      ScheduledJob.addToJobList(toRunLater, job);
+      scopeChanged();
+   }
+
 }

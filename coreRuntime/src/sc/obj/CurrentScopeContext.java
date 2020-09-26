@@ -5,6 +5,7 @@
 package sc.obj;
 
 import sc.dyn.DynUtil;
+import sc.dyn.ScheduledJob;
 import sc.type.PTypeUtil;
 
 import java.util.*;
@@ -415,6 +416,18 @@ public class CurrentScopeContext {
          }
       }
       return false;
+   }
+
+   public int indexInList(List<CurrentScopeContext> ctxs) {
+      if (ctxs == null)
+         return -1;
+      int ct = 0;
+      for (CurrentScopeContext elem:ctxs) {
+         if (elem.sameContexts(this))
+            return ct;
+         ct++;
+      }
+      return -1;
    }
 
 }

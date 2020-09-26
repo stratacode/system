@@ -5598,8 +5598,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * request pages, we need to store this in the request scope and re-create it from scratch on each request.
     */
    public void addServerTags(ScopeDefinition scopeDef, ServerTagContext stCtx, boolean defaultServerTag) {
+      if (replaceWith != null) {
+         replaceWith.addServerTags(scopeDef, stCtx, defaultServerTag);
+         return;
+      }
       if (defaultServerTag || serverTag) {
-
          String tagId = getServerTagId();
          if (tagId != null) {
             ServerTag serverTagInfo = getServerTagInfo(tagId);
@@ -5630,6 +5633,16 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         // for the parent element in a tree of server tags but since it's inherited, sub-tags should get this flag set too so we set it
                         // here to avoid walking up the tree to determine if an element is a server tag or not.
                         this.serverTag = true;
+
+                        // If the tag object class has its own synchronized properties, and it's a serverTag need to make sure the server tag properties
+                        // are also synchronized. We don't have a way to easily do this at code-gen time and it's possible the same component is used
+                        // without server tags
+                        Object thisType = DynUtil.getType(this);
+                        SyncProperties curProps = SyncManager.getSyncProperties(thisType, null);
+                        if (curProps != null && !curProps.isSynced("innerHTML", false)) {
+                           SyncProperties newProps = SyncProperties.appendProps(SyncManager.getSyncProperties(Element.class, null), curProps);
+                           SyncManager.addSyncType(thisType, newProps);
+                        }
 
                         // Even though this tag is already part of some ScopeContext, here we are adding it here by reference with it's tagId in the document.
                         // It seems to make sense to use the DOM id over the wire for readability and they are shorter although some of these ids
@@ -5745,6 +5758,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void refreshTags(boolean parentBodyChanged) {
+      if (replaceWith != null) {
+         replaceWith.refreshTags(parentBodyChanged);
+         return;
+      }
       if (isRepeatTag()) {
          if (!repeatTagsValid) {
             if (syncRepeatTags(getCurrentRepeatVal())) {
