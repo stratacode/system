@@ -4461,7 +4461,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       if (processor.getProcessorName() == null)
          processor.setProcessorName("@" + CTypeUtil.getClassName(annotationTypeName));
       if (old != null && layeredSystem.options.verbose) {
-         System.out.println("Annotation processor for: " + annotationTypeName + " replaced: " + old + " with: " + processor);
+         verbose("Annotation processor for: " + annotationTypeName + " replaced: " + old + " with: " + processor);
       }
    }
 
@@ -4479,14 +4479,20 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          scopeProcessors = new HashMap<String,IScopeProcessor>();
       IScopeProcessor old = scopeProcessors.put(scopeName, processor);
       if (old != null && layeredSystem.options.verbose) {
-         System.out.println("Scope processor for: " + scopeName + " replaced: " + old + " with: " + processor);
+         info("Scope processor for: " + scopeName + " replaced: " + old + " with: " + processor);
+      }
+      String scopeAlias = scopeAliases == null ? null : scopeAliases.remove(scopeName);
+      if (scopeAlias != null) {
+         verbose("Scope processor replaced scope alias: " + scopeName + ": " + scopeAlias);
       }
    }
 
    public void registerScopeAlias(String newScopeName, String aliasedToName) {
       if (scopeAliases == null)
          scopeAliases = new TreeMap<String,String>();
-      scopeAliases.put(newScopeName, aliasedToName);
+      String old = scopeAliases.put(newScopeName, aliasedToName);
+      if (old != null && !old.equals(aliasedToName))
+         verbose("Scope alias: " + aliasedToName + " replaced old alias: " + old + " for scope: " + newScopeName);
    }
 
    public void registerFileProcessor(IFileProcessor proc, String ext) {

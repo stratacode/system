@@ -217,6 +217,9 @@ public class Options {
 
    @Constant public boolean startInterpreter = true;
 
+   /** Set when refreshing the system because usually it's not helpful to refresh changed compiled types - with this true, we will skip them  */
+   @Constant public boolean refreshDynamicOnly = false;
+
    @Constant public SchemaManager.SchemaMode schemaMode = SchemaManager.SchemaMode.Prompt;
 
    boolean restartArg = false;

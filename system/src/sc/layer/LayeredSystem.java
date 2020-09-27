@@ -8904,6 +8904,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          for (SrcDirEntry srcDirEnt:sdEnts) {
             LinkedHashSet<SrcEntry> toGenerate = srcDirEnt.toGenerate;
 
+            ArrayList<SrcEntry> toSkip = null;
+
             for (SrcEntry toGenEnt:toGenerate) {
                ILanguageModel cachedModel = modelIndex.get(toGenEnt.absFileName);
                if (cachedModel != null && cachedModel.isStarted()) {
@@ -8923,6 +8925,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            verbose("Reusing: " + toGenEnt + " for: " + getProcessIdent());
                         continue;
                      }
+
+                     if (options.refreshDynamicOnly) {
+                        TypeDeclaration modelType = cachedJModel.getModelTypeDeclaration();
+                        if (modelType != null && !modelType.isDynamicType()) {
+                           if (toSkip == null)
+                              toSkip = new ArrayList<SrcEntry>();
+                           if (options.verbose)
+                              verbose("Skipping changed compiled type: " + toGenEnt + " for: " + getProcessIdent());
+                           toSkip.add(toGenEnt);
+                           continue;
+                        }
+                     }
                   }
                   if (options.verbose)
                      verbose("Stopping: " + toGenEnt + " for: " + getProcessIdent());
@@ -8930,9 +8944,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                   toStop.add(cachedModel);
                }
             }
+
+            if (toSkip != null)
+               toGenerate.removeAll(toSkip);
          }
       }
-
 
       for (int i = 0; i < toStop.size(); i++) {
          ILanguageModel cachedModel = toStop.get(i);
@@ -10987,8 +11003,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       acquireDynLock(false);
       boolean any = false;
 
+      // TODO: fix incremental compilation and probably don't set refreshDynamicOnly=true?
+      // Or add a way to turn it off for each process - for now, only pick up dynamic types and static files like .css changes
+      // For the main Java process, we only want to refresh dynamic types since trying to recompile the running process tends to just cause unrecoverable errors right now
+      if (!forceBuild /* && (runtimeProcessor == null || runtimeProcessor.getRuntimeName().equals("java")) */)
+         options.refreshDynamicOnly = true;
+
       if (systemCompiled && !options.rebuildAllFiles) {
-         clearBuildAllFiles();
+         clearBuildAllFiles(); // turn off the build-all option for a rebuild
       }
       buildingSystem = true;
       if (peerSystems != null && !peerMode) {
@@ -15630,20 +15652,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    public IScopeProcessor getScopeProcessor(Layer refLayer, String scopeName) {
       int startIx;
 
-      // We can substitute a different scope on a runtime-by-runtime basis - e.g. for the client, often many scopes collapse into one (e.g. window, session => global)
-      if (scopeName != null) {
-         String scopeAlias = getScopeAlias(refLayer, scopeName);
-         if (scopeAlias != null)
-            scopeName = scopeAlias;
-      }
-
       if (searchActiveTypesForLayer(refLayer)) {
          // In general we search from most recent to original
-         startIx = refLayer == null ? layers.size() - 1 : refLayer.getLayerPosition();
+         //startIx = refLayer == null ? layers.size() - 1 : refLayer.getLayerPosition();
 
          // During layer init we may not have been added yet
-         if (startIx >= layers.size())
-            return null;
+         //if (startIx >= layers.size())
+         //   return null;
+
+         // Always get the most specific scope for active layers
+         startIx = layers.size() - 1;
 
          // Only look at layers which precede the supplied layer
          for (int i = startIx; i >= 0; i--) {
@@ -15657,18 +15675,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
       if (searchInactiveTypesForLayer(refLayer)) {
-         return refLayer.getScopeProcessor(scopeName, true);
+         IScopeProcessor res = refLayer.getScopeProcessor(scopeName, true);
+         if (res != null)
+            return res;
       }
+      // We can substitute a different scope on a runtime-by-runtime basis - e.g. for the client, often many scopes collapse into one (e.g. window, session => global)
+      if (scopeName != null) {
+         String scopeAlias = getScopeAlias(refLayer, scopeName);
+         if (scopeAlias != null) {
+            if (scopeAlias.equals(scopeName))
+               return null;
+            return getScopeProcessor(refLayer, scopeAlias);
+         }
+      }
+
       return null;
    }
 
    public ScopeDefinition getScopeByName(String scopeName) {
+      ScopeDefinition def = ScopeDefinition.getScopeByName(scopeName);
+      if (def != null)
+         return def;
       if (buildLayer != null) {
          String alias = getScopeAlias(buildLayer, scopeName);
          if (alias != null && !alias.equals(scopeName))
             return ScopeDefinition.getScopeByName(alias);
       }
-      return ScopeDefinition.getScopeByName(scopeName);
+      return null;
    }
 
    public boolean needsSync(Object type) {

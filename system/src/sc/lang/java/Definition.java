@@ -263,9 +263,14 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
                LayeredSystem sys = model.getLayeredSystem();
                Layer refLayer = model.getLayer();
                if (sys != null && refLayer != null) {
-                  String scopeAlias = sys.getScopeAlias(refLayer, scopeName);
-                  if (scopeAlias != null) {
-                     return scopeAlias;
+                  IScopeProcessor proc = sys.getScopeProcessor(refLayer, scopeName);
+                  // Only resolve the alias if there's no processor with the original name. That let's us install a
+                  // default alias that gets overridden in a subsequent layer by a real processor.
+                  if (proc == null) {
+                     String scopeAlias = sys.getScopeAlias(refLayer, scopeName);
+                     if (scopeAlias != null) {
+                        return scopeAlias;
+                     }
                   }
                }
             }
