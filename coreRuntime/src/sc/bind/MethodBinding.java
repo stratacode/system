@@ -12,9 +12,10 @@ import sc.type.PTypeUtil;
 
 import static sc.bind.Bind.*;
 
-/** Represents a binding expression for a method invocation.   If this is a forward binding, the binding fires whenever
+/**
+ * Represents a binding expression for a method invocation.   If this is a forward binding, the binding fires whenever
  * any of the nested bindings fire.
- * */
+ */
 public class MethodBinding extends AbstractMethodBinding implements IResponseListener {
    Object method;
    boolean methodIsStatic;
