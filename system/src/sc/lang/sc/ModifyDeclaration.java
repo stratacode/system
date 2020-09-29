@@ -120,7 +120,8 @@ public class ModifyDeclaration extends TypeDeclaration {
                */
                modifyInherited = !ModelUtil.sameTypes(this, modifyTypeDecl);
 
-               if (modifyInherited && getEnclosingType() == null)
+               // For CmdScriptModel, a modify type might not have a direct enclosing type since we store them in a list, not a nested tree
+               if (modifyInherited && getEnclosingType() == null && !(getJavaModel() instanceof CmdScriptModel))
                   System.out.println("**** ERROR: modifyInherited occurs on top-level type!");
 
                // For a normal modification, we end up getting the type in a previous layer.  But if we inherited this
