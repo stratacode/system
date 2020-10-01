@@ -94,6 +94,12 @@ public class DBPropertyDescriptor {
    /** Especially for compile mode when property mapper is not available - the type of this property */
    public Object propertyType;
 
+   /** List of String path names (a.b) prefixed with a '-' if it's a reverse direction sort */
+   public List<String> orderBy;
+
+   public List<DBPropertyDescriptor> orderByProps;
+   public List<Boolean> orderByDirs;
+
    /**
     * If this property participates in a bi-directional relationship, points to the back-pointing property - i.e.
     * refDBTypeDesc == reversePropDesc.dbTypeDesc && reversePropDesc.reversePropDesc.refDBTypeDesc == dbTypeDesc

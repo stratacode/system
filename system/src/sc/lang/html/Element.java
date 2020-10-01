@@ -712,6 +712,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       if (template == null || tagName == null)
          return false;
 
+      AbstractMethodDefinition methDef = getEnclosingMethod();
+      if (methDef != null)
+         return false;
+
       // Annotation layers do not generate types - they can be used in extends though
       Layer templLayer = template.getLayer();
       if (templLayer != null && templLayer.annotationLayer)
@@ -728,6 +732,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
       Template template = getEnclosingTemplate();
       if (template == null || tagName == null)
+         return false;
+
+      AbstractMethodDefinition methDef = getEnclosingMethod();
+      if (methDef != null)
          return false;
 
       // When we are generating the server, if this says only put this tag on the client, we just omit the object.
@@ -4220,6 +4228,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         // Try to delete our way to the old guy so this stays incremental.  But at this point we also delete all the way to the old guy so the move is as short as possible (and to batch the removes in case this ever is used with transitions)
                         int delIx;
                         boolean needsMove = false;
+                        int numRemoved = 0;
                         for (delIx = i; delIx < curIx; delIx++) {
                            Element delElem = tags.get(i);
                            Object delArrayVal = delElem.repeatVar;
@@ -4227,6 +4236,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                            if (curNewIx == -1) {
                               Element toRem = tags.remove(i);
                               removeElement(toRem, i);
+                              numRemoved++;
                               if (renumberIx == -1)
                                  renumberIx = delIx;
                            }
@@ -4237,9 +4247,10 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         if (needsMove) {
                            renumberIx = i;
                            elemToMove.setRepeatIndex(i);
-                           tags.remove(curIx);
+                           int newIx = curIx - numRemoved;
+                           tags.remove(newIx);
                            tags.add(i, elemToMove);
-                           moveElement(elemToMove, curIx, i);
+                           moveElement(elemToMove, newIx, i);
                         }
                         childChanges = true;
                      }

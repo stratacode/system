@@ -28,6 +28,7 @@ public class SelectQuery implements Cloneable {
    List<DBPropertyDescriptor> refProps = null;
 
    List<DBPropertyDescriptor> orderByProps = null;
+   /** True for '-propName' - i.e. reverse direction  */
    List<Boolean> orderByDirs = null;
 
    /**
@@ -69,6 +70,23 @@ public class SelectQuery implements Cloneable {
 
          if (table.primary)
             includesPrimary = true;
+      }
+
+      if (table.multiRow && curRefProp != null) {
+         if (orderByProps.size() == 0) {
+            if (curRefProp.orderByProps != null && curRefProp.orderByProps.size() > 0) {
+               orderByProps.addAll(curRefProp.orderByProps);
+               orderByDirs.addAll(curRefProp.orderByDirs);
+            }
+            // Default to sorting by id by default for multi-valued references so there's a consistent order as things come out of the database that's easily pageable
+            else if (curRefProp.refDBTypeDesc.primaryTable.idColumns.size() == 1) {
+               orderByProps.add(curRefProp.refDBTypeDesc.primaryTable.idColumns.get(0));
+               orderByDirs.add(false);
+            }
+         }
+         else {
+            System.err.println("*** Conflicting order by for addProperty to query");
+         }
       }
 
       // For the one-to-many case, the table is just the reverse table

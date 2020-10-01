@@ -34,6 +34,48 @@ public class DBUtil {
 
    public static IMessageHandler msgHandler;
 
+   public static class TestValueReplacer implements IValueReplacer {
+      public static Object replaceDate(Date dateVal) {
+         long millisAgo = System.currentTimeMillis() - dateVal.getTime();
+         if (millisAgo >= 0) {
+            if (millisAgo < epsilonMillis)
+               return "<recent-date>";
+         }
+         else {
+            long millisAhead = -millisAgo;
+            if (millisAhead < monthMillis + epsilonMillis && millisAhead > monthMillis - epsilonMillis)
+               return "<month-from-now-date>";
+         }
+         return dateVal;
+      }
+
+      public Object replaceValue(Object orig) {
+         if (!testMode)
+            return orig;
+
+         if (orig instanceof Date) {
+            return replaceDate((Date) orig);
+         }
+         else if (orig instanceof IDBObject) {
+            IDBObject dbObj = ((IDBObject) orig);
+            Object id = dbObj.getDBId();
+            if (id instanceof Long) {
+               String testId = getTestId(((DBObject) dbObj.getDBObject()).dbTypeDesc, (Long) id);
+               if (testId != null)
+                  return testId;
+            }
+         }
+         else if (orig instanceof CharSequence && testTokens != null) {
+            String testToken = testTokens.get(orig.toString());
+            if (testToken != null)
+               return testToken;
+         }
+         return orig;
+      }
+   }
+
+   public static TestValueReplacer testReplacer = new TestValueReplacer();
+
    public static void addTestId(DBTypeDescriptor typeDesc, long id, String idName) {
       if (testMode) {
          if (testIdNameMap == null) {
@@ -230,16 +272,9 @@ public class DBUtil {
             // test are last-modified or created-on dates that change from run to run so we return a code instead
             if (testMode) {
                Date dateVal = (Date) val;
-               long millisAgo = System.currentTimeMillis() - dateVal.getTime();
-               if (millisAgo >= 0) {
-                  if (millisAgo < epsilonMillis)
-                     return "<recent-date>";
-               }
-               else {
-                  long millisAhead = -millisAgo;
-                  if (millisAhead < monthMillis + epsilonMillis && millisAhead > monthMillis - epsilonMillis)
-                     return "<month-from-now-date>";
-               }
+               Object newVal = TestValueReplacer.replaceDate(dateVal);
+               if (newVal instanceof String)
+                  return (String) newVal;
             }
             return val.toString();
          case LongId:
@@ -254,7 +289,7 @@ public class DBUtil {
             }
             break;
          case Json:
-            StringBuilder jsonSB = JSON.toJSON(val, pType);
+            StringBuilder jsonSB = JSON.toJSON(val, pType, testMode ? testReplacer : null);
             return jsonSB.toString();
          case ByteArray: {
             if (testMode)
@@ -316,7 +351,7 @@ public class DBUtil {
             st.setObject(index, ((IDBObject) val).getDBId());
             break;
          case Json:
-            String jsonStr = JSON.toJSON(val, pType).toString();
+            String jsonStr = JSON.toJSON(val, pType, null).toString();
             // TODO: using reflection here because we don't want this dependency unless using the postgresql driver.
             // We should add a general 'value converter' interface and register an implementation from the pgsql layer
             if (pgObject == null) {

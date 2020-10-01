@@ -42,4 +42,7 @@ public @interface DBPropertySettings {
    String reverseProperty() default "";
    /** The database expression to use for the default value for this column in the schema */
    String dbDefault() default "";
+
+   // TODO: need to add this and set DBPropertyDescriptor properties
+   // String orderBy()
 }

@@ -777,7 +777,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             try {
                execContext.pushStaticFrame(type);
 
-               CurrentObjectResult cor = selectCurrentObject(null, type, !pushedCtx, false, true);
+               CurrentObjectResult cor = selectCurrentObject(null, type, !pushedCtx, false, true, parentType != null ? parentObj : null);
                if (cor.wizardStarted)
                   return;
                obj = cor.curObj;
@@ -828,7 +828,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
 
          if (!pa.isStatic()) {
-            CurrentObjectResult cor = selectCurrentObject(pa, current, !pushedCtx, true, true);
+            CurrentObjectResult cor = selectCurrentObject(pa, current, !pushedCtx, true, true, null);
             if (cor.wizardStarted)
                return;
             noInstance = cor.skipEval;
@@ -981,7 +981,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          if (expr.errorArgs == null && !model.hasErrors) {
             pushedCtx = pushCurrentScopeContext();
             if (!expr.isStaticTarget() && currentType != null) {
-               CurrentObjectResult cor = selectCurrentObject(expr, currentType, !pushedCtx, true, true);
+               CurrentObjectResult cor = selectCurrentObject(expr, currentType, !pushedCtx, true, true, null);
                if (cor.wizardStarted)
                   return;
                pushed = cor.pushedObj;
@@ -1050,7 +1050,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          boolean pushedCtx = pushCurrentScopeContext();
 
          if (!block.staticEnabled) {
-            CurrentObjectResult cor = selectCurrentObject(block, currentType, !pushedCtx, true, true);
+            CurrentObjectResult cor = selectCurrentObject(block, currentType, !pushedCtx, true, true, null);
             if (cor.wizardStarted)
                return;
             pushed = cor.pushedObj;
@@ -1062,7 +1062,14 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          try {
             boolean updatedAlready = false;
             if (performUpdatesToSystem(system, false)) {
-               currentType.updateBlockStatement((BlockStatement)statement, execContext, null);
+               BlockStatement blockSt = (BlockStatement)statement;
+               if (edit) // Will update the code model for the type and run the statements against any applicable instances
+                  currentType.updateBlockStatement(blockSt, execContext, null);
+               else { // Does not change currentType - just evaluate the statements in the context of the current type or current object only
+                  blockSt.parentNode = currentType;
+                  currentType.evalBlockStatement(blockSt, execContext);
+               }
+
                updatedAlready = true;
             }
 
@@ -1114,7 +1121,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          if (expr.errorArgs == null && !model.hasErrors) {
             if (currentType != null) {
-               CurrentObjectResult cor = selectCurrentObject(expr, currentType, false, true, true);
+               CurrentObjectResult cor = selectCurrentObject(expr, currentType, false, true, true, null);
                if (cor.wizardStarted)
                   return;
                pushedCtx = pushedCtx || cor.pushedCtx;
@@ -1237,12 +1244,29 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
       boolean skipEval;
    }
 
-   private CurrentObjectResult selectCurrentObject(Statement statement, BodyTypeDeclaration currentType, boolean doPushCtx, boolean needsInstance, boolean useWizard) {
+   private CurrentObjectResult selectCurrentObject(Statement statement, BodyTypeDeclaration currentType, boolean doPushCtx, boolean needsInstance, boolean useWizard, Object parentObj) {
       CurrentObjectResult cor = new CurrentObjectResult();
       if (autoObjectSelect && currentType != null) {
          if (doPushCtx)
             cor.pushedCtx = pushCurrentScopeContext();
          if (!hasCurrentObject() || (cor.curObj = getCurrentObject()) == null) {
+            if (parentObj != null) {
+               TypeDeclaration enclType = currentType.getEnclosingType();
+               // The enclType might be a sub-class of the parentObject it's a modify type that
+               if (enclType != null /* && ModelUtil.isInstance(enclType, parentObj)*/) {
+                  Object childInst = DynUtil.getProperty(parentObj, currentType.typeName);
+                  if (childInst != null) {
+                     cor.curObj = childInst;
+                     execContext.pushCurrentObject(childInst);
+                     cor.pushedObj = true;
+                     return cor;
+                  }
+                  else
+                     System.out.println("*** No child instance of current parent");
+               }
+               else
+                  System.out.println("*** No enclosing type for current type with a parentObj ");
+            }
             // When we need to choose a current object, our first choice is to use the ScopeContext to choose a "singleton" - i.e. one instance of the given type in that CurrentScopeContext.
             CurrentScopeContext ctx = CurrentScopeContext.getThreadScopeContext();
             if (ctx != null) {
@@ -1280,6 +1304,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                cor.pushedObj = true;
             }
             else if (useWizard) {
+               if (noPrompt)
+                  System.err.println("*** Select object Wizard invoked with noPrompt - multiple instances of type: " + currentType.typeName);
                SelectObjectWizard.start(this, statement, instances);
                cor.wizardStarted = true;
                if (cor.pushedCtx) {
@@ -1546,7 +1572,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
          // else - should we be adding the modify-types required for this type in the pendingModel?
       }
-      CurrentObjectResult cor = selectCurrentObject(null, newType, false, false, false);
+      CurrentObjectResult cor = selectCurrentObject(null, newType, false, false, false, null);
    }
 
    public void edit() {
@@ -1804,10 +1830,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    }
 
    public void sleep(int millis) {
+      CurrentScopeContext pending = currentScopeCtx;
+      if (pending != null) {
+         popCurrentScopeContext();
+      }
       try {
          Thread.sleep(millis);
       }
       catch (InterruptedException exc) {}
+
+      if (pending != null)
+         pushCurrentScopeContext(); // assert that pending == CurrentScopeContext.get() used in this method
    }
 
    public PrintWriter recordOutputWriter;
@@ -2032,6 +2065,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    /** Pushes an include script onto the top of the stack of files to be processed and returns immediately - before the script has run. */
    public void pushIncludeScript(String baseDirName, String includeName, Layer includeLayer) {
       String relName = null;
+      String dirName = null;
       if (!FileUtil.isAbsolutePath(includeName)) {
          relName = includeName;
          String fileName = FileUtil.concat(baseDirName, includeName);
@@ -2040,12 +2074,16 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             throw new IllegalArgumentException("No script to include: " + fileName);
          }
          includeName = fileName;
+         int dirIx = relName.lastIndexOf("/");
+         if (dirIx != -1)
+            dirName = relName.substring(0, dirIx);
       }
       pushCurrentInput(false);
       try {
          this.inputFileName = includeName;
          this.inputRelName = relName;
          this.includeLayer = includeLayer; // Specifies the source layer where the test script came from (or null if we should use the buildLayer)
+         this.path = dirName == null ? null : dirName.replace("/", ".");
          resetInput();
       }
       catch (RuntimeException exc) {

@@ -31,6 +31,9 @@ public class URLPath implements Comparable {
    @Constant
    public boolean realTime;
 
+   @Constant
+   public String[] testScripts;
+
    public URLPath(String templatePathName, Object pageType) {
       keyName = templatePathName;
       name = templatePathName;
@@ -49,12 +52,13 @@ public class URLPath implements Comparable {
       url = templatePathName;
    }
 
-   public URLPath(String url, String name, String keyName, Object pageType, boolean realTime) {
+   public URLPath(String url, String name, String keyName, Object pageType, boolean realTime, String[] testScripts) {
       this.url = url;
       this.name = name;
       this.keyName = keyName;
       this.pageType = pageType;
       this.realTime = realTime;
+      this.testScripts = testScripts;
    }
 
    public int hashCode() {

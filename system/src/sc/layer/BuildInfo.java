@@ -752,6 +752,10 @@ public class BuildInfo {
                if (!system.serverEnabled) {
                   path.convertToRelativePath();
                }
+               String[] testScripts = (String[]) memb.getAnnotationValue("sc.html.URL", "testScripts");
+               if (testScripts != null) {
+                  path.testScripts = testScripts;
+               }
                if (!res.contains(path))
                   res.add(path);
                String[] testURLs = (String[]) memb.getAnnotationValue("sc.html.URL", "testURLs");

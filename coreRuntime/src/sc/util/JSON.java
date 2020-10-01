@@ -136,22 +136,29 @@ public class JSON {
    private static class JSONContext {
       IdentityHashMap<Object,Boolean> addedObjs = new IdentityHashMap<Object,Boolean>();
    }
-   public static StringBuilder toJSON(Object o, Object ptype) {
+   public static StringBuilder toJSON(Object o, Object ptype, IValueReplacer replacer) {
       StringBuilder sb = new StringBuilder();
       JSONContext ctx = new JSONContext();
-      appendValue(ctx, sb, o, ptype);
+      appendValue(ctx, sb, o, ptype, replacer);
       return sb;
    }
 
-   private static void appendObject(JSONContext ctx, StringBuilder sb, Object o, Object compType) {
+   private static void appendObject(JSONContext ctx, StringBuilder sb, Object o, Object compType, IValueReplacer replacer) {
       if (o instanceof IDBObject) {
          sb.append("\"ref:db:");
-         appendValue(ctx, sb, ((IDBObject) o).getDBId(), null);
+         if (replacer != null) {
+            Object newValue = replacer.replaceValue(o);
+            if (newValue != o) {
+               appendValue(ctx, sb, newValue, null, replacer);
+               return;
+            }
+         }
+         appendValue(ctx, sb, ((IDBObject) o).getDBId(), null, replacer);
          sb.append('"');
       }
       else if (DynUtil.isRootedObject(o)) {
          sb.append("\"ref:");
-         appendValue(ctx, sb, DynUtil.getObjectName(o), null);
+         appendValue(ctx, sb, DynUtil.getObjectName(o), null, replacer);
          sb.append('"');
       }
       else {
@@ -163,7 +170,7 @@ public class JSON {
          if (compType != null && instType != compType) {
             appendString(sb, "class");
             sb.append(":");
-            appendValue(ctx, sb, DynUtil.getTypeName(instType, false), null);
+            appendValue(ctx, sb, DynUtil.getTypeName(instType, false), null, replacer);
             any = true;
          }
 
@@ -188,7 +195,7 @@ public class JSON {
                   sb.append(", ");
                appendString(sb, prop.getPropertyName());
                sb.append(":");
-               appendValue(ctx, sb, val, prop.getGenericType());
+               appendValue(ctx, sb, val, prop.getGenericType(), replacer);
                any = true;
             }
          }
@@ -197,11 +204,19 @@ public class JSON {
       }
    }
 
-   static void appendValue(JSONContext ctx, StringBuilder sb, Object val, Object pType) {
+   static void appendValue(JSONContext ctx, StringBuilder sb, Object val, Object pType, IValueReplacer replacer) {
       if (val == null)
          sb.append("null");
-      else if (val instanceof CharSequence)
+      else if (val instanceof CharSequence) {
+         if (replacer != null) {
+            Object newVal = replacer.replaceValue(val);
+            if (newVal != val) {
+               appendValue(ctx, sb, newVal, pType, replacer);
+               return;
+            }
+         }
          appendString(sb, ((CharSequence) val));
+      }
       else if (val instanceof Character)
          appendString(sb, String.valueOf((Character) val));
       else if (val instanceof Number)
@@ -213,7 +228,7 @@ public class JSON {
          for (int i = 0; i < sz; i++) {
             if (i != 0)
                sb.append(", ");
-            appendValue(ctx, sb, DynUtil.getArrayElement(val, i), arrCompType);
+            appendValue(ctx, sb, DynUtil.getArrayElement(val, i), arrCompType, replacer);
          }
          sb.append("]");
       }
@@ -234,13 +249,20 @@ public class JSON {
                   sb.append(", ");
                appendString(sb, key.toString());
                sb.append(":");
-               appendValue(ctx, sb, entVal, null);
+               appendValue(ctx, sb, entVal, null, replacer);
                any = true;
             }
          }
          sb.append("}");
       }
       else if (val instanceof Date) {
+         if (replacer != null) {
+            Object newVal = replacer.replaceValue(val);
+            if (newVal != val) {
+               appendValue(ctx, sb, newVal, pType, replacer);
+               return;
+            }
+         }
          sb.append('"');
          sb.append(DynUtil.formatDate((Date) val));
          sb.append('"');
@@ -251,7 +273,7 @@ public class JSON {
          sb.append('"');
       }
       else {
-         appendObject(ctx, sb, val, pType);
+         appendObject(ctx, sb, val, pType, replacer);
       }
       // TODO: enums here?
    }

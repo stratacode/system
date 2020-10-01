@@ -5561,13 +5561,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       else {
          if (bs.staticEnabled) {
-            try {
-               ctx.pushStaticFrame(this);
-               bs.exec(ctx);
-            }
-            finally {
-               ctx.popStaticFrame();
-            }
+            evalBlockStatement(bs, ctx);
          }
          else
             updateInstBlockStatementLeaf(bs, ctx);
@@ -6878,9 +6872,25 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
       }
       else if (ctx != null) {
+         evalBlockStatement(bs, ctx);
+      }
+   }
+
+   public void evalBlockStatement(BlockStatement blockSt, ExecutionContext ctx) {
+      ParseUtil.initAndStartComponent(blockSt);
+      if (blockSt.staticEnabled) {
+         try {
+            ctx.pushStaticFrame(this);
+            blockSt.exec(ctx);
+         }
+         finally {
+            ctx.popStaticFrame();
+         }
+      }
+      else {
          Object curObj = ctx.getCurrentObject();
          if (curObj != null)
-            bs.execForObj(curObj, ctx);
+            blockSt.execForObj(curObj, ctx);
       }
    }
 
@@ -10468,6 +10478,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public String getTemplatePathName() {
+      // Because this type might be modified with a different relDir we need to use the most specific one so that the value
+      // used for the addPage call in the URL matches the one used in the type group member to go into URLPath
       JavaModel model = getJavaModel();
       String templatePathName = null;
       String ext = null;
