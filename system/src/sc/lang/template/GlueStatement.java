@@ -64,7 +64,13 @@ public class GlueStatement extends Statement implements ITemplateDeclWrapper {
    }
 
    public boolean transform(ILanguageModel.RuntimeType type) {
-      transformTemplate(0, true);
+      AbstractMethodDefinition meth = getEnclosingMethod();
+      boolean statefulContext;
+      if (meth != null)
+         statefulContext = false;
+      else
+         statefulContext = true;
+      transformTemplate(0, statefulContext);
       return true;
    }
 
