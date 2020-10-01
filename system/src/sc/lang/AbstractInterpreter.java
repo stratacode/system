@@ -776,6 +776,18 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             Object obj = null;
             try {
                execContext.pushStaticFrame(type);
+               if (parentObj != null) {
+                  String parentSubPath = CTypeUtil.getPackageName(origTypeName);
+                  if (parentSubPath != null) {
+                     try {
+                        parentObj = DynUtil.getPropertyPath(parentObj, parentSubPath);
+                     }
+                     catch (IllegalArgumentException exc) {
+                        System.err.println("*** Error trying to get subobject: " + parentSubPath + " of: " + parentType.typeName);
+                        parentObj = null;
+                     }
+                  }
+               }
 
                CurrentObjectResult cor = selectCurrentObject(null, type, !pushedCtx, false, true, parentType != null ? parentObj : null);
                if (cor.wizardStarted)
@@ -1253,7 +1265,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             if (parentObj != null) {
                TypeDeclaration enclType = currentType.getEnclosingType();
                // The enclType might be a sub-class of the parentObject it's a modify type that
-               if (enclType != null /* && ModelUtil.isInstance(enclType, parentObj)*/) {
+               if (enclType != null) {
                   Object childInst = DynUtil.getProperty(parentObj, currentType.typeName);
                   if (childInst != null) {
                      cor.curObj = childInst;
