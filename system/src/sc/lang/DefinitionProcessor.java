@@ -185,13 +185,13 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
             return;
          TypeDeclaration td = (TypeDeclaration) def;
          if (typeGroupName != null) {
-            bi.addTypeGroupMember(ModelUtil.getTypeName(def), td.getTemplatePathName(),  typeGroupName);
+            bi.addTypeGroupMember(ModelUtil.getTypeName(def), getTemplatePathName(td),  typeGroupName);
          }
          if (initOnStartup) {
-            bi.addTypeGroupMember(ModelUtil.getTypeName(def), td.getTemplatePathName(), BuildInfo.InitGroupName);
+            bi.addTypeGroupMember(ModelUtil.getTypeName(def), getTemplatePathName(td), BuildInfo.InitGroupName);
          }
          if (createOnStartup) {
-            bi.addTypeGroupMember(ModelUtil.getTypeName(def), td.getTemplatePathName(), BuildInfo.StartupGroupName);
+            bi.addTypeGroupMember(ModelUtil.getTypeName(def), getTemplatePathName(td), BuildInfo.StartupGroupName);
          }
       }
       // For methods, fields, etc. we will add the enclosing type as the type group member.  We can then use the type
@@ -204,6 +204,12 @@ public abstract class DefinitionProcessor implements IDefinitionProcessor {
          TypeDeclaration enclType = def.getEnclosingType();
          bi.addTypeGroupMember(enclType.getFullTypeName(), enclType.getTemplatePathName(), typeGroupName);
       }
+   }
+
+   // Make sure to use the most specific type for the start of the search. We choose the most specific template
+   // in the chain of modified types to get the relDir to use for the templatePathName.
+   private String getTemplatePathName(TypeDeclaration td) {
+      return td.resolve(true).getTemplatePathName();
    }
 
    private void checkForPublicAccess(Definition def) {
