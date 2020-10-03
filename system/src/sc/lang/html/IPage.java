@@ -4,6 +4,7 @@ import sc.obj.CurrentScopeContext;
 import sc.obj.ScopeContext;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * This is a lightweight interface used like Servlet implemented by the Element interface but
@@ -39,4 +40,7 @@ public interface IPage {
 
    void setCurrentScopeContexts(List<CurrentScopeContext> ctxs);
    List<CurrentScopeContext> getCurrentScopeContexts();
+
+   Map<String,Object> getPageProperties();
+   void setPageProperties(Map<String,Object> pp);
 }

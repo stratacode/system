@@ -14,6 +14,8 @@ import sc.parser.*;
 import sc.util.URLUtil;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -682,5 +684,25 @@ public class Pattern extends SemanticNode {
             sb.append(")");
       }
       return sb.toString();
+   }
+
+   public List<String> getPatternPropNames() {
+      if (elements == null)
+         return Collections.emptyList();
+      ArrayList<String> res = new ArrayList<String>();
+      for (Object elem:elements) {
+         addPropsForElem(elem, res);
+      }
+      return res;
+   }
+
+   private void addPropsForElem(Object elem, List<String> res) {
+      if (elem instanceof PatternVariable) {
+         res.add(((PatternVariable) elem).propertyName);
+      }
+      else if (elem instanceof Pattern) {
+         Pattern subPat = (Pattern) elem;
+         res.addAll(subPat.getPatternPropNames());
+      }
    }
 }

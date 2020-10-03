@@ -12,6 +12,7 @@ import sc.obj.*;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * We are setting the dependentTypes here to ensure these classes are compiled into the JS runtime when HtmlPage is used.
@@ -29,6 +30,7 @@ import java.util.List;
 @CompilerSettings(liveDynamicTypes=true,initConstructorPropertyMethod="sc.lang.html.PageInfo.getURLProperty")
 public class HtmlPage extends Html implements IPage {
    private final static sc.type.IBeanMapper _pageVisitProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.HtmlPage.class, "pageVisitCount");
+   private Map<String,Object> pageProperties;
 
    protected boolean isPageElement() {
       return true;
@@ -169,5 +171,12 @@ public class HtmlPage extends Html implements IPage {
                }, Element.REFRESH_TAG_PRIORITY, otherCtx);
          }
       }
+   }
+
+   public Map<String,Object> getPageProperties() {
+      return pageProperties;
+   }
+   public void setPageProperties(Map<String,Object> pp) {
+      pageProperties = pp;
    }
 }

@@ -4,6 +4,7 @@ import sc.obj.CurrentScopeContext;
 import sc.obj.ScopeContext;
 
 import java.util.List;
+import java.util.Map;
 
 public abstract class BasePage implements IPage {
    private IPageDispatcher pageDispatcher;
@@ -11,6 +12,7 @@ public abstract class BasePage implements IPage {
    private boolean cacheEnabled = false;
    private CacheMode cache;
    private List<CurrentScopeContext> currentScopeContexts;
+   private Map<String,Object> pageProperties;
 
    public void setPageDispatcher(IPageDispatcher dispatcher) {
       this.pageDispatcher = dispatcher;
@@ -55,6 +57,13 @@ public abstract class BasePage implements IPage {
 
    public CacheMode getCache() {
       return cache;
+   }
+
+   public Map<String,Object> getPageProperties() {
+      return pageProperties;
+   }
+   public void setPageProperties(Map<String,Object> pp) {
+      pageProperties = pp;
    }
 
    public abstract StringBuilder output(OutputCtx ctx);

@@ -33,6 +33,7 @@ public class Window implements IObjectId {
    private final static sc.type.IBeanMapper innerHeightProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Window.class, "innerHeight");
    private final static sc.type.IBeanMapper devicePixelRatioProp = sc.dyn.DynUtil.resolvePropertyMapping(sc.lang.html.Window.class, "devicePixelRatio");
 
+
    @Constant
    public Location location;
 
@@ -43,6 +44,12 @@ public class Window implements IObjectId {
    // Returns the tag object that wraps the document
    @Constant
    public Document documentTag;
+
+   @Constant
+   public History history;
+
+   @Constant
+   public IPageDispatcher pageDispatcher; /** Used for making remote method calls that target the browser window */
 
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
 
@@ -93,8 +100,10 @@ public class Window implements IObjectId {
       return errorCount;
    }
 
-   public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI, String pathInfo, String queryStr, String userAgentStr) {
+   public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI,
+                                        String pathInfo, String queryStr, String userAgentStr, IPageDispatcher pageDispatcher) {
       Window win = new Window();
+      win.pageDispatcher = pageDispatcher;
       if (userAgentStr != null) {
          UserAgentInfo userAgentInst = UserAgentInfo.getUserAgent(userAgentStr);
          if (userAgentInst != null) {
@@ -127,6 +136,7 @@ public class Window implements IObjectId {
       if (hashIx != -1)
          loc.hash = requestURL.substring(hashIx+1);
       win.document = win.documentTag = new Document();
+      win.history = new History(win);
       return win;
    }
 

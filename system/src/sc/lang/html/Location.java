@@ -9,6 +9,7 @@ import sc.bind.Bindable;
 import sc.obj.Constant;
 import sc.obj.TypeSettings;
 import sc.type.PTypeUtil;
+import sc.util.URLUtil;
 
 /**
  * A Java wrapper for the Javascript window.location object.  You can use it to refer to or modify the URL of the
@@ -59,6 +60,16 @@ public class Location {
    public static Location getLocation() {
       Window win = (Window) PTypeUtil.getThreadLocal("window");
       return win == null ? null : win.location;
+   }
+
+   public void updatePath(String pathname) {
+      this.pathname = pathname;
+      int startIx = this.href.indexOf("://");
+      if (startIx != -1) {
+         int endServerIx = this.href.indexOf("/", startIx+3);
+         if (endServerIx != -1)
+            this.href = this.href.substring(0, endServerIx) + pathname;
+      }
    }
 
    public static void setLocation(Location loc) {
