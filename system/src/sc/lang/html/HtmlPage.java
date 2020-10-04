@@ -21,6 +21,7 @@ import java.util.Map;
  * a JS runtime that uses some of these classes.
  */
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", dependentTypes="sc.obj.IChildInit,sc.js.ServerTagManager,sc.type.CTypeUtil")
+@SyncTypeFilter(typeNames={"sc.lang.html.History"})
 /** Used as the tag class for the html tag it is the top level tag in the page. */
 // TODO: on the client, this uses the js_Page_c constructor which we can't easily replicate in Java.  But maybe it should extend Page
 // and have it just set tagName to 'html'?
