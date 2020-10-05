@@ -21,6 +21,22 @@ public abstract class Query {
       return new OpQuery(propName, QCompare.NotEquals, value);
    }
 
+   public static Query gt(String propName, Object value) {
+      return new OpQuery(propName, QCompare.GreaterThan, value);
+   }
+
+   public static Query lt(String propName, Object value) {
+      return new OpQuery(propName, QCompare.LessThan, value);
+   }
+
+   public static Query gteq(String propName, Object value) {
+      return new OpQuery(propName, QCompare.GreaterThanEq, value);
+   }
+
+   public static Query lteq(String propName, Object value) {
+      return new OpQuery(propName, QCompare.LessThanEq, value);
+   }
+
    public static Query match(String propName, Object value) {
       return new OpQuery(propName, QCompare.Match, value);
    }

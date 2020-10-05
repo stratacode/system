@@ -699,11 +699,33 @@ public class DBUtil {
         logSB.append(val);
         logSB.append("'");
      }
+     else if (val instanceof Date) {
+        logSB.append("'");
+        logSB.append(DynUtil.formatDate((Date) val));
+        logSB.append("'");
+     }
      else if (colType != null) {
         logSB.append(formatValue(val, colType, refType, null));
      }
      else
         logSB.append(val);
+   }
+
+   static void appendConstant(StringBuilder sb, Object constVal) {
+     if (constVal instanceof CharSequence) {
+         sb.append("'");
+         sb.append(constVal);
+         sb.append("'");
+      }
+      else if (constVal instanceof Date) {
+         sb.append("'");
+         sb.append(DynUtil.formatDate((Date) constVal));
+         sb.append("'");
+      }
+      else if (constVal == null)
+         sb.append("null");
+      else
+         sb.append(constVal.toString());
    }
 
    static void append(StringBuilder sb, StringBuilder logSB, CharSequence val) {
@@ -895,6 +917,8 @@ public class DBUtil {
       }
       return lineCt;
    }
+
+
 
 }
 

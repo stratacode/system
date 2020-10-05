@@ -27,6 +27,10 @@ public class OpQuery extends Query {
          res.add(propValue);
    }
 
+   private void appendPropValueJavaString(StringBuilder sb) {
+      DBUtil.appendConstant(sb, propValue);
+   }
+
    public String toString() {
       if (propName == null || comparator == null)
          return "null op query";
@@ -35,23 +39,13 @@ public class OpQuery extends Query {
       if (comparator == QCompare.Equals) {
          if (!(propValue instanceof Boolean)) {
             sb.append(" == ");
-
-            if (propValue instanceof CharSequence) {
-               sb.append('"');
-               sb.append(propValue.toString());
-               sb.append('"');
-            }
-            else if (propValue == null)
-               sb.append("null");
-            else {
-               sb.append(propValue.toString());
-            }
+            appendPropValueJavaString(sb);
          }
       }
       else if (comparator == QCompare.NotEquals) {
          if (!(propValue instanceof Boolean)) {
             sb.append(" != ");
-            sb.append(propValue.toString());
+            appendPropValueJavaString(sb);
          }
          else
             sb = new StringBuilder("!" + sb);
@@ -63,8 +57,13 @@ public class OpQuery extends Query {
          sb.append('"');
          sb.append(")");
       }
-      else
-         throw new IllegalArgumentException();
+      else {
+         sb.append(" ");
+         sb.append(comparator.javaOp);
+         sb.append(" ");
+         appendPropValueJavaString(sb);
+      }
+
       return sb.toString();
    }
 }

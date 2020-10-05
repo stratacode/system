@@ -1467,20 +1467,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    private void appendDBPropParamValue(SelectQuery curQuery, String parentProp, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue) {
       if (logSB != null) {
          if (compareOp != null) {
-            if (compareOp == QCompare.Equals || compareOp == QCompare.NotEquals || propValue == null) {
-               if (propValue == null) {
-                  if (compareOp == QCompare.NotEquals)
-                     logSB.append(dbProp.columnName + " IS NOT NULL");
-                  else
-                     logSB.append(dbProp.columnName + " IS NULL");
-               }
-               else {
-                  DBUtil.appendVal(logSB, propValue, null, null);
-                  if (compareOp == QCompare.NotEquals)
-                     logSB.append(" != ");
-                  else
-                     logSB.append(" = ");
-               }
+            if (propValue == null) {
+               if (compareOp == QCompare.NotEquals)
+                  logSB.append(dbProp.columnName + " IS NOT NULL");
+               else if (compareOp == QCompare.Equals)
+                  logSB.append(dbProp.columnName + " IS NULL");
+               else
+                  throw new IllegalArgumentException("Invalid null database value comparison");
             }
          }
          if (dbProp.dynColumn)
@@ -1490,9 +1483,17 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
       if (compareOp != null) {
          if (propValue != null) {
-            if (logSB != null && compareOp == QCompare.Match) {
-               logSB.append(" ILIKE ");
-               DBUtil.appendVal(logSB, propValue, null, null);
+            if (logSB != null) {
+               if (compareOp == QCompare.Match) {
+                  logSB.append(" ILIKE ");
+                  DBUtil.appendVal(logSB, propValue, null, null);
+               }
+               else {
+                  logSB.append(" ");
+                  logSB.append(compareOp.sqlOp);
+                  logSB.append(" ");
+                  DBUtil.appendVal(logSB, propValue, null, null);
+               }
             }
             curQuery.paramValues.add(propValue);
             curQuery.paramTypes.add(dbProp.getDBColumnType());
@@ -1502,12 +1503,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    private void appendJSONPropParamValue(SelectQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue, String propPath) {
       if (logSB != null) {
-         if (compareOp == QCompare.Equals || compareOp == QCompare.NotEquals) {
+         if (compareOp != QCompare.Match) {
             DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType(), dbProp.refDBTypeDesc);
-            if (compareOp == QCompare.NotEquals)
-               logSB.append(" != ");
-            else
-               logSB.append(" = ");
+            logSB.append(" ");
+            logSB.append(compareOp.sqlOp);
+            logSB.append(" ");
          }
          curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName, propPath);
       }
@@ -2056,13 +2056,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          SelectQuery curQuery = groupQuery.curQuery;
          if (cval == null)
             curQuery.whereAppend(" IS NULL");
-         else if (cval instanceof CharSequence) {
-            curQuery.whereAppend("'");
-            curQuery.whereAppend(cval.toString());
-            curQuery.whereAppend("'");
-         }
-         else
-            curQuery.whereAppend(cval.toString());
+         StringBuilder newWhere = new StringBuilder();
+         DBUtil.appendConstant(newWhere, cval);
+         curQuery.whereAppend(newWhere.toString());
       }
       else if (binding instanceof ArithmeticBinding) {
          SelectQuery curQuery = groupQuery.curQuery;
@@ -2148,15 +2144,12 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          else {
             if (parentPropPath != null && propValue == null && comparator == QCompare.Equals)
                System.err.println("*** Funky case with is null comparison in a.b");
-            if (comparator != null) {
-               if (comparator == QCompare.Equals)
-                  curQuery.whereAppend("? = ");
-               else if (comparator == QCompare.NotEquals)
-                  curQuery.whereAppend("? != ");
-            }
             curQuery.appendWhereColumn(parentPropPath, dbProp);
             if (comparator == QCompare.Match)
                curQuery.whereAppend(" ILIKE ? ");
+            else if (comparator != null) {
+               curQuery.whereAppend(" " + comparator.sqlOp + " ? ");
+            }
          }
       }
       else {
@@ -2167,16 +2160,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             DBPropertyDescriptor pathProp = curTypeDesc.getPropertyDescriptor(propName);
             if (pathProp != null) {
                if (pathProp.getDBColumnType() == DBColumnType.Json) {
-                  if (comparator != null) {
-                     if (comparator == QCompare.Equals)
-                        curQuery.whereAppend("? = ");
-                     else if (comparator == QCompare.NotEquals)
-                        curQuery.whereAppend("? != ");
-                  }
                   StringBuilder pathRes = getPathRes(propNames, i+1);
                   curQuery.appendJSONWhereColumn(pathProp.getTableName(), pathProp.columnName, pathRes.toString());
                   if (comparator == QCompare.Match) {
                      curQuery.whereAppend(" ILIKE ? ");
+                  }
+                  else if (comparator != null) {
+                     curQuery.whereAppend(" " + comparator.sqlOp + " ? ");
                   }
                   return;
                }
