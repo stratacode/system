@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A basic pattern matching algorithm that also supports populating named variables in an instance and
+ * A basic pattern matching class that also supports populating named variables in an instance and
  * replacing a matched variable with a basic name for making it possible to filter log files, removing variables for
  * 'diff' comparison of test logs.
  * Use {parseletName} to parse/match a token of a specific type. Use {propName=parseletName} to define a variable that
@@ -704,5 +704,27 @@ public class Pattern extends SemanticNode {
          Pattern subPat = (Pattern) elem;
          res.addAll(subPat.getPatternPropNames());
       }
+   }
+
+   public boolean getHasDefaultValue() {
+      if (elements == null)
+         return true;
+      for (Object elem:elements) {
+         if (elem instanceof PatternVariable)
+            return false;
+      }
+      return true;
+   }
+
+   public String getDefaultValue() {
+      StringBuilder sb = new StringBuilder();
+      for (Object elem:elements) {
+         if (elem instanceof PatternVariable)
+            sb.append(((PatternVariable) elem).propertyName);
+         else if (elem instanceof OptionalPattern)
+            continue;
+         sb.append(elem.toString());
+      }
+      return sb.toString();
    }
 }
