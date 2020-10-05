@@ -276,7 +276,7 @@ public class DBUtil {
                if (newVal instanceof String)
                   return (String) newVal;
             }
-            return val.toString();
+            return "'" + DynUtil.formatDate((Date) val) + "'";
          case LongId:
             if (testMode && val instanceof Long) {
                if (refType != null) {
@@ -697,11 +697,6 @@ public class DBUtil {
      else if (val instanceof CharSequence) {
         logSB.append("'");
         logSB.append(val);
-        logSB.append("'");
-     }
-     else if (val instanceof Date) {
-        logSB.append("'");
-        logSB.append(DynUtil.formatDate((Date) val));
         logSB.append("'");
      }
      else if (colType != null) {
