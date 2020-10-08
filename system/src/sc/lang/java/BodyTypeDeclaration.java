@@ -2031,9 +2031,18 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    static void addAllMethods(List<Statement> bodyList, List<Object> methods, String modifier, boolean hasModifier, boolean isDyn, boolean overridesComp) {
       for (int i = 0; i < bodyList.size(); i++) {
          Definition member = bodyList.get(i);
-         if (member instanceof MethodDefinition && (modifier == null || hasModifier == member.hasModifier(modifier)) &&
-                 (!isDyn || ModelUtil.isDynamicType(member)) && (!overridesComp || ((MethodDefinition) member).getOverridesCompiled()))
-            methods.add(member);
+         if (member instanceof MethodDefinition) {
+            MethodDefinition meth = (MethodDefinition) member;
+            // Need to pick up even compiled abstract methods for overridesCompiled since we need to override them in the
+            // dynamic stub since it's never made abstract
+            if (overridesComp && meth.body == null && isDyn)
+               isDyn = false;
+
+            if ((modifier == null || hasModifier == meth.hasModifier(modifier)) &&
+                    (!isDyn || ModelUtil.isDynamicType(member)) && (!overridesComp || meth.getOverridesCompiled()))
+               methods.add(member);
+
+         }
       }
    }
 
@@ -4204,7 +4213,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    public boolean getLiveDynamicTypesAnnotation() {
       if (liveDynType)
          return true;
-      Object setting = getCompilerSetting("liveDynamicTypes");
+      Object setting = getCompilerSetting("liveDynamicTypes", true);
       // By default, only turn this on for components and objects so we are not tracking every class by default.  Using IObjChildren here to pick up Element and because it seems like another good way to find 'components' even that do not have @Component
       if (setting == null) {
          return isComponentType() || getDeclarationType() == DeclarationType.OBJECT || isAssignableFromClass(IObjChildren.class) || needsDBLiveDynamicTypes();
@@ -4288,13 +4297,13 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
    }
 
-   public boolean getBoolCompilerSetting(String settingName) {
-      Boolean res = (Boolean) getCompilerSetting(settingName);
+   public boolean getBoolCompilerSetting(String settingName, boolean inherited) {
+      Boolean res = (Boolean) getCompilerSetting(settingName, inherited);
       return res != null && res;
    }
 
-   public Object getCompilerSetting(String settingName) {
-      Object compilerSettings = getInheritedAnnotation("sc.obj.CompilerSettings");
+   public Object getCompilerSetting(String settingName, boolean inherited) {
+      Object compilerSettings = inherited ? getInheritedAnnotation("sc.obj.CompilerSettings") : getAnnotation("sc.obj.CompilerSettings");
       if (compilerSettings != null) {
          return ModelUtil.getAnnotationValue(compilerSettings, settingName);
       }
@@ -5036,8 +5045,58 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return res;
    }
 
+   /** These are methods that are defined as dynamic but override a compiled method so need some type of stub to make the transition */
    public List<Object> getDynCompiledMethods() {
-      return getAllMethods("static", false, true, true);
+      List<Object> res = getAllMethods("static", false, true, true);
+      List<Object> resCopy = null;
+      // This will return any compiled abstract/interface methods we inherit from a compiled base class but we only need that method
+      // as a dynCompiledMethod if there's no compiled implementation of that method defined for this class.
+      if (res != null) {
+         for (int i = 0; i < res.size(); i++) {
+            Object resMeth = res.get(i);
+            if (resMeth instanceof MethodDefinition) {
+               MethodDefinition meth = (MethodDefinition) resMeth;
+               if (meth.body == null) {
+                  boolean removed = false;
+                  List<Object> defMeths = getMethods(meth.name, null);
+                  for (Object defMeth:defMeths) {
+                     if (defMeth == meth)
+                        continue;
+                     if (!ModelUtil.isCompiledMethod(defMeth))
+                        continue;
+                     if (ModelUtil.hasModifier(defMeth, "abstract") || ModelUtil.isInterface(ModelUtil.getEnclosingType(defMeth)))
+                        continue;
+                     if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(defMeth), meth.getParameterTypes(false), false, getLayeredSystem())) {
+                        if (resCopy == null) {
+                           resCopy = new ArrayList<Object>(res);
+                           res = resCopy;
+                        }
+                        res.remove(i);
+                        i--;
+                        removed = true;
+                        break;
+                     }
+                  }
+
+                  // Need to check if this is a getX or setX in an interface and there's a property that will override
+                  // them to avoid a dynamic method trying to look up an existing compiled or dynamic property
+                  if (!removed && meth.propertyName != null) {
+                     Object prop = definesMember(meth.propertyName, MemberType.PropertyAnySet, null, null);
+                     if (prop != null) {
+                        if (resCopy == null) {
+                           resCopy = new ArrayList<Object>(res);
+                           res = resCopy;
+                        }
+                        res.remove(i);
+                        i--;
+                     }
+                  }
+               }
+            }
+
+         }
+      }
+      return res;
    }
 
    transient private static String dynStubTemplateStr = "<%= emptyString(packageName) ? \"\" : \"package \" + packageName + \";\"%>\n\n" +

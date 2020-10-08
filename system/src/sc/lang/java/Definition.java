@@ -11,7 +11,10 @@ import sc.lang.sc.ScopeModifier;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
 import sc.obj.ScopeDefinition;
+import sc.parser.IString;
 import sc.parser.PString;
+import sc.type.CTypeUtil;
+import sc.type.PTypeUtil;
 
 import java.lang.annotation.ElementType;
 import java.lang.reflect.AnnotatedElement;
@@ -425,16 +428,30 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
       return null;
    }
 
+   private static void addAllModifiers(List<Object> modifiersToUse, List<Object> modifiers) {
+      for (Object modifier:modifiers) {
+         if (modifier instanceof IString)
+            modifiersToUse.add((modifier.toString()));
+         else
+            modifiersToUse.add(modifier);
+      }
+   }
+
    public List<Object> getComputedModifiers() {
       List<Object> modifiersToUse;
       if (!transformed && defaultModifier != null && getInternalAccessLevel() == null) {
          modifiersToUse = new ArrayList<Object>();
          modifiersToUse.add(defaultModifier);
-         if (modifiers != null)
-            modifiersToUse.addAll(modifiers);
+         if (modifiers != null) {
+            addAllModifiers(modifiersToUse, modifiers);
+         }
+      }
+      else if (modifiers != null) {
+         modifiersToUse = new ArrayList<Object>();
+         addAllModifiers(modifiersToUse, modifiers);
       }
       else
-         modifiersToUse = modifiers;
+         modifiersToUse = null;
 
       Object[] extraModifiers = getExtraModifiers();
       if (extraModifiers != null) {
@@ -545,8 +562,26 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
          if (modifier instanceof Annotation) {
             Annotation annotation = (Annotation) modifier;
             String ftn;
-            if (annotation.typeName != null && annotation.typeName.equals(annotationName) || (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
+            if (annotation.typeName != null && annotation.typeName.equals(annotationName))
                return annotation;
+            //boolean isStarted = annotation.isStarted();
+            if (/*isStarted && &*/ (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
+               return annotation;
+            // We will look for CompilerSettings sometimes before we're ready to start resolving other annotations that
+            // might be found in the source path so being careful not to start a resolve of the annotation name until
+            // we know it's possibly the type we are looking for.
+            /*
+            if (!isStarted && CTypeUtil.getClassName(annotationName).equals(annotation.typeName)) {
+               String packageName = CTypeUtil.getPackageName(annotationName);
+               if (packageName != null && (packageName.equals("sc.obj") || packageName.equals("sc.bind"))) {
+                  Object annotClass = PTypeUtil.findType(annotation.typeName);
+
+               }
+                  annotation.start();
+               if ((ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
+                  return annotation;
+            }
+            */
          }
       }
       return null;

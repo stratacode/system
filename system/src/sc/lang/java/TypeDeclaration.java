@@ -96,6 +96,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       // TODO: should we at this point see if we can propagate the dynamic status to our extends type?  It would have
       // to be a src file but this would reduce the number of stubs we generate.
       if (hasModifier("dynamic") || ((layer != null && layer.dynamic) && !getCompiledOnly()) || isLayerComponent()) {
+         if (!isLayerType() && !isLayerComponent())
+            initCompiledOnly();
+
+         if (compiledOnly)
+            return;
+
          if (!useDynamicNew) {
             dynamicType = true;
          }
@@ -138,6 +144,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
       initTypeInfo();
       initPropagateConstructors();
+      initCompiledOnly();
+
       if (implementsBoundTypes != null) {
          JavaModel m = getJavaModel();
          for (Object implTypeObj:implementsBoundTypes) {
@@ -191,6 +199,22 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
 
    }
 
+   public void initCompiledOnly() {
+      JavaModel model = getJavaModel();
+      if (model != null && model.mergeDeclaration && !isLayerType) {
+         // Can't access inherited annotations in start
+         Object setting;
+         if (!needsCompiledClass) {
+            boolean ncc = getBoolCompilerSetting("needsCompiledClass", false);
+            if (ncc)
+               enableNeedsCompiledClass();
+         }
+         if (!compiledOnly) {
+            compiledOnly = getBoolCompilerSetting("compiledOnly", false);
+         }
+      }
+   }
+
    public void validate() {
       if (validated)
          return;
@@ -209,17 +233,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       JavaModel model = getJavaModel();
       if (model != null && model.mergeDeclaration && !isLayerType) {
 
-         // Can't access inherited annotations in start
-         Object setting;
-         if (!needsCompiledClass) {
-            boolean ncc = getBoolCompilerSetting("needsCompiledClass");
-            if (ncc)
-               enableNeedsCompiledClass();
-         }
-         if (!compiledOnly) {
-            compiledOnly = getBoolCompilerSetting("compiledOnly");
-         }
-
+         //initCompiledOnly();
          initDynTypeInfo();
       }
 
@@ -1661,13 +1675,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       dynTypeInfoInitialized = true;
       // Defaults to true
       Object setting;
-      setting = getCompilerSetting("useRuntimeReflection");
+      setting = getCompilerSetting("useRuntimeReflection", true);
       if (setting == null || !(setting instanceof Boolean))
          useRuntimeReflection = getLayeredSystem() != null ? getLayeredSystem().useRuntimeReflection : true;
       else
          useRuntimeReflection = (Boolean)setting;
 
-      setting = getCompilerSetting("useExternalDynType");
+      setting = getCompilerSetting("useExternalDynType", true);
       if (setting == null || !(setting instanceof Boolean))
          useExternalDynType = false;
       else

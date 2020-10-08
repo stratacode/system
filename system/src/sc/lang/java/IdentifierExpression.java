@@ -3111,7 +3111,12 @@ public class IdentifierExpression extends ArgumentsExpression {
       }
       newExpr.setProperty("arguments", args);
 
-      parentNode.replaceChild(this, newExpr);
+      if (inferredType != null) {
+         ParenExpression paren = ParenExpression.create(CastExpression.create(JavaType.createFromParamType(getLayeredSystem(), inferredType, null, getEnclosingType()), newExpr));
+         parentNode.replaceChild(this, paren);
+      }
+      else
+         parentNode.replaceChild(this, newExpr);
    }
 
    private boolean convertToGetMethod(String identifier, int i, int sz, int incr, boolean isIs) {

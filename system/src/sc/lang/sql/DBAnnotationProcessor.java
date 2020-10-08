@@ -16,6 +16,10 @@ public class DBAnnotationProcessor extends DefaultAnnotationProcessor {
       // to represent the merged view of the DBTypeDescriptor - that should be applied during validate - i.e. the staticMixinTemplate
       staticMixinTemplate = "sc.obj.DBStaticTemplate";
       defineTypesMixinTemplate = "sc.obj.DBDefineTypesTemplate";
+      // TODO: for now, these classes are compiled only even if they are in a dynamic layer but it wouldn't be difficult to
+      // support dynamic DB types too. When adding or removing properties and types, it would be possible to do full-lifecycle schema-evolution
+      // on the fly
+      compiledOnly = true;
       setAppendInterfaces(new String[] {"sc.db.IDBObject", "sc.obj.IStoppable"});
    }
 

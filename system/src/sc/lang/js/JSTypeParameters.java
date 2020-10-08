@@ -1123,7 +1123,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
                sb = asb;
          }
 
-         if (type.getBoolCompilerSetting("needsPropertyNames")) {
+         if (type.getBoolCompilerSetting("needsPropertyNames", true)) {
             StringBuilder psb = new StringBuilder();
             psb.append(getShortJSTypeName());
             psb.append("._PN = [");

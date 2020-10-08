@@ -81,6 +81,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
    }
 
    public boolean getOverridesCompiled() {
+      if (!overridesCompiled && body == null && ModelUtil.isCompiledMethod(this))
+         return true;
       return overridesCompiled;
    }
 

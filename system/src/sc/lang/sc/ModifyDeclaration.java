@@ -229,6 +229,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       try {
          initTypeInfo();
 
+         initCompiledOnly();
+
          // need to start the extends type before we go and start our children.  This ensures an independent layer
          // gets started completely before the dependent layers.
          if (modifyTypeDecl != null) {
@@ -294,7 +296,7 @@ public class ModifyDeclaration extends TypeDeclaration {
                   dynamicType = true;
                }
                else {
-                  /**
+                  /*
                    * When a "configure only" modify operation is in a dynamic layer, the modified type is compiled, we have an optimization.
                    * The type is not dynamic but but it gets its dynamicNew flag set.   Propagate the dynamicNew flag to the modified
                    * type so that any "new X" calls for that type are converted to dynamic calls.
@@ -2619,6 +2621,9 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (needsCompiledClass)
             return getFullTypeName();
 
+         // TODO: Using the extends type fixed a case where we were returning the compiled type name of a dynamic type (NavView.navMenu or maybe optionView?)
+         // but then broke the prepDemoTodo test and others
+         //Object extendsType = getExtendsTypeDeclaration();
          Object extendsType = getDerivedTypeDeclaration();
          if (!needsDynamicStub) {
             if (extendsType == null) {

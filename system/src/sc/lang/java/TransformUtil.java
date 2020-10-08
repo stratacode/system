@@ -910,9 +910,12 @@ public class TransformUtil {
    static final String[] nonTopLevelTypeModifiers = {"transient", "volatile", "static", "private"};
 
    // Like the above only adding "abstract".  Even if we generate a stub type which is abstract, we need to generate the class as physical since we may not generate subclasses.
+   // the abstract class will add implementations of any inherited abstract methods to invoke the dynamic method
    static final String[] nonStubTypeModifiers = {"transient", "volatile", "static", "private", "abstract"};
 
    static final String[] typeToConstrModifiers = {"abstract", "static"};
+
+   static final String[] abstractModifier = {"abstract"};
 
    static final String[] bindableModifiers = {"@Bindable", "@sc.bind.Bindable"};
 

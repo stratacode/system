@@ -280,7 +280,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
      // so we do the proper parameters and can create the "superArgs" - which get propagated through.
      // Object extTypeDecl = ModelUtil.getExtendsClass(objType);
      // Object[] constrs = extTypeDecl == null ? null : ModelUtil.getConstructors(extTypeDecl, objType);
-      Object[] constrs = ModelUtil.getConstructors(objType, objType);
+      Object[] constrs = ModelUtil.getConstructors(objType, objType, true);
       if (constrs == null) {
          Object ctor = ModelUtil.getPropagatedConstructor(sys, objType, objTypeDecl, refLayer);
          if (ctor != null)
@@ -1060,7 +1060,11 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       public String getModifiers() {
-         return ModelUtil.modifiersToString(method, false, true, false, false, true, null);
+         String res = ModelUtil.modifiersToString(method, false, true, false, false, true, null);
+         if (res != null) {
+            res = TransformUtil.removeModifiers(res, TransformUtil.abstractModifier);
+         }
+         return res;
       }
 
       public boolean isVoid() {
@@ -1200,7 +1204,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
       }
 
       Object findSuperMethod(Object type, List<Object> paramList) {
-         return ModelUtil.definesConstructor(sys, type, paramList, null, null, false);
+         return ModelUtil.declaresConstructor(sys, type, paramList, null, null);
       }
 
       public String getSuperExpression() {
