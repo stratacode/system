@@ -562,26 +562,8 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
          if (modifier instanceof Annotation) {
             Annotation annotation = (Annotation) modifier;
             String ftn;
-            if (annotation.typeName != null && annotation.typeName.equals(annotationName))
+            if (annotation.typeName != null && annotation.typeName.equals(annotationName) || (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
                return annotation;
-            //boolean isStarted = annotation.isStarted();
-            if (/*isStarted && &*/ (ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
-               return annotation;
-            // We will look for CompilerSettings sometimes before we're ready to start resolving other annotations that
-            // might be found in the source path so being careful not to start a resolve of the annotation name until
-            // we know it's possibly the type we are looking for.
-            /*
-            if (!isStarted && CTypeUtil.getClassName(annotationName).equals(annotation.typeName)) {
-               String packageName = CTypeUtil.getPackageName(annotationName);
-               if (packageName != null && (packageName.equals("sc.obj") || packageName.equals("sc.bind"))) {
-                  Object annotClass = PTypeUtil.findType(annotation.typeName);
-
-               }
-                  annotation.start();
-               if ((ftn = annotation.getFullTypeName()) != null && ftn.equals(annotationName))
-                  return annotation;
-            }
-            */
          }
       }
       return null;

@@ -5057,11 +5057,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             if (resMeth instanceof MethodDefinition) {
                MethodDefinition meth = (MethodDefinition) resMeth;
                if (meth.body == null) {
-                  boolean removed = false;
+                  boolean processed = false;
                   List<Object> defMeths = getMethods(meth.name, null);
                   for (Object defMeth:defMeths) {
-                     if (defMeth == meth)
+                     if (defMeth == meth) {
                         continue;
+                     }
                      if (!ModelUtil.isCompiledMethod(defMeth))
                         continue;
                      if (ModelUtil.hasModifier(defMeth, "abstract") || ModelUtil.isInterface(ModelUtil.getEnclosingType(defMeth)))
@@ -5073,16 +5074,16 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                         }
                         res.remove(i);
                         i--;
-                        removed = true;
+                        processed = true;
                         break;
                      }
                   }
 
                   // Need to check if this is a getX or setX in an interface and there's a property that will override
                   // them to avoid a dynamic method trying to look up an existing compiled or dynamic property
-                  if (!removed && meth.propertyName != null) {
+                  if (!processed && meth.propertyName != null) {
                      Object prop = definesMember(meth.propertyName, MemberType.PropertyAnySet, null, null);
-                     if (prop != null) {
+                     if (prop != null && prop != meth && !ModelUtil.isMethod(prop)) {
                         if (resCopy == null) {
                            resCopy = new ArrayList<Object>(res);
                            res = resCopy;
