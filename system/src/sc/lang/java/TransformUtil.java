@@ -532,7 +532,7 @@ public class TransformUtil {
 
          String postAssignment = parameters.getPostAssignment();
          if (postAssignment != null && postAssignment.length() > 0) {
-            Object[] constrs = objType.getConstructors(null);
+            Object[] constrs = objType.getConstructors(null, false);
             if (constrs == null || constrs.length == 0) {
                if (initString == null)
                   initString = new StringBuilder();

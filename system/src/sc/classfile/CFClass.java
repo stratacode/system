@@ -768,7 +768,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
       return typeParameters;
    }
 
-   public Object[] getConstructors(Object refType) {
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
       if (!started)
          start();
       // TODO: enforce ref type here?

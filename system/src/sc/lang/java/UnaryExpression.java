@@ -33,7 +33,6 @@ public class UnaryExpression extends ChainedExpression {
       if (bindingDirection != null) {
          return initBinding(expectedType, ctx);
       }
-      
       Object value = expression.eval(null, ctx);
       Object newValue = DynUtil.evalUnaryExpression(operator, null, value);
       if (isIncrementOperator()) {

@@ -252,7 +252,7 @@ public class EnumDeclaration extends TypeDeclaration {
       enumCl.syncProperties = syncProperties;
       enumCl.cachedNeedsSync = cachedNeedsSync;
 
-      Object[] constrs = getConstructors(null);
+      Object[] constrs = getConstructors(null, false);
       if (constrs != null && constrs.length > 0) {
          for (Object constrObj:constrs) {
             if (constrObj instanceof ConstructorDefinition) {
@@ -391,7 +391,11 @@ public class EnumDeclaration extends TypeDeclaration {
                modMeths = Arrays.asList(meths);
          }
       }
-      return ModelUtil.mergeMethods(modMeths, declMeths);
+      List<Object> result = ModelUtil.mergeMethods(modMeths, declMeths);
+
+      result = appendInterfaceMethods(result, methodName, modifier, includeExtends);
+
+      return result;
    }
 
    public Object getDerivedTypeDeclaration() {

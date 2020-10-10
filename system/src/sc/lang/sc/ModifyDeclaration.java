@@ -881,7 +881,7 @@ public class ModifyDeclaration extends TypeDeclaration {
       Object[] res = super.getConstructors(refType, includeHidden);
 
       if (modifyTypeDecl != null && !modifyInherited) {
-         Object[] modConsts = modifyTypeDecl.getConstructors(refType);
+         Object[] modConsts = modifyTypeDecl.getConstructors(refType, includeHidden);
          if (modConsts != null) {
             if (res != null) {
                List modProps = ModelUtil.mergeMethods(Arrays.asList(modConsts), Arrays.asList(res));
@@ -2043,31 +2043,33 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
       // If the modifying type has an extends type, it overrides the extends type in the base class
-      List declProps = super.getMethods(methodName, modifier, true);
-      List modProps;
+      List declMeths = super.getMethods(methodName, modifier, true);
+      List modMeths;
       Object modifyObj = getModifyObj();
       if (modifyObj == null)
-         modProps = declProps;
+         modMeths = declMeths;
       else {
          Object[] props = ModelUtil.getMethods(modifyObj, methodName, modifier, includeExtends && (extendsBoundTypes == null || extendsBoundTypes.length == 0));
          if (props != null)
-            modProps = Arrays.asList(props);
+            modMeths = Arrays.asList(props);
          else
-            modProps = null;
+            modMeths = null;
       }
-      modProps = ModelUtil.mergeMethods(modProps, declProps);
+      modMeths = ModelUtil.mergeMethods(modMeths, declMeths);
       if (extendsBoundTypes != null && includeExtends) {
          for (Object extType:extendsBoundTypes) {
             if (extType != null) {
                Object[] props = ModelUtil.getMethods(extType, methodName, modifier);
                if (props != null) {
                   List extProps = Arrays.asList(props);
-                  modProps = ModelUtil.mergeMethods(extProps, modProps);
+                  modMeths = ModelUtil.mergeMethods(extProps, modMeths);
                }
             }
          }
       }
-      return modProps;
+      modMeths = appendInterfaceMethods(modMeths, methodName, modifier, includeExtends);
+
+      return modMeths;
    }
 
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {

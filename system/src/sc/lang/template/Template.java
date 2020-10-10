@@ -303,10 +303,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
    }
 
    @Override
-   public Object getConstructorFromSignature(String sig) {
+   public Object getConstructorFromSignature(String sig, boolean includeHidden) {
       if (rootType == null)
          return null;
-      return ModelUtil.getConstructorFromSignature(rootType, sig);
+      return ModelUtil.getConstructorFromSignature(rootType, sig, includeHidden);
    }
 
    @Override
@@ -385,9 +385,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return ModelUtil.isDynamicNew(rootType);
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
       if (rootType instanceof ITypeDeclaration)
-         ((ITypeDeclaration) rootType).initDynStatements(inst, ctx, mode);
+         ((ITypeDeclaration) rootType).initDynStatements(inst, ctx, mode, initExt);
    }
 
    public void clearDynFields(Object inst, ExecutionContext ctx) {
@@ -462,10 +462,10 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return ModelUtil.getTypeParameters(rootType);
    }
 
-   public Object[] getConstructors(Object refType) {
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
       if (rootType == null)
          return null;
-      return ModelUtil.getConstructors(rootType, refType);
+      return ModelUtil.getConstructors(rootType, refType, includeHidden);
    }
 
    public boolean isComponentType() {

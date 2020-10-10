@@ -36,7 +36,7 @@ public class ExecutionContext {
    }
 
    Stack<Frame> frames = new Stack<Frame>();
-   Stack<Object> currentObjects = new Stack<Object>();
+   public Stack<Object> currentObjects = new Stack<Object>();
 
    public String currentLabel; // For the break and continue return actions, this specifies the label to process
 

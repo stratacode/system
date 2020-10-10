@@ -812,7 +812,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object getConstructorFromSignature(String sig) {
+      public Object getConstructorFromSignature(String sig, boolean includeHidden) {
          return null;
       }
 
@@ -885,7 +885,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object[] getConstructors(Object refType) {
+      public Object[] getConstructors(Object refType, boolean includeHidden) {
          return new Object[0];
       }
 
@@ -930,7 +930,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+      public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
 
       }
 
@@ -1152,7 +1152,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object getConstructorFromSignature(String sig) {
+      public Object getConstructorFromSignature(String sig, boolean includeHidden) {
          return null;
       }
 
@@ -1225,7 +1225,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public Object[] getConstructors(Object refType) {
+      public Object[] getConstructors(Object refType, boolean includeHidden) {
          return new Object[0];
       }
 
@@ -1270,7 +1270,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+      public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
 
       }
 

@@ -313,7 +313,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
             if (t instanceof BodyTypeDeclaration) {
                BodyTypeDeclaration bt = (BodyTypeDeclaration) t;
                if (bt.isComponentType() && bt.getNeedsDynInnerStub()) {
-                  Object[] constrs = bt.getConstructors(objType);
+                  Object[] constrs = bt.getConstructors(objType, false);
                   DynInnerConstructor dc;
                   if (constrs == null) {
                      dc = new DynInnerConstructor();
@@ -654,7 +654,7 @@ public class DynStubParameters extends AbstractTemplateParameters {
    private List<DynMethod> superInstMethods;
 
    private void initMethodTables() {
-      Object[] carr = objTypeDecl.getConstructors(null);
+      Object[] carr = objTypeDecl.getConstructors(null, false);
       List<Object> constructors = carr == null ? null : Arrays.asList(carr);
 
       declStaticMeths = new ArrayList<Object>();

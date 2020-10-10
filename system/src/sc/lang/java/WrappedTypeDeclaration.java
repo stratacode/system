@@ -181,8 +181,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
    }
 
    @Override
-   public Object getConstructorFromSignature(String sig) {
-      return ModelUtil.getConstructorFromSignature(baseType, sig);
+   public Object getConstructorFromSignature(String sig, boolean includeHidden) {
+      return ModelUtil.getConstructorFromSignature(baseType, sig, includeHidden);
    }
 
    @Override
@@ -243,8 +243,8 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return null;
    }
 
-   public Object[] getConstructors(Object refType) {
-      return ModelUtil.getConstructors(baseType, refType);
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
+      return ModelUtil.getConstructors(baseType, refType, includeHidden);
    }
 
    public boolean isComponentType() {
@@ -314,10 +314,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       return ModelUtil.isDynamicNew(baseType);
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
       if (!(baseType instanceof ITypeDeclaration))
          return;
-      ((ITypeDeclaration) baseType).initDynStatements(inst, ctx, mode);
+      ((ITypeDeclaration) baseType).initDynStatements(inst, ctx, mode, initExt);
    }
 
    public void clearDynFields(Object inst, ExecutionContext ctx) {

@@ -597,7 +597,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    public JSMethod getConstructor() {
       if (cachedConstructor != null)
          return cachedConstructor;
-      Object[] constrs = type.getConstructors(null);
+      Object[] constrs = type.getConstructors(null, false);
       JSMethod constr;
       if (constrs == null) {
          constr = new JSMethod(null);
@@ -1175,7 +1175,7 @@ public class JSTypeParameters extends ObjectTypeParameters {
    public String getMethodMetadata() {
       if (type.getSyncProperties() == null)
          return "";
-      Object[] constrs = type.getConstructors(null);
+      Object[] constrs = type.getConstructors(null, false);
       if (constrs == null)
          return "";
       StringBuilder sb = null;

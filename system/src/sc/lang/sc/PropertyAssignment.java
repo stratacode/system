@@ -258,8 +258,16 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
                Object val = init.eval(returnType, ctx);
 
                // Reverse only bindings do not initialize the value
-               if (bindingDirection == null || bindingDirection.doForward())
+               if (bindingDirection == null || bindingDirection.doForward()) {
+
+                  // Don't set primitive properties that are not set - they should already have been initialized to the
+                  // default value.  This can happen when there's a binding expression with a null intermediate for example.
+                  if (val == null && ModelUtil.isPrimitive(returnType)) {
+                     return;
+                  }
+
                   TypeUtil.setDynamicProperty(inst, propertyName, val, true);
+               }
 
             }
             finally {

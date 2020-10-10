@@ -79,7 +79,7 @@ public interface ITypeDeclaration {
 
    List<Object> getMethods(String methodName, String modifier, boolean includeExtends);
 
-   Object getConstructorFromSignature(String sig);
+   Object getConstructorFromSignature(String sig, boolean includeHidden);
 
    Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer);
 
@@ -122,7 +122,7 @@ public interface ITypeDeclaration {
     */
    List<?> getClassTypeParameters();
 
-   Object[] getConstructors(Object refType);
+   Object[] getConstructors(Object refType, boolean includeHidden);
 
    boolean isComponentType();
 
@@ -142,7 +142,7 @@ public interface ITypeDeclaration {
 
    boolean isDynamicNew();
 
-   void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode);
+   void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt);
 
    void clearDynFields(Object inst, ExecutionContext ctx);
 

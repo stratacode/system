@@ -61,4 +61,12 @@ public class ConstructorPropInfo {
             return propJavaTypes.get(i);
       return null;
    }
+
+   public String getSignature() {
+      StringBuilder sb = new StringBuilder();
+      for (int i = 0; i < propJavaTypes.size(); i++) {
+         sb.append(propJavaTypes.get(i).getSignature(true));
+      }
+      return sb.toString();
+   }
 }

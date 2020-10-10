@@ -1505,19 +1505,23 @@ public class ClassDeclaration extends TypeDeclaration {
    }
 
    public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
-      List declProps = super.getMethods(methodName, modifier, includeExtends);
-      List modProps;
+      List declMeths = super.getMethods(methodName, modifier, includeExtends);
+      List modMeths;
       Object extendsObj = includeExtends ? getDerivedTypeDeclaration() : null;
       if (extendsObj == null)
-         return declProps;
+         return declMeths;
       else {
          Object[] props = ModelUtil.getMethods(extendsObj, methodName, modifier);
          if (props != null)
-            modProps = Arrays.asList(props);
+            modMeths = Arrays.asList(props);
          else
-            modProps = null;
+            modMeths = null;
       }
-      return ModelUtil.mergeMethods(modProps, declProps);
+      List<Object> result = ModelUtil.mergeMethods(modMeths, declMeths);
+
+      result = appendInterfaceMethods(result, methodName, modifier, includeExtends);
+
+      return result;
    }
 
    public List<Object> getAllProperties(String modifier, boolean includeAssigns) {

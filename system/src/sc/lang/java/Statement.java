@@ -204,7 +204,7 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return null;
    }
 
-   protected void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+   protected void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
    }
 
    public void clearDynFields(Object inst, ExecutionContext ctx) {

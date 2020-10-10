@@ -372,14 +372,14 @@ public class InterfaceDeclaration extends TypeDeclaration {
       return res;
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
-      if (extendsBoundTypes != null) {
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
+      if (extendsBoundTypes != null && initExt) {
          for (int i = 0; i < extendsBoundTypes.length; i++) {
             Object impl = extendsBoundTypes[i];
-            ((BodyTypeDeclaration) impl).initDynStatements(inst, ctx, mode);
+            ((BodyTypeDeclaration) impl).initDynStatements(inst, ctx, mode, true);
          }
       }
-      super.initDynStatements(inst, ctx, mode);
+      super.initDynStatements(inst, ctx, mode, initExt);
    }
 
    public Object[] getImplementsTypeDeclarations() {

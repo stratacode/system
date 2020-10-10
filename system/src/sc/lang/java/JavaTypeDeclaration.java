@@ -166,7 +166,7 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
       return false;
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
    }
 
    public void clearDynFields(Object inst, ExecutionContext ctx) {
@@ -549,8 +549,8 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
       return res;
    }
 
-   public Object getConstructorFromSignature(String sig) {
-      Object[] cstrs = getConstructors(null);
+   public Object getConstructorFromSignature(String sig, boolean includeHidden) {
+      Object[] cstrs = getConstructors(null, includeHidden);
       if (cstrs == null)
          return null;
       for (int i = 0; i < cstrs.length; i++) {
@@ -566,7 +566,7 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
       if (methods == null) {
          // Special case way to refer to the constructor
          if (methodName.equals(getTypeName()))
-            return getConstructorFromSignature(signature);
+            return getConstructorFromSignature(signature, true);
          // TODO: default constructor?
          return null;
       }

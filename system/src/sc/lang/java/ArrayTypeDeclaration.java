@@ -325,7 +325,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
    }
 
    @Override
-   public Object getConstructorFromSignature(String sig) {
+   public Object getConstructorFromSignature(String sig, boolean includeHidden) {
       return null;
    }
 
@@ -400,7 +400,7 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return null;
    }
 
-   public Object[] getConstructors(Object refType) {
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
       return null;
    }
 
@@ -437,9 +437,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
       return ModelUtil.isDynamicNew(componentType);
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
       if (componentType instanceof ITypeDeclaration)
-         ((ITypeDeclaration) componentType).initDynStatements(inst, ctx, mode);
+         ((ITypeDeclaration) componentType).initDynStatements(inst, ctx, mode, initExt);
    }
 
    public void clearDynFields(Object inst, ExecutionContext ctx) {

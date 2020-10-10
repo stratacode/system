@@ -925,12 +925,10 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return result;
    }
 
-   public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
-      List<Object> result = super.getMethods(methodName, modifier, includeExtends);
-
+   public List<Object> appendInterfaceMethods(List<Object> result, String methodName, String modifier, boolean includeExtends) {
       initTypeInfo();
 
-      if (implementsBoundTypes != null) {
+      if (implementsBoundTypes != null && includeExtends) {
          for (Object impl:implementsBoundTypes) {
             if (impl != null) {
                // TODO: If we do this, it creates a lot more work to map type-parameters etc, but the ParamTypeDeclaration
@@ -946,6 +944,12 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             }
          }
       }
+      return result;
+   }
+
+   public List<Object> getMethods(String methodName, String modifier, boolean includeExtends) {
+      List<Object> result = super.getMethods(methodName, modifier, includeExtends);
+
       return result;
    }
 
@@ -1714,20 +1718,20 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       return getDeclarationType() == DeclarationType.OBJECT && !useNewTemplate;
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
       // Compiled types will have compiled the interface settings into their init and so do not process them now
       if (isDynamicType()) {
-         if (implementsBoundTypes != null) {
+         if (implementsBoundTypes != null && initExt) {
             for (int i = 0; i < implementsBoundTypes.length; i++) {
                Object impl = implementsBoundTypes[i];
                if (impl instanceof BodyTypeDeclaration) {
                   // Doing this even for compiled interfaces - unlike a base class, the interface does not compile in it's initial state (unless the referencing class is compiled)
-                  ((BodyTypeDeclaration) impl).initDynStatements(inst, ctx, mode);
+                  ((BodyTypeDeclaration) impl).initDynStatements(inst, ctx, mode, true);
                }
             }
          }
       }
-      super.initDynStatements(inst, ctx, mode);
+      super.initDynStatements(inst, ctx, mode, initExt);
    }
 
    public boolean refreshBoundTypes(int flags) {
@@ -2012,13 +2016,6 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
             ParseUtil.initAndStartComponent(excludedStub);
          }
       }
-   }
-
-   void initConstructorPropInfo() {
-   }
-
-   public ConstructorPropInfo getConstructorPropInfo() {
-      return null;
    }
 
    void initPropagateConstructors() {

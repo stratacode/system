@@ -1050,9 +1050,9 @@ public class ModelUtil {
 
    }
 
-   public static Object getConstructorFromSignature(Object type, String sig) {
+   public static Object getConstructorFromSignature(Object type, String sig, boolean includeHidden) {
       if (type instanceof ITypeDeclaration) {
-         return ((ITypeDeclaration) type).getConstructorFromSignature(sig);
+         return ((ITypeDeclaration) type).getConstructorFromSignature(sig, includeHidden);
       }
       else if (type instanceof Class) {
          return PTypeUtil.resolveMethod((Class) type, ModelUtil.getTypeName(type), null, sig);
@@ -3280,10 +3280,8 @@ public class ModelUtil {
    public static Object[] getConstructors(Object td, Object refType, boolean includeHidden) {
       while (ModelUtil.hasTypeParameters(td))
          td = ModelUtil.getParamTypeBaseType(td);
-      if (td instanceof BodyTypeDeclaration)
-         return ((BodyTypeDeclaration) td).getConstructors(refType, includeHidden);
-      else if (td instanceof ITypeDeclaration)
-         return ((ITypeDeclaration) td).getConstructors(refType);
+      if (td instanceof ITypeDeclaration)
+         return ((ITypeDeclaration) td).getConstructors(refType, includeHidden);
       else if (td instanceof Class) {
          Object[] res = RTypeUtil.getConstructors((Class) td);
          if (refType != null && res != null) {
@@ -3712,12 +3710,20 @@ public class ModelUtil {
          return (Throwable) PTypeUtil.createInstance(cl, null, message);
    }
 
-   public static Object getMethod(Object currentObject, String s) {
-      // TODO: support a sc-table in the dynamic object and interpret a MethodDefinition here
-      // See ClassDeclaration.createInstance.  Here we need to implement overriding of dynamic methods.
-      // The execution context probably needs to track the current type declaration so we can do the "super"
-      // definition in IdentifierExpression.  
-      return RTypeUtil.getMethod(currentObject.getClass(), s);
+   public static Object getMethod(Object currentObject, String methName) {
+      Object meth = RTypeUtil.getMethod(currentObject.getClass(), methName);
+      if (meth == null && currentObject instanceof IDynObject) {
+         BodyTypeDeclaration type = (BodyTypeDeclaration) ((IDynObject) currentObject).getDynType();
+         if (type != null) {
+            List<Object> meths = type.getMethods(methName, null);
+            if (meths != null) {
+               if (meths.size() > 1)
+                  System.err.println("Ambiguous method call for: " + methName); // should use a signature here
+               return meths.get(0);
+            }
+         }
+      }
+      return RTypeUtil.getMethod(currentObject.getClass(), methName);
    }
 
    public static Object createInstance(Object boundType, String sig, List<Expression> arguments, ExecutionContext ctx) {
@@ -4023,14 +4029,15 @@ public class ModelUtil {
    }
 
    /** Returns true for classes which have a constructor that takes a BodyTypeDeclaration */
-   public static boolean needsTypeDeclarationParam(Class compClass) {
+   public static boolean needsTypeDeclarationParam(Class compClass, boolean innerClass) {
       Constructor[] ctors = RTypeUtil.getConstructors(compClass);
       if (ctors == null)
          return false;
+      int ix = !innerClass ? 0 : 1;
       for (Constructor ctor:ctors) {
          Class[] subParamTypes = ctor.getParameterTypes();
-         if (subParamTypes != null && subParamTypes.length > 0) {
-            if (BodyTypeDeclaration.class.isAssignableFrom(subParamTypes[0]))
+         if (subParamTypes != null && subParamTypes.length > ix) {
+            if (BodyTypeDeclaration.class.isAssignableFrom(subParamTypes[ix]))
                return true;
          }
       }
@@ -9729,6 +9736,13 @@ public class ModelUtil {
                types.add(ftn);
          }
       }
+   }
+
+   public static String getConstructorPropSignature(Object type) {
+      if (type instanceof BodyTypeDeclaration) {
+         return ((BodyTypeDeclaration) type).getConstructorPropSignature();
+      }
+      throw new UnsupportedOperationException();
    }
 
 }

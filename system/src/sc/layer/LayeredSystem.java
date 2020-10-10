@@ -3835,8 +3835,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             TypeDeclaration typeDecl = (TypeDeclaration) typeObj;
 
             ExecutionContext ctx = new ExecutionContext(typeDecl.getJavaModel());
-            Object inst = typeDecl.constructInstance(ctx, outerObj, params, false);
-            typeDecl.initDynInstance(inst, ctx, false, true, outerObj, params);
+            Object inst = typeDecl.constructInstance(ctx, outerObj, params, false, true, true);
+            typeDecl.initDynInstance(inst, ctx, false, true, outerObj, params, true, true);
             return inst;
          }
          else {

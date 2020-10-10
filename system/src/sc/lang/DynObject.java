@@ -20,6 +20,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.BitSet;
 
 /** Used for dynamic types which do not extend either a compiled type, or type which is already an IDynObject  */
@@ -273,8 +274,116 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
       return create(true, dynType, outerObj, constructorSig, args);
    }
 
-
+   // TODO: this is almost the same as BodyTypeDeclaration.createInstance for where it handles 'class' creation... this
+   // version works for LayerComponents. We should clean this up so there's only one copy of this logic since there's a lot
+   // of overlap in the different versions. This version takes the constructor parameters - that version takes Expressions that
+   // are evaluated to get the constructor values, and that version deals with instantiating objects, not just classes.
    public static Object create(boolean doInit, TypeDeclaration dynType, Object outerObj, String constructorSig, Object...args) {
+      Object inst = null;
+      ExecutionContext ctx = new ExecutionContext(dynType.getJavaModel());
+
+      if (dynType.isLayerComponent())
+         return createCompiled(doInit, dynType, outerObj, constructorSig, args);
+
+      if (dynType.isDynamicNew()) {
+         // Get this before we add the inner obj's parent
+         ConstructorDefinition con = (ConstructorDefinition) dynType.getConstructorFromSignature(constructorSig, true);
+         int origNumArgs = args == null ? 0 : args.length;
+
+         // First get the constructor values in the parent's context
+         boolean success = false;
+         boolean isDynStub = dynType.isDynamicStub(false);
+
+         boolean pushedInst = false;
+         boolean needsInit = false;
+
+         try {
+            // TODO: paramTypes should be providing a type context here right?
+            if (con == null && origNumArgs > 0)
+               throw new IllegalArgumentException("No constructor matching " + Arrays.asList(args) + " for: ");
+
+            // If there are constructors and a base class (but we are not a dynamic stub), we need to do some work here.  The super(xx) call is the first
+            // time we have the constructor/args to construct the instance.   In that case, mark the ctx,
+            // set call the constructor.  when super is hit, it sees the flag in the ctx and creates the
+            // instance (or propagates the pending constructor to the next super call).
+            //
+            // If there is a constructor and a base class but no super
+            // call - using the implied zero arg constructor.  In that case, we do the init here.
+
+            if (con == null || !con.callsSuper(true) || isDynStub) {
+               // Was emptyObjectArray for the args
+               inst = dynType.constructInstance(ctx, outerObj == null ? ModelUtil.getOuterObject(dynType, ctx) : outerObj, args, false, true, true);
+               needsInit = false;
+            }
+            else {
+               if (ctx.getOrigConstructor() == null)
+                  ctx.setOrigConstructor(dynType);
+               ctx.setPendingConstructor(dynType);
+               needsInit = true;
+            }
+
+            if (con != null) {
+               //if (inst != null) {
+               //   ctx.pushCurrentObject(inst);
+               //   pushedInst = true;
+               //}
+
+               con.invoke(ctx, Arrays.asList(args));
+
+               //if (ctx.currentObjects.size() > 0)
+               //   inst = ctx.getCurrentObject();
+               //else
+               //  System.err.println("*** No current object created in constructor");
+
+               //dynType.initDynInstance(inst, ctx, true, false, outerObj, args);
+            }
+
+            if (ctx.getPendingConstructor() != null)
+               throw new IllegalArgumentException("Failure to construct instance of type: " + dynType.getFullTypeName());
+            success = true;
+         }
+         finally {
+            if (success && ctx.currentObjects.size() > 0) {
+               inst = ctx.getCurrentObject();
+               if (inst != null) {
+                  if (outerObj != null)
+                     dynType.initOuterInstanceSlot(inst, ctx, outerObj);
+
+                  if (needsInit) {
+                     dynType.initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
+                  }
+                  // Set the slot before we populate so that we can resolve cycles
+                  /*
+                  if (dynIndex != -1) {
+                     if (outerObj instanceof IDynObject) {
+                        IDynObject dynParent = (IDynObject) outerObj;
+                        dynParent.setProperty(dynIndex, inst, true);
+                     }
+                  */
+                        /*
+                        else
+                           dynParentType.setDynStaticField(dynIndex, inst);
+                  }
+                        */
+
+                  dynType.initNewSyncInst(args, inst);
+
+                  dynType.initDynComponent(inst, ctx, doInit, outerObj, args, false);
+                  // Fetches the object pushed from constructInstance, as called indirectly when super() is evaled.
+               }
+               ctx.popCurrentObject();
+            }
+         }
+      }
+      else {
+         inst = createCompiled(doInit, dynType, outerObj, constructorSig, args);
+      }
+      if (inst == null)
+         System.err.println("*** Failed to create instance of: " + dynType);
+      return inst;
+   }
+
+   public static Object createCompiled(boolean doInit, TypeDeclaration dynType, Object outerObj, String constructorSig, Object...args) {
       Class rtClass = dynType.getCompiledClass();
       Object dynObj;
       boolean dynInnerArgs = false;
@@ -305,7 +414,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             }
 
             // If we have an enclosing instance and the class we access this type is not the type itself... ie.
-            // the compiled classes use an inner type, add the outer obj as a parameteter.
+            // the compiled classes use an inner type, add the outer obj as a parameter.
             /*
             if (outerObj != null && accessClass != null) {
                Object[] newerArgs = new Object[newArgs.length+1];
@@ -386,23 +495,23 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          ctx.pushCurrentObject(dynObj);
          pushedObj = true;
          
-         dynType.initDynamicFields(dynObj, ctx);
+         dynType.initDynamicFields(dynObj, ctx, true);
          
          Object constr = null;
          if (constructorSig != null) {
-            constr = dynType.getConstructorFromSignature(constructorSig);
+            constr = dynType.getConstructorFromSignature(constructorSig, true);
          }
          else {
             if (args == null || args.length == 0) {
                // Look for an inherited constructor here.  If we don't find the zero arg constructor in our
-               // type we'll stil have to invoke the one in the super type.
+               // type we'll still have to invoke the one in the super type.
                constr = dynType.definesConstructor(null, null, false);
                // Unless the constructor we found is not dynamic - in that case, it will get called when we create the Java instance
                if (!ModelUtil.isDynamicType(constr))
                   constr = null;
             }
             else {
-               Object[] cstrs = dynType.getConstructors(null);
+               Object[] cstrs = dynType.getConstructors(null, true);
                if (cstrs != null) {
                   if (cstrs.length == 1) {
                      constr = cstrs[0];

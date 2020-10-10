@@ -135,8 +135,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return getCmdObject().getMethods(methodName, modifier, includeExtends);
    }
 
-   public Object getConstructorFromSignature(String sig) {
-      return getCmdObject().getConstructorFromSignature(sig);
+   public Object getConstructorFromSignature(String sig, boolean includeHidden) {
+      return getCmdObject().getConstructorFromSignature(sig, includeHidden);
    }
 
    public Object getMethodFromSignature(String methodName, String signature, boolean resolveLayer) {
@@ -175,8 +175,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return getCmdObject().getClassTypeParameters();
    }
 
-   public Object[] getConstructors(Object refType) {
-      return getCmdObject().getConstructors(refType);
+   public Object[] getConstructors(Object refType, boolean includeHidden) {
+      return getCmdObject().getConstructors(refType, includeHidden);
    }
 
    public boolean isComponentType() {
@@ -211,8 +211,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       return getCmdObject().isDynamicNew();
    }
 
-   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode) {
-      getCmdObject().initDynStatements(inst, ctx, mode);
+   public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
+      getCmdObject().initDynStatements(inst, ctx, mode, initExt);
    }
 
    public void clearDynFields(Object inst, ExecutionContext ctx) {
