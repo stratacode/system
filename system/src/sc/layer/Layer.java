@@ -5040,8 +5040,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** Used by both the command line and layers view to append a description for the layer based on what you are interested in */
    public boolean appendDetailString(StringBuilder sb, boolean first, boolean details, boolean runtime, boolean sync) {
-      boolean useHidden = !getVisibleInEditor();
       if (details) {
+         //boolean useHidden = !getVisibleInEditor(); // This is called from LayersView without the dynLock - not safe to call extendsLayer. It would be find to do this from the
+         // command line though
+         boolean useHidden = hidden;
          if (useHidden)
             first = opAppend(sb, "hidden", first);
          if (buildSeparate)
