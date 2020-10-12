@@ -310,15 +310,19 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
             // If there is a constructor and a base class but no super
             // call - using the implied zero arg constructor.  In that case, we do the init here.
 
+            if (outerObj == null)
+               outerObj = ModelUtil.getOuterObject(dynType, ctx);
+
             if (con == null || !con.callsSuper(true) || isDynStub) {
                // Was emptyObjectArray for the args
-               inst = dynType.constructInstance(ctx, outerObj == null ? ModelUtil.getOuterObject(dynType, ctx) : outerObj, args, false, true, true);
+               inst = dynType.constructInstance(ctx, outerObj, args, false, true, true);
                needsInit = false;
             }
             else {
                if (ctx.getOrigConstructor() == null)
                   ctx.setOrigConstructor(dynType);
                ctx.setPendingConstructor(dynType);
+               ctx.setPendingOuterObj(outerObj);
                needsInit = true;
             }
 
@@ -485,6 +489,7 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
          if (dynType.getLiveDynamicTypesAnnotation()) {
             // Add this instance to the global table so we can do type -> inst mapping
             if (outerObj != null) {
+               // TODO: should be able to remove this since we add it in initOuterInstanceSlot
                dynType.getLayeredSystem().addDynInnerInstance(dynType.getFullTypeName(), dynObj, outerObj);
             }
             else {

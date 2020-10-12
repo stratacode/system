@@ -306,6 +306,13 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       initTypeInfo();
    }
 
+   public void ensureTypeInfoInited() {
+      initTypeInfo();
+      BodyTypeDeclaration modType = getModifiedType();
+      if (modType != null)
+         modType.ensureTypeInfoInited();
+   }
+
    public void initTypeInfo() {
       if (typeInfoInitialized)
          return;

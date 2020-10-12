@@ -148,6 +148,7 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
 
    public Object invoke(ExecutionContext ctx, List<Object> paramValues) {
       BodyTypeDeclaration pendingConst = ctx.getPendingConstructor();
+      Object outerObj = ctx.getPendingOuterObj();
       boolean setInst = false;
 
       // We have a case where there was a dynamic class created with a super in the top level method so we set the pending
@@ -155,8 +156,9 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
       // here using the default constructor of the parent type.  There must be one right?
       if (pendingConst != null && !callsSuper(true)) {
          ctx.setPendingConstructor(null);
+         ctx.setPendingOuterObj(null);
 
-         Object inst = pendingConst.constructInstFromArgs(null, ctx, false);
+         Object inst = pendingConst.constructInstFromArgs(null, ctx, false, outerObj);
 
 
          setInst = true;
@@ -212,15 +214,18 @@ public class ConstructorDefinition extends AbstractMethodDefinition {
    public boolean isModifySuper() {
       // Don't count a constructor that is modifying a previous constructor.
       if (getEnclosingType() instanceof ModifyDeclaration) {
-         ModifyDeclaration modType = (ModifyDeclaration) getEnclosingType();
+         ModifyDeclaration enclModType = (ModifyDeclaration) getEnclosingType();
          Object[] paramTypes = getParameterTypes(false);
          List<?> paramTypesList;
          if (paramTypes == null)
             paramTypesList = Collections.emptyList();
          else
             paramTypesList = Arrays.asList(paramTypes);
+
+         Object modType = enclModType.getModifiedType();
+
          // We are modifying the super constructor so it's not a real extends super
-         if (modType.declaresConstructor(paramTypesList, null) != null)
+         if (modType instanceof TypeDeclaration && ((TypeDeclaration) modType).declaresConstructor(paramTypesList, null) != null)
             return true;
       }
       return false;

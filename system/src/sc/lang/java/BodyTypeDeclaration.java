@@ -4375,32 +4375,59 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    private final static IDynObjManager EMPTY_DYN_OBJ_MANAGER = new NoopDynObjManager();
 
-   public Object constructInstFromArgs(SemanticNodeList<Expression> arguments, ExecutionContext ctx, boolean fromSuper) {
+   public Object constructInstFromArgs(SemanticNodeList<Expression> arguments, ExecutionContext ctx, boolean fromSuper, Object outerObj) {
       Object superType = getExtendsTypeDeclaration();
       Object superCon = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
+      BodyTypeDeclaration origPendingType = ctx.getPendingConstructor();
+      Object origOuterObj = ctx.getPendingOuterObj();
       // If there is no dynamic call to super(x) we construct the pending object now.
       if (superCon == null || !ModelUtil.isDynamicType(superCon)) {
          ctx.setPendingConstructor(null); // processed this - so clear it out
-         Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, null);
-         return constructInstance(ctx, null, argValues, false, true, true);
+         ctx.setPendingOuterObj(null);
+         Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, outerObj);
+         return constructInstance(ctx, outerObj, argValues, false, true, true);
       }
       else { // We have a dynamic constructor
          ConstructorDefinition superConDef = (ConstructorDefinition) superCon;
          // If there's a chained super call, delegate the construction till that
          if (superConDef.callsSuper(true)) {
-            Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, null);
+            Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, outerObj);
             if (superType instanceof ParamTypeDeclaration)
                superType = ((ParamTypeDeclaration) superType).baseType;
-            if (superType instanceof BodyTypeDeclaration)
-               ctx.setPendingConstructor((BodyTypeDeclaration) superType);
-            return superConDef.invoke(ctx, Arrays.asList(argValues));
+            if (superType instanceof BodyTypeDeclaration) {
+               BodyTypeDeclaration superTypeDecl = (BodyTypeDeclaration) superType;
+               ctx.setPendingConstructor(superTypeDecl);
+               if (superTypeDecl.getEnclosingInstType() != null)
+                  ctx.setPendingOuterObj(outerObj);
+               else
+                  ctx.setPendingOuterObj(null);
+            }
+            superConDef.invoke(ctx, Arrays.asList(argValues));
+
+            Object inst = ctx.getCurrentObject();
+            if (inst == null)
+               System.err.println("*** super failed to instantiate the object");
+            else if (origPendingType != null)
+               origPendingType.initDynInstance(inst, ctx, true, false, origOuterObj, argValues, false, false);
+
+            return inst;
          }
          // Otherwise, we build it here before the constructor call
          else {
             ctx.setPendingConstructor(null);
-            Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, null);
-            BodyTypeDeclaration constrType = superType instanceof TypeDeclaration ? (TypeDeclaration) superType : this;
-            Object inst = constrType.constructInstance(ctx, null, argValues, fromSuper, true, false);
+            ctx.setPendingOuterObj(null);
+            BodyTypeDeclaration constrType;
+            Object constrOuterObj = outerObj;
+
+            if (superType instanceof TypeDeclaration) {
+               constrType = (TypeDeclaration) superType;
+               if (outerObj != null && ModelUtil.getEnclosingInstType(superType) == null)
+                  constrOuterObj = null;
+            }
+            else
+               constrType = this;
+            Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, constrOuterObj);
+            Object inst = constrType.constructInstance(ctx, constrOuterObj, argValues, fromSuper, true, true);
             boolean pushedThis = false;
             try {
                //if (inst != null) {
@@ -4410,6 +4437,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                superConDef.invoke(ctx, Arrays.asList(argValues));
 
                if (constrType != this) {
+                  // If this is the first type with an outerObj, this needs to be set for this type before we run the instance code on this type
+                  if (outerObj != null)
+                     initOuterInstanceSlot(inst, ctx, outerObj);
                   if (inst == null)
                      System.out.println("*** null instance for init dynamic fields");
                   initDynamicFields(inst, ctx, false);
@@ -4781,6 +4811,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (!genStub)
          return;
 
+      if (!isDynamicStub(false))
+         return;
+
       LayeredSystem sys = getLayeredSystem();
       Layer thisLayer = getLayer();
       Layer lyr = thisLayer.origBuildLayer;
@@ -5069,23 +5102,25 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                if (meth.body == null) {
                   boolean processed = false;
                   List<Object> defMeths = getMethods(meth.name, null);
-                  for (Object defMeth:defMeths) {
-                     if (defMeth == meth) {
-                        continue;
-                     }
-                     if (!ModelUtil.isCompiledMethod(defMeth))
-                        continue;
-                     if (ModelUtil.hasModifier(defMeth, "abstract") || ModelUtil.isInterface(ModelUtil.getEnclosingType(defMeth)))
-                        continue;
-                     if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(defMeth), meth.getParameterTypes(false), false, getLayeredSystem())) {
-                        if (resCopy == null) {
-                           resCopy = new ArrayList<Object>(res);
-                           res = resCopy;
+                  if (defMeths != null) {
+                     for (Object defMeth:defMeths) {
+                        if (defMeth == meth) {
+                           continue;
                         }
-                        res.remove(i);
-                        i--;
-                        processed = true;
-                        break;
+                        if (!ModelUtil.isCompiledMethod(defMeth))
+                           continue;
+                        if (ModelUtil.hasModifier(defMeth, "abstract") || ModelUtil.isInterface(ModelUtil.getEnclosingType(defMeth)))
+                           continue;
+                        if (ModelUtil.parametersMatch(ModelUtil.getParameterTypes(defMeth), meth.getParameterTypes(false), false, getLayeredSystem())) {
+                           if (resCopy == null) {
+                              resCopy = new ArrayList<Object>(res);
+                              res = resCopy;
+                           }
+                           res.remove(i);
+                           i--;
+                           processed = true;
+                           break;
+                        }
                      }
                   }
 
@@ -7475,7 +7510,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                // If there is a constructor and a base class but no super
                // call - using the implied zero arg constructor.  In that case, we do the init here.
 
-               if (con == null || !con.callsSuper(true) || isDynStub) {
+               if (con == null || !con.callsSuper(false) || isDynStub) {
                   // Was emptyObjectArray for the args
                   inst = constructInstance(ctx, outerObj == null ? ModelUtil.getOuterObject(this, ctx) : outerObj, argValues, false, true, true);
                   needsInit = false;
@@ -7484,6 +7519,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   if (ctx.getOrigConstructor() == null)
                      ctx.setOrigConstructor(this);
                   ctx.setPendingConstructor(this);
+                  ctx.setPendingOuterObj(outerObj);
                   needsInit = true;
                }
 
@@ -7493,6 +7529,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                     ctx.pushCurrentObject(inst);
                   }
                   */
+
+                  if (inst != null)
+                     initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
+
+                  // Here's where we actually start invoking the constructor but the instance is not created until
+                  // the IdentifierExpression for the super(..) in this constructor is called.  After that super
+                  // expression returns, but before the rest of the instructor runs, the initDynInstance call is made
+                  // to init the instance statements
                   con.invoke(ctx, Arrays.asList(argValues));
 
                   /*
@@ -7528,9 +7572,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                         */
                      }
 
-                     if (needsInit) {
-                        initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
-                     }
+                     //if (needsInit) {
+                     //   initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
+                     //}
 
                      initNewSyncInst(argValues, inst);
 
@@ -8658,7 +8702,22 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                   break;
                }
             }
-            extType = ModelUtil.getExtendsClass(extType);
+            if (extType instanceof ModifyDeclaration) {
+               ModifyDeclaration extModType = (ModifyDeclaration) extType;
+               Object modExtType = extModType.getExtendsTypeDeclaration();
+               Object modModType = extModType.getModifiedType();
+               if (modExtType != null && modExtType != modModType) {
+                  if (!ModelUtil.isDynamicType(modExtType)) {
+                     if (ModelUtil.getEnclosingInstType(modExtType) != null) {
+                        needsDynInnerStub = true;
+                        break;
+                     }
+                  }
+               }
+               extType = modModType;
+            }
+            else
+               extType = ModelUtil.getExtendsClass(extType);
          }
 
          // For compiled inner types, we need to clear, then reset this so we propagate it up the type hierarchy.
@@ -9334,9 +9393,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       dbTypeDescriptorInited = true;
   }
 
+  public void ensureTypeInfoInited() {
+  }
+
   public BaseTypeDescriptor getDBTypeDescriptor() {
-      if (!dbTypeDescriptorInited)
+      if (!dbTypeDescriptorInited) {
+         ensureTypeInfoInited();
          initDBTypeDescriptor();
+      }
       return dbTypeDescriptor;
   }
 

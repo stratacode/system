@@ -2008,12 +2008,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
                if (arguments != null) {
                   if (sz == 1 && (pendingConstructor = ctx.getPendingConstructor()) != null) {
-                     // Clear this out before invoking.
-                     //ctx.setPendingConstructor(null);
-
-                     //ctx.pendingConstructorInProgress = true;
-                     pendingConstructor.constructInstFromArgs(arguments, ctx, true);
-                     //ctx.pendingConstructorInProgress = false;
+                     pendingConstructor.constructInstFromArgs(arguments, ctx, true, ctx.getPendingOuterObj());
                      return null;
                   }
                   else if (sz == 2) {

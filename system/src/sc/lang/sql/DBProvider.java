@@ -1,6 +1,7 @@
 package sc.lang.sql;
 
 import sc.db.*;
+import sc.dyn.DynUtil;
 import sc.lang.SQLLanguage;
 import sc.lang.java.*;
 import sc.lang.sc.PropertyAssignment;
@@ -140,6 +141,11 @@ public class DBProvider {
          return res;
       }
       else {
+         if (sys.systemCompiled) {
+            DBTypeDescriptor res = DBTypeDescriptor.getByName(DynUtil.getTypeName(typeDecl, false), false);
+            if (res != null)
+               return res;
+         }
          BaseTypeDescriptor res = initDBTypeDescriptor(sys, refLayer, typeDecl);
          if (res != null && initTables && !res.tablesInitialized)
             completeDBTypeDescriptor(res, sys, refLayer, typeDecl);
@@ -1061,7 +1067,7 @@ public class DBProvider {
                      TypeDeclaration td = (TypeDeclaration) typeDecl;
                      td.addPropertyToMakeBindable(ModelUtil.getPropertyName(property), property, null, false, null);
                   }
-                  else {
+                  else if (!ModelUtil.isBindable(property)){
                      DBUtil.error("Unable to add persistence for property: " + ModelUtil.getPropertyName(property) + " of compiled type: " + ModelUtil.getTypeName(typeDecl));
                   }
                }

@@ -2706,6 +2706,16 @@ public class ModifyDeclaration extends TypeDeclaration {
          if (modifyClass != null)
             return modifyClass;
       }
+      // If we modify a modify type, it might be a modifyInherited as well so need to check that case
+      else if (modifyTypeDecl != null) {
+         BodyTypeDeclaration modType = modifyTypeDecl;
+         while (modType instanceof ModifyDeclaration) {
+            ModifyDeclaration modModType = (ModifyDeclaration) modType;
+            if (modModType.modifyInherited)
+               return modModType.getCompiledExtendsTypeDeclaration();
+            modType = modModType.modifyTypeDecl;
+         }
+      }
 
       return super.getExtendsTypeDeclaration();
    }
