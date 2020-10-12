@@ -4377,14 +4377,14 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public Object constructInstFromArgs(SemanticNodeList<Expression> arguments, ExecutionContext ctx, boolean fromSuper, Object outerObj) {
       Object superType = getExtendsTypeDeclaration();
-      Object superCon = ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
+      Object superCon = superType == null ? null : ModelUtil.declaresConstructor(getLayeredSystem(), superType, arguments, null);
       BodyTypeDeclaration origPendingType = ctx.getPendingConstructor();
       Object origOuterObj = ctx.getPendingOuterObj();
       // If there is no dynamic call to super(x) we construct the pending object now.
       if (superCon == null || !ModelUtil.isDynamicType(superCon)) {
          ctx.setPendingConstructor(null); // processed this - so clear it out
          ctx.setPendingOuterObj(null);
-         Object[] argValues = ModelUtil.constructorArgListToValues(superType, arguments, ctx, outerObj);
+         Object[] argValues = ModelUtil.constructorArgListToValues(superType == null ? this : superType, arguments, ctx, outerObj);
          return constructInstance(ctx, outerObj, argValues, false, true, true);
       }
       else { // We have a dynamic constructor
