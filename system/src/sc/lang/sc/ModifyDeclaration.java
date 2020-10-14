@@ -2985,6 +2985,10 @@ public class ModifyDeclaration extends TypeDeclaration {
             }
          }
       }
+      // When we are just initializing the fields for this type, need to process all modified types in the chain but
+      // don't want to process the extends types.
+      if (!modifyInherited && !initExt && modifyTypeDecl != null && ModelUtil.isDynamicNew(modifyTypeDecl))
+         ((ITypeDeclaration) modifyTypeDecl).clearDynFields(inst, ctx, false);
       super.clearDynFields(inst, ctx, initExt);
    }
 
