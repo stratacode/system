@@ -128,7 +128,7 @@ public class FieldDefinition extends TypedDefinition implements IClassBodyStatem
       return super.definesMember(name, mtype, refType, ctx, skipIfaces, isTransformed);
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
       if (hasModifier("static"))
          return;
 

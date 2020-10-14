@@ -631,30 +631,30 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
       }
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
       // No dynamic fields
       if (!(inst instanceof IDynObject))
          return;
 
       // TODO: Doing the implements before the extends so that extends has precedence... is that right and consistent with transform?
-      if (implementsBoundTypes != null) {
+      if (implementsBoundTypes != null && initExt) {
          for (int i = 0; i < implementsBoundTypes.length; i++) {
             Object impl = implementsBoundTypes[i];
             // Need to do even compiled interfaces in case there are any interface instance fields that were not compiled in
             if (impl instanceof BodyTypeDeclaration)
-               ((BodyTypeDeclaration) impl).clearDynFields(inst, ctx);
+               ((BodyTypeDeclaration) impl).clearDynFields(inst, ctx, initExt);
          }
       }
 
       Object extType = getDerivedTypeDeclaration();
-      if (ModelUtil.isDynamicNew(extType))
-         ((ITypeDeclaration) extType).clearDynFields(inst, ctx);
+      if (ModelUtil.isDynamicNew(extType) && initExt)
+         ((ITypeDeclaration) extType).clearDynFields(inst, ctx, initExt);
 
       if (body != null) {
          IDynObject dinst = (IDynObject) inst;
          for (Statement s:body) {
             if (!(s instanceof TypeDeclaration))
-               s.clearDynFields(inst, ctx);
+               s.clearDynFields(inst, ctx, true);
             else {
                TypeDeclaration innerType = (TypeDeclaration) s;
                int dynIndex;

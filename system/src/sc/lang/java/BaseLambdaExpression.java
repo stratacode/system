@@ -935,7 +935,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public void clearDynFields(Object inst, ExecutionContext ctx) {
+      public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
 
       }
 
@@ -1275,8 +1275,7 @@ public abstract class BaseLambdaExpression extends Expression {
       }
 
       @Override
-      public void clearDynFields(Object inst, ExecutionContext ctx) {
-
+      public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
       }
 
       @Override

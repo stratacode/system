@@ -215,8 +215,8 @@ public class CmdScriptModel extends JavaModel implements ITypeDeclaration {
       getCmdObject().initDynStatements(inst, ctx, mode, initExt);
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
-      getCmdObject().clearDynFields(inst, ctx);
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
+      getCmdObject().clearDynFields(inst, ctx, initExt);
    }
 
    public Object[] getImplementsTypeDeclarations() {

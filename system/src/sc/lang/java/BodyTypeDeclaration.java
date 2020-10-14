@@ -4227,7 +4227,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public void initDynamicFields(Object inst, ExecutionContext ctx, boolean initExt) {
       // First pass - need to set primitive types to 0 to avoid nulls
-      clearDynFields(inst, ctx);
+      clearDynFields(inst, ctx, initExt);
       boolean isComponent = ModelUtil.isComponentType(this);
 
       // Register global objects here before initializing the fields so any resolveName calls made in there will find this instance and not try to create another one
@@ -7367,6 +7367,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
                //outerObj = null;
                appendOuterObj = false;
                if (argValues.length > 0) {
+                  if (outerObj == null)
+                     outerObj = argValues[0];
                   Object[] remOuterArgs = new Object[argValues.length - 1];
                   System.arraycopy(argValues, 1, remOuterArgs, 0, remOuterArgs.length);
                   argValues = remOuterArgs;

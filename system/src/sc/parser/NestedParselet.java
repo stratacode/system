@@ -9,7 +9,6 @@ import sc.dyn.IDynObject;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.java.ITypeDeclaration;
-import sc.lang.java.IdentifierExpression;
 import sc.type.RTypeUtil;
 import sc.type.BeanMapper;
 import sc.util.FileUtil;

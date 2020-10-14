@@ -169,7 +169,7 @@ public abstract class JavaTypeDeclaration extends SemanticNode implements ITypeD
    public void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt) {
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
    }
 
    public Object[] getAllImplementsTypeDeclarations() {

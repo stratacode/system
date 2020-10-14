@@ -144,7 +144,7 @@ public interface ITypeDeclaration {
 
    void initDynStatements(Object inst, ExecutionContext ctx, TypeDeclaration.InitStatementMode mode, boolean initExt);
 
-   void clearDynFields(Object inst, ExecutionContext ctx);
+   void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt);
 
    Object[] getImplementsTypeDeclarations();
 

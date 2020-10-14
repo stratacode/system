@@ -390,9 +390,9 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          ((ITypeDeclaration) rootType).initDynStatements(inst, ctx, mode, initExt);
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
       if (rootType instanceof ITypeDeclaration)
-         ((ITypeDeclaration) rootType).clearDynFields(inst, ctx);
+         ((ITypeDeclaration) rootType).clearDynFields(inst, ctx, initExt);
    }
 
    public Object[] getImplementsTypeDeclarations() {

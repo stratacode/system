@@ -320,10 +320,10 @@ public class WrappedTypeDeclaration implements ITypeDeclaration {
       ((ITypeDeclaration) baseType).initDynStatements(inst, ctx, mode, initExt);
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
       if (!(baseType instanceof ITypeDeclaration))
          return;
-      ((ITypeDeclaration) baseType).clearDynFields(inst, ctx);
+      ((ITypeDeclaration) baseType).clearDynFields(inst, ctx, initExt);
    }
 
    public Object[] getImplementsTypeDeclarations() {

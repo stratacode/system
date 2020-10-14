@@ -442,9 +442,9 @@ public class ArrayTypeDeclaration implements ITypeDeclaration, IArrayTypeDeclara
          ((ITypeDeclaration) componentType).initDynStatements(inst, ctx, mode, initExt);
    }
 
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
       if (componentType instanceof ITypeDeclaration)
-         ((ITypeDeclaration) componentType).clearDynFields(inst, ctx);
+         ((ITypeDeclaration) componentType).clearDynFields(inst, ctx, initExt);
    }
 
    public Object[] getImplementsTypeDeclarations() {

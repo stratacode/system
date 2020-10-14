@@ -2970,9 +2970,8 @@ public class ModifyDeclaration extends TypeDeclaration {
       return "<modify>";
    }
 
-
-   public void clearDynFields(Object inst, ExecutionContext ctx) {
-      if (extendsTypes != null && !isLayerType) {
+   public void clearDynFields(Object inst, ExecutionContext ctx, boolean initExt) {
+      if (initExt && extendsTypes != null && !isLayerType) {
          // No dynamic fields so nothing to initialize
          if (!(inst instanceof IDynObject))
             return;
@@ -2982,11 +2981,11 @@ public class ModifyDeclaration extends TypeDeclaration {
                Object ext = extendsBoundTypes[i];
                // Need to do even compiled interfaces in case there are any interface instance fields that were not compiled in
                if (ext instanceof BodyTypeDeclaration)
-                  ((BodyTypeDeclaration) ext).clearDynFields(inst, ctx);
+                  ((BodyTypeDeclaration) ext).clearDynFields(inst, ctx, true);
             }
          }
       }
-      super.clearDynFields(inst, ctx);
+      super.clearDynFields(inst, ctx, initExt);
    }
 
    public boolean isEmpty() {
