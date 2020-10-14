@@ -332,6 +332,9 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                //   pushedInst = true;
                //}
 
+               //if (inst != null)
+               //   dynType.initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
+
                con.invoke(ctx, Arrays.asList(args));
 
                //if (ctx.currentObjects.size() > 0)
@@ -353,9 +356,9 @@ public class DynObject implements IDynObject, IDynSupport, Serializable {
                   if (outerObj != null)
                      dynType.initOuterInstanceSlot(inst, ctx, outerObj);
 
-                  if (needsInit) {
-                     dynType.initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
-                  }
+                  //if (needsInit) {
+                  //   dynType.initDynInstance(inst, ctx, true, false, outerObj, null, false, false);
+                  //}
                   // Set the slot before we populate so that we can resolve cycles
                   /*
                   if (dynIndex != -1) {
