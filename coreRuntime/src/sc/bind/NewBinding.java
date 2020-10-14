@@ -31,8 +31,11 @@ public class NewBinding extends AbstractMethodBinding {
             valid = false;
       }
 
-      if (valid)
+      if (valid) {
+         // If this is an inner instance, the outer param will already be in paramValues and the paramSig so
+         // not calling createInnerInstance with an explicit outer object here.
          return DynUtil.createInstance(newClass, paramSig, paramValues);
+      }
       else
          return UNSET_VALUE_SENTINEL;
    }
