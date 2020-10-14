@@ -225,7 +225,7 @@ public class SyncHandler {
          // Call the constructor to create the right type of collection, i.e. Collection((Collection a))
          else {
             if (type == List.class) // TODO: need to handle more of these - use the SyncHandler interface here?
-               type = ArrayList.class;
+               return value; // Returning the BArrayList so that bindability is on even for properties that are declared with java.util.List
             // TODO - security: validate this type is allowed to be deserialized
             value = DynUtil.createInstance(type, "Ljava/util/Collection;", value);
          }
