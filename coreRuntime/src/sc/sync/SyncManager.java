@@ -481,6 +481,8 @@ public class SyncManager {
       }
 
       private boolean isNonReference(Object val) {
+         if (val == null)
+            return false;
          Class valClass = val.getClass();
          boolean primType = isPrimitiveClass(valClass);
          if (primType)
