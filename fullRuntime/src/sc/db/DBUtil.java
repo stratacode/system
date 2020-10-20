@@ -357,7 +357,7 @@ public class DBUtil {
             if (pgObject == null) {
                pgObject = (Class) DynUtil.findType("org.postgresql.util.PGobject");
                if (pgObject == null)
-                  throw new IllegalArgumentException("Missing postgresql class: org.postgresql.util.PGobject");
+                  throw new IllegalArgumentException("Missing postgresql class: org.postgresql.util.PGobject - check for postgres jdbc library in classpath");
             }
             Object pgo = DynUtil.createInstance(pgObject, null);
             DynUtil.setProperty(pgo, "type", "jsonb");
