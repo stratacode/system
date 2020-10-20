@@ -345,7 +345,6 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
    public Object evalBinding(Class expectedType, ExecutionContext ctx) {
       String bindingType = getBindingTypeName();
 
-
       assert bindingStatement != null && bindingType != null;
 
       List<Object> bindArgs = new ArrayList<Object>(5);
@@ -505,6 +504,9 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
       "sc.bind.Bind.INACTIVE", "sc.bind.Bind.TRACE", "sc.bind.Bind.VERBOSE", "sc.bind.Bind.QUEUED", "sc.bind.Bind.IMMEDIATE", "sc.bind.Bind.HISTORY",
       "sc.bind.Bind.ORIGIN", "sc.bind.Bind.CROSS_SCOPE", "sc.bind.Bind.SKIP_NULL", "sc.bind.Bind.DO_LATER"};
 
+   private final static int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY,
+                                                   sc.bind.Bind.ORIGIN, sc.bind.Bind.CROSS_SCOPE, Bind.SKIP_NULL, Bind.DO_LATER};
+
    void addBindFlagsAndOptionsExpr(SemanticNodeList<Expression> bindArgs) {
       Expression flagsExpr = null;
       Expression optsExpr = null;
@@ -593,8 +595,6 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
                Integer delay = null;
                Integer priority = null;
                for (Object annotObj: annotObjs) {
-                  String[] bindFlagAnnotNames = {"activated", "trace", "verbose", "queued", "immediate", "history", "origin", "crossScope", "skipNull"};
-                  int[] bindFlagConstVals = {sc.bind.Bind.INACTIVE, sc.bind.Bind.TRACE, sc.bind.Bind.VERBOSE, sc.bind.Bind.QUEUED, sc.bind.Bind.IMMEDIATE, sc.bind.Bind.HISTORY, sc.bind.Bind.ORIGIN, sc.bind.Bind.CROSS_SCOPE, Bind.SKIP_NULL};
                   for (int i = 0; i < bindFlagAnnotNames.length; i++) {
                      String annotName = bindFlagAnnotNames[i];
                      int currentFlag = bindFlagConstVals[i];
