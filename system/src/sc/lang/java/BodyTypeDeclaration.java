@@ -2620,6 +2620,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       //return dynamicType;
    }
 
+   /** Returns true if this type is either a 'dynamic new' or a plain old dynamic type */
    public boolean isDynamicNew() {
       if (getCompiledOnly())
          return false;
