@@ -153,7 +153,12 @@ public class JSON {
                return;
             }
          }
-         appendValue(ctx, sb, ((IDBObject) o).getDBId(), null, replacer);
+         Object dbId = ((IDBObject) o).getDBId();
+         // TODO: should avoid this by inserting these automatically like
+         // in TxOperation.insertTransientRefs 
+         if (dbId == null || (dbId instanceof Long && ((Long) dbId) == 0))
+            System.err.println("*** Saving reference to transient object in JSON");
+         appendValue(ctx, sb, dbId, null, replacer);
          sb.append('"');
       }
       else if (DynUtil.isRootedObject(o)) {
