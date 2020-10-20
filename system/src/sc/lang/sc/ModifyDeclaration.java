@@ -1355,7 +1355,7 @@ public class ModifyDeclaration extends TypeDeclaration {
          BodyTypeDeclaration modResolvedType = modType.resolve(true);
          JavaModel modResolvedModel = modResolvedType.getJavaModel();
          JavaModel modModel = modType.getJavaModel();
-         if (modResolvedModel.nonTransformedModel == null && modResolvedModel.mergeDeclaration) {
+         if (modResolvedModel.nonTransformedModel == null && modResolvedModel.mergeDeclaration && !modType.isDynamicNew()) {
             if (modType.transformedType == null) {
                // We are the first to need the transformed model for this type.  At this point we just clone the transformed model, starting
                // at the most specific one. It will transform any modified models and during the 'deepCopy' operation, will set the modifyTypeDecl's
