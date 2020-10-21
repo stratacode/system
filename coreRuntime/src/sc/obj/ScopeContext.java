@@ -239,4 +239,6 @@ public abstract class ScopeContext {
       scopeChanged();
    }
 
+   public void closeScopeContext() {
+   }
 }

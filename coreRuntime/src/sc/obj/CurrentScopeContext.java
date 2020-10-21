@@ -271,7 +271,7 @@ public class CurrentScopeContext {
    }
 
    public static void markReady(String scopeContextName, boolean val) {
-      CurrentScopeContext ctx = null;
+      CurrentScopeContext ctx;
       synchronized (scopeContextNamesLock) {
          ctx = scopeContextNames.get(scopeContextName);
       }
@@ -281,6 +281,25 @@ public class CurrentScopeContext {
          if (ScopeDefinition.verbose)
             System.out.println("ScopeContextName " + scopeContextName + " is ready");
          ctx.markWaiting(val);
+      }
+   }
+
+   public static void closeScopeContext(String scopeContextName) {
+      CurrentScopeContext ctx;
+      synchronized (scopeContextNamesLock) {
+         ctx = scopeContextNames.get(scopeContextName);
+      }
+      if (ctx == null)
+         System.err.println("**** CurrentScopeContext.closeScopeContext - no scope for scopeContextName: " + scopeContextName);
+      else {
+         if (ctx.scopeContexts != null) {
+            if (ScopeDefinition.verbose)
+               System.out.println("Closing scopeContextName " + scopeContextName);
+            for (ScopeContext scopeContext:ctx.scopeContexts) {
+               scopeContext.closeScopeContext();
+               scopeContext.scopeChanged();
+            }
+         }
       }
    }
 
