@@ -1259,4 +1259,83 @@ public class LayerUtil implements LayerConstants {
       return path;
    }
 
+   static void initBuiltRuntimesFile(LayeredSystem sys) {
+      StringBuilder rtSB = new StringBuilder();
+      rtSB.append(sys.getProcessIdent());
+      if (sys.peerSystems != null) {
+         for (int i = 0; i < sys.peerSystems.size(); i++) {
+            rtSB.append(",");
+            rtSB.append(sys.peerSystems.get(i));
+         }
+      }
+
+      String rtString = rtSB.toString();
+
+      String builtStatusFile = FileUtil.concat(sys.buildDir, LayeredSystem.PROCESSES_FILE);
+
+      String oldRtString = new File(builtStatusFile).canRead() ? FileUtil.getFileAsString(builtStatusFile) : null;
+      if (oldRtString != null) {
+         oldRtString = oldRtString.trim();
+         if (!oldRtString.equals(rtString)) {
+            List<String> toRem = new ArrayList<String>();
+            String[] oldProcNames = StringUtil.split(oldRtString,',');
+            for (String oldProcessId:oldProcNames) {
+               if (sys.getProcessIdent().equals(oldProcessId) || sys.getPeerLayeredSystem(oldProcessId) != null)
+                  continue;
+               toRem.add(oldProcessId);
+            }
+
+            List<String> newProcs = new ArrayList<String>();
+            List<String> oldProcs = Arrays.asList(oldProcNames);
+            if (!oldProcs.contains(sys.getProcessIdent()))
+               newProcs.add(sys.getProcessIdent());
+            if (sys.peerSystems != null) {
+               for (int i = 0; i < sys.peerSystems.size(); i++) {
+                  String oldIdent = sys.peerSystems.get(i).getProcessIdent();
+                  if (!oldProcs.contains(oldIdent))
+                     newProcs.add(oldIdent);
+               }
+            }
+
+            if (newProcs.size() > 0 && oldProcs.size() > 0) {
+               sys.verbose("Process list changed for buildDir from: " + oldRtString + " to: " + rtString);
+            }
+            else if (newProcs.size() > 0)
+               sys.verbose("New processes added for buildDir: " + newProcs);
+            else if (oldProcs.size() > 0) {
+               sys.verbose("Old processes removed for buildDir: " + oldProcs);
+            }
+            if (oldProcs.size() > 0)
+               cleanOldProcessBuildSrcDirs(sys, oldProcs);
+            sys.options.buildAllFiles = true;
+         }
+
+      }
+
+      FileUtil.saveStringAsFile(builtStatusFile,  rtString + FileUtil.LINE_SEPARATOR, true);
+   }
+
+   static void cleanOldProcessBuildSrcDirs(LayeredSystem sys, List<String> oldProcIdents) {
+      for (int i = 0; i < oldProcIdents.size(); i++) {
+         String oldProcIdent = oldProcIdents.get(i);
+
+         Layer buildLayer = sys.buildLayer;
+
+         String rtPrefix = oldProcIdent;
+         int rtIx = rtPrefix.indexOf('_');
+         if (rtIx != -1) {
+            rtPrefix = oldProcIdent.substring(0, rtIx);
+         }
+
+         String buildSrcDir = FileUtil.concat(LayerUtil.getLayerClassFileDirectory(buildLayer, buildLayer.layerPathName, true), rtPrefix, buildLayer.getBuildSrcSubDir());
+
+         if (buildSrcDir != null) {
+            File buildSrcFile = new File(buildSrcDir);
+            if (buildSrcFile.isDirectory()) {
+               sys.verbose("Removing old buildSrcDir for process: " + oldProcIdent);
+               FileUtil.removeDirectory(buildSrcDir);
+            }
+         }
+      }
+   }
 }

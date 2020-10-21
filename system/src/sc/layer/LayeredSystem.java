@@ -858,6 +858,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    private final static String TYPE_INDEX_DIR_PREFIX = "types_";
+   final static String PROCESSES_FILE = ".sc_processes.txt";
 
    public String getTypeIndexDir() {
       // Organized by runtime name, not process ident because the process ident can change during initialization.
@@ -7987,6 +7988,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    // in the build layer.
    HashSet<Layer> generatedLayers = new HashSet<Layer>();
 
+
    public GenerateCodeStatus preInitPeerChangedModels(Layer genLayer, List<String> includeFiles, BuildPhase phase, boolean separateOnly) {
       // Before we start this model's files, make sure any build layers in peer systems have been started.  This happens when there's an
       // intermediate build layer in the peer before the one in the default runtime.
@@ -8277,6 +8279,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          else
             bd.prepPhase.preInited = true;
       }
+
+      if (!peerMode && phase == BuildPhase.Process)
+         LayerUtil.initBuiltRuntimesFile(this);
 
       if (preInitPeerChangedModels(genLayer, includeFiles, phase, separateOnly) == GenerateCodeStatus.Error)
          return GenerateCodeStatus.Error;
@@ -8931,8 +8936,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                         if (modelType != null && !modelType.isDynamicType()) {
                            if (toSkip == null)
                               toSkip = new ArrayList<SrcEntry>();
-                           if (options.verbose)
-                              verbose("Skipping changed compiled type: " + toGenEnt + " for: " + getProcessIdent());
+                           if (options.info)
+                              info("Skipping changed compiled type: " + toGenEnt + " for: " + getProcessIdent());
                            toSkip.add(toGenEnt);
                            continue;
                         }
