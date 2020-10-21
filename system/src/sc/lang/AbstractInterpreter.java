@@ -117,6 +117,8 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    public boolean exitOnError = true;
    public boolean noPrompt = false;
 
+   public List<Layer> typeLayerStack = new ArrayList<Layer>();
+
    /** A stateless class we use for resolving scripts at edit time - i.e. in the IDE */
    public static class DefaultCmdClassDeclaration extends ClassDeclaration {
       public boolean isDynamicStub(boolean includeExt) {
@@ -554,6 +556,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          BodyTypeDeclaration type = (BodyTypeDeclaration) statement;
          BodyTypeDeclaration parentType = getCurrentType(false);
          Layer layer = currentLayer;
+         Layer origLayer = layer;
 
          if (layer == null) {
             System.err.println("Cannot define a type when there is no layer.  Use cmd.createLayer()");
@@ -762,6 +765,10 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
          Object parentObj = getCurrentObjectWithDefault();
          currentTypes.add(type);
+
+         // In case we changed the current layer for the type, keep track of the old one so the EndTypeDeclaration can
+         // restore it
+         typeLayerStack.add(origLayer);
 
          //System.out.println("*** Added currentType: " + type.typeName + " size=" + currentTypes.size());
 
@@ -973,6 +980,13 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                clearPendingModel();
             origIndent--;
             markCurrentTypeChanged();
+            int numInStack = typeLayerStack.size();
+            if (numInStack > 0) {
+               Layer oldLayer = typeLayerStack.get(numInStack - 1);
+               typeLayerStack.remove(numInStack - 1);
+               if (oldLayer != currentLayer)
+                  setCurrentLayer(oldLayer);
+            }
          }
       }
       else if (statement instanceof Expression) {
