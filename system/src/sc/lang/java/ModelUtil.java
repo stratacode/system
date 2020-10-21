@@ -7043,7 +7043,7 @@ public class ModelUtil {
                   // Need to rebuild here to be sure all transformed types are transformed before we try to generate the JS that updates the clients
                   //sys.rebuildSystem();
 
-                  if (!typeDef.isDynamicType())
+                  if (!typeDef.isDynamicNew())
                      model.transformModel();
 
                   if (info != null)
