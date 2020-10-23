@@ -49,12 +49,6 @@ public class CurrentScopeContext {
    // Used for debug logging
    public String scopeContextName, traceInfo;
 
-   // Optional set of type names to restrict which types are sent to the client from this context.
-   public Set<String> syncTypeFilter = null;
-
-   // Optional set of type names for types where we only send reset state for resetting a lost session
-   public Set<String> resetSyncTypeFilter = null;
-
    // Flag set to true when there is a thread waiting for change events for this CurrentScopeContext - it is used as a trigger to wake up the test script (or another waiter) when
    // a scopeContextName has been created, and the corresponding client is waiting for idle events for this window (or another scope).
    boolean contextIsReady = false;
@@ -408,12 +402,14 @@ public class CurrentScopeContext {
       if (ScopeDefinition.verbose)
          System.out.println("Adding type: " + typeName + " to sync type filter for: " + reason);
 
-      if (syncTypeFilter != null) {// null means no filtering in this context
-         if (syncTypeFilter instanceof HashSet)
-            syncTypeFilter.add(typeName);
+      ScopeContext eventScopeCtx = getEventScopeContext();
+
+      if (eventScopeCtx.syncTypeFilter != null) {// null means no filtering in this context
+         if (eventScopeCtx.syncTypeFilter instanceof HashSet)
+            eventScopeCtx.syncTypeFilter.add(typeName);
          else {
-            syncTypeFilter = new HashSet<String>(syncTypeFilter);
-            syncTypeFilter.add(typeName);
+            eventScopeCtx.syncTypeFilter = new HashSet<String>(eventScopeCtx.syncTypeFilter);
+            eventScopeCtx.syncTypeFilter.add(typeName);
          }
       }
    }

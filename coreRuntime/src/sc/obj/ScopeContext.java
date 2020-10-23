@@ -9,10 +9,7 @@ import sc.dyn.ScheduledJob;
 import sc.sync.SyncManager;
 import sc.util.PerfMon;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Extended to implement a new scope.  Each ScopeContext manages values obtained with it's scope's lifecycle (e.g. one per session, per-app-per-session, global, per-app but global, per-request or
@@ -69,6 +66,12 @@ public abstract class ScopeContext {
 
    // Used for receiving cross-scope binding events
    public IScopeEventListener eventListener = null;
+
+   // Optional set of type names to restrict which types are sent to the client from this context.
+   public Set<String> syncTypeFilter = null;
+
+   // Optional set of type names for types where we only send reset state for resetting a lost session
+   public Set<String> resetSyncTypeFilter = null;
 
    public void scopeDestroyed(ScopeContext fromParent) {
       if (destroyed) {
