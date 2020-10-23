@@ -398,7 +398,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
          // If our modified type needs a dynamic stub we do too.   the propagateDynamicStub method only goes down the modify tree
          if (modifyTypeDecl.needsDynamicStub && !modifyInherited)
-            modifyTypeDecl.markNeedsDynamicStub(true);
+            markNeedsDynamicStub(true);
       }
 
       if (modifyInherited && isDynamicType() && !ModelUtil.isDynamicType(modifyTypeDecl)) {
