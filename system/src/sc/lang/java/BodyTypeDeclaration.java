@@ -118,7 +118,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    public transient boolean isLayerType;
 
-   protected transient boolean typeInfoCompleted = false;
+   public transient boolean typeInfoCompleted = false;
 
    private transient long lastAccessTime;
 
@@ -7394,8 +7394,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          allValues = addObjectToArray(outerObj, allValues);
 
       Object inst = PTypeUtil.createInstance(compClass, null, allValues);
-      if (inst != null && doInit)
+      if (inst != null && doInit) {
+         // Normally we will create a dyn object with the dyn type in the constructor, but if a class implements IDynObject
+         // but does not have that constructor, set the dynType here
+         if (inst instanceof IDynObject) {
+            IDynObject dynObj = (IDynObject) inst;
+            Object dynType = dynObj.getDynType();
+            if (dynType == null || dynType instanceof Class)
+               dynObj.setDynType(origConstructor);
+            else if (dynType != origConstructor && !(dynType instanceof EnumDeclaration) && !(inst instanceof DynEnumConstant))
+               System.err.println("*** Invalid dyn type for instance");
+         }
+
          initDynInstance(inst, ctx, true, false, outerObj, argValues, initExt, true);
+      }
 
       return inst;
    }
@@ -8751,6 +8763,12 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // Need this for duplicate fields, classes and objects
       if (membersByName == null) {
          initMembersByName();
+      }
+
+      if (!isDynamicNew()) {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys != null && sys.buildInfo != null)
+            sys.buildInfo.addCompiledType(getFullTypeName());
       }
    }
 

@@ -39,6 +39,10 @@ public class BuildInfo {
    public final static String InitGroupName = "_init";
    public final static String AllowEditorCreateGroupName = "_allowEditorCreate";
 
+   // The above public properties are saved in source format for easy inspection. For other information
+   // that might be larger or not as useful to be in ascii, it can go in BuildInfoData to be serialized.
+   transient BuildInfoData buildInfoData;
+
    public BuildInfo() {
    }
 
@@ -815,4 +819,41 @@ public class BuildInfo {
       return res;
    }
 
+   public void updateSyncTypeNames(String forType, Set<String> syncTypeNames) {
+      if (buildInfoData == null) {
+         buildInfoData = new BuildInfoData();
+      }
+      buildInfoData.syncTypeNames.put(forType, syncTypeNames);
+   }
+
+   public Set<String> getSyncTypeNames(String forType) {
+      if (buildInfoData == null)
+         return null;
+      return buildInfoData.syncTypeNames.get(forType);
+   }
+
+   public void updateResetSyncTypeNames(String forType, Set<String> syncTypeNames) {
+      if (buildInfoData == null) {
+         buildInfoData = new BuildInfoData();
+      }
+      buildInfoData.resetSyncTypeNames.put(forType, syncTypeNames);
+   }
+
+   public Set<String> getResetSyncTypeNames(String forType) {
+      if (buildInfoData == null)
+         return null;
+      return buildInfoData.resetSyncTypeNames.get(forType);
+   }
+
+   public void addCompiledType(String compiledTypeName) {
+      if (buildInfoData == null)
+         buildInfoData = new BuildInfoData();
+      buildInfoData.compiledTypes.add(compiledTypeName);
+   }
+
+   public boolean isCompiledType(String typeName) {
+      if (buildInfoData == null)
+         return false;
+      return buildInfoData.compiledTypes.contains(typeName);
+   }
 }

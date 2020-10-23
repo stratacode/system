@@ -166,8 +166,10 @@ public class VariableDefinition extends AbstractVariable implements IVariableIni
       if (!convertGetSet && !bindable && isProperty()) {
          LayeredSystem sys = getLayeredSystem();
          Layer refLayer = getLayer();
-         DBPropertyDescriptor dbPropDesc = this.dbPropDesc == null ? DBProvider.getDBPropertyDescriptor(sys, refLayer, this, true) : this.dbPropDesc;
-         addDBPropertyDescriptor(dbPropDesc, sys, refLayer);
+         if (sys != null && !sys.systemCompiled) {
+            DBPropertyDescriptor dbPropDesc = this.dbPropDesc == null ? DBProvider.getDBPropertyDescriptor(sys, refLayer, this, true) : this.dbPropDesc;
+            addDBPropertyDescriptor(dbPropDesc, sys, refLayer);
+         }
       }
 
       if (bindingDirection != null && (bindingDirection.doReverse() || bindable)) {

@@ -130,6 +130,11 @@ public class DBProvider {
    }
 
    public static BaseTypeDescriptor getDBTypeDescriptor(LayeredSystem sys, Layer refLayer, Object typeDecl, boolean initTables) {
+      if (sys == null || sys.systemCompiled) {
+         DBTypeDescriptor res = DBTypeDescriptor.getByName(DynUtil.getTypeName(typeDecl, false), false);
+         if (res != null)
+            return res;
+      }
       if (typeDecl instanceof ITypeDeclaration) {
          // Make sure we have the most specific type before returning the dbTypeDescriptor
          if (typeDecl instanceof BodyTypeDeclaration) {
@@ -141,11 +146,6 @@ public class DBProvider {
          return res;
       }
       else {
-         if (sys.systemCompiled) {
-            DBTypeDescriptor res = DBTypeDescriptor.getByName(DynUtil.getTypeName(typeDecl, false), false);
-            if (res != null)
-               return res;
-         }
          BaseTypeDescriptor res = initDBTypeDescriptor(sys, refLayer, typeDecl);
          if (res != null && initTables && !res.tablesInitialized)
             completeDBTypeDescriptor(res, sys, refLayer, typeDecl);

@@ -3783,6 +3783,9 @@ public class ModelUtil {
                // if needed.  TODO: maybe we should split GlueExpression.transformTemplate into two steps - one to produce the expression and the other to replace and then we would skip the eval here?
                Element elem = (Element) def;
                Expression outExpr = elem.getOutputExpression();
+               outExpr.parentNode = elem;
+               if (!outExpr.isStarted())
+                  ParseUtil.initAndStartComponent(outExpr);
                Object exprRes = outExpr.eval(String.class, ctx);
                if (exprRes != null)
                   sb.append(exprRes.toString());
@@ -9588,12 +9591,15 @@ public class ModelUtil {
       if (!(type instanceof BodyTypeDeclaration))
          System.err.println("*** Unable to get sync types from compiled class!");
       else {
-         HashSet<String> syncTypeNames = null;
+         String typeName = ModelUtil.getTypeName(type);
+         Set<String> syncTypeNames = sys.buildInfo.getSyncTypeNames(typeName);
+         if (syncTypeNames != null)
+            return syncTypeNames;
+
          LayeredSystem jsSys = sys.getPeerLayeredSystem("js");
+         Set<String> res;
          if (!sys.hasActiveRuntime("js")) {
-            // This is the server tags case - TODO: should we only include resetState in this list?
-            //syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) type);
-            return Collections.emptySet();
+            syncTypeNames = Collections.emptySet();
          }
          else {
             if (jsSys == null)
@@ -9602,20 +9608,22 @@ public class ModelUtil {
             if (jsType instanceof BodyTypeDeclaration) {
                syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) jsType, false);
             }
-         }
-         BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
-         JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
-         ctx.mode = JavaSemanticNode.DepTypeMode.RemoteMethodTypes;
-         ctx.recursive = true;
-         ctx.visited = new IdentityHashSet<Object>();
-         Set<Object> methTypes = typeDecl.getDependentTypes(ctx);
-         if (methTypes.size() > 0) {
-            if (syncTypeNames == null)
-               syncTypeNames = new HashSet<String>(methTypes.size());
-            for (Object methType:methTypes) {
-               syncTypeNames.add(ModelUtil.getTypeName(methType));
+            BodyTypeDeclaration typeDecl = (BodyTypeDeclaration) type;
+            JavaSemanticNode.DepTypeCtx ctx = new JavaSemanticNode.DepTypeCtx();
+            ctx.mode = JavaSemanticNode.DepTypeMode.RemoteMethodTypes;
+            ctx.recursive = true;
+            ctx.visited = new IdentityHashSet<Object>();
+            ctx.sys = sys;
+            Set<Object> methTypes = typeDecl.getDependentTypes(ctx);
+            if (methTypes.size() > 0) {
+               if (syncTypeNames == null)
+                  syncTypeNames = new HashSet<String>(methTypes.size());
+               for (Object methType:methTypes) {
+                  syncTypeNames.add(ModelUtil.getTypeName(methType));
+               }
             }
          }
+         sys.buildInfo.updateSyncTypeNames(typeName, syncTypeNames);
          if (syncTypeNames != null)
             return syncTypeNames;
       }
@@ -9627,7 +9635,13 @@ public class ModelUtil {
       if (!(type instanceof BodyTypeDeclaration))
          System.err.println("*** Unable to get sync types from compiled class!");
       else {
-         HashSet<String> syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) type, true);
+         String typeName = ModelUtil.getTypeName(type);
+         Set<String> syncTypeNames = sys.buildInfo.getResetSyncTypeNames(typeName);
+         if (syncTypeNames != null)
+            return syncTypeNames;
+
+         syncTypeNames = getSyncTypeNamesForType((BodyTypeDeclaration) type, true);
+         sys.buildInfo.updateResetSyncTypeNames(typeName, syncTypeNames);
          return syncTypeNames;
       }
       // Returning the empty set here - which means no sync types at all, not null which means to disable the filter
@@ -9641,6 +9655,7 @@ public class ModelUtil {
       ctx.mode = resetSync ? JavaSemanticNode.DepTypeMode.ResetSyncTypes : JavaSemanticNode.DepTypeMode.SyncTypes;
       ctx.recursive = true;
       ctx.visited = new IdentityHashSet<Object>();
+      ctx.sys = typeDecl.getLayeredSystem();
       Set<Object> syncTypes = jsTypeDecl.getDependentTypes(ctx);
       if (syncTypes.size() > 0) {
          if (syncTypeNames == null)

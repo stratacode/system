@@ -3619,12 +3619,33 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Not only does this fetch the type, it guarantees the statics have been initialized. */
    public Object getRuntimeType(String fullTypeName) {
+      // If we've compiled the system and determined this type is compiled, don't try to load the source type
+      // even if it's in the source path or else we'll end up initializing the entire source tree to load whatever
+      // dynamic types there are up stream
+      if (systemCompiled && buildInfo.isCompiledType(fullTypeName)) {
+         // TODO: move the initialize option down into loadClass to avoid the double lookup here
+         Class compiledClass = loadClass(fullTypeName);
+         if (compiledClass != null) {
+            Class newClass = RTypeUtil.loadClass(getSysClassLoader(), compiledClass.getName(), true);
+            return compiledClass;
+         }
+      }
+
       Object td = getTypeDeclaration(fullTypeName);
       if (td instanceof Class) {
          ModelUtil.initType(td);
          return td;
       }
       else if (td instanceof ITypeDeclaration) {
+         // TODO - is this if test still needed? It was to prevent some recursive reference problems before the isCompiledType() call above was added
+         if (systemCompiled && td instanceof TypeDeclaration) {
+            TypeDeclaration btd = (TypeDeclaration) td;
+            // We might be in the middle of initializing this type when starting up types in runtime mode - for example,
+            // to look up the type for the DBTypeDescriptor. Return the class in that case rather than a partially inited type
+            if (btd.typeInfoInitialized && !btd.typeInfoCompleted) {
+               return getCompiledClass(fullTypeName);
+            }
+         }
          ModelUtil.ensureStarted(td, true);
          Object cl = ((ITypeDeclaration) td).getRuntimeType();
          if (cl != null) {
@@ -16184,6 +16205,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          this.inactiveDBProviders.put(provider.providerName, provider);
       }
    }
+
 }
 
 

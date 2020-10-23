@@ -24,6 +24,7 @@ public class RTypeUtil {
    public static boolean verboseClasses = false;
 
    public static Map<ClassLoader,Map<String,Class>> loadedClasses = new HashMap<ClassLoader,Map<String,Class>>();
+   public static Map<ClassLoader,Map<String,Class>> initializedClasses = new HashMap<ClassLoader,Map<String,Class>>();
 
    public static Set<String> systemClasses = new HashSet<String>();
    /* Generated from a code snippet above */
@@ -158,11 +159,13 @@ public class RTypeUtil {
       methodCache.clear();
       DynUtil.flushCaches();
       loadedClasses.clear();
+      initializedClasses.clear();
    }
 
    public static void flushLoadedClasses() {
       // TODO - most of the time here we only need to remove the NullSentinels.   Maybe we should set a sequence number to invalidate the null the next time we check?
       loadedClasses.clear();
+      initializedClasses.clear();
    }
 
    public static Field[] getFields(Class cl) {
@@ -1117,14 +1120,27 @@ public class RTypeUtil {
       return clMap;
    }
 
+   private static Map<String,Class> getClassLoaderInitMap(ClassLoader cl) {
+      Map<String,Class> clMap = initializedClasses.get(cl);
+      if (clMap == null) {
+         synchronized (initializedClasses) {
+            clMap = initializedClasses.get(cl);
+            if (clMap == null) {
+               initializedClasses.put(cl, clMap = new HashMap<String, Class>());
+            }
+         }
+      }
+      return clMap;
+   }
+
    /**
-    * Returns a class by name.
+    * Returns an initialized class by name.
     */
    public static Class loadClass(String className) {
       Map<String,Class> clMap = null;
       try {
          Class res;
-         clMap = getClassLoaderMap(null);
+         clMap = getClassLoaderInitMap(null);
          res = clMap.get(className);
          if (res != null) {
             if (res == NullSentinelClass.class) {
@@ -1160,7 +1176,7 @@ public class RTypeUtil {
             return loadClass(className);
          }
          try {
-            clMap = getClassLoaderMap(classLoader);
+            clMap = initialize ? getClassLoaderInitMap(classLoader) : getClassLoaderMap(classLoader);
             res = clMap.get(className);
             if (res != null) {
                if (res == NullSentinelClass.class) {

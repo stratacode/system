@@ -12,6 +12,7 @@ public interface LayerConstants {
    String BUILD_DIRECTORY = "build";
    String DYN_BUILD_DIRECTORY = "dynbuild";
    String BUILD_INFO_FILE = "BuildInfo.sc";
+   String BUILD_INFO_DATA_FILE = "BuildInfoData.ser";
    String DYN_TYPE_INDEX_FILE = "dynTypeIndex.ser";
    String DEFAULT_VM_PARAMETERS = "-Xmx1024m";
 

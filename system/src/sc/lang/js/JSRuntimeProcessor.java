@@ -1106,6 +1106,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             JavaSemanticNode.DepTypeCtx depTypeCtx = new JavaSemanticNode.DepTypeCtx();
             depTypeCtx.mode = JavaSemanticNode.DepTypeMode.All;
             depTypeCtx.recursive = false;
+            depTypeCtx.sys = sys;
             Set<Object> dependentTypes = type.getDependentTypes(depTypeCtx);
             for (Object dependentType:dependentTypes) {
                if (!ModelUtil.isOuterType(type, dependentType)) // If we are in the midst of starting an outer type, and we end up finding that outer type is a dependency of some inner type - don't go and add that dependency as it causes us to restart the outer type
@@ -2948,6 +2949,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   JavaSemanticNode.DepTypeCtx depTypeCtx = new JavaSemanticNode.DepTypeCtx();
                   depTypeCtx.mode = JavaSemanticNode.DepTypeMode.All;
                   depTypeCtx.recursive = false;
+                  depTypeCtx.sys = type.getLayeredSystem();
                   Set<Object> depTypes = type.getDependentTypes(depTypeCtx);
 
                   if (depTypes.contains(Bind.class))

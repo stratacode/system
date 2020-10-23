@@ -4114,6 +4114,35 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       gd.layer = this;
       gd.init();
       buildInfo = gd;
+
+      File buildDataFile = new File(FileUtil.concat(buildSrcDir, LayerConstants.BUILD_INFO_DATA_FILE));
+      if (buildDataFile.canRead()) {
+         ObjectInputStream ois = null;
+         FileInputStream fis = null;
+         try {
+            ois = new ObjectInputStream(fis = new FileInputStream(buildDataFile));
+            BuildInfoData buildData = (BuildInfoData) ois.readObject();
+            if (buildData != null) {
+               gd.buildInfoData = buildData;
+            }
+         }
+         catch (InvalidClassException exc) {
+            System.out.println("BuildInfoData.ser - version changed: " + this);
+            buildDataFile.delete();
+         }
+         catch (IOException exc) {
+            System.out.println("*** can't read BuildInfoData.ser: " + exc);
+         }
+         catch (ClassNotFoundException exc) {
+            System.out.println("*** invalid BuildInfoData.ser file: " + exc);
+         }
+         finally {
+            FileUtil.safeClose(ois);
+            FileUtil.safeClose(fis);
+         }
+      }
+      else
+         gd.buildInfoData = null;
       return gd;
    }
 
@@ -4122,9 +4151,28 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          if (writeBuildSrcIndex)
             writeBuildSrcIndex(!layeredSystem.systemCompiled);
 
-         if (buildInfo != null && buildInfo.changed)
+         if (buildInfo != null && buildInfo.changed) {
             LayerUtil.saveTypeToFixedTypeFile(FileUtil.concat(buildSrcDir, layeredSystem.getBuildInfoFile()), buildInfo,
                     "sc.layer.BuildInfo");
+            File buildDataFile = new File(FileUtil.concat(buildSrcDir, LayerConstants.BUILD_INFO_DATA_FILE));
+            if (buildInfo.buildInfoData == null) {
+               if (buildDataFile.canRead())
+                  buildDataFile.delete();
+            }
+            else {
+               ObjectOutputStream os = null;
+               try {
+                  os = new ObjectOutputStream(new FileOutputStream(buildDataFile));
+                  os.writeObject(buildInfo.buildInfoData);
+               }
+               catch (IOException exc) {
+                  System.err.println("*** Can't write build data file: " + exc);
+               }
+               finally {
+                  FileUtil.safeClose(os);
+               }
+            }
+         }
 
          if (buildSrcDir != null)
             saveDynTypeIndex();
