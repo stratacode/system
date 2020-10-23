@@ -9,7 +9,9 @@ import sc.lang.DynObject;
 import sc.lang.INamedNode;
 import sc.lang.ISrcStatement;
 import sc.lang.IUserDataNode;
+import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.JavaSemanticNode;
+import sc.lang.java.TypeDeclaration;
 import sc.parser.Language;
 import sc.type.TypeUtil;
 
@@ -83,6 +85,10 @@ public abstract class Node extends JavaSemanticNode implements IDynObject, ISrcS
    public void setDynType(Object typeObj) {
       if (dynObj != null)
          dynObj.setTypeFromWrapper(this, typeObj);
+      else if (typeObj instanceof BodyTypeDeclaration)
+         dynObj = new DynObject((BodyTypeDeclaration) typeObj);
+      else
+         System.err.println("*** Unrecognized typeObj for tagObject");
    }
    public <_TPROP> _TPROP getTypedProperty(String propName, Class<_TPROP> propType) {
       if (dynObj == null)
