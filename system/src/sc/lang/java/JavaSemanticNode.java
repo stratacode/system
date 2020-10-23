@@ -10,6 +10,7 @@ import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
 import sc.lang.template.Template;
 import sc.layer.LayeredSystem;
+import sc.obj.ComponentImpl;
 import sc.parser.IParseNode;
 import sc.type.CTypeUtil;
 import sc.type.PTypeUtil;
@@ -92,7 +93,13 @@ public abstract class JavaSemanticNode extends SemanticNode {
    public static class DepTypeCtx {
       public DepTypeMode mode;
       public boolean recursive;
+      // Added this for finding sync types on an incremental build but then fixed it by caching the original list
+      // so it's not set to true right now but might be useful in the future since we cannot follow dependencies
+      // in the compiled class
+      public boolean resolveSrcType;
       public Set<Object> visited;
+
+      public LayeredSystem sys;
 
       public String toString() {
          return mode + " recursive=" + recursive;
@@ -674,6 +681,12 @@ public abstract class JavaSemanticNode extends SemanticNode {
       // Unwrap here or else we'll add duplicates because the types set is using object identity for efficiency
       if (type instanceof ParamTypeDeclaration)
          type = ((ParamTypeDeclaration) type).baseType;
+      if (!(type instanceof BodyTypeDeclaration) && type != ComponentImpl.class && ctx.resolveSrcType) {
+         Object newType = ModelUtil.resolveSrcTypeDeclaration(ctx.sys, type);
+         if (newType instanceof BodyTypeDeclaration) {
+            type = newType;
+         }
+      }
       if (ctx.recursive) {
          if (ctx.visited.contains(type))
             return;
