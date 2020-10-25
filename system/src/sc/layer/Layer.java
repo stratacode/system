@@ -4117,28 +4117,34 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
       File buildDataFile = new File(FileUtil.concat(buildSrcDir, LayerConstants.BUILD_INFO_DATA_FILE));
       if (buildDataFile.canRead()) {
-         ObjectInputStream ois = null;
-         FileInputStream fis = null;
-         try {
-            ois = new ObjectInputStream(fis = new FileInputStream(buildDataFile));
-            BuildInfoData buildData = (BuildInfoData) ois.readObject();
-            if (buildData != null) {
-               gd.buildInfoData = buildData;
-            }
-         }
-         catch (InvalidClassException exc) {
-            System.out.println("BuildInfoData.ser - version changed: " + this);
+         if (getBuildAllFiles()) {
             buildDataFile.delete();
+            gd.buildInfoData = null;
          }
-         catch (IOException exc) {
-            System.out.println("*** can't read BuildInfoData.ser: " + exc);
-         }
-         catch (ClassNotFoundException exc) {
-            System.out.println("*** invalid BuildInfoData.ser file: " + exc);
-         }
-         finally {
-            FileUtil.safeClose(ois);
-            FileUtil.safeClose(fis);
+         else {
+            ObjectInputStream ois = null;
+            FileInputStream fis = null;
+            try {
+               ois = new ObjectInputStream(fis = new FileInputStream(buildDataFile));
+               BuildInfoData buildData = (BuildInfoData) ois.readObject();
+               if (buildData != null) {
+                  gd.buildInfoData = buildData;
+               }
+            }
+            catch (InvalidClassException exc) {
+               System.out.println("BuildInfoData.ser - version changed: " + this);
+               buildDataFile.delete();
+            }
+            catch (IOException exc) {
+               System.out.println("*** can't read BuildInfoData.ser: " + exc);
+            }
+            catch (ClassNotFoundException exc) {
+               System.out.println("*** invalid BuildInfoData.ser file: " + exc);
+            }
+            finally {
+               FileUtil.safeClose(ois);
+               FileUtil.safeClose(fis);
+            }
          }
       }
       else

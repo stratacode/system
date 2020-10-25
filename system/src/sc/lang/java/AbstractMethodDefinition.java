@@ -87,6 +87,17 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
    }
 
    private Annotation getRemoteRuntimesAnnotation() {
+      if (remoteRuntimes == null) {
+         LayeredSystem sys = getLayeredSystem();
+         if (sys != null && sys.buildInfo != null && sys.systemCompiled) {
+            Set<String> remoteRuntimesSet = sys.buildInfo.getRemoteMethodRuntimes(getMethodFullName());
+            if (remoteRuntimesSet != null) {
+               this.remoteRuntimes = new ArrayList<String>(remoteRuntimesSet);
+            }
+         }
+      }
+      if (remoteRuntimes == null)
+         return null;
       return Annotation.create("sc.obj.Remote", "remoteRuntimes", String.join(",",remoteRuntimes));
    }
 
@@ -966,12 +977,21 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
          System.err.println("*** Unable to add remote runtime to transformed method");
          return;
       }
-      if (!ModelUtil.isRemoteMethod(getLayeredSystem(), this)) {
+      LayeredSystem sys = getLayeredSystem();
+      if (!ModelUtil.isRemoteMethod(sys, this)) {
          if (remoteRuntimes == null)
             remoteRuntimes = new ArrayList<String>();
          if (!remoteRuntimes.contains(remoteRuntimeName))
             remoteRuntimes.add(remoteRuntimeName);
+
+         if (!sys.systemCompiled && sys.buildInfo != null) {
+            sys.buildInfo.addRemoteMethodRuntime(getMethodFullName(), remoteRuntimeName);
+         }
       }
+   }
+
+   public String getMethodFullName() {
+      return getMethodTypeName() + "." + getMethodName() + "(" + getTypeSignature() + ")";
    }
 
    /**
@@ -1048,7 +1068,7 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       Object res = super.getAnnotation(annotationName);
       if (res != null)
          return res;
-      if (remoteRuntimes != null && annotationName.equals("sc.obj.Remote")) {
+      if (annotationName.equals("sc.obj.Remote")) {
          return getRemoteRuntimesAnnotation();
       }
       return null;

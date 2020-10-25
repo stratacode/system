@@ -856,4 +856,24 @@ public class BuildInfo {
          return false;
       return buildInfoData.compiledTypes.contains(typeName);
    }
+
+   public void addRemoteMethodRuntime(String methFullName, String runtime) {
+      if (buildInfoData == null) {
+         buildInfoData = new BuildInfoData();
+      }
+      Set<String> remoteRuntimes = buildInfoData.remoteMethodRuntimes.get(methFullName);
+      if (remoteRuntimes == null) {
+         remoteRuntimes = new TreeSet<String>();
+         buildInfoData.remoteMethodRuntimes.put(methFullName, remoteRuntimes);
+      }
+      else if (remoteRuntimes.contains(runtime))
+         return;
+      remoteRuntimes.add(runtime);
+   }
+
+   public Set<String> getRemoteMethodRuntimes(String methFullName) {
+      if (buildInfoData == null)
+         return null;
+      return buildInfoData.remoteMethodRuntimes.get(methFullName);
+   }
 }
