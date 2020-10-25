@@ -951,42 +951,52 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          addChangedModel(pendingModel);
       }
       else if (statement instanceof EndTypeDeclaration) {
-         if (currentTypes.size() == startTypeIndex) {
-            if (path == null || path.equals("")) {
-               if (currentLayer == null)
-                  System.err.println("No current layer to go up");
-               else
-                  System.err.println("No more package levels to go up.  Current layer: " + currentLayer + " begins with prefix: " + currentLayer.packagePrefix);
+         // Need to acquire the locks in order to change the current layer at least since
+         // these changes can affect other scope contexts
+         boolean pushedCtx = pushCurrentScopeContext();
+         try {
+            if (currentTypes.size() == startTypeIndex) {
+               if (path == null || path.equals("")) {
+                  if (currentLayer == null)
+                     System.err.println("No current layer to go up");
+                  else
+                     System.err.println("No more package levels to go up.  Current layer: " + currentLayer + " begins with prefix: " + currentLayer.packagePrefix);
+               }
+               else {
+                  int ix = path.lastIndexOf(".");
+                  if (ix == -1) {
+                     path = "";
+                  }
+                  else
+                     path = path.substring(0, ix);
+               }
             }
             else {
-               int ix = path.lastIndexOf(".");
-               if (ix == -1) {
-                  path = "";
+               BodyTypeDeclaration oldType = currentTypes.remove(currentTypes.size()-1);
+               if (oldType.getDefinesCurrentObject()) {
+                  execContext.popCurrentObject();
+                  execContext.popStaticFrame();
                }
-               else
-                  path = path.substring(0, ix);
+               else if (oldType.getDeclarationType() != DeclarationType.UNKNOWN) {
+                  execContext.popStaticFrame();
+               }
+               if (currentTypes.size() == startTypeIndex)
+                  clearPendingModel();
+               origIndent--;
+               markCurrentTypeChanged();
+               int numInStack = typeLayerStack.size();
+               if (numInStack > 0) {
+                  Layer oldLayer = typeLayerStack.get(numInStack - 1);
+                  typeLayerStack.remove(numInStack - 1);
+                  if (oldLayer != currentLayer) {
+                     setCurrentLayer(oldLayer);
+                  }
+               }
             }
          }
-         else {
-            BodyTypeDeclaration oldType = currentTypes.remove(currentTypes.size()-1);
-            if (oldType.getDefinesCurrentObject()) {
-               execContext.popCurrentObject();
-               execContext.popStaticFrame();
-            }
-            else if (oldType.getDeclarationType() != DeclarationType.UNKNOWN) {
-               execContext.popStaticFrame();
-            }
-            if (currentTypes.size() == startTypeIndex)
-               clearPendingModel();
-            origIndent--;
-            markCurrentTypeChanged();
-            int numInStack = typeLayerStack.size();
-            if (numInStack > 0) {
-               Layer oldLayer = typeLayerStack.get(numInStack - 1);
-               typeLayerStack.remove(numInStack - 1);
-               if (oldLayer != currentLayer)
-                  setCurrentLayer(oldLayer);
-            }
+         finally {
+            if (pushedCtx)
+               popCurrentScopeContext();
          }
       }
       else if (statement instanceof Expression) {
