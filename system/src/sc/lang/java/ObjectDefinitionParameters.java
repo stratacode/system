@@ -782,6 +782,8 @@ public class ObjectDefinitionParameters extends AbstractTemplateParameters {
          sb.append('"');
       }
       appendString(sb, dbTypeDescriptor.schemaSQL, true);
+      sb.append(", ");
+      sb.append(dbTypeDescriptor.needsAutoId);
 
       sb.append(");");
 

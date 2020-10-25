@@ -42,9 +42,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    public static DBTypeDescriptor create(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
-              List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL) {
+              List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL, boolean needsAutoId) {
 
-      DBTypeDescriptor dbTypeDesc = new DBTypeDescriptor(typeDecl, baseType, typeId, dataSourceName, primary, auxTables, multiTables, queries, versionPropName, schemaSQL);
+      DBTypeDescriptor dbTypeDesc = new DBTypeDescriptor(typeDecl, baseType, typeId, dataSourceName, primary, auxTables, multiTables, queries, versionPropName, schemaSQL, needsAutoId);
 
       BaseTypeDescriptor oldType = typeDescriptorsByType.put(typeDecl, dbTypeDesc);
       String typeName = DynUtil.getTypeName(typeDecl, false);
@@ -247,8 +247,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    /** This is the version used from the runtime code, when all info for defining the type is available in the constructor */
    public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
-                           List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL) {
+                           List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL, boolean needsAutoId) {
       this(typeDecl, baseType, typeId, dataSourceName, primary, queries, schemaSQL);
+      this.needsAutoId = needsAutoId;
    }
 
    public void initTables(List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, String versionPropName, boolean runtimeMode) {
