@@ -1162,11 +1162,12 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          else if (tagName.equalsIgnoreCase("style") && getAttribute("type") == null)
             tagSpecial = " type=\"text/css\"";
 
-         // This installs the rule that if you use clickEvent handler that you by default prevent the default handler of that event on the underlying DOM node (unless the
-         // tag explicitly declares a handler for that attribute of course).   I'm not sure this is 100% needed for the general case but helps with forms, and anchors.
+         // If you use clickEvent, might add onclick="return false;" to prevent the default action - i.e. navigating to
+         // an anchor tag's href. Don't use this for a general purpose wrapper that might swallow the click events on the
+         // whole page - e.g. a div tag since that will break all href links on the page.
          String res = tagSpecial;
          for (HTMLElement.EventType eventType:HTMLElement.EventType.values()) {
-            if (eventType.getPreventDefault()) {
+            if (eventType.getPreventDefault(tagName)) {
                String attName = eventType.getAttributeName();
                if (getAttribute(eventType.getEventName()) != null && getAttribute(attName) == null) {
                   if (res == null)
@@ -3826,7 +3827,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       systemTagClassMap.put("style", Style.class);
 
       String[] emptyArgs = {};
-      addTagAttributes("element", null, new String[] {"id", "style", "class"}, null);
+      addTagAttributes("element", null, new String[] {"id", "style", "class", "onclick"}, null);
       addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
       addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex", "tabindex"}, null);
       addTagAttributes("option", "element", new String[] {"selected", "value", "disabled", "tabindex"}, null);

@@ -19,10 +19,7 @@ import sc.sync.SyncManager;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 /** The base class for all HTML elements.
  *
@@ -114,18 +111,24 @@ public class HTMLElement<RE> extends Element<RE> {
 
    enum EventType {
 
-      Click(true), DblClick(false), MouseDown(false), MouseMove(false), MouseOver(false), MouseOut(false), MouseUp(false), KeyDown(false), KeyPress(false), KeyUp(false), Submit(true), Change(false),
+      Click(true, "a", "input"), DblClick(false), MouseDown(false),
+      MouseMove(false), MouseOver(false), MouseOut(false), MouseUp(false),
+      KeyDown(false), KeyPress(false), KeyUp(false),
+      Submit(true, "form"), Change(false),
       Focus(false), Blur(false),
 
       // Not a real DOM event - our way of representing a listener that will move from the window, to the document for mouseDown to Move/Up so you can implement drag style interfaces (or drag/drop)
       MouseDownMoveUp(false);
 
-      EventType(boolean preventDefault) {
+      EventType(boolean preventDefault, String... tagNames) {
          this.preventDefault = preventDefault;
+         if (preventDefault)
+            this.preventDefaultTagNames = new TreeSet<String>(Arrays.asList(tagNames));
          domEventNames.add(getEventName());
       }
 
       boolean preventDefault;
+      TreeSet<String> preventDefaultTagNames = null;
 
       public String getEventName() {
          String name = toString();
@@ -137,9 +140,14 @@ public class HTMLElement<RE> extends Element<RE> {
          return "on" + toString().toLowerCase();
       }
 
-      /** Return true if the clickEvent for example should do onclick="return false;" */
-      public boolean getPreventDefault() {
-         return preventDefault;
+      /**
+       * Return true if using clickEvent on an 'a' tag should add onclick="return false;" to prevent it from
+       * navigating to the href on the tag. We don't want to use this for a container tag since it might contain
+       * an anchor href that should follow it's link - it basically swallows the default event for all clicks that occur
+       * inside which is too much when all you want to do is to hide a menu if one is visible
+       */
+      public boolean getPreventDefault(String tagName) {
+         return preventDefault && preventDefaultTagNames != null && preventDefaultTagNames.contains(tagName.toLowerCase());
       }
    }
 
