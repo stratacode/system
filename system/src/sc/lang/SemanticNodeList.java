@@ -487,13 +487,13 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
 
    /** Find the supplied node in our list */
    public boolean containsChild(Object toReplace) {
-      int ix = indexOf(toReplace);
+      int ix = indexOf(toReplace); // TODO performance - can we use indexOfChild below?
       if (ix == -1)
          return false;
       return true;
    }
 
-   private int shallowIndexOf(Object find) {
+   public int indexOfChild(Object find) {
       //int ix = indexOf(toReplace);
       int sz = size();
       for (int i = 0; i < sz; i++) {
@@ -505,6 +505,10 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       return -1;
    }
 
+   public Object getChildAtIndex(int ix) {
+      return ix < size() ? get(ix) : null;
+   }
+
    /** Find the supplied node in our list, and replace it with the other one */
    public int replaceChild(Object toReplace, Object other) {
       //int ix = indexOf(toReplace);
@@ -512,7 +516,7 @@ public class SemanticNodeList<E> extends ArrayList<E> implements ISemanticNode, 
       // same statement and replace the wrong instance.
       // TODO: should we revisit having 'equals' map to deepEquals in semantic node? It seems like a separate operation might be more
       // robust and less error prone.
-      int ix = shallowIndexOf(toReplace);
+      int ix = indexOfChild(toReplace);
 
       if (ix == -1) {
          return -1;

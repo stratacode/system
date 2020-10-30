@@ -477,6 +477,28 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       }
    }
 
+   public Object getChildAtIndex(int ix) {
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] props = type.getSemanticPropertyList();
+
+      IBeanMapper prop = props[ix];
+      Object thisProp = PTypeUtil.getProperty(this, prop.getField(), false);
+      return thisProp;
+   }
+
+   public int indexOfChild(Object toReplace) {
+      DynType type = TypeUtil.getPropertyCache(getClass());
+      IBeanMapper[] props = type.getSemanticPropertyList();
+
+      for (int i = 0; i < props.length; i++) {
+         IBeanMapper prop = props[i];
+         Object thisProp = PTypeUtil.getProperty(this, prop.getField(), false);
+         if (thisProp == toReplace)
+            return i;
+      }
+      return -1;
+   }
+
    public boolean containsChild(Object toReplace) {
       DynType type = TypeUtil.getPropertyCache(getClass());
       IBeanMapper[] props = type.getSemanticPropertyList();

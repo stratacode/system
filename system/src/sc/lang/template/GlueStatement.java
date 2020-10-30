@@ -70,7 +70,24 @@ public class GlueStatement extends Statement implements ITemplateDeclWrapper {
          statefulContext = false;
       else
          statefulContext = true;
+      // Normally transformTemplate will replace this statement with a block statement so we need to find it and
+      // make sure it gets transformed.
+      int ix = parentNode.indexOfChild(this);
       transformTemplate(0, statefulContext);
+      if (ix != -1) {
+         Object newChild = parentNode.getChildAtIndex(ix);
+         if (newChild != this) {
+            if (newChild instanceof BlockStatement) {
+               BlockStatement bs = (BlockStatement) newChild;
+               if (!bs.getTransformed())
+                  bs.transform(type);
+            }
+            else
+               System.err.println("*** Unrecognized transformed result for glue expression");
+         }
+         else
+            System.out.println("*** Glue statement not transformed?");
+      }
       return true;
    }
 

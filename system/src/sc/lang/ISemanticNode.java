@@ -58,6 +58,10 @@ public interface ISemanticNode {
 
    public boolean containsChild(Object toReplace);
 
+   public int indexOfChild(Object child);
+
+   public Object getChildAtIndex(int ix);
+
    /** Finds the "toReplace" object in this nodes children, then replaces that node with the other object */
    public int replaceChild(Object toReplace, Object other);
 
