@@ -97,6 +97,10 @@ public class SyncLayer {
       public boolean isCommand() {
          return false;
       }
+
+      public boolean applySyncFilterOnSerialize() {
+         return true;
+      }
    }
 
    private static class SyncPropChange extends SyncChange {
@@ -257,6 +261,14 @@ public class SyncLayer {
          return sb.toString();
       }
 
+      /**
+       * We don't filter remote method calls from the side in which the call originates - i.e. the server
+       * can call any method on the client and the client does not use the sync filter.  We'll instead check
+       * on the server before running a remote method call that is authorized
+       */
+      public boolean applySyncFilterOnSerialize() {
+         return false;
+      }
    }
 
    public static class SyncFetchProperty extends SyncChange {
@@ -820,7 +832,7 @@ public class SyncLayer {
          changedObjType = syncHandler.getObjectType(changedObj);
          objTypeName = DynUtil.getTypeName(changedObjType, false);
 
-         if (syncTypeFilter != null && !parentContext.matchesTypeFilter(syncTypeFilter, objTypeName)) {
+         if (change.applySyncFilterOnSerialize() && syncTypeFilter != null && !parentContext.matchesTypeFilter(syncTypeFilter, objTypeName)) {
             // If it's not in either filter, it's not meant to be serialized to this client
             if (resetTypeFilter == null || !resetTypeFilter.contains(objTypeName)) {
                if (SyncManager.trace)
@@ -855,7 +867,8 @@ public class SyncLayer {
             // sample which only needs the name of the remote object, since the object itself is not sync'd.
             if (parentInstInfo == null) {
                if (isNew) {
-                  System.err.println("*** Invalid sync change - no inst info for new object"); // TODO: fixme - this is happening when the SyncContext is for a different window - why is it getting queued into this sync layer?
+                  if (SyncManager.trace)
+                     System.out.println("Skipping sync change for object of type: " + objTypeName + " - not found in sync context: " + parentContext);
                   return;
                }
             }
