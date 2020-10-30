@@ -7338,6 +7338,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (refreshTypeIndex(typeIndexProcessedLayers)) {
          buildReverseTypeIndex(false);
 
+         typeIndexLoaded = true;
+
          saveTypeIndexFiles();
       }
    }
@@ -8954,7 +8956,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                      if (options.refreshDynamicOnly) {
                         TypeDeclaration modelType = cachedJModel.getModelTypeDeclaration();
-                        if (modelType != null && !modelType.isDynamicType()) {
+                        // TODO: is modelType started here so the is dynamic new test does not work?
+                        if (modelType != null && systemCompiled && buildInfo.isCompiledType(cachedJModel.getModelTypeName())) {
                            if (toSkip == null)
                               toSkip = new ArrayList<SrcEntry>();
                            if (options.info)
@@ -10587,6 +10590,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
                   ILanguageModel oldModel = activatedLayer ? modelIndex.get(srcEnt.absFileName) : inactiveModelIndex.get(srcEnt.absFileName);
                   if (oldModel instanceof JavaModel && oldModel != model && model instanceof JavaModel) {
+                     if (externalModelIndex != null && externalModelIndex.isValidModel(oldModel)) {
+                        // TODO: check if the contents have changed? Could this be a case where the IDE has not refreshed a change that we
+                        // have found here?
+                        System.err.println("*** parseSrcFile called with model that's already in the cache and valid - not replacing the old model");
+                        return oldModel;
+                     }
                      ((JavaModel) oldModel).replacedByModel = (JavaModel) model;
                   }
 
