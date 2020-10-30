@@ -1370,6 +1370,22 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          SemanticNodeList<Expression> strExprs = new SemanticNodeList<Expression>();
          String methSuffix = doFlags != doOutputStart ? "Body" : "StartTag";
 
+         Attr visAtt;
+         if (!needsObject && (visAtt = getAttribute("visible")) != null) {
+            Expression visExpr = visAtt.getOutputExpr();
+            if (visExpr == null) {
+               visAtt.displayError("Tag visible attribute must be a valid expression: ");
+            }
+            else {
+               IfStatement ifSt = new IfStatement();
+               ifSt.setProperty("expression", ParenExpression.create(visExpr));
+               BlockStatement ifBlock = new BlockStatement();
+               ifSt.setProperty("trueStatement", ifBlock);
+               template.addToOutputMethod(block, ifSt);
+               block = ifBlock;
+            }
+         }
+
          if ((doFlags & doOutputStart) != 0) {
             if (!inactive) {
                str.append("<");
@@ -1548,6 +1564,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
 
          /** When there's no object for a tag that has visible="=..." we wrap the tag's content in a ternary expression */
+         /*
          Attr visAtt;
          if (!needsObject && (visAtt = getAttribute("visible")) != null) {
             Expression outExpr = visAtt.getOutputExpr();
@@ -1557,6 +1574,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             else
                tagExpr = QuestionMarkExpression.create(outExpr, tagExpr, StringLiteral.create(""));
          }
+         */
 
          if (tagExpr != null)
             ix = template.addTemplateDeclToOutputMethod(parentType, block, tagExpr, false, methSuffix, ix, this, this, statefulContext, false);
