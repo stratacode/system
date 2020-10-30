@@ -3530,6 +3530,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             if (model == null) {
                SrcEntry srcEnt = sys.getSrcEntryForPath(ref.absFileName, false, true);
                if (srcEnt != null) {
+                  System.err.println("*** Parsing file for getSrcStatementForGenLine"); // TODO: do we need this code path anymore?
                   Object obj = sys.parseSrcFile(srcEnt, srcEnt.isLayerFile(), true, true, false, false, true);
                   if (obj instanceof ILanguageModel)
                      model = (ILanguageModel) obj;
