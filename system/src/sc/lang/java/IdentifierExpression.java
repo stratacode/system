@@ -2325,6 +2325,10 @@ public class IdentifierExpression extends ArgumentsExpression {
          if (scopeCtx != null) {
             Object type = DynUtil.getType(methThis);
             String typeName = ModelUtil.getTypeName(type);
+            // TODO: do we need this? Right now, it's adding the type to the current window but the target of the remote method
+            // call is determined by the scope of the object - so for the simpleScope example, we send the method call for the output_c()
+            // call to the right app windows. In general, we don't need to stop the server from calling methods on the client
+            // since we are already targeting the method calls using scope and instances involved.
             scopeCtx.addSyncTypeToFilter(typeName, " command line expression: " + this);
          }
          targetCtx = jmodel.commandInterpreter.getTargetScopeContext();
