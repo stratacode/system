@@ -1631,7 +1631,9 @@ public class SyncManager {
             boolean isStatic = (flags & SyncPropOptions.SYNC_STATIC) != 0;
             if (isStatic) {
                // TODO: do we need to support these? If so, we should do some type of initProperty for the static properties in addType
-               System.err.println("*** Not listening for changes on static synchronized property: " + propName);
+               // Also code to skip removing the listener
+               if (trace)
+                  System.out.println("*** Not listening for changes on static synchronized property: " + propName);
                return false;
             }
 
@@ -2083,6 +2085,8 @@ public class SyncManager {
             flags = syncProps.getSyncFlags(propName);
          }
          if ((flags & SyncPropOptions.SYNC_RECEIVE_ONLY) != 0)
+            return;
+         if ((flags & SyncPropOptions.SYNC_STATIC) != 0)
             return;
 
          if ((flags & SyncPropOptions.SYNC_ON_DEMAND) == 0 || toRemove.isFetchedOnDemand(propName))
