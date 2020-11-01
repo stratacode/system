@@ -26,6 +26,8 @@ import java.util.TreeMap;
  * or use that - since the mappings may not include the total number of lines in the file and we need numLines in appendIndex()
  */
 public class GenFileLineIndex implements Serializable, Cloneable {
+   public final static String DEBUG_INDEX_EXT = "dbgidx";
+
    public String genFileName;
 
    // Used to build the index only when you are using offsets - not saved or available for the lookup operations
@@ -443,7 +445,7 @@ public class GenFileLineIndex implements Serializable, Cloneable {
    }
 
    public static String getLineIndexFileName(String genSrcName) {
-      return FileUtil.replaceExtension(genSrcName, "dbgIdx");
+      return FileUtil.replaceExtension(genSrcName, DEBUG_INDEX_EXT);
    }
 
    public static File getLineIndexFile(String genSrcName) {

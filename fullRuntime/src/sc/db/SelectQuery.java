@@ -1,5 +1,7 @@
 package sc.db;
 
+import sc.bind.BindingContext;
+import sc.bind.IListener;
 import sc.dyn.DynUtil;
 import sc.type.IBeanMapper;
 import sc.util.JSON;
@@ -288,8 +290,11 @@ public class SelectQuery implements Cloneable {
       ResultSet rs = null;
       List<IdPropertyDescriptor> idColumns = mainTable.getIdColumns();
       StringBuilder logSB = null;
+
       boolean origDBChanges = transaction.applyingDBChanges;
       PreparedStatement st = null;
+      BindingContext oldBindCtx = null;
+      BindingContext ctx = null;
       try {
          String queryStr = qsb.toString();
          boolean res;
@@ -321,6 +326,11 @@ public class SelectQuery implements Cloneable {
                logSB.append(" -> ");
 
             transaction.applyingDBChanges = true;
+            // Start queuing the validate events so that we don't run bindings on partial results.
+            // This is like the code from applySyncLayer - when we are deserializing request data
+            ctx = new BindingContext(IListener.SyncType.QUEUE_VALIDATE_EVENTS);
+            oldBindCtx = BindingContext.getBindingContext();
+            BindingContext.setBindingContext(ctx);
 
             if (!multiRow) {
                // populate properties of dbObj from the tables in this query, or return null or return a sub-type of dbObj
@@ -348,6 +358,10 @@ public class SelectQuery implements Cloneable {
       }
       finally {
          transaction.applyingDBChanges = origDBChanges;
+         if (oldBindCtx != null) {
+            BindingContext.setBindingContext(oldBindCtx);
+            ctx.dispatchEvents(null);
+         }
          if (rs != null)
             DBUtil.close(null, st, rs);
       }

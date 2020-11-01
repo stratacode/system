@@ -1,5 +1,7 @@
 package sc.db;
 
+import sc.bind.BindingContext;
+import sc.bind.IListener;
 import sc.dyn.DynUtil;
 
 import java.sql.*;
@@ -83,6 +85,8 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
 
          int col = 1;
          boolean origDBChanges = transaction.applyingDBChanges;
+         BindingContext oldBindCtx = null;
+         BindingContext ctx = null;
          try {
             conn = transaction.getConnection(dbTypeDesc.getDataSource().jndiName);
             st = conn.prepareStatement(querySB.toString());
@@ -119,6 +123,9 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
             List<Object> listRes = multiRow ? new ArrayList<Object>() : null;
 
             transaction.applyingDBChanges = true;
+            ctx = new BindingContext(IListener.SyncType.QUEUE_VALIDATE_EVENTS);
+            oldBindCtx = BindingContext.getBindingContext();
+            BindingContext.setBindingContext(ctx);
 
             while (rs.next()) {
                if (!multiRow && rowCt > 0)
@@ -241,6 +248,10 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
          }
          finally {
             transaction.applyingDBChanges = origDBChanges;
+            if (oldBindCtx != null) {
+               BindingContext.setBindingContext(oldBindCtx);
+               ctx.dispatchEvents(null);
+            }
             DBUtil.close(null, st, rs);
          }
       }
