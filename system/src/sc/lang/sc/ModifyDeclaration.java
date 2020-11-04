@@ -460,7 +460,14 @@ public class ModifyDeclaration extends TypeDeclaration {
 
       TypeDeclaration enclType = getEnclosingType();
 
-      return res == null ? thisModel.getPreviousDeclaration(fullTypeName, enclType != null && enclType.isEnumeratedType()) : res;
+      boolean includeEnums = false;
+
+      if (enclType != null) {
+         includeEnums = enclType.isEnumeratedType();
+         if (!(enclType instanceof ModifyDeclaration) && !temporaryType)
+            return (BodyTypeDeclaration) enclType.getInnerType(typeName, new TypeContext(thisModel.getLayer(), true), true, false, true, includeEnums);
+      }
+      return res == null ? thisModel.getPreviousDeclaration(fullTypeName, includeEnums) : res;
    }
 
    void checkModify() {
@@ -1562,6 +1569,11 @@ public class ModifyDeclaration extends TypeDeclaration {
       BodyTypeDeclaration subType;
       boolean replaceNode = true;
       boolean newType;
+
+      // Any special init-time code that the tag type needs to add.  This could be done with a mixin but we already have the element dependency
+      if (element != null)
+         element.addMixinProperties(this);
+
       do {
          // Need to handle the "a.b" types here - we create class a extends modType.a {  class b extends modType.a.b here }
          int dotIx = nextType.indexOf(".");
