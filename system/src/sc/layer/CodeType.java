@@ -15,9 +15,9 @@ import java.util.EnumSet;
  * it can be used with to choose another layer. Maybe a wizard that starts at the frameworks, and works down to find a run configuration?
  */
 public enum CodeType {
-   Model, UI, Style, Application, Persist, Framework, Admin, Deploy;
+   Model, UI, Style, Application, Persist, Framework, Admin, Deploy, Test;
 
    public static EnumSet<CodeType> allSet = EnumSet.allOf(CodeType.class);
 
-   public static EnumSet<CodeType> nonFrameworkSet = EnumSet.of(CodeType.Model, CodeType.UI, CodeType.Style, CodeType.Application, CodeType.Admin, CodeType.Style, CodeType.Persist, CodeType.Deploy);
+   public static EnumSet<CodeType> nonFrameworkSet = EnumSet.of(CodeType.Model, CodeType.UI, CodeType.Style, CodeType.Application, CodeType.Admin, CodeType.Style, CodeType.Persist, CodeType.Deploy, CodeType.Test);
 }
