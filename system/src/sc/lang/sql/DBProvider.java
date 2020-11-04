@@ -1110,7 +1110,7 @@ public class DBProvider {
       return needsGetSet;
    }
 
-   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.dbGetProperty<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(<%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
+   private static String GET_PROP_TEMPLATE = "<% if (!dbPropDesc.isId()) { %>\n     sc.db.PropUpdate _pu = sc.db.DBObject.dbGetProperty<%= dbPropDesc.getNeedsRefId() ? \"WithRefId\" : \"\" %>(this, <%= dbObjVarName %>,\"<%= lowerPropertyName %>\");\n" +
                                                 "     if (_pu != null) return (<%= propertyTypeName %><%= arrayDimensions %>) _pu.value; <% } %>";
 
    private static String UPDATE_PROP_TEMPLATE = "\n      if (sc.db.DBObject.<%= dbPropDesc.isId() ? \"dbSetIdProperty\" : \"dbSetProperty\"%>(<%= dbObjVarName %>, \"<%= lowerPropertyName %>\", _<%=lowerPropertyName%>, <%= superGetName %>) != null) return;";
