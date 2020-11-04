@@ -1,10 +1,10 @@
 package sc.db;
 
+import sc.util.LinkedIdentityHashSet;
+
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.IdentityHashMap;
-import java.util.TreeMap;
+import java.util.*;
 
 /**
  * Represents a per-thread representation of the current transaction, including cached DB connections for each data source,
@@ -22,6 +22,8 @@ public class DBTransaction {
    IdentityHashMap<Object,TxOperation> operationIndex;
 
    ArrayList<TxOperation> operationApplyList;
+
+   LinkedHashMap<IDBObject, List<String>> toFetchLater;
 
    public long startTime = System.currentTimeMillis();
    public boolean completed = false;
@@ -179,5 +181,36 @@ public class DBTransaction {
 
    public String toString() {
       return "tx:" + lastThreadName + (connections == null ? " (new)" : " pending dataSources:" + connections.keySet()) + (operationList == null ? "" : " - " + operationList.size() + " queued op");
+   }
+
+   public void addFetchLaterProperty(IDBObject wrapper, String propName) {
+      if (toFetchLater == null)
+         toFetchLater = new LinkedHashMap<IDBObject,List<String>>();
+      List<String> propList = toFetchLater.get(wrapper);
+      if (propList == null) {
+         propList = new ArrayList<String>();
+         toFetchLater.put(wrapper, propList);
+      }
+      else if (propList.contains(propName))
+         return;
+      propList.add(propName);
+   }
+
+   public void doFetchLater() {
+      if (toFetchLater != null) {
+         Map<IDBObject,List<String>> toFetch = toFetchLater;
+         toFetchLater = null;
+         // TODO: look for some common types, properties and batch up the queries to avoid the N+1 select statements
+         for (Map.Entry<IDBObject,List<String>> fetchEnt:toFetch.entrySet()) {
+            IDBObject wrapper = fetchEnt.getKey();
+            DBObject dbObj = (DBObject) wrapper.getDBObject();
+            List<String> propNames = fetchEnt.getValue();
+            for (String prop:propNames) {
+               if (DBUtil.verbose)
+                  DBUtil.verbose("Fetching stale referenced property: " + dbObj.toString() + "." + prop);
+               Object res = dbObj.getProperty(prop);
+            }
+         }
+      }
    }
 }

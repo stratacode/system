@@ -358,6 +358,8 @@ public class SelectQuery implements Cloneable {
       }
       finally {
          transaction.applyingDBChanges = origDBChanges;
+         if (!origDBChanges)
+            transaction.doFetchLater();
          if (oldBindCtx != null) {
             BindingContext.setBindingContext(oldBindCtx);
             ctx.dispatchEvents(null);
@@ -404,6 +406,8 @@ public class SelectQuery implements Cloneable {
       }
 
       boolean origDBChanges = transaction.applyingDBChanges;
+      BindingContext oldBindCtx = null;
+      BindingContext ctx = null;
       PreparedStatement st = null;
       try {
          String queryStr = qsb.toString();
@@ -427,6 +431,11 @@ public class SelectQuery implements Cloneable {
                logSB.append(" -> ");
 
             transaction.applyingDBChanges = true;
+            // Start queuing the validate events so that we don't run bindings on partial results.
+            // This is like the code from applySyncLayer - when we are deserializing request data
+            ctx = new BindingContext(IListener.SyncType.QUEUE_VALIDATE_EVENTS);
+            oldBindCtx = BindingContext.getBindingContext();
+            BindingContext.setBindingContext(ctx);
 
             if (!multiRow) {
                IDBObject resInst = processOneRowQueryResults(transaction, proto, inst, rs, logSB);
@@ -472,6 +481,12 @@ public class SelectQuery implements Cloneable {
       }
       finally {
          transaction.applyingDBChanges = origDBChanges;
+         if (!origDBChanges)
+            transaction.doFetchLater();
+         if (oldBindCtx != null) {
+            BindingContext.setBindingContext(oldBindCtx);
+            ctx.dispatchEvents(null);
+         }
          DBUtil.close(rs);
          DBUtil.close(st);
       }

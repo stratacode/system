@@ -248,6 +248,8 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
          }
          finally {
             transaction.applyingDBChanges = origDBChanges;
+            if (!origDBChanges)
+               transaction.doFetchLater();
             if (oldBindCtx != null) {
                BindingContext.setBindingContext(oldBindCtx);
                ctx.dispatchEvents(null);

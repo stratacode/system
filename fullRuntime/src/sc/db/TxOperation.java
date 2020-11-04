@@ -582,6 +582,8 @@ public abstract class TxOperation {
          }
          finally {
             transaction.applyingDBChanges = origDBChanges;
+            if (!origDBChanges)
+               transaction.doFetchLater();
          }
       }
 

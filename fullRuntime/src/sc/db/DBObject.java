@@ -294,8 +294,10 @@ public class DBObject implements IDBObject {
       if (pu != null)
          return pu;
 
-      if (curTransaction.applyingDBChanges)
+      if (curTransaction.applyingDBChanges) {
+         curTransaction.addFetchLaterProperty(wrapper, property);
          return null;
+      }
 
       SelectGroupQuery selectQuery = dbTypeDesc.getFetchQueryForProperty(property);
       if (selectQuery == null)
@@ -326,8 +328,10 @@ public class DBObject implements IDBObject {
                   IBeanMapper mapper = prop.getPropertyMapper();
 
                   DBTransaction curTx = DBTransaction.getOrCreate();
-                  if (curTx.applyingDBChanges)
+                  if (curTx.applyingDBChanges) {
+                     curTx.addFetchLaterProperty(wrapper, property);
                      return null;
+                  }
 
                   curTx.applyingDBChanges = true;
                   try {
@@ -336,6 +340,7 @@ public class DBObject implements IDBObject {
                   }
                   finally {
                      curTx.applyingDBChanges = false;
+                     curTx.doFetchLater();
                   }
                }
             }
@@ -994,13 +999,19 @@ public class DBObject implements IDBObject {
       return "persistent";
    }
 
-   public static PropUpdate dbGetProperty(DBObject obj, String prop) {
+   public static PropUpdate dbGetProperty(IDBObject wrapper, DBObject obj, String prop) {
       if (obj != null)
          return obj.dbFetch(prop);
+      else {
+         DBTransaction curTx = DBTransaction.getCurrent();
+         if (curTx != null && curTx.applyingDBChanges) {
+            curTx.addFetchLaterProperty(wrapper, prop);
+         }
+      }
       return null;
    }
 
-   public static PropUpdate dbGetPropertyWithRefId(DBObject obj, String prop) {
+   public static PropUpdate dbGetPropertyWithRefId(IDBObject wrapper, DBObject obj, String prop) {
       if (obj != null)
          return obj.dbFetchWithRefId(prop);
       return null;
