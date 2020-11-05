@@ -13,10 +13,7 @@ import sc.lang.java.ModelUtil;
 import sc.parser.*;
 import sc.util.URLUtil;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A basic pattern matching class that also supports populating named variables in an instance and
@@ -41,6 +38,29 @@ public class Pattern extends SemanticNode {
 
    /** Flag to enable comparison of the two ways of matching a pattern - with and without parselets */
    public static boolean testMode = false;
+
+   public static final Map<String,VarType> varTypesMap = new HashMap<String,VarType>();
+
+   enum VarType {
+      urlString("urlString"), identifier("identifier"), alphaNumString("alphaNumString"),
+      escapedString("escapedString"), urlPath("urlPath"), integer("integer"),
+      integerLiteral("integerLiteral"), digits("digits"), whiteSpace("whiteSpace"),
+      quoteChar("quoteChar");
+
+      String name;
+      VarType(String name) {
+         this.name = name;
+      }
+   }
+
+   static public void initVarTypes() {
+      synchronized (varTypesMap) {
+         if (varTypesMap.size() == 0) {
+            for (VarType varType:VarType.values())
+               varTypesMap.put(varType.name, varType);
+         }
+      }
+   }
 
    public void init() {
       super.init();
@@ -425,205 +445,232 @@ public class Pattern extends SemanticNode {
                String propName = patVar.propertyName;
                Object propVal = null;
                int matchLen = matchStr.length();
+               if (varTypesMap.size() == 0) {
+                  initVarTypes();
+               }
+               VarType varType = varTypesMap.get(typeName);
+               if (varType == null) {
+                  System.err.println("*** Unrecognized variable type: " + typeName);
+                  return null;
+               }
                try {
-                  if (typeName.equals("integer") || typeName.equals("integerLiteral") || typeName.equals("digits")) {
-                     int intLen;
-                     for (intLen = 0; intLen < matchLen && Character.isDigit(matchStr.charAt(intLen)); intLen++) {
-                     }
+                  switch (varType) {
+                     case integer:
+                     case integerLiteral:
+                     case digits: {
+                        int intLen;
+                        for (intLen = 0; intLen < matchLen && Character.isDigit(matchStr.charAt(intLen)); intLen++) {
+                        }
 
-                     boolean intMatched = true;
-                     if (intLen == 0) {
-                        if (negated) {
-                           nextRes.append(matchStr.charAt(0));
-                           nextLen++;
-                           matchStr = matchStr.substring(1);
-                           intMatched = false;
-                           ix = numElems;
-                        }
-                        else
-                           return null;
-                     }
-                     if (intMatched) {
-                        String intStr = matchStr.substring(0, intLen);
-                        try {
-                           int intVal = Integer.parseInt(intStr); // validate that this string is an integer
-                           // TODO: should we add an option to return the values?
-                           if (propName != null && inst != null) {
-                              setPatternProperty(inst, propName, intVal, isMap);
-                           }
-                        }
-                        catch (NumberFormatException exc) {
+                        boolean intMatched = true;
+                        if (intLen == 0) {
                            if (negated) {
                               nextRes.append(matchStr.charAt(0));
                               nextLen++;
                               matchStr = matchStr.substring(1);
                               intMatched = false;
+                              ix = numElems;
                            }
                            else
                               return null;
                         }
-                        // TODO: catch IllegalArgumentException here and log an error?
                         if (intMatched) {
-                           if (negated) {
-                              if (propName == null) {
-                                 pendingNeg.append(intStr);
+                           String intStr = matchStr.substring(0, intLen);
+                           try {
+                              int intVal = Integer.parseInt(intStr); // validate that this string is an integer
+                              // TODO: should we add an option to return the values?
+                              if (propName != null && inst != null) {
+                                 setPatternProperty(inst, propName, intVal, isMap);
+                              }
+                           }
+                           catch (NumberFormatException exc) {
+                              if (negated) {
+                                 nextRes.append(matchStr.charAt(0));
+                                 nextLen++;
+                                 matchStr = matchStr.substring(1);
+                                 intMatched = false;
+                              }
+                              else
+                                 return null;
+                           }
+                           // TODO: catch IllegalArgumentException here and log an error?
+                           if (intMatched) {
+                              if (negated) {
+                                 if (propName == null) {
+                                    pendingNeg.append(intStr);
+                                 }
+                                 else {
+                                    if (doReplace)
+                                       appendSubstitute(pendingNeg, propName);
+                                 }
+                                 pendingNegLen += intLen;
                               }
                               else {
-                                 if (doReplace)
-                                    appendSubstitute(pendingNeg, propName);
+                                 if (propName == null) {
+                                    nextRes.append(intStr);
+                                 }
+                                 else {
+                                    if (doReplace)
+                                       appendSubstitute(nextRes, propName);
+                                 }
+                                 nextLen += intLen;
                               }
-                              pendingNegLen += intLen;
+                              matchStr = matchStr.substring(intLen);
+                           }
+                        }
+                        break;
+                     }
+                     case urlString:
+                     case identifier:
+                     case alphaNumString:
+                     case escapedString:
+                     case urlPath: {
+                        int strLen = 0;
+                        while (strLen < matchLen) {
+                           char c = matchStr.charAt(strLen);
+                           boolean isFirst = strLen == 0;
+
+                           boolean matched = true;
+
+                           switch (varType) {
+                              case urlString:
+                                 if (!URLUtil.isURLCharacter(c)) {
+                                    matched = false;
+                                 }
+                                 break;
+                              case identifier:
+                                 if (isFirst) {
+                                    if (!Character.isJavaIdentifierStart(c)) {
+                                       matched = false;
+                                    }
+                                 }
+                                 else if (!Character.isJavaIdentifierPart(c)) {
+                                    matched = false;
+                                 }
+                                 break;
+                              case alphaNumString:
+                                 if (!Character.isAlphabetic(c) && !Character.isDigit(c))
+                                    matched = false;
+                                 break;
+                              case escapedString:
+                                 if (c == '"' || c == 0 || c == '\n')
+                                    matched = false;
+                                 break;
+                              case urlPath:
+                                 if (!URLUtil.isURLCharacter(c) && c != '/')
+                                    break;
+                           }
+                           if (!matched)
+                              break;
+                           strLen++;
+                        }
+                        if (strLen == 0) {
+                           if (negated) {
+                              if (matchStr.length() > 0) {
+                                 int addLen = 1;
+                                 nextRes.append(matchStr.substring(0, addLen));
+                                 nextLen += addLen;
+                                 matchStr = matchStr.substring(addLen);
+                              }
+                              ix = numElems;
+                              repeatMatch = true;
+                              break;
                            }
                            else {
-                              if (propName == null) {
-                                 nextRes.append(intStr);
+                              return null;
+                           }
+                        }
+                        else {
+                           String strVal = matchStr.substring(0, strLen);
+                           propVal = strVal;
+
+                           if (negated) {
+                              if (propName == null)
+                                 pendingNeg.append(strVal);
+                              else {
+                                 appendSubstitute(pendingNeg, propName);
                               }
+                              pendingNegLen += strLen;
+                           }
+                           else {
+                              if (propName == null)
+                                 nextRes.append(strVal);
                               else {
                                  if (doReplace)
                                     appendSubstitute(nextRes, propName);
-                              }
-                              nextLen += intLen;
-                           }
-                           matchStr = matchStr.substring(intLen);
-                        }
-                     }
-                  }
-                  // TODO: speed this up with a hash table or something
-                  else if (typeName.equals("urlString") || typeName.equals("identifier") || typeName.equals("alphaNumString") ||
-                           typeName.equals("escapedString") || typeName.equals("urlPath")) {
-                     int strLen = 0;
-                     while (strLen < matchLen) {
-                        char c = matchStr.charAt(strLen);
-                        boolean isFirst = strLen == 0;
-
-                        if (typeName.equals("urlString")) {
-                           if (!URLUtil.isURLCharacter(c))
-                              break;
-                        }
-                        else if (typeName.equals("identifier")) {
-                           if (isFirst) {
-                              if (!Character.isJavaIdentifierStart(c))
-                                 break;
-                           }
-                           else if (!Character.isJavaIdentifierPart(c))
-                              break;
-                        }
-                        else if (typeName.equals("alphaNumString")) {
-                           if (!Character.isAlphabetic(c) && !Character.isDigit(c))
-                              break;
-                        }
-                        else if (typeName.equals("escapedString")) {
-                           if (c == '"' || c == 0 || c == '\n')
-                              break;
-                        }
-                        else if (typeName.equals("urlPath")) {
-                           if (!URLUtil.isURLCharacter(c) && c != '/')
-                              break;
-                        }
-                        strLen++;
-                     }
-                     if (strLen == 0) {
-                        if (negated) {
-                           if (matchStr.length() > 0) {
-                              int addLen = 1;
-                              nextRes.append(matchStr.substring(0, addLen));
-                              nextLen += addLen;
-                              matchStr = matchStr.substring(addLen);
-                           }
-                           ix = numElems;
-                           repeatMatch = true;
-                           break;
-                        }
-                        else {
-                           return null;
-                        }
-                     }
-                     else {
-                        String strVal = matchStr.substring(0, strLen);
-                        propVal = strVal;
-
-                        if (negated) {
-                           if (propName == null)
-                              pendingNeg.append(strVal);
-                           else {
-                              appendSubstitute(pendingNeg, propName);
-                           }
-                           pendingNegLen += strLen;
-                        }
-                        else {
-                           if (propName == null)
-                              nextRes.append(strVal);
-                           else {
-                              if (doReplace)
-                                 appendSubstitute(nextRes, propName);
-                              else {
-                                 if (inst != null) {
-                                    setPatternProperty(inst, propName, strVal, isMap);
+                                 else {
+                                    if (inst != null) {
+                                       setPatternProperty(inst, propName, strVal, isMap);
+                                    }
                                  }
                               }
+                              nextLen += strLen;
                            }
-                           nextLen += strLen;
+                           matchStr = matchStr.substring(strLen);
                         }
-                        matchStr = matchStr.substring(strLen);
+                        break;
                      }
-                  }
-                  else if (typeName.equals("whiteSpace")) {
-                     int strLen = 0;
-                     while (strLen < matchLen) {
-                        char c = matchStr.charAt(strLen);
-                        if (!Character.isWhitespace(c))
-                           break;
-                        strLen++;
+
+                     case whiteSpace: {
+                        int strLen = 0;
+                        while (strLen < matchLen) {
+                           char c = matchStr.charAt(strLen);
+                           if (!Character.isWhitespace(c))
+                              break;
+                           strLen++;
+                        }
+                        if (strLen > 0) {
+                           if (negated) {
+                              pendingNeg.append(matchStr.substring(0, strLen));
+                              pendingNegLen += strLen;
+                           }
+                           else {
+                              nextRes.append(matchStr.substring(0, strLen));
+                              nextLen += strLen;
+                           }
+                           matchStr = matchStr.substring(strLen);
+                        }
+                        break;
                      }
-                     if (strLen > 0) {
-                        if (negated) {
-                           pendingNeg.append(matchStr.substring(0, strLen));
-                           pendingNegLen += strLen;
+
+                     case quoteChar: {
+                        char c = matchStr.charAt(0);
+                        if (c == '"' || c == '\'') {
+                           if (negated) {
+                              pendingNeg.append(c);
+                              pendingNegLen++;
+                              matchStr = matchStr.substring(1);
+                              repeatMatch = false;
+                           }
+                           else {
+                              matchStr = matchStr.substring(1);
+                              nextRes.append(c);
+                              nextLen++;
+                           }
                         }
                         else {
-                           nextRes.append(matchStr.substring(0, strLen));
-                           nextLen += strLen;
+                           if (negated) {
+                              nextRes.append(pendingNeg);
+                              nextLen += pendingNegLen;
+                              pendingNeg = new StringBuilder();
+                              pendingNegLen = 0;
+                              nextRes.append(matchStr.charAt(0));
+                              nextLen++;
+                              matchStr = matchStr.substring(1);
+                              ix = numElems;
+                              repeatMatch = true;
+                              break;
+                           }
+                           else {
+                              if (len == 0)
+                                 return null;
+                              return new ReplaceResult(res.toString(), len);
+                           }
                         }
-                        matchStr = matchStr.substring(strLen);
+                        break;
                      }
-                  }
-                  else if (typeName.equals("quoteChar")) {
-                     char c = matchStr.charAt(0);
-                     if (c == '"' || c == '\'') {
-                        if (negated) {
-                           pendingNeg.append(c);
-                           pendingNegLen++;
-                           matchStr = matchStr.substring(1);
-                           repeatMatch = false;
-                        }
-                        else {
-                           matchStr = matchStr.substring(1);
-                           nextRes.append(c);
-                           nextLen++;
-                        }
-                     }
-                     else {
-                        if (negated) {
-                           nextRes.append(pendingNeg);
-                           nextLen += pendingNegLen;
-                           pendingNeg = new StringBuilder();
-                           pendingNegLen = 0;
-                           nextRes.append(matchStr.charAt(0));
-                           nextLen++;
-                           matchStr = matchStr.substring(1);
-                           ix = numElems;
-                           repeatMatch = true;
-                           break;
-                        }
-                        else {
-                           if (len == 0)
-                              return null;
-                           return new ReplaceResult(res.toString(), len);
-                        }
-                     }
-                  }
-                  else {
-                     System.err.println("*** Unrecognized pattern name: " + typeName);
+                     default:
+                        System.err.println("*** Unrecognized variable type name for pattern: " + typeName);
                   }
                }
                catch (IllegalArgumentException exc) {
@@ -649,7 +696,7 @@ public class Pattern extends SemanticNode {
       return new ReplaceResult(res.toString(), len);
    }
 
-   private void setPatternProperty(Object inst, String propName, Object val, boolean isMap) {
+   protected void setPatternProperty(Object inst, String propName, Object val, boolean isMap) {
       if (isMap)
          ((Map) inst).put(propName, val);
       else

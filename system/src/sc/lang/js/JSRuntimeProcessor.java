@@ -132,6 +132,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    /** Used to generate the JS code snippet to prefix all class-based type references */
    public String classPrefix = "<%= typeName %>" + typeNameSuffix;
 
+   public String typeInitTemplate = "sc_clInit(<%= JSTypeName %>);\n";
+
    /** Used to generate the JS code snippet to instantiate a type, to implement MainInit */
    public String instanceTemplate =
           "<%= needsSync ? \"sc_SyncManager_c.beginSyncQueue();\\n\" : \"\" %>" + // The sync queue is here because we need the children sync-insts to be registered with their parent's names.
@@ -2141,6 +2143,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return JSUtil.convertTypeName(system, typeName);
    }
 
+   public String getTypeInitTemplate(BodyTypeDeclaration td) {
+      Object typeParams = new JSTypeParameters(td);
+      return TransformUtil.evalTemplate(typeParams, typeInitTemplate, true, false, null);
+   }
+
    public String getInstanceTemplate(BodyTypeDeclaration td) {
       Object typeParams = new JSTypeParameters(td);
       return TransformUtil.evalTemplate(typeParams, instanceTemplate, true, false, null);
@@ -2361,13 +2368,24 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                   BodyTypeDeclaration initType = e.getResolvedType(sys);
                   InitCodeInfo initCodeInfo = new InitCodeInfo(initType);
                   initCodeInfos.add(initCodeInfo);
-                  if (sys.options.verbose)
-                     initCodeInfo.initBody.append("console.log(\"Init type: " + initType.typeName + "\");\n");
 
-                  if (!e.isMain)
-                     initCodeInfo.initBody.append(getInstanceTemplate(initType));
-                  else
+                  if (!e.isMain)  {
+                     if (!ModelUtil.isAssignableFrom(sc.lang.html.IPage.class, initType)) {
+                        if (sys.options.verbose)
+                           initCodeInfo.initBody.append("console.log(\"Init object: " + initType.typeName + "\");\n");
+                        initCodeInfo.initBody.append(getInstanceTemplate(initType));
+                     }
+                     else {
+                        if (sys.options.verbose)
+                           initCodeInfo.initBody.append("console.log(\"Page type: " + initType.typeName + "\");\n");
+                        initCodeInfo.initBody.append(getTypeInitTemplate(initType));
+                     }
+                  }
+                  else {
+                     if (sys.options.verbose)
+                        initCodeInfo.initBody.append("console.log(\"Init main: " + initType.typeName + "\");\n");
                      initCodeInfo.initBody.append(evalMainTemplate(initType));
+                  }
                }
             }
          }

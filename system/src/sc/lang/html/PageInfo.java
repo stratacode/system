@@ -14,12 +14,13 @@ import java.util.List;
 public class PageInfo {
    private static HashMap<String,PageInfo> pages = new HashMap<String,PageInfo>();
 
-   public static void addPage(String pageTypeName, String pattern, Object pageType, List<QueryParamProperty> queryParamProps,
+   public static void addPage(String pageTypeName, String pattern, Object pageType, boolean needsSync, List<QueryParamProperty> queryParamProps,
                               List<Object> urlParts, List<String> constructorProps, String constructorPropSig) {
       PageInfo pi = new PageInfo();
       pi.pageTypeName = pageTypeName;
       pi.pattern = pattern;
       pi.pageType = pageType;
+      pi.needsSync = needsSync;
       pi.queryParamProps = queryParamProps;
       pi.urlParts = urlParts;
       pi.constructorProps = constructorProps;
@@ -30,6 +31,7 @@ public class PageInfo {
    public String pattern;
    public String pageTypeName;
    public Object pageType;
+   public boolean needsSync;
 
    // Stores the list of query parameters (if any) for the given page - created with @QueryParam
    List<QueryParamProperty> queryParamProps;

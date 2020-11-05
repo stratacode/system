@@ -1469,6 +1469,7 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          else
             meth = ModelUtil.definesMethod(peerType, methodName, arguments, null, enclPeerType, false, isStatic, inferredType, expr.getMethodTypeArguments(), expr.getLayeredSystem());
+
          if (meth != null) {
             boundTypes[ix] = meth;
             if (ModelUtil.isLocalDefinedMethod(sys, meth))

@@ -13,6 +13,8 @@ import java.util.EnumSet;
  * a better way to designate 'runnable' layers - like those that only specify dependencies? Or maybe that's a separate property like configLayer.
  * also need a way to see if layers are compatible and maybe to suggest 'option' layers for when you include one layer - see all of the options
  * it can be used with to choose another layer. Maybe a wizard that starts at the frameworks, and works down to find a run configuration?
+
+ * TODO: allow default code type to be set in the layer bundle since we tend to have framework bundles, test bundles etc.
  */
 public enum CodeType {
    Model, UI, Style, Application, Persist, Framework, Admin, Deploy, Test;
