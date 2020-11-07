@@ -1897,7 +1897,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          }
       }
       if (checkPeers && layeredSystem.peerSystems != null) {
-         for (LayeredSystem peerSys:layeredSystem.peerSystems) {
+         for (int i = 0; i < layeredSystem.peerSystems.size(); i++) {
+            LayeredSystem peerSys = layeredSystem.peerSystems.get(i);
             Layer peerLayer = activated ? peerSys.getLayerByName(getLayerUniqueName()) : peerSys.lookupInactiveLayer(getLayerName(), false, true);
             if (peerLayer != null)
                peerLayer.addNewSrcFile(srcEnt, false);
