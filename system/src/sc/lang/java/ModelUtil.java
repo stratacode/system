@@ -3130,8 +3130,13 @@ public class ModelUtil {
          }
          return res;
       }
-      else
-         throw new UnsupportedOperationException();
+      else if (td == null)
+         throw new IllegalArgumentException();
+      else {
+         // TODO: this happened in the IDE but not sure what type is coming through here so just returning null and printing
+         // an error here.
+         System.err.println("*** Unrecognized class to declaresConstructor: " + td.getClass());
+      }
       return null;
    }
 
