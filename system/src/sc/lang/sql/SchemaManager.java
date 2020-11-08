@@ -514,34 +514,55 @@ public class SchemaManager {
       return schemaChanged;
    }
 
-   void updateAlterModel(SchemaTypeChange change) {
+   boolean updateAlterModel(SchemaTypeChange change) {
       ArrayList<SchemaChangeDetail> notUpgradeable = new ArrayList<SchemaChangeDetail>();
       // Get the list of alter commands to convert a DDL defined by fromModel.sqlCommands to one defined by toModel.sqlCommands
       SQLFileModel updateModel = change.fromModel.alterTo(change.toModel, notUpgradeable);
-      if (updateModel != null)
+      if (updateModel != null && updateModel.sqlCommands != null && updateModel.sqlCommands.size() > 0)
          addToSchemaList(alterSchema, updateModel);
+      else
+         return false;
       change.alterModel = updateModel;
       change.notUpgradeable = notUpgradeable;
+      return true;
    }
 
    void updateAlterSchema(Layer buildLayer) {
       for (SQLFileModel newModel:newModels)
          addToSchemaList(alterSchema, newModel);
-      for (SchemaTypeChange change:changedTypes) {
+      for (int i = 0; i < changedTypes.size(); i++) {
+         SchemaTypeChange change = changedTypes.get(i);
          try {
-            updateAlterModel(change);
+            // If the SQL model has changed at all, we get here to look for changes but it might only be a re-ordering
+            // of the columns. If there are no changes, print this extra diagnostic just so the changes can be reviewed
+            // and hopefully we don't miss any changes here!
+            if (!updateAlterModel(change)) {
+               DBUtil.info("Schema for type: " + change.typeName + " changed but no differences detected for alter script ");
+               DBUtil.info("---- Old DDL: ");
+               DBUtil.info(change.fromModel.toLanguageString());
+               DBUtil.info("---- New DDL: ");
+               DBUtil.info(change.toModel.toLanguageString());
+               changedTypes.remove(i);
+               i--;
+            }
          }
          catch (UnsupportedOperationException exc) {
             DBUtil.error("Unable to create SQL script to update for change: " + change.fromModel);
          }
       }
 
-      // TODO: include info in this file in the from and to schema versions, or maybe the dates? The deployedSchema files should have the dates, version
-      // info stored (optionally) so we can track the database using the metadata table. Otherwise, we'll just use the last build date and snag the last
-      // build version of the program in the deployed schema directory.
-      StringBuilder alterSB = convertSQLModelsToString(alterSchema, "Alter table script", buildLayer);
-      if (saveSchemaFile(buildLayer, alterSB, "alter")) {
-         schemaChanged = true;
+      if (changedTypes.size() == 0) {
+         DBUtil.info("Schema files have changed but no changes for alter script");
+         schemaChanged = false;
+      }
+      else {
+         // TODO: include info in this file in the from and to schema versions, or maybe the dates? The deployedSchema files should have the dates, version
+         // info stored (optionally) so we can track the database using the metadata table. Otherwise, we'll just use the last build date and snag the last
+         // build version of the program in the deployed schema directory.
+         StringBuilder alterSB = convertSQLModelsToString(alterSchema, "Alter table script", buildLayer);
+         if (saveSchemaFile(buildLayer, alterSB, "alter")) {
+            schemaChanged = true;
+         }
       }
    }
 
