@@ -98,7 +98,7 @@ public class AssignmentExpression extends TwoOperatorExpression {
          if (lhs instanceof IdentifierExpression) {
             IdentifierExpression varRef = (IdentifierExpression) lhs;
             assignedProperty = varRef.getAssignedProperty();
-            if (assignedProperty == null)
+            if (assignedProperty == null && !lhs.hasErrors())
                displayTypeError("Binding expression on assignment must refer to a field or a property of an object for: ");
          }
 
