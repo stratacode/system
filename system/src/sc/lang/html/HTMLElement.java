@@ -297,6 +297,7 @@ public class HTMLElement<RE> extends Element<RE> {
       formattingTags.add("th");
       formattingTags.add("a");
       formattingTags.add("img");
+      formattingTags.add("o:p");
    }
 
    public static Set<String> formattingAtts = new TreeSet<String>();
