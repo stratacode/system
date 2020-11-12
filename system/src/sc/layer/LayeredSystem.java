@@ -8,10 +8,7 @@ import sc.bind.Bind;
 import sc.bind.Bindable;
 import sc.bind.BindingContext;
 import sc.classfile.CFClass;
-import sc.db.BaseTypeDescriptor;
-import sc.db.DBTypeDescriptor;
-import sc.db.DBDataSource;
-import sc.db.DataSourceManager;
+import sc.db.*;
 import sc.js.URLPath;
 import sc.lang.js.JSLanguage;
 import sc.lang.js.JSRuntimeProcessor;
@@ -4127,6 +4124,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // This will do any post-build processing such as generating static HTML files.  Only do it for the main runtime... otherwise, we'll do the .html files twice.
       // This has to be done after the peerSystems are built so we have enough information to check the other runtime for the list of JS files the app depends on.
       sys.initPostBuildModels();
+
+      if (sys.activeDataSources != null && (sys.options.verbose || DBUtil.verbose)) {
+         for (DBDataSource ds:sys.activeDataSources)
+            sys.verbose("Data source: " + ds.toDataSourceString(sys.defaultDBProvider == null ? null : sys.defaultDBProvider.providerName) + " for: " + sys.getProcessIdent());
+      }
 
       PerfMon.start("runMain");
       try {
@@ -12195,7 +12197,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             if (fromPosition == -1 || decls.fromPosition >= fromPosition) {
                if (fromLayer == null) {
                   TypeDeclaration retDecl = decls.get(0);
-                  if (srcLayer == null || retDecl.layer.layerPosition >= srcLayer.layerPosition)
+                  if (srcLayer == null || (retDecl.layer != null && retDecl.layer.layerPosition >= srcLayer.layerPosition))
                      return decls.get(0);
                }
                else {
@@ -16170,11 +16172,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (definedInLayer.activated) {
          if (this.activeDataSources == null)
             this.activeDataSources = new ArrayList<DBDataSource>();
+         else if (this.activeDataSources.contains(newDataSource))
+            return;
          this.activeDataSources.add(newDataSource);
       }
       else {
          if (this.inactiveDataSources == null)
             this.inactiveDataSources = new ArrayList<DBDataSource>();
+         else if (this.inactiveDataSources.contains(newDataSource))
+            return;
          this.inactiveDataSources.add(newDataSource);
       }
    }
