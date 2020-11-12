@@ -1235,7 +1235,8 @@ public class LayerUtil implements LayerConstants {
                sb.append(", ");
             if (wrap.wrapped instanceof JavaModel) {
                JavaModel m = (JavaModel) wrap.wrapped;
-               sb.append(m.getModelTypeName() + " (sn=" + m.getNodeCount() + ", pn=" + m.getParseNode().getNodeCount() + ")");
+               IParseNode pn = m.getParseNode();
+               sb.append(m.getModelTypeName() + " (sn=" + m.getNodeCount() + ", pn=" + ( pn == null ? "<none>" : pn.getNodeCount()) + ")");
             }
             ct++;
          }
