@@ -56,4 +56,33 @@ public class DBDataSource {
          }
       }
    }
+
+   public String toDataSourceString(String defaultProvider) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("dataSource:");
+      sb.append(serverName);
+      sb.append(":");
+      sb.append(port);
+      sb.append(":");
+      sb.append(jndiName);
+      sb.append(":");
+      sb.append(dbName);
+      if (readOnly)
+         sb.append(" (read only)");
+      if (dbDisabled)
+         sb.append(" (disabled)");
+      if (provider != null) {
+         sb.append(" provider:");
+         sb.append(provider);
+      }
+      else if (defaultProvider != null) {
+         sb.append(" default provider:");
+         sb.append(defaultProvider);
+      }
+      return sb.toString();
+   }
+
+   public String toString() {
+      return toDataSourceString(null);
+   }
 }
