@@ -476,6 +476,26 @@ public class BinaryExpression extends Expression {
       }
    }
 
+   boolean replaceInTree(JavaSemanticNode toReplace, JavaSemanticNode replaceWith) {
+      if (rhs == toReplace) {
+         setProperty("rhs", replaceWith, false, true);
+         return true;
+      }
+      else if (lhs == toReplace) {
+         setProperty("lhs", replaceWith, false, true);
+         return true;
+      }
+      if (lhs instanceof BinaryExpression) {
+         if (((BinaryExpression) lhs).replaceInTree(toReplace, replaceWith))
+            return true;
+      }
+      if (rhs instanceof BinaryExpression) {
+         if (((BinaryExpression) rhs).replaceInTree(toReplace, replaceWith))
+            return true;
+      }
+      return false;
+   }
+
    public Expression getRhsExpr() {
       return (Expression) rhs;
    }

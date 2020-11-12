@@ -4,6 +4,8 @@
 
 package sc.lang.java;
 
+import sc.lang.ISemanticNode;
+
 import java.util.Set;
 
 public class BinaryOperand extends BaseOperand {
@@ -38,6 +40,28 @@ public class BinaryOperand extends BaseOperand {
       if (rhs != null)
          ix = rhs.transformTemplate(ix, statefulContext);
       return ix;
+   }
+
+   public int replaceChild(Object toReplace, Object replaceWith) {
+      int ix =  super.replaceChild(toReplace, replaceWith);
+      if (ix != -1) {
+         BinaryExpression parentExpr = getEnclosingExpression();
+         if (parentExpr != null) {
+            if (!parentExpr.replaceInTree((JavaSemanticNode) toReplace, (JavaSemanticNode) replaceWith))
+               System.err.println("*** Did not find the parent to replace for a binary operand");
+         }
+      }
+      return ix;
+   }
+
+   public BinaryExpression getEnclosingExpression() {
+      ISemanticNode par = parentNode;
+      while (par != null && !(par instanceof BinaryExpression))
+         par = par.getParentNode();
+
+      if (par != null)
+         return (BinaryExpression) par;
+      return null;
    }
 
 }
