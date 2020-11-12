@@ -551,7 +551,7 @@ public class SchemaManager {
          }
       }
 
-      if (changedTypes.size() == 0) {
+      if (changedTypes.size() == 0 && newModels.size() == 0) {
          DBUtil.info("Schema files have changed but no changes for alter script");
          schemaChanged = false;
       }
