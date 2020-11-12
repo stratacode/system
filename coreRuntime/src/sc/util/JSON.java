@@ -72,6 +72,10 @@ public class JSON {
          String className = (String) map.get("class");
          if (className != null) {
             instType = DynUtil.findType(className);
+            if (instType == null) {
+               System.err.println("Database reference to missing class: " + className);
+               throw new IllegalArgumentException("Database reference to missing class: " + className);
+            }
          }
          Object inst = DynUtil.newInnerInstance(instType, null, null);
          for (Map.Entry<String,Object> ent:map.entrySet()) {
