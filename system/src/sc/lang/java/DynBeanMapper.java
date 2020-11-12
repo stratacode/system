@@ -6,6 +6,7 @@ package sc.lang.java;
 
 import sc.dyn.DynUtil;
 import sc.dyn.IDynObject;
+import sc.lang.sc.ModifyDeclaration;
 import sc.type.IBeanMapper;
 import sc.type.AbstractBeanMapper;
 import sc.type.TypeUtil;
@@ -364,13 +365,34 @@ public class DynBeanMapper extends AbstractBeanMapper {
 
    /** Explicitly marked properties final fields and object types are constant */
    public boolean isConstant() {
-      return ((attMask & IS_CONSTANT) != 0) || (setSelector == field && (field != null && ModelUtil.hasModifier(field, "final"))) || field instanceof BodyTypeDeclaration;
+      return ((attMask & IS_CONSTANT) != 0) ||
+              (setSelector == field && (field != null && ModelUtil.hasModifier(field, "final"))) ||
+              (field instanceof BodyTypeDeclaration && isConstantTypeDef((BodyTypeDeclaration) field));
+   }
+
+   /** 
+    * This determines whether we call the setX property for the object instance. For non-layer components
+    * we set that property ahead of time but for layer components, we need to set the property to avoid creating
+    * the lazy instance more than once since it seems the dynInstField index is not set in the modify type
+    * TODO: is this right?
+    */
+   private boolean isConstantTypeDef(BodyTypeDeclaration td) {
+      if (td.isLayerComponent())
+         return false;
+      return true;
    }
 
    public boolean isWritable() {
       // For Object types in the dynamic type system the field is really the type declaration.  We can't change it with a set property value
       // so need a way in the code to avoid that.
-      return super.isWritable() && !(field instanceof ITypeDeclaration);
+      if (!super.isWritable())
+         return false;
+      if (field instanceof BodyTypeDeclaration) {
+         BodyTypeDeclaration modType = (BodyTypeDeclaration) field;
+         if (modType.isLayerComponent())
+            return true;
+      }
+      return false;
    }
 
    public void setConstant(boolean val) {
