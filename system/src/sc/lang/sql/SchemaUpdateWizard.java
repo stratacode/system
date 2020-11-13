@@ -163,7 +163,7 @@ public class SchemaUpdateWizard extends CommandWizard {
    private void printUpgradeWarning(SchemaManager.SchemaTypeChange change) {
       if (mgr.conflictModels.size() > 0)
          print("   Warning - schema not upgradeable due to conflicts found in metadata");
-      if (change.notUpgradeable.size() > 0) {
+      if (change.notUpgradeable != null && change.notUpgradeable.size() > 0) {
          print("   Warning - tables for type cannot be upgraded without losing data:");
          for (int i = 0; i < change.notUpgradeable.size(); i++) {
             print("      " + change.notUpgradeable.get(i));
