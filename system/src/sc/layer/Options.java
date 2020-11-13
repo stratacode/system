@@ -98,13 +98,17 @@ public class Options {
 
    @Constant public boolean retryAfterFailedBuild = false;
 
+   /** When set, only matching tests are run  */
    @Constant public String testPattern = null;
 
-   /** Exit after running the tests */
+   /** Set to true if the system should exit after running the tests */
    @Constant public boolean testExit = false;
 
-   /** General flag for when we are running tests  */
+   /** General flag for when the system is running tests - used to make log messages more consistent or to enable additional diagnostic  */
    @Constant public boolean testMode = false;
+
+   /** General flag for when the system is being run by a developer as opposed to production */
+   @Constant public boolean devMode = true;
 
    /** Defaults the command interpreter to use cmd.edit = false - i.e. to just set properties rather than build or edit the layer */
    @Constant public boolean scriptMode = false;
