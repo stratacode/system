@@ -535,6 +535,17 @@ public class SyncManager {
                addPreviousValue(obj, propName, val, false, true); // If this scope does not support change events, we just apply the previous value now, so we'll continue to propagate any subsequent changes to children
             }
          }
+         else {
+            InstInfo ii = getInstInfo(obj);
+            if (ii == null) {
+               System.err.println("*** No instInfo in add changedInfo");
+            }
+            else if (ii.previousValues != null) {
+               Object prevVal = ii.previousValues.get(propName);
+               if (!DynUtil.equalObjects(prevVal,val))
+                  addPreviousValue(obj, propName, val, false, true);
+            }
+         }
 
          // else if !initialSync - not recording this change here!
          SyncState syncState = getSyncState();
@@ -1675,14 +1686,20 @@ public class SyncManager {
                   addChangedValue(depChanges, inst, propName, curVal, syncProps.syncGroup, syncLayer);
                }
                else {
-                  if (initialSync && initial)
+                  boolean addChange = false;
+                  if (initialSync && initial) {
                      toUse = initialSyncLayer;
-                     // The client does not have to record any initial changes since we do not have to refresh the server from the client
+                     addChange = true;
+                  }
+                  // The client does not have to record any initial changes since we do not have to refresh the server from the client
                   else if (needsInitialSync) {
                      toUse = getChangedSyncLayer(syncProps.syncGroup);
+                     addChange = scope.getScopeDefinition().supportsChangeEvents && scope.isCurrent();
                   }
+                  else
+                     addChange = true;
 
-                  if (toUse != null && !toUse.hasExactChangedValue(inst, propName, curVal)) {
+                  if (addChange && toUse != null && !toUse.hasExactChangedValue(inst, propName, curVal)) {
                      toUse.addChangedValue(inst, propName, curVal);
                      changeAdded = true;
                   }
