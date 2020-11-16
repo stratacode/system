@@ -804,6 +804,10 @@ public class IdentifierExpression extends ArgumentsExpression {
       if (enclType != null && enclType.excluded)
          return;
 
+      AbstractMethodDefinition enclMeth = getEnclosingMethod(false);
+      if (enclMeth != null && enclMeth.excluded)
+         return;
+
       int sz = idents.size();
 
       for (int i = 0; i < sz; i++) {
@@ -2591,7 +2595,7 @@ public class IdentifierExpression extends ArgumentsExpression {
    boolean isManualGetSet() {
       AbstractMethodDefinition enclMeth = getEnclosingMethod();
       if (enclMeth != null) {
-         Object annotObj = enclMeth.getAnnotation("sc.obj.ManualGetSet");
+         Object annotObj = enclMeth.getAnnotation("sc.obj.ManualGetSet", true);
          if (annotObj != null) {
             Object manualObj = ModelUtil.getAnnotationValue(annotObj, "value");
             return manualObj == null || !(manualObj instanceof Boolean) || ((Boolean) manualObj);

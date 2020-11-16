@@ -555,7 +555,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
 
    // TODO: should be using the full type name here and in getAnnotation
    // otherwise, two annotations with the same name but in different packages will get merged.
-   public Object getAnnotation(String annotationName) {
+   public Object getAnnotation(String annotationName, boolean checkModified) {
       if (modifiers == null)
          return null;
       for (Object modifier:modifiers) {
@@ -590,7 +590,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
    }
 
    public boolean hasAnnotation(String annotName) {
-      return getAnnotation(annotName) != null;
+      return getAnnotation(annotName, true) != null;
    }
 
    public void removeAnnotation(String annotationName) {
@@ -641,7 +641,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
             for (Object modifier:overrideDef.modifiers) {
                if (modifier instanceof Annotation) {
                   Annotation overriddenAnnotation = (Annotation) modifier;
-                  Object thisAnnotation = getAnnotation(overriddenAnnotation.getFullTypeName());
+                  Object thisAnnotation = getAnnotation(overriddenAnnotation.getFullTypeName(), false);
                   if (thisAnnotation == null) {
                      any = true;
                      if (modifiers == null) {
@@ -672,7 +672,7 @@ public abstract class Definition extends JavaSemanticNode implements IDefinition
          if (annotations != null) {
             for (java.lang.annotation.Annotation annot:annotations) {
                // Can this be a compiled annotation?  That should only happen if there's a modify on a compiled type I think and don't think we transform those as above.
-               Annotation thisAnnotation = (Annotation) getAnnotation(annot.getClass().getName());
+               Annotation thisAnnotation = (Annotation) getAnnotation(annot.getClass().getName(), false);
                Annotation overrideAnnotation = Annotation.createFromElement(annot);
                if (thisAnnotation == null) {
                   any = true;

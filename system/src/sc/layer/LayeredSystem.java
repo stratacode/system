@@ -854,6 +854,27 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return res;
    }
 
+   static Map<String,Map<String,AnnotationMergeMode>> annotationMergeModes = new HashMap<String,Map<String,AnnotationMergeMode>>();
+
+   public static void setAnnotationMergeMode(String annotationTypeName, String attributeValue, AnnotationMergeMode mode) {
+      Map<String,AnnotationMergeMode> annotTypeMap = annotationMergeModes.get(annotationTypeName);
+      if (annotTypeMap == null) {
+         annotationMergeModes.put(annotationTypeName, annotTypeMap = new HashMap<String,AnnotationMergeMode>());
+      }
+      annotTypeMap.put(attributeValue, mode);
+   }
+
+   public static AnnotationMergeMode getAnnotationMergeMode(String annotationTypeName, String attributeValue) {
+      Map<String,AnnotationMergeMode> annotTypeMap = annotationMergeModes.get(annotationTypeName);
+      AnnotationMergeMode res = null;
+      if (annotTypeMap != null)
+         res = annotTypeMap.get(attributeValue);
+      if (res == null)
+         res = AnnotationMergeMode.Replace;
+      return res;
+   }
+
+
    private final static String TYPE_INDEX_DIR_PREFIX = "types_";
    final static String PROCESSES_FILE = ".sc_processes.txt";
 
@@ -1484,6 +1505,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
       // Not registering Javascript yet because it is not complete.  In most projects we just copy the JS files as well so don't need to parse them as a language
       JSLanguage.INSTANCE.initialize();
+
+      // The dependentTypes annotation is a comma-separated list where we need to merge lists so that we
+      // can pick up dependent types from any layer in the stack, like when we merge in features
+      setAnnotationMergeMode("sc.js.JSSettings", "dependentTypes", AnnotationMergeMode.AppendCommaString);
 
       layerPath = layerPathNames;
 

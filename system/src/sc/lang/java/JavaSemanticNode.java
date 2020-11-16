@@ -374,15 +374,24 @@ public abstract class JavaSemanticNode extends SemanticNode {
       return null;
    }
 
-   public AbstractMethodDefinition getEnclosingMethod() {
+   public AbstractMethodDefinition getEnclosingMethod(boolean initLambda) {
       for (ISemanticNode pnode = parentNode; pnode != null; pnode = pnode.getParentNode()) {
          if (pnode instanceof AbstractMethodDefinition)
             return (AbstractMethodDefinition) pnode;
          if (pnode instanceof LambdaExpression) {
-            return ((LambdaExpression) pnode).getLambdaMethod();
+            LambdaExpression le = (LambdaExpression) pnode;
+            if (le.lambdaMethod != null)
+               return le.lambdaMethod;
+            if (!initLambda)
+               return null;
+            return le.getLambdaMethod();
          }
       }
       return null;
+   }
+
+   public AbstractMethodDefinition getEnclosingMethod() {
+      return getEnclosingMethod(true);
    }
 
    public IMethodDefinition getEnclosingIMethod() {

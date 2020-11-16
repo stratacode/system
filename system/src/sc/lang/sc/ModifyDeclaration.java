@@ -964,8 +964,11 @@ public class ModifyDeclaration extends TypeDeclaration {
       return null;
    }
 
-   public Object getAnnotation(String annotationName) {
-      Object annot = super.getAnnotation(annotationName);
+   public Object getAnnotation(String annotationName, boolean checkInherited) {
+      Object annot = super.getAnnotation(annotationName, checkInherited);
+
+      if (!checkInherited)
+         return annot;
 
       // Then the modified type
       Object superType = getDerivedTypeDeclaration();
@@ -1032,7 +1035,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       // First check this definition
-      Object annot = getAnnotation(annotationName);
+      Object annot = getAnnotation(annotationName, true);
       if (annot != null)
          return annot;
 
@@ -1058,7 +1061,7 @@ public class ModifyDeclaration extends TypeDeclaration {
 
    public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
       // First check this definition
-      Object annot = getAnnotation(annotationName);
+      Object annot = getAnnotation(annotationName, true);
       ArrayList<Object> res = null;
       if (annot != null) {
          res = new ArrayList<Object>(1);

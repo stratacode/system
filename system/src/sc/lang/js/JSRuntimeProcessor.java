@@ -1126,7 +1126,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          Object mainInit = type.getInheritedAnnotation("sc.html.MainInit", true, type.getLayer(), false);
          if (mainInit != null && !type.hasModifier("abstract")) {
             Boolean subTypesOnly = (Boolean) ModelUtil.getAnnotationValue(mainInit, "subTypesOnly");
-            if (subTypesOnly == null || !subTypesOnly || type.getAnnotation("sc.html.MainInit") == null) {
+            if (subTypesOnly == null || !subTypesOnly || type.getAnnotation("sc.html.MainInit", true) == null) {
                if (verboseJS)
                   system.verbose("JS @MainInit entry point: " + jsEnt.fullTypeName);
 
@@ -1217,6 +1217,27 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
          addAnnotationDeps(type, typeLibFile);
       }
+      // If this is a type lib being added from a dependency, make sure we have recorded the dependency in addLibFile
+      /*
+      else if (depType != null) {
+         String typeLibFilesStr = getJSLibFiles(type);
+         String[] typeLibFiles = null;
+         String typeLibFile;
+         if (typeLibFilesStr == null) {
+            typeLibFile = getJSModuleFile(type, true, true);
+            if (typeLibFile == null)
+               typeLibFile = rootLibFile;
+            addLibFile(typeLibFile, rootLibFile, type, parentType, depType);
+
+         }
+         else {
+            typeLibFiles = StringUtil.split(typeLibFilesStr,',');
+            for (String typeLib:typeLibFiles) {
+               addLibFile(typeLib, rootLibFile, type, parentType, depType);
+            }
+         }
+      }
+      */
       // We need to catch errors on files that Javascript pulls in that are not part of the project - otherwise, the build keeps going
       if (javaModel.hasErrors()) {
          SrcEntry errorSrc = javaModel.getSrcFile();
@@ -1249,16 +1270,18 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    private List<Object> getDependentJSTypeList(Object type) {
-      String depTypesStr = getDependentJSTypes(type);
-      if (depTypesStr != null) {
+      List<String> depTypesList = getDependentJSTypes(type);
+      if (depTypesList != null) {
          ArrayList<Object> res = new ArrayList<Object>();
-         String[] depTypeNames = StringUtil.split(depTypesStr, ',');
-         for (String depTypeName:depTypeNames) {
-            BodyTypeDeclaration depType = system.getSrcTypeDeclaration(depTypeName, null, true);
-            if (depType != null)
-               res.add(depType);
-            else
-               system.error("No src type found for type: " + depTypeName + " in JSSettings annotation on: " + type);
+         for (String depTypesStr:depTypesList) {
+            String[] depTypeNames = StringUtil.split(depTypesStr, ',');
+            for (String depTypeName:depTypeNames) {
+               BodyTypeDeclaration depType = system.getSrcTypeDeclaration(depTypeName, null, true);
+               if (depType != null)
+                  res.add(depType);
+               else
+                  system.error("No src type found for type: " + depTypeName + " in JSSettings annotation on: " + type);
+            }
          }
          return res;
       }
@@ -1678,6 +1701,24 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       }
    }
 
+   public List<String> getJSSettingsListStringValue(Object type, String attribute, boolean resolve) {
+      // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
+      // for example when there's an annotation set on the annotation layer for java.lang.Object.
+      if (resolve)
+         type = ModelUtil.resolveSrcTypeDeclaration(system, type, false, true, null);
+      ArrayList<Object> annots = ModelUtil.getAllInheritedAnnotations(system, type, "sc.js.JSSettings",
+                                 false, null, false);
+      if (annots == null || annots.size() == 0)
+         return null;
+      ArrayList<String> res = new ArrayList<String>();
+      for (Object annot:annots) {
+         String attStr = (String) ModelUtil.getAnnotationValue(annot, attribute);
+         if (attStr != null && attStr.length() > 0)
+            res.add(attStr);
+      }
+      return res.size() == 0 ? null : res;
+   }
+
    public String getJSSettingsStringValue(Object type, String attribute, boolean inherited, boolean resolve) {
       // Make sure we get the most specific type for this type.  We might have a dependency on java.lang.Object
       // for example when there's an annotation set on the annotation layer for java.lang.Object.
@@ -1702,9 +1743,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return null;
    }
 
-   String getDependentJSTypes(Object type) {
+   List<String> getDependentJSTypes(Object type) {
       if (!(type instanceof PrimitiveType)) {
-         return getJSSettingsStringValue(type, "dependentTypes", false, false);
+         return getJSSettingsListStringValue(type, "dependentTypes", false);
       }
       return null;
    }

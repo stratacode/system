@@ -823,12 +823,12 @@ public class PropertyAssignment extends Statement implements IVariableInitialize
    }
 
    public Object getMyAnnotation(String annotation) {
-      return super.getAnnotation(annotation);
+      return super.getAnnotation(annotation, true);
    }
 
-   public Object getAnnotation(String annotation) {
-      Object thisAnnot = super.getAnnotation(annotation);
-      if (assignedProperty != null) {
+   public Object getAnnotation(String annotation, boolean checkInherited) {
+      Object thisAnnot = super.getAnnotation(annotation, checkInherited);
+      if (assignedProperty != null && checkInherited) {
          Object overriddenAnnotation = ModelUtil.getAnnotation(assignedProperty, annotation);
 
          if (thisAnnot == null) {

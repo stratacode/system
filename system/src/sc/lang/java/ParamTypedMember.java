@@ -44,7 +44,7 @@ public class ParamTypedMember implements ITypedObject, IDefinition {
       return member;
    }
 
-   public Object getAnnotation(String annotName) {
+   public Object getAnnotation(String annotName, boolean checkModified) {
       return ModelUtil.getAnnotation(member, annotName);
    }
 

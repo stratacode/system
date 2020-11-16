@@ -98,7 +98,7 @@ public abstract class WrapperMethod implements IMethodDefinition {
       return ModelUtil.getThrowsClause(wrapped);
    }
 
-   public Object getAnnotation(String annotName) {
+   public Object getAnnotation(String annotName, boolean checkModified) {
       return ModelUtil.getAnnotation(wrapped, annotName);
    }
 

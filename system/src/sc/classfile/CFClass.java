@@ -776,7 +776,7 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
    }
 
 
-   public Object getAnnotation(String annotName) {
+   public Object getAnnotation(String annotName, boolean checkModified) {
       return classFile.getAnnotation(annotName);
    }
 

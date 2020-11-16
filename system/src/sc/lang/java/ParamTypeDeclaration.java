@@ -539,7 +539,7 @@ public class ParamTypeDeclaration implements ITypeDeclaration, ITypeParamContext
       return ModelUtil.isCompiledProperty(baseType, name, fieldMode, interfaceMode);
    }
 
-   public Object getAnnotation(String annotName) {
+   public Object getAnnotation(String annotName, boolean checkModified) {
       return ModelUtil.getAnnotation(baseType, annotName);
    }
 

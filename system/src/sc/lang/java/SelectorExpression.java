@@ -135,6 +135,10 @@ public class SelectorExpression extends ChainedExpression {
       if (typeDecl != null && typeDecl.excluded)
          return;
 
+      AbstractMethodDefinition enclMeth = getEnclosingMethod(false);
+      if (enclMeth != null && enclMeth.excluded)
+         return;
+
       if (bindingDirection != null) {
          Object referenceType;
          int numSelectors = selectors.size();

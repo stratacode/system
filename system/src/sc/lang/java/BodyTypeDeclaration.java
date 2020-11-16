@@ -1144,7 +1144,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
    // Either a compiled java annotation or a parsed Annotation
    public Object getInheritedAnnotation(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
-      Object annot = getAnnotation(annotationName);
+      Object annot = getAnnotation(annotationName, true);
       if (annot != null)
          return annot;
 
@@ -1155,7 +1155,8 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       }
       JavaModel model = getJavaModel();
       if (model == null) {
-         System.err.println("*** No model for getInheritedAnnotation");
+         // This happens when copying the transformed model if we happen to start a component before the parent model is set
+         //System.err.println("*** No model for getInheritedAnnotation");
          return null;
       }
 
@@ -1175,7 +1176,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public ArrayList<Object> getAllInheritedAnnotations(String annotationName, boolean skipCompiled, Layer refLayer, boolean layerResolve) {
-      Object annot = getAnnotation(annotationName);
+      Object annot = getAnnotation(annotationName, true);
       ArrayList<Object> res = null;
       if (annot != null) {
          res = new ArrayList<Object>();
@@ -1190,7 +1191,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          }
          JavaModel model = getJavaModel();
          if (model == null) {
-            System.err.println("*** No model for getInheritedAnnotation");
+            //System.err.println("*** No model for getInheritedAnnotation");
             return res;
          }
 
@@ -1931,7 +1932,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          displayError("Unable to modify compiled definition: ");
          return null;
       }
-      else if ((annotObj = getAnnotation("AddBefore")) != null || (annotObj = getAnnotation("AddAfter")) != null) {
+      else if ((annotObj = getAnnotation("AddBefore", true)) != null || (annotObj = getAnnotation("AddAfter", true)) != null) {
          Annotation annot = Annotation.toAnnotation(annotObj);
          if (!(annot.elementValue instanceof StringLiteral)) {
             System.err.println("*** Annotation: " + annot.toDefinitionString() + " should specify class name as a String");
@@ -4299,7 +4300,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
    }
 
    public Object getCompilerSetting(String settingName, boolean inherited) {
-      Object compilerSettings = inherited ? getInheritedAnnotation("sc.obj.CompilerSettings") : getAnnotation("sc.obj.CompilerSettings");
+      Object compilerSettings = inherited ? getInheritedAnnotation("sc.obj.CompilerSettings") : getAnnotation("sc.obj.CompilerSettings", true);
       if (compilerSettings != null) {
          return ModelUtil.getAnnotationValue(compilerSettings, settingName);
       }
@@ -7877,7 +7878,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          Object annot;
          Boolean isObject;
          String objName;
-         if ((objName = meth.propertyName) != null && (annot = st.getAnnotation("TypeSettings")) != null &&
+         if ((objName = meth.propertyName) != null && (annot = st.getAnnotation("TypeSettings", true)) != null &&
                  (isObject = (Boolean) ModelUtil.getAnnotationValue(annot, "objectType")) != null && isObject) {
             String ftn = getFullTypeName();
             String innerTypeNameL = CTypeUtil.prefixPath(ftn, objName);
@@ -9328,7 +9329,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       Object annotObj = getInheritedAnnotation(annotName);
       if (annotObj != null) {
          Annotation annot = Annotation.toAnnotation(annotObj);
-         if (p.getSubTypesOnly() && getAnnotation(annotName) != null)
+         if (p.getSubTypesOnly() && getAnnotation(annotName, true) != null)
             return;
          p.process(this, annot);
       }

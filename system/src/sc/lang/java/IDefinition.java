@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface IDefinition {
-   Object getAnnotation(String annotName);
+   Object getAnnotation(String annotName, boolean checkModified);
    List<Object> getRepeatingAnnotation(String annotName);
    Map<String,Object> getAnnotations();
    boolean hasModifier(String modifierName);

@@ -2794,7 +2794,7 @@ public class ModelUtil {
       PerfMon.start("getAnnotation");
       try {
       if (definition instanceof IDefinition) {
-         return ((IDefinition) definition).getAnnotation(annotationName);
+         return ((IDefinition) definition).getAnnotation(annotationName, true);
       }
       else if (definition instanceof VariableDefinition)
          return getAnnotation(((VariableDefinition) definition).getDefinition(), annotationName);

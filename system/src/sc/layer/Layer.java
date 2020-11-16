@@ -4520,7 +4520,6 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-
    /**
     * When encountering scope&lt;name&gt; in the code as an annotation for a type, the IScopeProcessor will allow
     * the framework developer the ability to customize how the getX, setX, methods of the object or property are

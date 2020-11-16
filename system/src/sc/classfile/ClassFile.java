@@ -184,7 +184,7 @@ public class ClassFile {
          return useDesc;
       }
 
-      public Object getAnnotation(String annotName) {
+      public Object getAnnotation(String annotName, boolean checkModified) {
          AnnotationsAttribute aa = AnnotationsAttribute.getAttribute(attributes);
          if (aa == null)
             return null;

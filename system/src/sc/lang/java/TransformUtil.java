@@ -365,7 +365,7 @@ public class TransformUtil {
    {
       if (model.types != null) {
          for (Definition def:model.types)
-            if (def instanceof ClassDeclaration && def.getAnnotation(BINDABLE_ANNOTATION) != null)
+            if (def instanceof ClassDeclaration && def.getAnnotation(BINDABLE_ANNOTATION, true) != null)
                makeClassBindable((ClassDeclaration) def);
       }
    }

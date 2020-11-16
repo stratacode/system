@@ -830,7 +830,7 @@ public class ParamTypedMethod implements ITypedObject, IMethodDefinition, ITypeP
       return ModelUtil.getNumParameters(method);
    }
 
-   public Object getAnnotation(String annotName) {
+   public Object getAnnotation(String annotName, boolean checkModified) {
       return ModelUtil.getAnnotation(method, annotName);
    }
 

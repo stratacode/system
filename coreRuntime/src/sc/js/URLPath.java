@@ -83,6 +83,7 @@ public class URLPath implements Comparable {
    }
 
    /** Cleans the first / and extension out of the URL and handles the default case */
+   /*
    public static String getAppNameFromURL(String url) {
       String app = url;
       int ix = app.indexOf("/");
@@ -95,6 +96,7 @@ public class URLPath implements Comparable {
          app = app.substring(0, ix);
       return app;
    }
+   */
 
    // TODO: do we need to encode string values into UTF8 here or maybe it should be done downstream?
    public static String addQueryParam(String url, String param, Object value) {

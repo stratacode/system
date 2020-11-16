@@ -768,7 +768,7 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
          // Preserves the order of the children in the list.
          otherType.parentNode.replaceChild(otherType, this);
       }
-      else if ((annotObj = getAnnotation("AddBefore")) != null || (annotObj = getAnnotation("AddAfter")) != null) {
+      else if ((annotObj = getAnnotation("AddBefore", true)) != null || (annotObj = getAnnotation("AddAfter", true)) != null) {
          Annotation annot = Annotation.toAnnotation(annotObj);
          if (!(annot.elementValue instanceof StringLiteral)) {
             System.err.println("*** Annotation: " + annot.toDefinitionString() + " should specify class name as a String");
@@ -1557,8 +1557,8 @@ public abstract class TypeDeclaration extends BodyTypeDeclaration {
    }
 
    public boolean needsTransform() {
-      return isComponentType() || getDeclarationType() == DeclarationType.OBJECT || isDynamicType() || getAnnotation("sc.obj.Sync") != null ||
-              propertiesToMakeBindable != null || getAnnotation("sc.obj.CompilerSettings") != null || super.needsTransform();
+      return isComponentType() || getDeclarationType() == DeclarationType.OBJECT || isDynamicType() || getAnnotation("sc.obj.Sync", true) != null ||
+              propertiesToMakeBindable != null || getAnnotation("sc.obj.CompilerSettings", true) != null || super.needsTransform();
    }
 
    void transformBindableProperties(ILanguageModel.RuntimeType runtime) {

@@ -552,7 +552,7 @@ public class ClassDeclaration extends TypeDeclaration {
       }
 
       // Don't inherit this set of compiler settings
-      Object myCompilerSettings = getAnnotation("sc.obj.CompilerSettings");
+      Object myCompilerSettings = getAnnotation("sc.obj.CompilerSettings", true);
       if (myCompilerSettings != null) {
          String jarFile = (String) ModelUtil.getAnnotationValue(myCompilerSettings, "jarFileName");
          Boolean includeDeps = (Boolean) ModelUtil.getAnnotationValue(myCompilerSettings, "includeDepsInJar");
@@ -921,7 +921,7 @@ public class ClassDeclaration extends TypeDeclaration {
       }
 
       if (isObject || propertiesAlreadyBindable != null) {
-         if (getAnnotation("sc.obj.TypeSettings") == null) {
+         if (getAnnotation("sc.obj.TypeSettings", true) == null) {
             Annotation annot = Annotation.create(getImportedTypeName("sc.obj.TypeSettings"));
             ArrayList<AnnotationValue> annotVals = new ArrayList<AnnotationValue>();
             if (isObject)

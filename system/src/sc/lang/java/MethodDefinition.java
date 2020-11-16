@@ -129,7 +129,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
       // If we've been replaced by another method on this same type, let that method do the processing since it will
       // have the completed merged annotations
-      Object mainSettings = replacedByMethod == null ? getAnnotation("sc.obj.MainSettings") : null;
+      Object mainSettings = replacedByMethod == null ? getAnnotation("sc.obj.MainSettings", true) : null;
       if (mainSettings != null) {
          Boolean disabled = (Boolean) ModelUtil.getAnnotationValue(mainSettings, "disabled");
          if (disabled == null || !disabled) {
@@ -620,7 +620,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
                }
          }
       }
-      else if (!isMain && getAnnotation("sc.obj.MainSettings") != null) {
+      else if (!isMain && getAnnotation("sc.obj.MainSettings", true) != null) {
          if (!isStatic())
             displayError("MainSettings set on non-static method: ");
          else
@@ -913,8 +913,8 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       }
    }
 
-   public Object getAnnotation(String annotation) {
-      Object thisAnnot = super.getAnnotation(annotation);
+   public Object getAnnotation(String annotation, boolean checkInherited) {
+      Object thisAnnot = super.getAnnotation(annotation, checkInherited);
       if (overriddenMethod != null) {
          Object overriddenAnnotation = ModelUtil.getAnnotation(overriddenMethod, annotation);
 

@@ -8,6 +8,9 @@ import sc.classfile.CFAnnotation;
 import sc.lang.JavaLanguage;
 import sc.lang.ISemanticNode;
 import sc.lang.SemanticNodeList;
+import sc.layer.AnnotationMergeMode;
+import sc.layer.LayeredSystem;
+import sc.parser.PString;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 
@@ -130,13 +133,45 @@ public class Annotation extends ErrorSemanticNode implements IAnnotation {
          for (int i = 0; i < overriddenValues.size(); i++) {
             AnnotationValue av = (AnnotationValue) overriddenValues.get(i);
             AnnotationValue thisAv;
+            AnnotationMergeMode mergeMode = LayeredSystem.getAnnotationMergeMode(typeName, av.identifier);
             if ((thisAv = getAnnotationValueWrapper(av.identifier)) == null) {
                thisElementValues.add(av);
                any = true;
             }
-            else if (replace) {
-               thisElementValues.remove(thisAv);
-               thisElementValues.add(av);
+            else {
+               switch (mergeMode) {
+                  case Replace:
+                     if (replace) {
+                        thisElementValues.remove(thisAv);
+                        thisElementValues.add(av);
+                     }
+                     // else - leave the overriding one in place
+                     break;
+                  case AppendCommaString:
+                     Object thisVal = thisAv.elementValue;
+                     Object otherVal = av.elementValue;
+                     if (thisVal instanceof StringLiteral && otherVal instanceof StringLiteral) {
+                        StringLiteral thisLiteral = (StringLiteral)thisVal;
+                        String thisStr = (String) thisLiteral.getLiteralValue();
+                        String otherStr = (String) ((StringLiteral)otherVal).getLiteralValue();
+                        String merged;
+                        if (thisStr.length() == 0)
+                           merged = otherStr;
+                        else if (otherStr.length() == 0)
+                           merged = thisStr;
+                        else
+                           merged = thisStr + "," + otherStr;
+                        thisLiteral.setProperty("value", merged);
+                        thisLiteral.stringValue = merged;
+                        any = true;
+                     }
+                     else
+                        displayError("Expected string value for annotation: " + av.identifier);
+                     break;
+                  default:
+                     System.err.println("*** Unrecognized merge mode");
+                     break;
+               }
             }
          }
       }

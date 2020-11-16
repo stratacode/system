@@ -60,9 +60,23 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
                      body.statements.get(0) instanceof GlueStatement;
    }
 
+   public void start() {
+      super.start();
+
+      if (execForRuntime(getLayeredSystem()) == RuntimeStatus.Disabled)
+         excluded = true;
+   }
+
+   public RuntimeStatus execForRuntime(LayeredSystem runtimeSys) {
+      JavaModel model = getJavaModel();
+      Layer refLayer = model == null ? null : model.getLayer();
+      RuntimeStatus propStatus = ModelUtil.execForRuntime(getLayeredSystem(), refLayer, this, runtimeSys);
+      return propStatus;
+   }
+
    public void process() {
       super.process();
-      Object editorSettings = getAnnotation("sc.obj.EditorCreate"); // TODO: need getInheritedAnnotation for methods
+      Object editorSettings = getAnnotation("sc.obj.EditorCreate", true); // TODO: need getInheritedAnnotation for methods
       if (editorSettings != null) {
          String constrParamNames = (String) ModelUtil.getAnnotationValue(editorSettings, "constructorParamNames");
          if (constrParamNames != null && constrParamNames.length() > 0) {
@@ -1064,8 +1078,8 @@ public abstract class AbstractMethodDefinition extends TypedDefinition implement
       return DynUtil.getObjectId(this, null, "MMD_" + getMethodTypeName()  + "_" + methName);
    }
 
-   public Object getAnnotation(String annotationName) {
-      Object res = super.getAnnotation(annotationName);
+   public Object getAnnotation(String annotationName, boolean checkInherited) {
+      Object res = super.getAnnotation(annotationName, checkInherited);
       if (res != null)
          return res;
       if (annotationName.equals("sc.obj.Remote")) {
