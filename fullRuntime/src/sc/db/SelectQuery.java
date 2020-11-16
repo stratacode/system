@@ -901,7 +901,11 @@ public class SelectQuery implements Cloneable {
                      }
                      else {
                         IBeanMapper propMapper = propDesc.getPropertyMapper();
-                        propMapper.setPropertyValue(propInst, val);
+                        Object oldVal = propMapper.getPropertyValue(propInst, true, false);
+                        // Don't update the value unless it has changed in case we are populating an existing
+                        // instance to avoid work downstream
+                        if (!DynUtil.equalObjects(oldVal, val))
+                           propMapper.setPropertyValue(propInst, val);
                         logVal = val;
                         logName = propDesc.propertyName;
                         logColType = propDesc.getDBColumnType();
