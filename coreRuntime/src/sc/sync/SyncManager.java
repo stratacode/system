@@ -508,7 +508,14 @@ public class SyncManager {
             System.out.println("Changed value: " + DynUtil.getInstanceName(obj) + "." + propName + " = " + DynUtil.getInstanceName(val) + (!needsSync ? " *** first change in sync" : ""));
          }
          markChanged();
-         // When we are processing the initial sync, we are not recording changes.
+         InstInfo ii = getInstInfo(obj);
+         if (ii == null) {
+            System.err.println("*** No instInfo in addChangedValue");
+            return;
+         }
+         boolean initialDepChange = false;
+         // When we are processing the initial sync, we are not recording changes unless we are in the midst of serializing
+         // the initial sync where depChanges will be set.
          if (!initialSync) {
             if (scope.getScopeDefinition().supportsChangeEvents) {
                // For simple value properties, that cannot refer recursively, we add them to the dep changes which are put before the object which is referencing the
@@ -532,15 +539,13 @@ public class SyncManager {
                   changedLayer.addChangedValue(obj, propName, val);
             }
             else {
-               addPreviousValue(obj, propName, val, false, true); // If this scope does not support change events, we just apply the previous value now, so we'll continue to propagate any subsequent changes to children
+               // Should we add to the initial layer here? If this is onDemand and not queued and we are not processing a reference
+               // to this object, it may not be referenced on the client so don't add it to the initial layer
+               addPreviousValue(obj, propName, val, false, !ii.onDemand || ii.nameQueued || depChanges != null); // If this scope does not support change events, we just apply the previous value now, so we'll continue to propagate any subsequent changes to children
             }
          }
          else {
-            InstInfo ii = getInstInfo(obj);
-            if (ii == null) {
-               System.err.println("*** No instInfo in add changedInfo");
-            }
-            else if (ii.previousValues != null) {
+            if (ii.previousValues != null) {
                Object prevVal = ii.previousValues.get(propName);
                if (!DynUtil.equalObjects(prevVal,val))
                   addPreviousValue(obj, propName, val, false, true);
@@ -550,9 +555,11 @@ public class SyncManager {
          // else if !initialSync - not recording this change here!
          SyncState syncState = getSyncState();
          if (recordInitial || syncState != SyncState.Initializing) {
-            // For the 'remote' parameter, we want it to be true only for those changes which definitively originated on the client.  The binding count test will
-            // eliminate side-effect changes from those original ones.  This is the same logic we use to determine
-            initialSyncLayer.addChangedValue(obj, propName, val, recordInitial && syncState == SyncState.ApplyingChanges && Bind.getNestedBindingCount() <= 1);
+            if (!recordInitial || !ii.onDemand || ii.nameQueued || depChanges != null) {
+               // For the 'remote' parameter, we want it to be true only for those changes which definitively originated on the client.  The binding count test will
+               // eliminate side-effect changes from those original ones.  This is the same logic we use to determine
+               initialSyncLayer.addChangedValue(obj, propName, val, recordInitial && syncState == SyncState.ApplyingChanges && Bind.getNestedBindingCount() <= 1);
+            }
          }
       }
 
