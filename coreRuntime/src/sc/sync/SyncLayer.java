@@ -835,8 +835,12 @@ public class SyncLayer {
          if (change.applySyncFilterOnSerialize() && syncTypeFilter != null && !parentContext.matchesTypeFilter(syncTypeFilter, objTypeName)) {
             // If it's not in either filter, it's not meant to be serialized to this client
             if (resetTypeFilter == null || !resetTypeFilter.contains(objTypeName)) {
-               if (SyncManager.trace)
-                  System.out.println("Omitting sync for type: " + objTypeName + ": to client - no reference in filter for: " + parentContext);
+               if (SyncManager.trace) {
+                  if (change instanceof SyncPropChange)
+                     System.out.println("Omitting sync for prop: " + objTypeName + "." + ((SyncPropChange) change).prop + ": to client - no reference in filter for: " + parentContext);
+                  else
+                     System.out.println("Omitting sync for type: " + objTypeName + ": to client - no reference in filter for: " + parentContext);
+               }
                return;
             }
             // This represents a client that does not have the code for the remote side, but still wants some state to
@@ -1111,8 +1115,11 @@ public class SyncLayer {
                   System.err.println("*** Missing instInfo for reset prop change");
                   return;
                }
-               if ((syncProps.getSyncFlags(propName) & SyncPropOptions.SYNC_RESET_STATE) == 0 || !instInfo.resetState)
+               if ((syncProps.getSyncFlags(propName) & SyncPropOptions.SYNC_RESET_STATE) == 0 || !instInfo.resetState) {
+                  if (SyncManager.trace)
+                     System.out.println("Omitting sync for property: " + objTypeName + "." + propName + ": to client - in reset filter but not regular and not sync'd as reset state: " + parentContext);
                   return;
+               }
             }
 
             // Need to add this in the context of a current object - before the property change
