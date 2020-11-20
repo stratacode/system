@@ -9644,11 +9644,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             filterDestinations = Arrays.asList(destArray);
          Boolean syncOnDemandBool = (Boolean) ModelUtil.getAnnotationValue(syncAnnot, "onDemand");
          if (syncOnDemandBool != null) {
-            // Once we have an on-demand initialization, we do not track property assignments after initialization so
-            // we have to do the init by default.
-            syncOnDemand = syncOnDemandBool;
-            if (syncOnDemand)
-               syncInitDefault = true;
+            // For object instances, we are making them onDemand=false even if onDemand is set for a use case like
+            // the ProductView that can be used as an onDemand class, or instantiated as an object in the page where
+            // there is no synchronized reference to pull in the page object.
+            // TODO: maybe just ignore onDemand if it's inherited since there might still be a use case for onDemand
+            // object instances
+            if (syncOnDemandBool && getDeclarationType() == DeclarationType.OBJECT)
+               syncOnDemand = false;
+            else {
+               // Once we have an on-demand initialization, we do not track property assignments after initialization so
+               // we have to do the init by default.
+               syncOnDemand = syncOnDemandBool;
+               if (syncOnDemand)
+                  syncInitDefault = true;
+            }
          }
          Boolean syncInitDefaultBool = (Boolean) ModelUtil.getAnnotationValue(syncAnnot, "initDefault");
          if (syncInitDefaultBool != null)
