@@ -4004,7 +4004,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return ModelUtil.getEnclosingType(memberType);
    }
 
-   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = true, debugSuspend = true, maxMemory = 2048, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
+   @MainSettings(produceJar = true, produceScript = true, produceBAT = true, execName = "bin/scc", jarFileName="bin/sc.jar", debug = true, debugSuspend = true, maxMemory = 2560, defaultArgs = "-restartArgsFile <%= getTempDir(\"restart\", \"tmp\") %>")
    public static void main(String[] args) {
       Options options = new Options();
 
@@ -4226,16 +4226,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (options.verbose && !options.testVerifyMode) {
             sys.verbose("Prepared runtime: " + StringUtil.formatFloat((System.currentTimeMillis() - sys.sysStartTime)/1000.0));
          }
-
-         if (options.schemaMode != SchemaManager.SchemaMode.Prompt) {
-            if (sys.activeDBProviders != null) {
-               for (DBProvider dbProvider:sys.activeDBProviders.values()) {
-                  dbProvider.applySchemaOperation(sys.buildLayer, options.schemaMode);
-               }
-            }
-
-         }
-
 
          if (options.runClass != null) {
 
@@ -16102,6 +16092,15 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    // Once the SyncManager and destinations have been registered, we might need to init the sync types for the command interpreter
    public void runtimeInitialized() {
+
+      if (options.schemaMode != SchemaManager.SchemaMode.Prompt) {
+         if (activeDBProviders != null) {
+            for (DBProvider dbProvider:activeDBProviders.values()) {
+               dbProvider.applySchemaOperation(buildLayer, options.schemaMode);
+            }
+         }
+      }
+
       if (cmd != null) {
          cmd.runtimeInitialized();
       }
