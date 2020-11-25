@@ -1771,6 +1771,12 @@ public class IdentifierExpression extends ArgumentsExpression {
          }
          if (!remote && ModelUtil.isRemoteMethod(sys, meth))
             remote = true;
+         //if (remote) {
+            // TODO: Should we set sc.obj.Remote(remoteRuntimes=..thisruntime) for each version of 'meth' here that is
+            // in the syncSystems for this system? This is the case where someone has used an annotation so we find the
+            // method in the local system but at runtime are treating it as a remote call. Seems like it should also
+            // do the automatic registration like in checkRemoteMethod
+         //}
       }
       return remote ? IdentifierType.RemoteMethodInvocation : IdentifierType.MethodInvocation;
    }
