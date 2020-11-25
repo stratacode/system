@@ -3847,7 +3847,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       String[] emptyArgs = {};
       addTagAttributes("element", null, new String[] {"id", "style", "class", "onclick"}, null);
       addTagAttributes("html", "element", new String[] {"manifest", "xmlns"}, null);
-      addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex", "tabindex"}, null);
+      addTagAttributes("select", "element", new String[] {"multiple", "disabled", "selectedindex", "tabindex", "autofocus", "autocomplete"}, null);
       addTagAttributes("option", "element", new String[] {"selected", "value", "disabled", "tabindex"}, null);
       addTagAttributes("input", "element",
            new String[] {"value", "disabled", "type", "checked", "defaultchecked", "form", "name", "placeholder", "size",
@@ -5682,7 +5682,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                         // made on the server to send back to the client.  Using the DOM element id so the sync results are traceable
                         // and those should be unique cause they are already a global name space used by this page.
                         // TODO: if we have name conflicts, we could pass the DOM element id in the ServerTagInfo as well as the object name
-                        SyncManager.registerSyncInst(this, tagId, scopeDef.scopeId, true);
+                        SyncManager.registerSyncInst(this, null, tagId, scopeDef.scopeId, true);
                      }
                   }
                }
