@@ -572,7 +572,8 @@ public abstract class TxOperation {
          }
       }
 
-      if (useCurrent && !(propList instanceof DBList)) {
+      boolean setProp = !(propList instanceof DBList);
+      if (setProp) {
          DBList dbList = new DBList(propList, dbObject, multiValueProp);
          boolean origDBChanges = transaction.applyingDBChanges;
          transaction.applyingDBChanges = true;
