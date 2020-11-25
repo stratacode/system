@@ -3248,6 +3248,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    @Constant
    public boolean getExistsInJSRuntime() {
+      if (unsavedModel) // For temporary command line objects like those used in scripts, this next check may find the src file but it's not saved yet
+         return false;
       return getJSRuntimeModelType() != null;
    }
 
