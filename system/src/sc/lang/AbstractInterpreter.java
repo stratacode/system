@@ -933,22 +933,29 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          }
       }
       else if (statement instanceof TypedDefinition) {
-         BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
+         boolean pushedCtx = pushCurrentScopeContext();
+         try {
+            BodyTypeDeclaration current = currentTypes.get(currentTypes.size()-1);
 
-         // We do not generate unless the component is started
-         if (!model.isStarted())
-            ParseUtil.initAndStartComponent(model);
-         TypedDefinition def = (TypedDefinition) statement;
+            // We do not generate unless the component is started
+            if (!model.isStarted())
+               ParseUtil.initAndStartComponent(model);
+            TypedDefinition def = (TypedDefinition) statement;
 
-         def.parentNode = current;
-         ParseUtil.initAndStartComponent(statement);
-         if (!def.hasErrors()) {
-            current.updateBodyStatement(def, execContext, true, null, false, null);
+            def.parentNode = current;
+            ParseUtil.initAndStartComponent(statement);
+            if (!def.hasErrors()) {
+               current.updateBodyStatement(def, execContext, true, null, false, null);
+            }
+            else
+               System.err.println("*** Errors resolving: " + def.getNodeErrorText());
+            // TODO: handle other systems here
+            addChangedModel(pendingModel);
          }
-         else
-            System.err.println("*** Errors resolving: " + def.getNodeErrorText());
-         // TODO: handle other systems here
-         addChangedModel(pendingModel);
+         finally {
+            if (pushedCtx)
+               popCurrentScopeContext();
+         }
       }
       else if (statement instanceof EndTypeDeclaration) {
          // Need to acquire the locks in order to change the current layer at least since
@@ -2049,6 +2056,9 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
 
    public void execLaterJobs(int minPriority, int maxPriority) {
       boolean pushed = false;
+      if (toRunLater == null || toRunLater.size() == 0)
+         return;
+
       if (CurrentScopeContext.getThreadScopeContext() == null)
          pushed = pushCurrentScopeContext(); // TODO: maybe we should just set this and leave it in place rather than popping in processStatement?  We do need to update it each time in case the scope we are using has been changed
       try {
