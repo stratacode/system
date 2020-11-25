@@ -61,7 +61,7 @@ public class UpdateInstanceInfo {
 
          if (sys.runtimeProcessor == null || sys.runtimeProcessor.usesLocalSyncManager()) {
             List<SyncProperties> newSyncPropList = newRoot.getSyncProperties();
-            if (newSyncPropList != null) {
+            if (newSyncPropList != null && SyncManager.isSyncedType(oldType)) {
                for (SyncProperties newSyncProps:newSyncPropList) {
                   // Using oldType here instead of oldType.getModifiedByRoot() since we've replaced the links in the chain that would let us get back to the
                   // original old type. It might not have changed...
@@ -168,7 +168,7 @@ public class UpdateInstanceInfo {
          // Make sure sync properties are updated since we clear them before adding the field
          newType.initSyncProperties();
          if (newType.isDynamicType()) {
-            if (newType.syncProperties != null) {
+            if (newType.syncProperties != null && SyncManager.isSyncedType(newType)) {
                // In case the sync properties have changed for a dynamic type, update them with the sync manager using the API.
                // The original call to addSyncType was done through a staticMixinTemplate so uses the same logic
                // as the compiled type version except that here we have programmatically build the SyncProperties, instead of code-gen
