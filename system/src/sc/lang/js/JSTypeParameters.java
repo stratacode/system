@@ -553,9 +553,9 @@ public class JSTypeParameters extends ObjectTypeParameters {
       public String getInstanceOf() {
          Object type = param.getTypeDeclaration();
          if (ModelUtil.isArray(type))
-            return "sc_arrayInstanceOf";
+            return "sc_arrayParamType";
          if (ModelUtil.isCharacter(type))
-            return "sc_instanceOfChar";
+            return ModelUtil.isPrimitive(type) ? "sc_instanceOfChar" : "sc_charParamType";
          return ModelUtil.isPrimitive(type) ? "sc_instanceOf" : "sc_paramType";
       }
 
