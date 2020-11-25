@@ -2531,6 +2531,20 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
 
       if (isLayerType)
          return false;
+
+      // Our inherited types contribute to the list of instFields and those might have changed so we need to refresh them here
+      if (instFields != null) {
+         int ix = 0;
+         for (Object instField:instFields) {
+            if (instField instanceof BodyTypeDeclaration) {
+               Object newType = ModelUtil.refreshBoundType(getLayeredSystem(), instField, flags);
+               if (newType != instField)
+                  instFields[ix] = newType;
+            }
+            ix++;
+         }
+      }
+
       if (body != null) {
          for (Statement st : body) {
             if (st.refreshBoundTypes(flags))
@@ -10067,7 +10081,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
             // but we have enabled the sync queue so we know this will happen before we actually add the sync inst itself, so it will get the right name.
             // Since this reference comes from the client, we do want to reset the name when there's a new client for the same session (i.e. a refresh).
             if (syncCtx != null)
-               syncCtx.registerObjName(inst, typeName, true, false, true);
+               syncCtx.registerObjName(inst, null, typeName, true, false, true);
 
             // Now that we've registered the real name for the instance, we can do the addSyncInst call we queued up.
             if (flushQueue)
@@ -10372,6 +10386,10 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       LayeredSystem sys = getLayeredSystem();
       JSRuntimeProcessor runtime = (JSRuntimeProcessor) sys.getRuntime("js");
       if (runtime == null)
+         return false;
+
+      JavaModel model = getJavaModel();
+      if (model == null || model.unsavedModel)
          return false;
 
       LayeredSystem jsSys = runtime.getLayeredSystem();

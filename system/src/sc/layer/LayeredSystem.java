@@ -13706,7 +13706,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                            inst = ModelUtil.getObjectInstance(rootType);
                            scopeCtx.setValue(typeName, inst);
                            // Register this instance by name but don't initialize it.
-                           SyncManager.registerSyncInst(inst, typeName, scope.scopeId, false);
+                           SyncManager.registerSyncInst(inst, null, typeName, scope.scopeId, false);
                         }
                         nextObj = inst;
                      }

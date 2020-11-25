@@ -639,14 +639,14 @@ public class SyncManager {
          syncListenerInfo.remove(parentObj);
       }
 
-      public void registerObjName(Object inst, String objName, boolean fixedName, boolean initInst, boolean receivedChange) {
+      public void registerObjName(Object inst, Object[] args, String objName, boolean fixedName, boolean initInst, boolean receivedChange) {
          String scopeName = DynUtil.getScopeName(inst);
          ScopeDefinition def = getScopeDefinitionByName(scopeName);
          SyncContext useCtx = getSyncContext(def.scopeId, true);
          if (useCtx == null)
             System.err.println("Unable to resolve sync context for scope: " + scopeName + " to register inst: " + objName);
          else {
-            useCtx.registerObjNameOnScope(inst, objName, fixedName, initInst, false, false, false);
+            useCtx.registerObjNameOnScope(inst, args, objName, fixedName, initInst, false, false, false);
             InstInfo ii = getInstInfo(inst);
             if (ii == null) {
                ii = getInheritedInstInfo(inst);
@@ -664,7 +664,7 @@ public class SyncManager {
          syncInsts.put(inst, ii);
       }
 
-      InstInfo registerObjNameOnScope(Object inst, String objName, boolean fixedName, boolean initInst, boolean nameQueued, boolean registered, boolean addOnDemandChanges) {
+      InstInfo registerObjNameOnScope(Object inst, Object[] args, String objName, boolean fixedName, boolean initInst, boolean nameQueued, boolean registered, boolean addOnDemandChanges) {
          if (objName == null)
             throw new IllegalArgumentException("Invalid null object name for instance: " + inst);
          InstInfo ii = syncInsts.get(inst);
@@ -674,7 +674,7 @@ public class SyncManager {
                ii = createAndRegisterInheritedInstInfo(inst, ii);
             }
             else {
-               ii = new InstInfo(this, null, false, true, false);
+               ii = new InstInfo(this, args, false, true, false);
                putInstInfo(inst, ii);
             }
 
@@ -693,7 +693,7 @@ public class SyncManager {
                if (verbose)
                   System.out.println("Re-registering " + ii.name + " as: " + objName);
             }
-            if (ii.onDemand && !ii.initialized && initInst) { // TODO: should the ii.onDemand part be removed here?
+            if (!ii.initialized && initInst) {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
                   ii.setName(objName);
@@ -1329,7 +1329,7 @@ public class SyncManager {
                         //childII = childCtx.createAndRegisterInheritedInstInfo(inst, ii);
                         //childII.nameQueued = true;
                         //childII.initialized = true;
-                        childII = childCtx.registerObjNameOnScope(inst, ii.name, ii.fixedObject, true, true, ii.registered, addOnDemandChanges);
+                        childII = childCtx.registerObjNameOnScope(inst, ii.args, ii.name, ii.fixedObject, true, true, ii.registered, addOnDemandChanges);
                      }
                      if (initChildContexts == null) {
                         initChildContexts = new ArrayList<SyncContext>();
@@ -2521,7 +2521,7 @@ public class SyncManager {
                return null;
             }
             // Because we always use this to 'receive' a new instance set registered in this SyncContext to keep us from trying to send it back
-            registerObjName(inst, name, isClient, true, true);
+            registerObjName(inst, args, name, isClient, true, true);
          }
          finally {
             if (flushSyncQueue)
@@ -2794,6 +2794,15 @@ public class SyncManager {
    public static void initStandardTypes() {
       // Allows serialization of references to java.lang.Class objects through synchronization
       SyncManager.addSyncType(ClassSyncWrapper.class, new SyncProperties(null, null, new Object[] {}, null, SyncPropOptions.SYNC_INIT | SyncPropOptions.SYNC_CONSTANT, 0));
+   }
+
+   public static boolean isSyncedType(Object type) {
+      // If no specific destination is given, register it for all destinations
+      for (SyncManager mgr:syncManagers) {
+         if (mgr.syncTypes.containsKey(type))
+            return true;
+      }
+      return false;
    }
 
    public static void addSyncType(Object type, SyncProperties props) {
@@ -3332,29 +3341,29 @@ public class SyncManager {
       }
    }
 
-   public static void registerSyncInst(Object inst, String instName, int scopeId, boolean initInst) {
-      registerSyncInst(inst, instName, scopeId, true, initInst);
+   public static void registerSyncInst(Object inst, Object[] args, String instName, int scopeId, boolean initInst) {
+      registerSyncInst(inst, args, instName, scopeId, true, initInst);
    }
 
-   public static void registerSyncInst(Object inst, String instName, int scopeId, boolean fixedName, boolean initInst) {
+   public static void registerSyncInst(Object inst, Object[] args, String instName, int scopeId, boolean fixedName, boolean initInst) {
       for (SyncManager syncMgr:syncManagers) {
          SyncContext ctx = syncMgr.getSyncContext(scopeId, true);
          if (ctx != null) {
             // Here we've already been given the scope for the syncInst so just put it into that one.
-            ctx.registerObjNameOnScope(inst, instName, fixedName, initInst, true, true, false);
+            ctx.registerObjNameOnScope(inst, args, instName, fixedName, initInst, true, true, false);
          }
       }
    }
 
-   public static void registerSyncInst(Object inst, String instName, boolean fixedName, boolean initInst) {
+   public static void registerSyncInst(Object inst, Object[] args, String instName, boolean fixedName, boolean initInst) {
       SyncContext ctx = getDefaultSyncContext();
-      ctx.registerObjName(inst, instName, fixedName, initInst, false);
+      ctx.registerObjName(inst, args, instName, fixedName, initInst, false);
    }
 
    // Used by the JS code
    public static void registerSyncInst(Object inst, String instName) {
       SyncContext ctx = getDefaultSyncContext();
-      ctx.registerObjName(inst, instName, ctx.getSyncManager().syncDestination.clientDestination, true, false);
+      ctx.registerObjName(inst, null, instName, ctx.getSyncManager().syncDestination.clientDestination, true, false);
    }
 
    /** Returns the SyncContext to use for a sync instance which has already been added to the system. */
