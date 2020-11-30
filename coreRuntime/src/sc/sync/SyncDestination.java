@@ -17,6 +17,7 @@ import sc.type.IResponseListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static sc.sync.SyncManager.verbose;
@@ -64,6 +65,13 @@ public abstract class SyncDestination {
 
    /** How much time should we wait on the client after completing a sync before we start the next sync in case the server has more changes */
    public int pollTime = realTime ? 500 : -1;
+
+   /** Set to true by the system when the remote side has invalidated the session */
+   public boolean needsClearSync = false;
+
+   /** Set to true when the remote side has validated it's session, set to false once we've received a successful init sync
+    * from the server */
+   public boolean needsInitSync = false;
 
    /** Are we currently connected to the remote destination?  Set to true after a successful response and to false after a server error */
    private boolean connected = false;
@@ -129,10 +137,12 @@ public abstract class SyncDestination {
       BindingContext.setBindingContext(ctx);
 
       boolean anyChanges = false;
+      int flags = 0;
 
       while (input != null && input.length() > 0) {
          String layerDef = input;
          boolean success = false;
+         int layerDefLen = layerDef.length();
          // When no receiveLanguage is known at this time, we must parse it from the header in the value itself
          if (receiveLanguage == null) {
             // Otherwise, it's a string of the form sync:language:len:data:sync:language:len:data
@@ -141,20 +151,37 @@ public abstract class SyncDestination {
                int endLangIx = layerDef.indexOf(':', SYNC_LAYER_START_LEN);
                if (endLangIx != -1) {
                   receiveLanguage = layerDef.substring(SYNC_LAYER_START_LEN, endLangIx);
-                  int lenStart = endLangIx + 1;
-                  if (layerDef.length() > lenStart) {
-                     int endLenIx = layerDef.indexOf(':', lenStart);
-                     if (endLenIx != -1) {
-                        String lenStr = layerDef.substring(lenStart, endLenIx);
-                        try {
-                           int syncLen = Integer.parseInt(lenStr);
-                           int layerDefStart = endLenIx + 1;
-                           layerDef = layerDef.substring(layerDefStart, layerDefStart + syncLen);
-                           // Process the next chunk on the next iteration of the loop.
-                           input = input.substring(layerDefStart + syncLen + 1);
-                           success = true;
+                  int flagsStart = endLangIx + 1;
+                  if (layerDefLen > flagsStart) {
+                     int endFlagsIx = layerDef.indexOf(':', flagsStart);
+                     if (endFlagsIx != -1) {
+                        String flagsStr = layerDef.substring(flagsStart, endFlagsIx);
+                        if (flagsStr.length() > 0) {
+                           try {
+                              flags = Integer.parseInt(flagsStr);
+                           }
+                           catch (NumberFormatException exc) {
+                              System.err.println("*** Invalid flags in sync request");
+                           }
                         }
-                        catch (NumberFormatException exc) {
+
+                        int lenStart = endFlagsIx + 1;
+                        if (layerDefLen > lenStart) {
+                           int endLenIx = layerDef.indexOf(':', lenStart);
+                           if (endLenIx != -1) {
+                              String lenStr = layerDef.substring(lenStart, endLenIx);
+                              try {
+                                 int syncLen = Integer.parseInt(lenStr);
+                                 int layerDefStart = endLenIx + 1;
+                                 layerDef = layerDef.substring(layerDefStart, layerDefStart + syncLen);
+                                 // Process the next chunk on the next iteration of the loop.
+                                 input = input.substring(layerDefStart + syncLen + 1);
+                                 success = true;
+                              }
+                              catch (NumberFormatException exc) {
+                                 System.err.println("*** Invalid length in sync request");
+                              }
+                           }
                         }
                      }
                   }
@@ -190,6 +217,14 @@ public abstract class SyncDestination {
 
       if (anyChanges)
          SyncManager.callAfterApplySync();
+
+      // Session was reset from the remote side
+      if ((flags & 1) != 0) {
+         // First step - clear the state on the client
+         needsClearSync = true;
+         // Second step - on the next sync, add a parameter to have the server return the new initSync for this page
+         needsInitSync = true;
+      }
 
       return anyChanges;
    }
@@ -228,9 +263,9 @@ public abstract class SyncDestination {
       ArrayList<SyncLayer> syncLayers;
       SyncManager.SyncContext clientContext;
       boolean anyChanges; // Did the sync request contain any changes
-      public SyncListener(ArrayList<SyncLayer> sls, boolean anyChanges) {
+      public SyncListener(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> sls, boolean anyChanges) {
          syncLayers = sls;
-         clientContext = sls.get(sls.size()-1).syncContext;
+         clientContext = sls == null ? parentContext : sls.get(sls.size()-1).syncContext;
          this.anyChanges = anyChanges;
       }
 
@@ -252,7 +287,16 @@ public abstract class SyncDestination {
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
          try {
+            boolean reinitResponse = needsInitSync;
+            if (reinitResponse) {
+               needsInitSync = false;
+               System.out.println("Applying sync init response after session reset");
+            }
             applySyncLayer(responseText, null, null, false, "response");
+            if (needsClearSync) {
+               needsClearSync = false;
+               clientContext.clearAllResetState();
+            }
          }
          finally {
             SyncManager.setCurrentSyncLayers(null);
@@ -343,7 +387,7 @@ public abstract class SyncDestination {
          anyChanges = sb.length() > 0;
          System.out.println("Sending reset sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
          updateInProgress(true, anyChanges);
-         writeToDestination(sb.toString(), null, new SyncListener(layers, anyChanges), "reset=true", null);
+         writeToDestination(sb.toString(), null, new SyncListener(clientContext, layers, anyChanges), "reset=true", null);
          complete = true;
       }
       finally {
@@ -394,15 +438,22 @@ public abstract class SyncDestination {
          else
             lastSer.appendSerializer(nextSer);
       }
+
+      String layerDef = lastSer == null ? "" : lastSer.getOutput().toString();
+      String debugDef = !SyncManager.trace || lastSer == null ? "" : lastSer.getDebugOutput().toString();
+
+      return sendSyncData(parentContext, layers, layerDef, syncGroup, debugDef, markAsSentOnly, codeUpdates);
+   }
+
+   public SyncResult sendSyncData(SyncManager.SyncContext parentContext, ArrayList<SyncLayer> layers, String layerDef,
+                                  String syncGroup, String debugDef, boolean markAsSentOnly,  CharSequence codeUpdates) {
       boolean complete = false;
       boolean anyChanges = false;
       String errorMessage = null;
       try {
-         String layerDef = lastSer == null ? "" : lastSer.getOutput().toString();
          anyChanges = layerDef.length() > 0;
          if (SyncManager.trace) {
             // For scn, want easy way to debug the sc version, not the JS code
-            String debugDef = lastSer == null ? "" : lastSer.getDebugOutput().toString();
             if (markAsSentOnly)
                System.out.println("Marking changes as sent for " + parentContext + " to: " + name + " size: " + debugDef.length() + "\n" + debugDef);
             else if (layerDef.trim().length() > 0)
@@ -413,7 +464,7 @@ public abstract class SyncDestination {
             //   System.out.println("*** More than 5 waits in progress");
             //System.out.println("Sending sync with changes: " + anyChanges + " numSends=" + numSendsInProgress + " numWaits=" + numWaitsInProgress);
             updateInProgress(true, anyChanges);
-            writeToDestination(layerDef, syncGroup, new SyncListener(layers, anyChanges), null, codeUpdates);
+            writeToDestination(layerDef, syncGroup, new SyncListener(parentContext, layers, anyChanges), null, codeUpdates);
          }
          complete = true;
       }
@@ -437,9 +488,11 @@ public abstract class SyncDestination {
    private void completeSync(ArrayList<SyncLayer> layers, boolean complete, String errorMessage) {
       if (!complete && errorMessage == null)
          errorMessage = "Sync failed.";
-      SyncManager.SyncContext clientContext = layers.get(layers.size()-1).syncContext;
-      for (SyncLayer syncLayer:layers) {
-         syncLayer.completeSync(clientContext, errorMessage == null ? null : SYNC_FAILED_ERROR, errorMessage);
+      if (layers != null) {
+         SyncManager.SyncContext clientContext = layers.get(layers.size()-1).syncContext;
+         for (SyncLayer syncLayer:layers) {
+            syncLayer.completeSync(clientContext, errorMessage == null ? null : SYNC_FAILED_ERROR, errorMessage);
+         }
       }
       if (errorMessage != null)
          System.err.println("*** Sync failed: " + errorMessage);

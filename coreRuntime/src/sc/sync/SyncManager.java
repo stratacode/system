@@ -2666,6 +2666,11 @@ public class SyncManager {
          if (initialSyncLayer != null)
             initialSyncLayer.removeSyncInst(inst);
       }
+
+      public void clearAllResetState() {
+         initialSyncLayer = new SyncLayer(this);
+         initialSyncLayer.initialLayer = true;
+      }
    }
 
    public boolean allowCreate(Object type) {
@@ -3776,6 +3781,21 @@ public class SyncManager {
             return syncDestination.sendResetSync(ctx, toSend);
 
          return syncDestination.sendSync(ctx, toSend, syncGroup, markAsSentOnly, codeUpdates, syncTypeFilter, resetTypeFilter);
+      }
+      else if (verbose) {
+         System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));
+      }
+      return new SyncResult(false, null);
+   }
+
+   public SyncResult sendReInitSync(String reInitSync, String syncGroup, int scopeId, boolean markAsSentOnly, CharSequence codeUpdates) {
+      SyncContext ctx = getSyncContext(scopeId, false);
+      if (ctx == null) {  // If the default scope does not have a context, check for a sync context on the parent scope
+         ctx = getFirstParentSyncContext(scopeId, false);
+      }
+
+      if (ctx != null) {
+         return syncDestination.sendSyncData(ctx, null, reInitSync, syncGroup,reInitSync, markAsSentOnly, codeUpdates);
       }
       else if (verbose) {
          System.out.println("No changes to synchronize for scope: " + ScopeDefinition.getScope(scopeId));
