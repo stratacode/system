@@ -25,7 +25,7 @@ public class TxInsert extends TxOperation {
          tables = dbTypeDesc.multiTables;
          if (tables != null) {
             for (TableDescriptor table:tables)
-               ct += doMultiInsert(table, null, true);
+               ct += doMultiInsert(table, null, true, true);
          }
       }
       insertTransientRefs(false);

@@ -433,7 +433,7 @@ public abstract class TxOperation {
     * Called with the useCurrent flag set to true to insert parentInst's current multi-valued property value, or for
     * incremental updates, the propList parameter specifies the list of values to insert
     */
-   protected int doMultiInsert(TableDescriptor insertTable, List<IDBObject> propList, boolean useCurrent) {
+   protected int doMultiInsert(TableDescriptor insertTable, List<IDBObject> propList, boolean useCurrent, boolean doUpdate) {
       if (insertTable.isReadOnly())
          return 0;
 
@@ -572,7 +572,8 @@ public abstract class TxOperation {
          }
       }
 
-      boolean setProp = !(propList instanceof DBList);
+      //boolean setProp = useCurrent && !(propList instanceof DBList);
+      boolean setProp = doUpdate && !(propList instanceof DBList);
       if (setProp) {
          DBList dbList = new DBList(propList, dbObject, multiValueProp);
          boolean origDBChanges = transaction.applyingDBChanges;

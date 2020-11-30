@@ -42,7 +42,7 @@ public class TxUpdate extends VersionedOperation {
                      if (!(propUpdate.value instanceof List))
                         System.err.println("*** Unsupported type for db list: ");
                      else
-                        ct += doMultiInsert(multiTable, (List<IDBObject>) propUpdate.value, false);
+                        ct += doMultiInsert(multiTable, (List<IDBObject>) propUpdate.value, false, true);
                   }
                }
             }

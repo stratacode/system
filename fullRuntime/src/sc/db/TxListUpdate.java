@@ -67,7 +67,7 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
          resCt = ct;
       }
       if (toInsert.size() > 0) {
-         int ct = doMultiInsert(oldList.listProp.getTable(), toInsert, false);
+         int ct = doMultiInsert(oldList.listProp.getTable(), toInsert, false, false);
          if (ct != toInsert.size())
             DBUtil.error("Failed to insert all of the rows in a list update");
          resCt += ct;
