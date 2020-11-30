@@ -64,6 +64,10 @@ public class TxUpdate extends VersionedOperation {
       if (dbObject.isTransient()) {
          throw new IllegalArgumentException("Updating transient object");
       }
+      if (!dbObject.isActive()) {
+         System.err.println("*** Warning - ignoring update for stopped object of type: " + dbObject.dbTypeDesc);
+         return 0;
+      }
       DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
       boolean isPrimary = primaryTable == updateTable;
