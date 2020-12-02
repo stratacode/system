@@ -339,6 +339,10 @@ public class SchemaManager {
       List<GraphSortNode> graphNodes = new ArrayList<GraphSortNode>();
       StringBuilder metadata = new StringBuilder();
       for (SQLFileModel in:inList) {
+         if (in == null || in.srcType == null) {
+            System.err.println("*** Null entry or src type in sortSQLModels");
+            continue;
+         }
          metadata.append("   Type: ");
          metadata.append(in.srcType.getFullTypeName());
          if (in.typeMetadata != null) {
