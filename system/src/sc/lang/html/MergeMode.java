@@ -22,6 +22,7 @@ import java.util.Set;
  * For the append tagMerge mode, the matched tag is itself not changed.  The new tag creates a new object with a new name that is appended to the body of the previous tag's body.
  * (? Question: should this append to the parent's body after the last matched tag?  Same with prepend)
  * </p>
+ * <p>
  * For the prepend tagMerge mode, the matched dynamic tag is also not changed.  The new tag creates a new object with a new name that is prepended to the body of the previous tag's body.
  * </p>
  * When you've chosen the tagMerge mode of Merge, by default the tag objects in the body of this tag will be merged with any matching tag objects in the previous matched tag's body.  Commonly, this default

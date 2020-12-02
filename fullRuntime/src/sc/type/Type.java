@@ -924,7 +924,7 @@ public enum Type {
 
    public abstract Object evalUnary(String operator, Object arg);
 
-   /** Use this to avoid evaluating the second arg to an && or || statement if the first one evals to false or true */
+   /** Use this to avoid evaluating the second arg to an &amp;&amp; or || statement if the first one evals to false or true */
    public Boolean evalPreConditional(String operator, Object lhsObj) {
       return null;
    }

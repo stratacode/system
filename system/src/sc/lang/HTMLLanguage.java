@@ -25,9 +25,9 @@ import java.util.Set;
  * TODO: The parser here generates the HTML tree, matching open and close tags using a rudimentary approach to first
  * parse a tree-tag, then when that fails to parse a valid body + close tag, just to go and parse an simple tag.  Because we
  * enable caching on the key elements it's faster than it might seem at first glance, but it's still not nearly as fast as it
- * could be.   A simple performance optimization would be to pre-parse a table of </tagName patterns that we find, possibly with
+ * could be.   A simple performance optimization would be to pre-parse a table of &lt;/tagName patterns that we find, possibly with
  * the index where we find it.  Given that most tags are used only one way in any given file, we'd be able to skip the tree-tag
- * parsing for <br> and <p> tags, for example.
+ * parsing for &lt;br&gt; and &lt;p&gt; tags, for example.
  *
  * TODO: It would be nice to have a grammar that deals with pure HTML, that's not based on the template language
  */

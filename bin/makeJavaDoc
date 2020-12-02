@@ -1,3 +1,3 @@
 #!/bin/bash
 
-javadoc -sourcepath /jjv/sc/sc/system/src:/jjv/sc/sc/fullRuntime/src:/jjv/sc/sc/coreRuntime/src -d /usr/local/scMain/build/doc_clientOnly/web/javadoc sc.lang.html sc.lang.js sc.obj sc.dyn sc.type sc.lang sc.lang.java sc.db sc.lang.template sc.bind sc.layer sc.parser sc.js sc.lifecycle sc.util sc.sync sc.repos sc.repos.mvn 
+javadoc -sourcepath /jjv/sc/sc/system/src:/jjv/sc/sc/fullRuntime/src:/jjv/sc/sc/coreRuntime/src -classpath ~/.stratacode/pkgs/jline/jline/2.13/jline-2.13.jar -d /usr/local/scMain/build/doc_clientOnly/web/javadoc sc.lang.html sc.lang.js sc.obj sc.dyn sc.type sc.lang sc.lang.java sc.db sc.lang.template sc.bind sc.layer sc.parser sc.js sc.lifecycle sc.util sc.sync sc.repos sc.repos.mvn 

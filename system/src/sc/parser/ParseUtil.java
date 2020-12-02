@@ -1184,7 +1184,7 @@ public class ParseUtil  {
       return oldNode;
    }
 
-   /** @Deprecated This version can potentially inherit a StrataCode index directory because it does not specify the mainDir yet may use the type index */
+   /** (deprecated - for compatibility only) This version can potentially inherit a StrataCode index directory because it does not specify the mainDir yet may use the type index */
    public static LayeredSystem createSimpleParser(String classPath, String externalClassPath, String srcPath, IExternalModelIndex modelIndex) {
       return createSimpleParser(null, classPath, externalClassPath, srcPath, modelIndex);
    }

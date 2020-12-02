@@ -102,7 +102,7 @@ public class DBPropertyDescriptor {
 
    /**
     * If this property participates in a bi-directional relationship, points to the back-pointing property - i.e.
-    * refDBTypeDesc == reversePropDesc.dbTypeDesc && reversePropDesc.reversePropDesc.refDBTypeDesc == dbTypeDesc
+    * refDBTypeDesc == reversePropDesc.dbTypeDesc &amp;&amp; reversePropDesc.reversePropDesc.refDBTypeDesc == dbTypeDesc
     */
    public DBPropertyDescriptor reversePropDesc;
 

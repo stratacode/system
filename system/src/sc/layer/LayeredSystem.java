@@ -91,10 +91,11 @@ import static sc.type.RTypeUtil.systemClasses;
  * it can optionally be copied to the build directory along with the generated code so that you have one complete
  * source directory with all source, or it can be compiled directly from where it lives in the source tree.
  * After generating any Java files, any modified files are then compiled using a standard java compiler.
- * <p/>
+ * <p>
  * See the usage() method for details on options.
  * Note that the LayeredSystem is also used in two other contexts - in the dynamic runtime and when using a program editor such as an IDE or
  * dynamic application editing system.
+ * </p>
  * <p>
  * When you run an application which uses the dynamic runtime, the LayeredSystem
  * serves the same purposes.  It compiles the compiled layers, and then manages the interpretation of the dynamic layers.  Dynamic layers are stored

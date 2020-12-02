@@ -4209,7 +4209,7 @@ public class IdentifierExpression extends ArgumentsExpression {
 
    /**
     * From "a.b.c" to:
-    *    Bind.bind(<enclosingObject or class>, boundFieldName,
+    *    Bind.bind(&lt;enclosingObject or class&gt;, boundFieldName,
     */
    public void transformBindingArgs(SemanticNodeList<Expression> bindArgs, BindDescriptor bd) {
       int startPropertyIndex = 0;      // The first identifier which is a bound property.

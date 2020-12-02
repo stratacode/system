@@ -45,7 +45,7 @@ public interface ITemplateProcessor {
 
    String getTypeGroupName();
 
-   /** Return true if the template should evaluate itself during the toString operator.  Useful for including templates inside of each other using a simple syntax: <%= templateName %> */
+   /** Return true if the template should evaluate itself during the toString operator.  Useful for including templates inside of each other using a simple syntax: &lt;%= templateName %&gt; */
    boolean evalToString();
 
    boolean getDefaultModify();

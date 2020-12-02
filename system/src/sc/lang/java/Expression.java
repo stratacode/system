@@ -402,7 +402,7 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
    /**
     * From "a.b.c" to:
-    *    Bind.bind(<enclosingObject or class>, boundFieldName,
+    *    Bind.bind(&lt;enclosingObject or class&gt;, boundFieldName,
     */
    public void transformBinding(ILanguageModel.RuntimeType runtime) {
       // srcObj: idTypes[0] = variableName: find enclosing type of that variable:

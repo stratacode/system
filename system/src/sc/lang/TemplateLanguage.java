@@ -41,13 +41,13 @@ import java.util.List;
  * like in a regular language.
  *
  * Perhaps the best way for a programmer to understand the template language is to think of there being a new String operator
- * which opens with %> and closes with <% (yes, it looks backwards when you look at it from the StrataCode perspective).
+ * which opens with %&gt; and closes with &lt;% (yes, it looks backwards when you look at it from the StrataCode perspective).
  * The only other change to the language is that we start out by parsing an unescaped string have
- * to break into Java.  There's a special <%! which you can put at the top of the file to control the Class, fields, methods etc.
+ * to break into Java.  There's a special &lt;%! which you can put at the top of the file to control the Class, fields, methods etc.
  * available to the page.
  *
- * The new %> <% operators are more powerful than typical string deliminaters.  You can nest Java statements inside with <% %> or
- * expressions with <%= %>.
+ * The new %&gt; &lt;% operators are more powerful than typical string deliminaters.  You can nest Java statements inside with &lt;% %&gt; or
+ * expressions with &lt;%= %&gt;.
  *
  * The template language can either be interpreted and evaluated as is, converted into StrataCode and interpreted, or transformed into a
  * Java file and compiled.  The syntax is the same.  The framework developer controls the default extends class, a "this" object,
@@ -197,7 +197,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    /** Filter command to run for evalled templates */
    public List<String> filterCommand;
 
-   /** The Template should implement toString by evaluating itself.  Useful for cases where there are no parameters needed to evaluate and you want something like <%= templateName %> to work.  */
+   /** The Template should implement toString by evaluating itself.  Useful for cases where there are no parameters needed to evaluate and you want something like &lt;%= templateName %&gt; to work.  */
    public boolean evalToString = false;
 
    /**
@@ -212,7 +212,7 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    /** Use this as the default extends type for any template without an explicit type definition */
    public String defaultExtendsType;
 
-   /** If a template file does not have an explicit <%! TypeName %> statement it will either replace or modify the previous type based on this setting.  For now, static file processors will simply replace the previous type for simplicity.  But schtml and other more sophisticated template types probably should make the default be to modify...*/
+   /** If a template file does not have an explicit &lt;%! TypeName %&gt; statement it will either replace or modify the previous type based on this setting.  For now, static file processors will simply replace the previous type for simplicity.  But schtml and other more sophisticated template types probably should make the default be to modify...*/
    public boolean defaultModify;
 
    /** Should templates define classes or objects by default */

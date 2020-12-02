@@ -23,7 +23,7 @@ import java.lang.reflect.WildcardType;
 import java.util.*;
 
 /** Java 8 lambda expression.  To run these in JS, and in dynamic java, and to validate the code in general we convert them to anonymous classes -
- * i.e. new InferredType<lambda-params>(...) {
+ * i.e. new InferredType&lt;lambda-params&gt;(...) {
  *    inferredMethodReturn inferredMethod(inferredMethodParams) {
  *       lambdaBody
  *       return lambdaReturnType

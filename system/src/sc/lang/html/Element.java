@@ -307,7 +307,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    /**
-    * Typed either as a List<RE> or an RE[]
+    * Typed either as a List&lt;RE&gt; or an RE[]
     *
     * This instance can be used in two modes - one as the controller of the array in which case repeat is set.  The other when it represents the element of the array and repeatVar is set to the element of the array.
     */
@@ -4609,7 +4609,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       bodyCache = htmlTxt;
    }
 
-   /** Returns the current contents of the startTagTxt, composed of the tag name and attributes - e.g. <input id="foo"> */
+   /** Returns the current contents of the startTagTxt, composed of the tag name and attributes - e.g. &lt;input id="foo"&gt; */
    public String getStartTagTxt() {
       if (replaceWith != null)
          return replaceWith.getStartTagTxt();

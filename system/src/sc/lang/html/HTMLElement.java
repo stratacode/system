@@ -36,7 +36,7 @@ import java.util.*;
  * The benefit being that Java compiles in the repeat element's type without needing to add a new repeat var at compile time.  There are problems
  * getting that to work in the general case.  When you have a parent class that has type parameters and you have an inner instance class which also has
  * type parameters, Java intermittently barfs saying that the parent type is a "raw type" and can't have type parameters.   It's weird because in simple cases
- * it works but in the general case it falls over.  You would Need to change the code to generate an extends like:   class InnerSubClass<TP> extends outerClass<Object>.innerBaseClass<TP>
+ * it works but in the general case it falls over.  You would Need to change the code to generate an extends like:   class InnerSubClass&lt;TP&gt; extends outerClass&lt;Object&gt;.innerBaseClass&lt;TP&gt;
  */
 //@Sync(syncMode= SyncMode.Automatic) // Turn back on sync mode for subclasses with this enabled.  Turned out to not be a good idea to sync both the UI and the model
 @sc.js.JSSettings(prefixAlias="js_", jsLibFiles="js/tags.js", extendsJSFiles="js/javasys.js")
