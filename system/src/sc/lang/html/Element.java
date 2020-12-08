@@ -11,6 +11,7 @@ import sc.dyn.IObjChildren;
 import sc.dyn.IScheduler;
 import sc.js.ServerTag;
 import sc.js.ServerTagContext;
+import sc.js.URLPath;
 import sc.lang.*;
 import sc.lang.java.*;
 import sc.lang.js.JSRuntimeProcessor;
@@ -5100,19 +5101,25 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
     * external URL corresponds to a given internal path.
     */
    public static String getRelURL(String srcRelPath, String urlPath) {
-      String res = URLUtil.concat(getRelPrefix(srcRelPath), urlPath);
+      Window window = Window.getWindow();
+      String scn = window == null ? null : window.scopeContextName;
+      if (scn != null && PTypeUtil.testMode) {
+         urlPath = URLPath.addQueryParam(urlPath, "scopeContextName", scn);
+      }
+      String res = URLUtil.concat(getRelPrefix(window, srcRelPath), urlPath);
       //System.out.println("*** in getRelURL - returning: " + res + " for: " + srcRelPath + " and " + urlPath);
       return res;
    }
 
-   /** In the generated code, we'll call this method to find the relative directory prefix to prepend (if any) for a reference from this src path in the tree.  */
    public static String getRelPrefix(String srcRelPath) {
+      return getRelPrefix(Window.getWindow(), srcRelPath);
+   }
+
+   /** In the generated code, we'll call this method to find the relative directory prefix to prepend (if any) for a reference from this src path in the tree.  */
+   public static String getRelPrefix(Window window, String srcRelPath) {
       //System.out.println("in getRelPrefix: " + srcRelPath);
       if (srcRelPath == null)
          srcRelPath = "";
-      Window window = Window.getWindow();
-      if (window == null)
-         return srcRelPath;
       String curRelPath = window.location.getPathname();
       //System.out.println("in getRelPrefix cur path: " + curRelPath);
       if (curRelPath != null) {
@@ -5867,6 +5874,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       // This class inherits from Element but we are not inheriting the sync properties of Element right now... this api is not for content, just for global events
       SyncManager.addSyncType(Document.class, new SyncProperties(null, null, new Object[]{"mouseDownEvent", "mouseMoveEvent", "mouseUpEvent", new SyncPropOptions("activeElement", SyncPropOptions.SYNC_ON_DEMAND)}, null, SyncPropOptions.SYNC_RECEIVE_ONLY));
       SyncManager.addSyncType(History.class, new SyncProperties(null, null, new Object[]{"popStateEvent"}, null, 0));
+      SyncManager.addSyncType(Screen.class, new SyncProperties(null, null, new Object[]{"width", "height"}, null, 0));
    }
 
    public boolean isCacheEnabled() {

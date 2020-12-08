@@ -107,6 +107,9 @@ public class Options {
    /** General flag for when the system is running tests - used to make log messages more consistent or to enable additional diagnostic  */
    @Constant public boolean testMode = false;
 
+   /** Set to true for the -tv, -tw, -t, and -ta options to run the configured test suite. Use -tm to just enable testMode without running a script  */
+   @Constant public boolean runTests = false;
+
    /** General flag for when the system is being run by a developer as opposed to production */
    @Constant public boolean devMode = true;
 
@@ -282,6 +285,7 @@ public class Options {
                          "   [ -tw ]: Enable 'test with window' mode.  Like -tv but shows the window.\n" +
                          "   [ -t <test-class-pattern>]: Run only the matching tests.\n" +
                          "   [ -ts/-ti <scriptName.scr>]: After compilation, run (-ts) or include (-ti) the specified test-script.  Use -ts to exit when the script is done.  -ti to enter the interpreter when the test is completed\n" +
+                         "   [ -tm ]: Enable test mode but do not run tests - use for creating new test scripts\n" +
                          "   [ -o <pattern> ]: Sets the openPattern, used by frameworks to choose which page to open after startup.\n" +
                          "   [ -ta ]: Like -tv but runs all tests without 'test verify mode'.\n" +
                          "   [ -nw ]: For web frameworks, do not open the default browser window.\n" +
@@ -586,6 +590,7 @@ public class Options {
                   if (opt.equals("ta")) {
                      testPattern = ".*";
                      testMode = true;
+                     runTests = true;
                   }
                   else if (opt.equals("te")) {
                      testExit = true;
@@ -597,12 +602,14 @@ public class Options {
                      //testPattern = ".*";
                      testVerifyMode = true;
                      testMode = true;
+                     runTests = true;
                   }
                   // Test in verify with window mode
                   else if (opt.equals("tw")) {
                      testVerifyMode = true;
                      testMode = true;
                      headlessSet = true;
+                     runTests = true;
                   }
                   else if (opt.equals("tdbg")) {
                      testDebugMode = true;
@@ -615,6 +622,11 @@ public class Options {
                      else {
                         testPattern = args[++i];
                      }
+                     runTests = true;
+                  }
+                  else if (opt.equals("tm")) {
+                     testMode = true;
+                     headlessSet = true;
                   }
                   else if (opt.equals("ts") || opt.equals("ti")) {
                      testMode = true;
@@ -624,6 +636,7 @@ public class Options {
                      else {
                         testScriptName = args[++i];
                      }
+                     runTests = true;
                   }
                   else
                      Options.usage("Unrecognized option: " + opt, args);

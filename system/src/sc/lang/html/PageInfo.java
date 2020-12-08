@@ -38,6 +38,10 @@ public class PageInfo {
    List<Object> urlParts; // List of String, URLParamProperty, and OptionalParamParameter (which itself has an elements list0
    List<String> constructorProps;
    String constructorPropSig;
+   /** Names of query parameters to propagate onto relative links from the current page. If any of these parameters
+    * are set in the page's URL, any dynamic URL changes with window.location.href = "..." or any getRe */
+   // TODO: implement this? We already propagate the scopeContextName parameter
+   //List<String> propagateQueryParams;
 
    public String toString() {
       if (pattern == null)

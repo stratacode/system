@@ -114,7 +114,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
    // Are we in the midst of a slash-star style comment - i.e. ignoring all lines
    boolean inBlockComment = false;
 
-   public boolean exitOnError = true;
+   public boolean exitOnError = false;
    public boolean noPrompt = false;
 
    public List<Layer> typeLayerStack = new ArrayList<Layer>();
@@ -309,9 +309,12 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
             Object errSt = result;
             if (errSt instanceof List && ((List) errSt).size() == 1)
                errSt = ((List) errSt).get(0);
-            System.err.println("Script error: " + exc.toString() + " for statement: " + errSt);
-            if (system.options.verbose)
+            if (system.options.verbose) {
+               System.err.println("Script error: " + exc.toString() + " for statement: " + errSt + " with trace: ");
                exc.printStackTrace();
+            }
+            else
+               System.err.println("Script error: " + exc.toString() + " for statement: " + errSt + " set system.options.verbose = true for trace.");
             if (exitOnError) {
                System.err.println("Exiting -1 on error because cmd.exitOnError configured as true");
                System.exit(-1);
@@ -605,21 +608,38 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                            break;
                      }
                   }
-                  if (absType != null) {
-                     Layer typeLayer = ModelUtil.getLayerForType(system, absType);
-                     JavaModel absModel = null;
-                     if (absType instanceof BodyTypeDeclaration)
-                        absModel = ((BodyTypeDeclaration) absType).getJavaModel();
-                     if (absModel != null)
-                        absModel.commandInterpreter = this;
-                     // Unless we are creating a new 'modify' for this type, we want to change the current layer to match the type, or else this type will disappear.
-                     if (typeLayer != null && typeLayer != currentLayer && (!edit || currentLayer == null || (!StringUtil.equalStrings(typeLayer.packagePrefix, currentLayer.packagePrefix) && !StringUtil.isEmpty(currentLayer.packagePrefix)))) {
-                        setCurrentLayer(typeLayer);
-                        layer = typeLayer;
-                        if (!edit)
-                           pendingModel = absModel;
-                        model = getModel();
+               }
+               if (absType != null) {
+                  Layer typeLayer = ModelUtil.getLayerForType(system, absType);
+                  JavaModel absModel = null;
+                  if (absType instanceof BodyTypeDeclaration)
+                     absModel = ((BodyTypeDeclaration) absType).getJavaModel();
+                  if (absModel != null)
+                     absModel.commandInterpreter = this;
+                  // Unless we are creating a new 'modify' for this type, we want to change the current layer to match the type, or else this type will disappear.
+                  if (typeLayer != null && typeLayer != currentLayer && (!edit || currentLayer == null || (!StringUtil.equalStrings(typeLayer.packagePrefix, currentLayer.packagePrefix) && !StringUtil.isEmpty(currentLayer.packagePrefix)))) {
+                     setCurrentLayer(typeLayer);
+                     layer = typeLayer;
+                     if (!edit)
+                        pendingModel = absModel;
+                     model = getModel();
+                  }
+                  String prefixDir = CTypeUtil.getPackageName(typeName);
+                  if (prefixDir != null) {
+                     String layerPrefix = layer.packagePrefix;
+                     if (!prefixDir.startsWith(layerPrefix)) {
+                        System.err.println("*** Mismatching layer package and type");
                      }
+                     else {
+                        if (prefixDir.equals(layerPrefix))
+                           prefixDir = null;
+                        else {
+                           prefixDir = prefixDir.substring(layerPrefix.length() + 1);
+                           prefixDir = prefixDir.replace('.', '/');
+                        }
+                        type.typeName = CTypeUtil.getClassName(typeName);
+                     }
+                     path = prefixDir;
                   }
                }
             }

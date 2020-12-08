@@ -1671,11 +1671,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          }
       }
 
-      // Need to fix the CommandInterpreter - it cannot handle empty package names in dialogs
-      //cmd = System.console() != null ? new JLineInterpreter(this) : new CommandInterpreter(this, System.in);
       cmd = new JLineInterpreter(this, consoleDisabled, testInputName);
-      if (options.testVerifyMode)
+      if (options.testVerifyMode) {
          cmd.noPrompt = true; // The prompt can appear at random times in the output so don't show it when in test-verify mode
+         cmd.exitOnError = true;
+      }
    }
 
    public boolean getNeedsSync() {

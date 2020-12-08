@@ -6,6 +6,7 @@ package sc.lang.html;
 
 import sc.bind.Bind;
 import sc.bind.Bindable;
+import sc.js.URLPath;
 import sc.obj.Constant;
 import sc.obj.TypeSettings;
 import sc.type.PTypeUtil;
@@ -29,8 +30,18 @@ public class Location {
    /** These can be changed and are sync'd to the client */
    public String href, pathname, search;
 
+   private Window parentWindow;
+
+   public Location(Window parentWindow) {
+      this.parentWindow = parentWindow;
+   }
+
    @Bindable(manual=true)
    public void setHref(String href) {
+      String scn = parentWindow.scopeContextName;
+      if (scn != null && PTypeUtil.testMode) {
+         href = URLPath.addQueryParam(href, "scopeContextName", scn);
+      }
       this.href = href;
       Bind.sendChangedEvent(this, "href");
    }

@@ -79,8 +79,18 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
          try {
             String nextLine;
             String nextPrompt = inputBytesAvailable() ? "" : prompt();
+            boolean lastStatementError = false;
             while ((nextLine = input.readLine(nextPrompt)) != null) {
                currentLine++;
+               if (lastStatementError && pendingInput.length() > 0 && nextLine.length() == 1) {
+                  if (nextLine.equals("q")) {
+                     System.out.println("*** Incomplete statement canceled");
+                     pendingInput = new StringBuilder();
+                     nextPrompt = inputBytesAvailable() ? "" : prompt();
+                     lastStatementError = false;
+                     continue;
+                  }
+               }
                Object result = null;
                String lastCommand = null;
                // Check the currentWizard to be sure it's still active before parsing the command
@@ -93,8 +103,10 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                }
                doProcessStatement(result, lastCommand);
                if (pendingInput.length() > 0) {
-                  if (!consoleDisabled)
-                     System.out.print("Incomplete statement: ");
+                  if (!consoleDisabled) {
+                     System.out.print("Incomplete statement - q to cancel: ");
+                     lastStatementError = true;
+                  }
                   String remaining = pendingInput.toString();
                   int newLineIx = remaining.lastIndexOf("\n");
                   // Need to take away the newline for the prompt but put in a space in case the newline was the space separator in a command line input dump
@@ -102,7 +114,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                      remaining = remaining.substring(0, newLineIx);
                      remaining = remaining + " ";
                   }
-                  // When we disable the terminal factor, this killLine does not put the string back so we need to keep it in pendingInput
+                  // When using the smart terminal, this killLine does not put the string back so we need to keep it in pendingInput
                   if (!consoleDisabled && smartTerminal) {
                      input.killLine();
                      input.putString(remaining);
@@ -111,6 +123,7 @@ public class JLineInterpreter extends AbstractInterpreter implements Completer {
                   nextPrompt = "";
                }
                else {
+                  lastStatementError = false;
                   // Note: any doLater jobs that we encounter here will not be synchronized with the command that's been run.  They can get here because
                   // pushCurrentScopeContext returns false - i.e. there's no defined scopeContextName like when we start running commands like TestPageLoader.loadAllPages().
                   // It can invalidate scope contexts - for global scope for example which add invokeLater calls that won't then get flushed out in popCurrentScopeCtx.

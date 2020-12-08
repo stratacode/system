@@ -10,7 +10,9 @@ import sc.bind.BindingListener;
 import sc.js.ServerTag;
 import sc.js.ServerTagContext;
 import sc.obj.Constant;
+import sc.obj.CurrentScopeContext;
 import sc.obj.IObjectId;
+import sc.obj.ScopeContext;
 import sc.type.IBeanMapper;
 import sc.type.PTypeUtil;
 
@@ -49,6 +51,9 @@ public class Window implements IObjectId {
    public History history;
 
    @Constant
+   public Screen screen;
+
+   @Constant
    public IPageDispatcher pageDispatcher; /** Used for making remote method calls that target the browser window */
 
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
@@ -59,6 +64,14 @@ public class Window implements IObjectId {
    // TODO - we could have the client set these via an XMLHTTP request but the whole point is to render CSS and HTML
    // up front properly.  We could at least choose different values for different user-agents.
    private int innerWidth = DefaultWidth, innerHeight = DefaultHeight;
+
+   /**
+    * Set for test environments only - specifies the name of a particular context - usually a window that gets forwarded along
+    * links in the page so that we have a way to attach to this flow from test scripts
+    */
+   public String scopeContextName;
+
+   public String origURL;
 
    @Bindable(manual=true)
    public int getInnerWidth() {
@@ -118,7 +131,7 @@ public class Window implements IObjectId {
                win.setDevicePixelRatio(dpr);
          }
       }
-      win.location = new Location();
+      win.location = new Location(win);
       Location loc = win.location;
       if (serverPort == 80) {
          loc.port = "";
@@ -130,6 +143,7 @@ public class Window implements IObjectId {
       }
       loc.hostname = serverName;
       loc.setHref(requestURL);
+      win.origURL = requestURL;
       loc.setPathname(requestURI);
       loc.setSearch(queryStr);
       int hashIx = requestURL.lastIndexOf("#");
@@ -137,13 +151,24 @@ public class Window implements IObjectId {
          loc.hash = requestURL.substring(hashIx+1);
       win.document = win.documentTag = new Document();
       win.history = new History(win);
+      win.screen = new Screen(win);
       return win;
    }
 
    // TODO: do we need to do binding events when this changes from thread-to-thread?  Will anyone cache this value from request to request?
    @Bindable(manual=true)
    public static Window getWindow() {
-      return (Window) PTypeUtil.getThreadLocal("window");
+      Window res = (Window) PTypeUtil.getThreadLocal("window");
+      if (res == null) {
+         CurrentScopeContext curScope = CurrentScopeContext.getThreadScopeContext();
+         if (curScope != null) {
+            ScopeContext winCtx = curScope.getScopeContextByName("window");
+            if (winCtx != null) {
+               return (Window) winCtx.getValue("window");
+            }
+         }
+      }
+      return res;
    }
 
    public static void setWindow(Window window) {
@@ -156,6 +181,9 @@ public class Window implements IObjectId {
 
       ServerTag documentServerTag = document.getServerTagInfo("document");
       stCtx.updateServerTag("document", documentServerTag);
+
+      ServerTag screenServerTag = screen.getServerTagInfo("screen");
+      stCtx.updateServerTag("screen", screenServerTag);
    }
 
    public ServerTag getServerTagInfo(String id) {
