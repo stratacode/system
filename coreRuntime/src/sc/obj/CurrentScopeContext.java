@@ -162,14 +162,16 @@ public class CurrentScopeContext {
     * cmd.scopeContextName or to find the ScopeContext param to DynUtil.invokeRemote.   So far, this is only used in debug mode
     * to make test scripts more flexible in being able to deal with multi-browser window applications.
     */
-   public static void register(String scopeContextName, CurrentScopeContext ctx) {
+   public static CurrentScopeContext register(String scopeContextName, CurrentScopeContext ctx) {
       ctx.scopeContextName = scopeContextName;
+      CurrentScopeContext old;
       synchronized (scopeContextNamesLock) {
          if (scopeContextNames == null)
             scopeContextNames = new HashMap<String,CurrentScopeContext>();
-         scopeContextNames.put(scopeContextName, ctx);
+         old = scopeContextNames.put(scopeContextName, ctx);
          scopeContextNamesLock.notify();
       }
+      return old;
    }
 
    public static CurrentScopeContext get(String scopeContextName) {
