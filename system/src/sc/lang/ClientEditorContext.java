@@ -32,6 +32,8 @@ public abstract class ClientEditorContext {
    ArrayList<BodyTypeDeclaration> currentTypes = new ArrayList<BodyTypeDeclaration>();
    int startTypeIndex = 0;
 
+   ArrayList<String> currentPaths = new ArrayList<String>();
+
    boolean currentModelStale = false;
 
    public Layer currentLayer;

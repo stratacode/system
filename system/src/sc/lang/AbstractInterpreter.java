@@ -560,6 +560,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          BodyTypeDeclaration parentType = getCurrentType(false);
          Layer layer = currentLayer;
          Layer origLayer = layer;
+         String origPath = path;
 
          if (layer == null) {
             System.err.println("Cannot define a type when there is no layer.  Use cmd.createLayer()");
@@ -627,18 +628,17 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                   String prefixDir = CTypeUtil.getPackageName(typeName);
                   if (prefixDir != null) {
                      String layerPrefix = layer.packagePrefix;
+
                      if (!prefixDir.startsWith(layerPrefix)) {
-                        System.err.println("*** Mismatching layer package and type");
+                        prefixDir = CTypeUtil.prefixPath(layerPrefix, prefixDir);
                      }
+                     if (prefixDir.equals(layerPrefix))
+                        prefixDir = null;
                      else {
-                        if (prefixDir.equals(layerPrefix))
-                           prefixDir = null;
-                        else {
-                           prefixDir = prefixDir.substring(layerPrefix.length() + 1);
-                           prefixDir = prefixDir.replace('.', '/');
-                        }
-                        type.typeName = CTypeUtil.getClassName(typeName);
+                        prefixDir = prefixDir.substring(layerPrefix.length() + 1);
+                        prefixDir = prefixDir.replace('.', '/');
                      }
+                     type.typeName = CTypeUtil.getClassName(typeName);
                      path = prefixDir;
                   }
                }
@@ -789,6 +789,7 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          // In case we changed the current layer for the type, keep track of the old one so the EndTypeDeclaration can
          // restore it
          typeLayerStack.add(origLayer);
+         currentPaths.add(origPath);
 
          //System.out.println("*** Added currentType: " + type.typeName + " size=" + currentTypes.size());
 
@@ -1019,6 +1020,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
                      setCurrentLayer(oldLayer);
                   }
                }
+            }
+            int numPaths = currentPaths.size();
+            if (numPaths > 0) {
+               path = currentPaths.get(numPaths - 1);
+               currentPaths.remove(numPaths - 1);
             }
          }
          finally {
