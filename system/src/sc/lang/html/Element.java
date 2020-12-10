@@ -3873,6 +3873,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       addTagAttributes("td", "element", emptyArgs, null);
       addTagAttributes("th", "element", emptyArgs, null);
       addTagAttributes("hr", "element", emptyArgs, null);
+      addTagAttributes("sup", "element", emptyArgs, null);
+      addTagAttributes("sub", "element", emptyArgs, null);
       addTagAttributes("form", "element", new String[] {"action", "method", "onsubmit", "enctype", "accept-charset", "autocomplete", "rel", "target", "name", "novalidate"}, new String[] {"action"});
       addTagAttributes("a", "element", new String[] {"href", "disabled", "tabindex", "download", "target", "hreflang", "media", "rel", "type", "referrerpolicy"}, new String[] {"href"});
       addTagAttributes("script", "element", new String[] {"type", "src", "integrity", "crossorigin", "charset", "async", "defer"}, new String[] {"src"});
