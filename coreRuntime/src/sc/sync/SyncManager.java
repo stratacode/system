@@ -1225,7 +1225,8 @@ public class SyncManager {
             return true;
 
          // For calling remote methods, we need to support objects which are not synchronized - at least calls to rooted objects.  Those are never new anyway.
-         return !isRootedObject(changedObj);
+         //return !isRootedObject(changedObj);
+         return false;
       }
 
       public ScopeContext getScopeContext() {
@@ -2481,7 +2482,14 @@ public class SyncManager {
                   if (inst != null)
                      return inst;
                }
-               return null;
+            }
+            // It's possible that we are resolving a method return reference for a sync object that
+            // has just been deleted by changes in the previous sync - e.g. deleteIcon.click() on an
+            // element of the list.
+            for (SyncLayer syncLayer: changedLayersByGroup.values()) {
+               inst = syncLayer.pendingMethodObjs.get(fullPathName == null ? name : fullPathName);
+               if (inst != null)
+                  return inst;
             }
          }
          finally {

@@ -45,6 +45,7 @@ public class SyncLayer {
    private Map<SyncChange,SyncChange> latestChanges = new HashMap<SyncChange,SyncChange>();
 
    private TreeMap<String, RemoteResult> pendingMethods = new TreeMap<String, RemoteResult>();
+   TreeMap<String, Object> pendingMethodObjs = new TreeMap<String, Object>();
    private ArrayList<RemoteResult> notifyMethods = new ArrayList<RemoteResult>();
 
    public IdentityHashMap<Object, SyncNewObj> pendingNewObjs = null;
@@ -529,9 +530,14 @@ public class SyncLayer {
       RemoteResult res = new RemoteResult();
       res.callId = change.getCallId();
       res.returnType = retType;
+      res.object = obj;
+      res.instName = change.instName;
+
       change.result = res;
 
       pendingMethods.put(res.callId, res);
+      if (obj != null)
+         pendingMethodObjs.put(change.instName, obj);
 
       return res;
    }
@@ -547,6 +553,8 @@ public class SyncLayer {
          return false;
       if (res.returnType != null)
          retValue = SyncHandler.convertRemoteType(retValue, res.returnType);
+      if (res.instName != null)
+         pendingMethodObjs.remove(res.instName);
 
       res.exceptionStr = exceptionStr;
       res.setValue(retValue);

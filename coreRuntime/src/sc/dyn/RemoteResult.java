@@ -35,6 +35,10 @@ public class RemoteResult {
     */
    public IResponseListener postListener;
 
+   public Object object;
+
+   public String instName;
+
    private Object value;
    /** A bindable property you can use to listen to the response value of the method */
    public Object getValue() {
