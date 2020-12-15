@@ -89,6 +89,11 @@ public class Input extends HTMLElement {
       Bind.sendEvent(sc.bind.IListener.VALUE_CHANGED, this, _checkedProp, _checked);
    }
 
+   /** Method implemented on the client only to generate a simulated value change event  */
+   @sc.obj.Exec(clientOnly=true)
+   public void changeValue(String newVal) {
+   }
+
    @sc.obj.EditorSettings(visible=false)
    @Bindable(manual=true) public Event getChangeEvent() {
       return (Event) getDOMEvent(EventType.Change);
