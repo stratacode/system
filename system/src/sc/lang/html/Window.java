@@ -56,6 +56,10 @@ public class Window implements IObjectId {
    @Constant
    public IPageDispatcher pageDispatcher; /** Used for making remote method calls that target the browser window */
 
+   public List<WebCookie> cookiesToSet = null;
+
+   public boolean sessionInvalid = false;
+
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
 
    public static int DefaultWidth = 1100;
@@ -220,5 +224,16 @@ public class Window implements IObjectId {
    @Override
    public String getObjectId() {
       return "window";
+   }
+
+   /** Provides an ability to add a cookie for this window without servlet dependencies */
+   public void addCookie(WebCookie cookie) {
+      if (cookiesToSet == null)
+         cookiesToSet = new ArrayList<WebCookie>();
+      cookiesToSet.add(cookie);
+   }
+
+   public void invalidateSession() {
+      sessionInvalid = true;
    }
 }
