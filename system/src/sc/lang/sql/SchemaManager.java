@@ -52,6 +52,7 @@ public class SchemaManager {
    boolean schemaChanged = false;
 
    public ArrayList<SchemaTypeChange> changedTypes = new ArrayList<SchemaTypeChange>();
+   public ArrayList<SchemaTypeChange> noAlterChangeTypes = new ArrayList<SchemaTypeChange>();
    public ArrayList<SQLFileModel> newModels = new ArrayList<SQLFileModel>();
    public ArrayList<SQLFileModel> conflictModels = new ArrayList<SQLFileModel>();
 
@@ -546,6 +547,7 @@ public class SchemaManager {
                DBUtil.info(change.fromModel.toLanguageString());
                DBUtil.info("---- New DDL: ");
                DBUtil.info(change.toModel.toLanguageString());
+               noAlterChangeTypes.add(change);
                changedTypes.remove(i);
                i--;
             }
@@ -809,11 +811,29 @@ public class SchemaManager {
          }
          String alterSQL = change.alterModel.toLanguageString();
          curVersion.setAlterSQL(alterSQL);
+         DBUtil.verbose("Accepted new schema for type: " + typeName + " with alter script for: " + dataSourceName + " and buildLayer: " + buildLayer);
+         updateDBSchema(updater, typeName, info, newModel, buildLayer);
+      }
+
+      // These are changes to the DDL model that did not generate an alter script. Often, it's the order of the
+      // columns that has changed
+      for (int i = 0; i < noAlterChangeTypes.size(); i++) {
+         SchemaTypeChange change = noAlterChangeTypes.get(i);
+         SQLFileModel newModel = change.toModel;
+         DBSchemaType info = new DBSchemaType();
+         String typeName = change.typeName;
+         info.setTypeName(typeName);
+         DBSchemaVersion curVersion = info.getCurrentVersion();
+         curVersion.setSchemaSQL(newModel.toLanguageString());
+         curVersion.setDateApplied(new Date());
+         curVersion.setAlterSQL("");
+         DBUtil.verbose("Accepted new schema for type: " + typeName + " for: " + dataSourceName + " and buildLayer: " + buildLayer);
          updateDBSchema(updater, typeName, info, newModel, buildLayer);
       }
 
       return true;
    }
+
 
    private void updateDBSchema(ISchemaUpdater updater, String typeName, DBSchemaType info, SQLFileModel newModel, Layer buildLayer) {
       try {
