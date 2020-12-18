@@ -73,6 +73,8 @@ public abstract class SyncDestination {
     * from the server */
    public boolean needsInitSync = false;
 
+   public boolean initSyncPending = false;
+
    /** Are we currently connected to the remote destination?  Set to true after a successful response and to false after a server error */
    private boolean connected = false;
 
@@ -224,6 +226,7 @@ public abstract class SyncDestination {
          needsClearSync = true;
          // Second step - on the next sync, add a parameter to have the server return the new initSync for this page
          needsInitSync = true;
+         initSyncPending = false;
       }
 
       return anyChanges;
@@ -287,10 +290,9 @@ public abstract class SyncDestination {
          SyncManager.setCurrentSyncLayers(syncLayers);
          SyncManager.setSyncState(SyncManager.SyncState.ApplyingChanges);
          try {
-            boolean reinitResponse = needsInitSync;
-            if (reinitResponse) {
+            if (initSyncPending) {
                needsInitSync = false;
-               System.out.println("Applying sync init response after session reset");
+               initSyncPending = false;
             }
             applySyncLayer(responseText, null, null, false, "response");
             if (needsClearSync) {
