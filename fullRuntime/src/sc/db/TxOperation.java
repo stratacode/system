@@ -13,11 +13,15 @@ import java.util.*;
 public abstract class TxOperation {
    DBTransaction transaction;
    public DBObject dbObject;
+   public List<TxOperation> batch;
    public boolean applied = false;
+
+   DBTypeDescriptor dbTypeDesc;
 
    public TxOperation(DBTransaction tx, DBObject dbObject) {
       this.transaction = tx;
       this.dbObject = dbObject;
+      this.dbTypeDesc = dbObject.dbTypeDesc;
    }
 
    public abstract int apply();
@@ -38,12 +42,13 @@ public abstract class TxOperation {
       if (insertTable.isReadOnly())
          return 0;
 
-      DBTypeDescriptor dbTypeDesc = dbObject.dbTypeDesc;
       TableDescriptor primaryTable = dbTypeDesc.primaryTable;
       boolean isPrimary = primaryTable == insertTable;
 
       DBPropertyDescriptor lmtProp = isPrimary ? dbTypeDesc.lastModifiedProperty : null;
       Object lmtValue = null;
+
+      int numExpected = 1;
 
       if (isPrimary) {
          if (!dbObject.isTransient()) {
@@ -96,16 +101,22 @@ public abstract class TxOperation {
       if (nullProps != null)
          throw new IllegalArgumentException("Null id properties for DBObject in insert: " + nullProps);
 
+      int batchSz = batch == null ? 0 : batch.size();
       int idSize = columnNames.size();
-      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols, columnRefTypes, columnPTypes);
+      addColumnsAndValues(dbTypeDesc, insertTable.columns, columnNames, columnTypes, columnValues, dbIdCols, columnRefTypes,
+                          columnPTypes, batchSz > 0);
 
       int numCols = columnNames.size();
 
       // If it's only id columns should we do the insert?
-      if (!insertTable.insertWithNullValues && numCols == idSize)
+      if (!insertTable.insertWithNullValues && numCols == idSize && batchSz == 0)
          return 0;
 
+      ArrayList<List<Object>> batchList = batchSz == 0 ? null : new ArrayList<List<Object>>();
+
+      boolean hasLmt = false;
       if (lmtProp != null && !columnNames.contains(lmtProp.columnName)) {
+         hasLmt = true;
          columnNames.add(lmtProp.columnName);
          columnTypes.add(lmtProp.getDBColumnType());
          columnValues.add(lmtValue = new Date());
@@ -119,7 +130,6 @@ public abstract class TxOperation {
       sb.append("INSERT INTO ");
       DBUtil.appendIdent(sb, null, insertTable.tableName);
 
-      StringBuilder rest = new StringBuilder();
       if (numCols == 0) {
          sb.append(" DEFAULT VALUES");
       }
@@ -136,35 +146,55 @@ public abstract class TxOperation {
          if (logSB != null)
             logSB.append(sb);
 
-         for (int i = 0; i < numCols; i++) {
+         appendColumnValueList(sb, logSB, numCols, columnTypes, columnRefTypes, columnPTypes, columnValues);
+
+         sb.append(")");
+         if (logSB != null)
+            logSB.append(")");
+
+         if (batchSz > 0) {
+
+            numExpected += batchSz;
+            for (int bi = 0; bi < batchSz; bi++) {
+               ArrayList<Object> batchValues = new ArrayList<Object>(numCols);
+               TxOperation batchOp = batch.get(bi);
+               Object batchInst = batchOp.dbObject.getInst();
+               for (int di = 0; di < idCols.size(); di++) {
+                  IdPropertyDescriptor idCol = idCols.get(di);
+                  if (!isPrimary || !idCol.definedByDB) {
+                     IBeanMapper mapper = idCol.getPropertyMapper();
+                     Object val = mapper.getPropertyValue(batchInst, false, false);
+                     batchValues.add(val);
+                  }
+               }
+               addInstValues(dbTypeDesc, batchInst, insertTable.columns, batchValues);
+               sb.append(", (");
+               if (logSB != null)
+                  logSB.append(", (");
+               if (hasLmt)
+                  batchValues.add(lmtValue);
+               appendColumnValueList(sb, logSB, numCols, columnTypes, columnRefTypes, columnPTypes, batchValues);
+               sb.append(")");
+               if (logSB != null)
+                  logSB.append(")");
+               batchList.add(batchValues);
+            }
+         }
+      }
+
+      if (dbIdCols != null) {
+         sb.append(" RETURNING ");
+         if (logSB != null)
+            logSB.append(" RETURNING ");
+         for (int i = 0; i < dbIdCols.size(); i++) {
             if (i != 0) {
                sb.append(", ");
                if (logSB != null)
                   logSB.append(", ");
             }
-            sb.append("?");
-            if (logSB != null) {
-               DBTypeDescriptor colRefType = columnRefTypes.get(i);
-               DBColumnType colType = columnTypes.get(i);
-               if (colRefType != null && colType != DBColumnType.Json)
-                  colType = DBColumnType.LongId;
-               logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType, columnPTypes.get(i)));
-            }
-         }
-         rest.append(")");
-      }
-
-      if (dbIdCols != null) {
-         rest.append(" RETURNING ");
-         for (int i = 0; i < dbIdCols.size(); i++) {
-            if (i != 0)
-               rest.append(", ");
-            DBUtil.appendIdent(rest, null, dbIdCols.get(i).columnName);
+            DBUtil.appendIdent(sb, logSB, dbIdCols.get(i).columnName);
          }
       }
-      sb.append(rest);
-      if (logSB != null)
-         logSB.append(rest);
 
       DBDataSource ds = dbTypeDesc.getDataSource();
       boolean addToDB = !dbTypeDesc.dbReadOnly;
@@ -177,8 +207,17 @@ public abstract class TxOperation {
             String statementStr = sb.toString();
             st = conn.prepareStatement(statementStr);
 
+            int stIx = 1;
             for (int i = 0; i < numCols; i++) {
-               DBUtil.setStatementValue(st, i+1, columnTypes.get(i), columnValues.get(i), columnPTypes.get(i));
+               DBUtil.setStatementValue(st, stIx++, columnTypes.get(i), columnValues.get(i), columnPTypes.get(i));
+            }
+            if (batchSz > 0) {
+               for (int bi = 0; bi < batchSz; bi++) {
+                  List<Object> batchValues = batchList.get(bi);
+                  for (int i = 0; i < numCols; i++) {
+                     DBUtil.setStatementValue(st, stIx++, columnTypes.get(i), batchValues.get(i), columnPTypes.get(i));
+                  }
+               }
             }
 
             if (dbIdCols != null) {
@@ -199,6 +238,24 @@ public abstract class TxOperation {
                      logSB.append(id);
                   }
                }
+               for (int bi = 0; bi < batchSz; bi++) {
+                  TxOperation batchOp = batch.get(bi);
+                  Object batchInst = batchOp.dbObject.getInst();
+                  if (!rs.next()) {
+                     throw new IllegalArgumentException("Missing returned id for batch element: " + bi);
+                  }
+                  for (int i = 0; i < dbIdCols.size(); i++) {
+                     DBPropertyDescriptor dbIdCol = dbIdCols.get(i);
+                     IBeanMapper mapper = dbIdCol.getPropertyMapper();
+                     Object id = DBUtil.getResultSetByIndex(rs, i+1, dbIdCol);
+                     mapper.setPropertyValue(batchInst, id);
+
+                     if (logSB != null) {
+                        logSB.append(", ");
+                        logSB.append(id);
+                     }
+                  }
+               }
 
                if (logSB != null) {
                   DBUtil.info(logSB);
@@ -206,12 +263,16 @@ public abstract class TxOperation {
             }
             else {
                int numInserted = st.executeUpdate();
-               if (numInserted != 1)
-                 DBUtil.error("Insert of one row returns: " + numInserted + " rows inserted");
+               if (numInserted != numExpected)
+                 DBUtil.error("Insert of " + numExpected + " rows returns: " + numInserted + " rows inserted");
 
                if (logSB != null) {
-                  if (numInserted == 1)
-                     logSB.append(" -> inserted one row");
+                  if (numInserted == numExpected) {
+                     if (numExpected == 1)
+                        logSB.append(" -> inserted one row");
+                     else
+                        logSB.append(" -> inserted " + numExpected + " rows");
+                  }
                   else
                      logSB.append(" -> updated " + numInserted + " rows") ;
 
@@ -257,7 +318,29 @@ public abstract class TxOperation {
       finally {
          DBUtil.close(null, st, rs);
       }
-      return 1;
+      return numExpected;
+   }
+
+   private void appendColumnValueList(StringBuilder sb, StringBuilder logSB, int numCols,
+                                      List<DBColumnType> columnTypes, List<DBTypeDescriptor> columnRefTypes,
+                                      List<Object> columnPTypes, List<Object> columnValues) {
+      for (int i = 0; i < numCols; i++) {
+         if (i != 0) {
+            sb.append(", ");
+            if (logSB != null)
+               logSB.append(", ");
+         }
+         sb.append("?");
+         if (logSB != null) {
+            DBTypeDescriptor colRefType = columnRefTypes.get(i);
+            DBColumnType colType = columnTypes.get(i);
+            if (colRefType != null && colType != DBColumnType.Json)
+               colType = DBColumnType.LongId;
+            if (i == columnValues.size() || i == columnPTypes.size())
+               System.out.println("***");
+            logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType, columnPTypes.get(i)));
+         }
+      }
    }
 
    protected int doMultiDelete(TableDescriptor deleteTable, List<IDBObject> toRemove, boolean removeCurrent, boolean removeAll) {
@@ -693,7 +776,8 @@ public abstract class TxOperation {
 
    private void addColumnsAndValues(DBTypeDescriptor dbTypeDesc, List<? extends DBPropertyDescriptor> cols,
                                     ArrayList<String> columnNames, ArrayList<DBColumnType> columnTypes, ArrayList<Object> columnValues,
-                                    List<DBPropertyDescriptor> dbReturnCols, List<DBTypeDescriptor> columnRefTypes, List<Object> columnPTypes) {
+                                    List<DBPropertyDescriptor> dbReturnCols, List<DBTypeDescriptor> columnRefTypes, List<Object> columnPTypes,
+                                    boolean isBatchInsert) {
       Object inst = dbObject.getInst();
 
       Map<String,Object> tableDynProps = null;
@@ -722,7 +806,7 @@ public abstract class TxOperation {
          else {
             int numCols = col.getNumColumns();
             if (numCols == 1) {
-               if (val != null) {
+               if (val != null || isBatchInsert) {
                   DBColumnType colType;
                   if (col.refDBTypeDesc != null && !col.isJsonReference()) {
                      val = col.refDBTypeDesc.getIdColumnValue(val, 0);
@@ -765,6 +849,54 @@ public abstract class TxOperation {
          if (columnRefTypes != null)
             columnRefTypes.add(null);
          columnPTypes.add(null);
+      }
+   }
+
+   private void addInstValues(DBTypeDescriptor dbTypeDesc, Object inst, List<? extends DBPropertyDescriptor> cols, ArrayList<Object> columnValues) {
+      Map<String,Object> tableDynProps = null;
+
+      for (DBPropertyDescriptor col:cols) {
+         Object val;
+         if (col.typeIdProperty) {
+            int typeId = dbTypeDesc.typeId;
+            val = typeId;
+            if (typeId == DBTypeDescriptor.DBAbstractTypeId)
+               throw new IllegalArgumentException("Unable to insert instance of abstract type: " + dbTypeDesc);
+         }
+         else {
+            if (col.ownedByOtherType(dbTypeDesc))
+               continue;
+            IBeanMapper mapper = col.getPropertyMapper();
+            val = mapper.getPropertyValue(inst, false, false);
+         }
+         if (col.dynColumn) {
+            if (val != null) {
+               if (tableDynProps == null)
+                  tableDynProps = new HashMap<String,Object>();
+               tableDynProps.put(col.propertyName, val);
+            }
+         }
+         else {
+            int numCols = col.getNumColumns();
+            if (numCols == 1) {
+               if (col.refDBTypeDesc != null && !col.isJsonReference()) {
+                  val = val == null ? null : col.refDBTypeDesc.getIdColumnValue(val, 0);
+               }
+               columnValues.add(val);
+            }
+            else {
+               if (col.refDBTypeDesc != null) {
+                  for (int ci = 0; ci < numCols; ci++) {
+                     columnValues.add(col.refDBTypeDesc.getIdColumnValue(val, ci));
+                  }
+               }
+               else
+                  System.err.println("*** Multi column key with no way to map columns");
+            }
+         }
+      }
+      if (tableDynProps != null) {
+         columnValues.add(tableDynProps);
       }
    }
 
@@ -1037,5 +1169,23 @@ public abstract class TxOperation {
    }
 
    public abstract Map<String, String> validate();
+
+   public abstract boolean supportsBatch();
+
+   private static final int BatchSize = 1000;
+
+   public boolean addToBatch(TxOperation nextOp) {
+      if (nextOp.getClass() == getClass() && dbTypeDesc == nextOp.dbTypeDesc && supportsBatch()) {
+         if (batch == null)
+            batch = new ArrayList<TxOperation>();
+         else if (batch.size() >= BatchSize)
+            return false;
+
+         batch.add(nextOp);
+         return true;
+      }
+      return false;
+   }
+
 }
 

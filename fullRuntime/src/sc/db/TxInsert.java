@@ -56,4 +56,10 @@ public class TxInsert extends TxOperation {
       }
       return res;
    }
+
+   public boolean supportsBatch() {
+      if (dbTypeDesc.multiTables != null && dbTypeDesc.multiTables.size() > 0)
+         return false; // TODO: the doMultiInsert method needs to support the 'batch' list to append all of the batched rows
+      return true;
+   }
 }

@@ -925,6 +925,8 @@ public class DBUtil {
       }
    }
 
+   private final static int BatchSize = 1000;
+
    public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, List<String> properties) {
       int lineCt = 0;
       File file = new File(fileName);
@@ -937,6 +939,8 @@ public class DBUtil {
          FileInputStream fileInput = new FileInputStream(file);
          reader = new BufferedReader(new InputStreamReader(fileInput, "UTF-8"));
          String nextLine;
+         DBTransaction curTx = DBTransaction.getOrCreate();
+         ArrayList<IDBObject> resInsts = new ArrayList<IDBObject>();
          while ((nextLine = reader.readLine()) != null) {
             lineCt++;
             String[] values = StringUtil.split(nextLine, separator);
@@ -947,7 +951,7 @@ public class DBUtil {
 
             if (headerRow && lineCt == 1) {
                StringBuilder sb = new StringBuilder();
-               sb.append("*** Importing cvs file: " + fileName + " with columns: ");
+               sb.append("*** Importing csv file: " + fileName + " with columns: ");
                for (int i = 0; i < values.length; i++) {
                   if (i != 0)
                      sb.append(", ");
@@ -981,10 +985,22 @@ public class DBUtil {
                   val = propDesc.stringToValue(strVal);
                ((DBObject) obj.getDBObject()).setPropertyInPath(propName, val);
             }
-            obj.dbInsert(false);
+            // Queuing here allows the transaction to batch up the inserts
+            obj.dbInsert(true);
 
-            DynUtil.dispose(obj);
+            resInsts.add(obj);
+
+            if (resInsts.size() >= BatchSize) {
+               curTx.commit();
+               for (IDBObject resInst:resInsts)
+                  DynUtil.dispose(resInst);
+               resInsts.clear();
+            }
          }
+
+         curTx.commit();
+         for (IDBObject resInst:resInsts)
+            DynUtil.dispose(resInst);
       }
       catch (IOException exc) {
          throw new IllegalArgumentException(exc.toString());

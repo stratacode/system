@@ -33,4 +33,8 @@ public class TxDelete extends VersionedOperation {
    public Map<String,String> validate() {
       return null;
    }
+
+   public boolean supportsBatch() {
+      return false;
+   }
 }

@@ -79,4 +79,8 @@ class TxListUpdate<E extends IDBObject> extends TxOperation {
    public Map<String,String> validate() {
       return null;
    }
+
+   public boolean supportsBatch() {
+      return false;
+   }
 }

@@ -292,4 +292,8 @@ public class TxUpdate extends VersionedOperation {
       }
       return res;
    }
+
+   public boolean supportsBatch() {
+      return false;
+   }
 }

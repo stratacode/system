@@ -95,11 +95,26 @@ public class DBTransaction {
          operationList = null;
          operationIndex = null;
 
-         for (TxOperation op:toApply) {
+         int numOps = toApply.size();
+         for (int i = 0; i < numOps; ) {
+            TxOperation op = toApply.get(i);
+            int nextIx = i+1;
+            while (nextIx < numOps) {
+               TxOperation nextOp = toApply.get(nextIx);
+               if (op.addToBatch(nextOp)) {
+                  if (!nextOp.removeOp())
+                     DBUtil.error("Attempt to remove batched op failed");
+                  toApply.remove(nextIx);
+                  numOps--;
+               }
+               else
+                  break;
+            }
             if (op.removeOp())
                op.apply();
             else
                DBUtil.error("Attempt to flush operation not found in pendingOps for DBObject");
+            i = nextIx;
          }
       }
    }
@@ -129,7 +144,6 @@ public class DBTransaction {
             }
          }
       }
-      close();
    }
 
    /** Flush pending operations and commit any transactions */
@@ -148,7 +162,6 @@ public class DBTransaction {
             }
          }
       }
-      close();
    }
 
    public void close() {
