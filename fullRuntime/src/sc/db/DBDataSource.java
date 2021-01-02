@@ -4,6 +4,8 @@ import sc.type.PTypeUtil;
 
 import javax.naming.InitialContext;
 import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.List;
 
 /** Used for defining data sources in the layer definition file, as well as for data source config at runtime if necessary.  */
 public class DBDataSource {
@@ -41,6 +43,10 @@ public class DBDataSource {
       schemaReady = val;
       if (val) {
          notifyAll();
+         if (toRunWhenReady != null) {
+            for (Runnable r:toRunWhenReady)
+               r.run();
+         }
       }
    }
 
@@ -55,6 +61,14 @@ public class DBDataSource {
             }
          }
       }
+   }
+
+   List<Runnable> toRunWhenReady = null;
+
+   public void runWhenReady(Runnable r) {
+      if (toRunWhenReady == null)
+         toRunWhenReady = new ArrayList<Runnable>();
+      toRunWhenReady.add(r);
    }
 
    public String toDataSourceString(String defaultProvider) {
