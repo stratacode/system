@@ -15,13 +15,13 @@ import java.util.*;
 /** Lightweight JSON formatter and parser built on the sc framework, supporting dynamic properties and types. */
 public class JSON {
 
-   public static Object parseJSON(String jsonStr) {
-      JSONParser parser = new JSONParser(jsonStr, null);
-      return parser.parseJSONValue();
+   public static Object parseJSON(Object propertyType, String jsonStr, JSONResolver resolver) {
+      JSONParser parser = new JSONParser(jsonStr, resolver);
+      return parser.parseJSONValue(propertyType);
    }
 
    public static Object toObject(Object propertyType, String jsonStr, JSONResolver resolver) {
-      Object value = parseJSON(jsonStr);
+      Object value = parseJSON(propertyType, jsonStr, resolver);
       if (propertyType == null)
          return value;
       return convertTo(propertyType, value, resolver);

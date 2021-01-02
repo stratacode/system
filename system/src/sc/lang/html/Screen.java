@@ -83,5 +83,8 @@ public class Screen implements IObjectId {
    public void setHeight(int h) {
       this.height = h;
       Bind.sendChange(this, heightProp, h);
+      if (window != null) {
+         window.screenSizeChanged();
+      }
    }
 }

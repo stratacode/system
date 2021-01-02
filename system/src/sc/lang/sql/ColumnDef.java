@@ -1,6 +1,7 @@
 package sc.lang.sql;
 
 import sc.db.ColumnInfo;
+import sc.db.DBUtil;
 import sc.util.StringUtil;
 
 import java.sql.Types;
@@ -105,7 +106,7 @@ public class ColumnDef extends TableDef {
             diffs.colType = columnType.getJDBCType();
 
             diffs.diffMessage = new StringBuilder("Mismatching column types - required: " + columnType.getIdentifier() + " database has: " +
-                                                   SQLDataType.getNameForJDBCType(diffs.colType));
+                                                   DBUtil.getNameForJDBCType(diffs.colType));
          }
       }
       return null;

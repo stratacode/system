@@ -1914,8 +1914,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       else if (pnode instanceof BlockStatement)
          return null;
       if (pnode == null)
-         return null;
-      throw new UnsupportedOperationException();
+         return null; // TODO: return typeName here?
+      System.err.println("*** Unrecognized type of parent node: " + pnode.getClass());
+      return typeName;
    }
 
    public Definition modifyDefinition(BodyTypeDeclaration base, boolean doMerge, boolean inTransformed) {

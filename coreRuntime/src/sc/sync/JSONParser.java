@@ -4,6 +4,7 @@
 
 package sc.sync;
 
+import sc.dyn.DynUtil;
 import sc.type.CTypeUtil;
 import sc.util.BArrayList;
 import sc.util.BHashMap;
@@ -81,12 +82,12 @@ public class JSONParser {
 
    /** The JSON format does not natively support references so when JSONDeserializer is present,
     *  use a string with a special prefix 'ref:'.  This also allows null */
-   public Object parseRefOrString() {
+   public Object parseRefOrString(Object resultType) {
       CharSequence val = parseString(true);
       int len;
       if (resolver != null && val != null && (len = val.length()) > 4) {
          if (isRefPrefix(val, 0)) {
-            return resolveRefString(val, len);
+            return resolveRefString(val, len, resultType);
          }
          // When the string value starts with 'ref:' we insert a \ as the first char so just need to strip this off.
          else if (val.charAt(0) == '\\' && len > 5 && isRefPrefix(val, 1))
@@ -97,11 +98,11 @@ public class JSONParser {
       return val;
    }
 
-   Object resolveRefString(CharSequence val, int valLen) {
+   Object resolveRefString(CharSequence val, int valLen, Object resultType) {
       String objName = val.subSequence(4, valLen).toString();
       // For sync, this will be JSONDeserializer that resolves named object references in the sync stream
       // For DB types it will resolve a reference to either DB object or a rooted object in the tree
-      Object obj = resolver.resolveRef(objName, null);
+      Object obj = resolver.resolveRef(objName, resultType);
       if (obj == null) {
          System.err.println("No object: " + objName + " for reference in JSON: " + this);
       }
@@ -138,7 +139,7 @@ public class JSONParser {
             if (name == null) {
                throw new IllegalArgumentException("Expected string name value at: " + this);
             }
-            Object val = parseJSONValue();
+            Object val = parseJSONValue(null);
 
             map.put(name, val);
             first = false;
@@ -148,7 +149,7 @@ public class JSONParser {
       throw new IllegalArgumentException("Expected object definition at: " + this);
    }
 
-   public List parseArray() {
+   public List parseArray(Object resultType) {
       if (parseCharToken('[')) {
          BArrayList res = new BArrayList();
 
@@ -157,7 +158,8 @@ public class JSONParser {
             if (!first)
                expect(",");
             first = false;
-            Object val = parseJSONValue();
+            Object compType = resultType == null ? null : DynUtil.getComponentType(resultType);
+            Object val = parseJSONValue(compType);
             res.add(val);
          }
          return res;
@@ -165,16 +167,16 @@ public class JSONParser {
       throw new IllegalArgumentException("Expected JSON array at: " + this);
    }
 
-   public Object parseJSONValue() {
+   public Object parseJSONValue(Object resultType) {
       skipWhitespace();
       char nextChar = input.charAt(curPos);
       switch (nextChar) {
          case '{':
             return parseObject();
          case '[':
-            return parseArray();
+            return parseArray(resultType);
          case '"':
-            return parseRefOrString();
+            return parseRefOrString(resultType);
          case 't':
             expect("true");
             return Boolean.TRUE;

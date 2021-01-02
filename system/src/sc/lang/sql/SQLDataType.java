@@ -75,6 +75,8 @@ public class SQLDataType extends SQLParamType {
       else if (typeName.equalsIgnoreCase("date") || typeName.equalsIgnoreCase("time") ||
                typeName.equalsIgnoreCase("datetime") || typeName.equals("timestamp"))
          return "java.util.Date";
+      else if (typeName.equalsIgnoreCase("cidr") || typeName.equalsIgnoreCase("inet"))
+         return "String";
       return null;
    }
 
@@ -115,38 +117,6 @@ public class SQLDataType extends SQLParamType {
               typeName.equalsIgnoreCase("datetime") || typeName.equals("timestamp"))
          return Types.DATE;
       return Types.OTHER;
-   }
-
-   /**
-    * TODO: this is for debugging only right now - it seems like we lose info from the schema to the metadata so this helps
-    * translate what the metadata is expressing about the data type
-    */
-   public static String getNameForJDBCType(int colType) {
-      switch (colType) {
-         case Types.VARCHAR:
-            return "text";
-         case Types.INTEGER:
-            return "integer";
-         case Types.BIGINT:
-            return "bigint";
-         case Types.TINYINT:
-            return "tinyint";
-         case Types.SMALLINT:
-            return "smallint";
-         case Types.FLOAT:
-            return "float";
-         case Types.DOUBLE:
-            return "double";
-         case Types.BOOLEAN:
-         case Types.BIT:
-            return "bit";
-         case Types.DATE:
-            return "timestamp";
-         case Types.OTHER:
-            return "other";
-         default:
-            return "<missing-name-for-type:" + colType + ">";
-      }
    }
 
    public DBColumnType getDBColumnType() {

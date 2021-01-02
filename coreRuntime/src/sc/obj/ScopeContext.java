@@ -82,7 +82,7 @@ public abstract class ScopeContext {
          destroyListener.scopeDestroyed(this);
       if (parentContexts != null) {
          for (ScopeContext par:parentContexts) {
-            if (fromParent != par && !par.removeChildContext(this))
+            if (fromParent != par && !par.destroyed && !par.removeChildContext(this))
                System.err.println("*** Failed to remove child context");
          }
       }

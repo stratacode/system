@@ -10,4 +10,10 @@ public class IndexColumn extends BaseIndexColumn {
       res.columnName = SQLIdentifier.create(columnName);
       return res;
    }
+
+   public String toString() {
+      if (columnName == null)
+         return "<null index column name>";
+      return columnName.getIdentifier();
+   }
 }

@@ -250,7 +250,7 @@ public class SQLFileModel extends SCModel {
       return null;
    }
 
-   public void replaceCommand(SQLCommand newCmd) {
+   public void addOrReplaceCommand(SQLCommand newCmd) {
       if (sqlCommands == null) {
          addCommand(newCmd);
          return;
@@ -270,6 +270,7 @@ public class SQLFileModel extends SCModel {
             }
          }
       }
+      addCommand(newCmd);
    }
 
    public void addCreateTable(TableDescriptor tableDesc) {

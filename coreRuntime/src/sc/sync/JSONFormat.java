@@ -59,7 +59,7 @@ public class JSONFormat extends SerializerFormat {
       newCmd("new") {
          // { "new": "objName", "ext": "typeName", "sub": [ props + subObjs ]
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            List res = dser.parser.parseArray();
+            List res = dser.parser.parseArray(null);
             if (res != null && res.size() == 3) {
                String objName = dser.acceptString(res.get(0), false);
                String extTypeName = dser.acceptString(res.get(1), false);
@@ -96,7 +96,7 @@ public class JSONFormat extends SerializerFormat {
       methReturn {
          public void apply(JSONDeserializer dser, boolean topLevel) {
             // Method return value comes first
-            Object returnValue = dser.parser.parseJSONValue();
+            Object returnValue = dser.parser.parseJSONValue(null);
             dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.callId.name());
             CharSequence callIdVal = dser.parser.parseString(false);
             dser.parser.expectNextName(JSONSerializer.MethodReturnArgs.retType.name());
@@ -126,7 +126,7 @@ public class JSONFormat extends SerializerFormat {
       cn {
          // { "cn": "oldName", "newName": "newName"}
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            Object oldName = dser.parser.parseJSONValue();
+            Object oldName = dser.parser.parseJSONValue(null);
             dser.parser.expectNextName("newName");
             CharSequence newName = dser.parser.parseString(false);
             dser.receiveNameChange(oldName.toString(), newName.toString());
@@ -135,7 +135,7 @@ public class JSONFormat extends SerializerFormat {
       nc {
          // { "cn": "oldName", "newName": "newName"}
          public void apply(JSONDeserializer dser, boolean topLevel) {
-            Object oldName = dser.parser.parseJSONValue();
+            Object oldName = dser.parser.parseJSONValue(null);
             dser.parser.expectNextName("newName");
             CharSequence newName = dser.parser.parseString(false);
             dser.nameChangeAck(oldName.toString(), newName.toString());

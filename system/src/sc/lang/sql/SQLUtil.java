@@ -65,7 +65,7 @@ public class SQLUtil {
             }
          }
          if (dbTypeDesc.schemaSQL != null) {
-            Object schemaSQLRes = SQLLanguage.getSCLanguage().parseString(dbTypeDesc.schemaSQL);
+            Object schemaSQLRes = SQLLanguage.getSQLLanguage().parseString(dbTypeDesc.schemaSQL);
             if (schemaSQLRes instanceof ParseError) {
                fromModel.displayError("SchemaSQL parse error: " + schemaSQLRes);
             }
@@ -73,7 +73,7 @@ public class SQLUtil {
                SQLFileModel schemaSQLCmds = (SQLFileModel) ParseUtil.nodeToSemanticValue(schemaSQLRes);
                if (schemaSQLCmds.sqlCommands != null) {
                   for (SQLCommand newCmd:schemaSQLCmds.sqlCommands) {
-                     res.replaceCommand(newCmd);
+                     res.addOrReplaceCommand(newCmd);
                   }
                }
             }

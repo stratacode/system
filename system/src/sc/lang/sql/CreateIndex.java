@@ -34,14 +34,63 @@ public class CreateIndex extends SQLCommand {
       return false;
    }
 
+   private String getColumnNames() {
+      if (indexColumns == null || indexColumns.size() == 0)
+         return "_noCol";
+      BaseIndexColumn ic = indexColumns.get(0);
+      if (ic instanceof IndexColumn)
+         return ((IndexColumn) ic).columnName.getIdentifier();
+      return "_exprIndex"; // TODO what does postgres do for the index name in this case?
+   }
+
    public SQLCommand getDropCommand() {
       DropIndex dt = new DropIndex();
       dt.indexNames = new SemanticNodeList<SQLIdentifier>();
-      dt.indexNames.add((SQLIdentifier) indexName.deepCopy(ISemanticNode.CopyNormal, null));
+      SQLIdentifier idxName = indexName;
+      if (idxName == null) {
+         idxName = SQLIdentifier.create(getDefaultIndexName());
+      }
+      dt.indexNames.add((SQLIdentifier) idxName.deepCopy(ISemanticNode.CopyNormal, null));
       return dt;
    }
 
+   private String getDefaultIndexName() {
+      return tableName + "_" + getColumnNames() + "_idx";
+   }
+
    public String getIdentifier() {
+      if (indexName == null) {
+         return getDefaultIndexName();
+      }
       return indexName.getIdentifier();
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("CREATE ");
+      if (unique)
+         sb.append("UNIQUE ");
+      sb.append("INDEX ");
+      if (concurrently)
+         sb.append("CONCURRENTLY ");
+      if (indexName != null)
+         sb.append(indexName + " ");
+      sb.append("ON ");
+      sb.append(tableName);
+      sb.append(" ");
+      if (usingMethod != null) {
+         sb.append("USING ");
+         sb.append(usingMethod);
+      }
+      if (indexColumns != null) {
+         sb.append("(");
+         for (int i = 0; i < indexColumns.size(); i++) {
+            if (i != 0)
+               sb.append(", ");
+            sb.append(indexColumns.get(i));
+         }
+         sb.append(")");
+      }
+      return sb.toString();
    }
 }

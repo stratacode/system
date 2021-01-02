@@ -5,7 +5,7 @@ import sc.dyn.DynUtil;
 import java.sql.Types;
 
 public enum DBColumnType {
-   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId, Numeric, EnumInt, EnumDB, ByteArray;
+   Int, Long, String, Float, Double, Boolean, Json, Reference, Date, LongId, Numeric, EnumInt, EnumDB, ByteArray, Inet, Cidr;
 
    public static DBColumnType fromJavaType(Object propertyType) {
       if (propertyType == java.lang.Integer.class || propertyType == java.lang.Integer.TYPE) {
@@ -61,6 +61,8 @@ public enum DBColumnType {
             return Types.BIT;
          case Json:
          case Reference:
+         case Inet:
+         case Cidr:
             return Types.OTHER;
          case Date:
             return Types.TIMESTAMP;
@@ -102,6 +104,10 @@ public enum DBColumnType {
          return Json;
       else if (columnType.equalsIgnoreCase("bytea"))
          return ByteArray;
+      else if (columnType.equalsIgnoreCase("inet"))
+         return Inet;
+      else if (columnType.equalsIgnoreCase("cidr"))
+         return Cidr;
       return null;
    }
 }

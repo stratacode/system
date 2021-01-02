@@ -60,6 +60,10 @@ public class GlobalScopeDefinition extends ScopeDefinition {
       return globalContext;
    }
 
+   public static GlobalScopeContext getGlobalScope() {
+      return getGlobalScopeDefinition().globalContext;
+   }
+
    // Drag in the IObjectId class into the JS runtime.  Probably can remove this at some point as eventually someone will add a reference... or fix the bug where we look for JSSettings in src that's imported from a layer definition file.
    IObjectId getDummyObjectId() {
       return null;

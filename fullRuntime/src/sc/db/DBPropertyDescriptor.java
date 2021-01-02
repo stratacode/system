@@ -548,8 +548,19 @@ public class DBPropertyDescriptor {
          return DBColumnType.Reference;
       if (typeIdProperty)
          return DBColumnType.Int;
+      DBColumnType colBasedColType = null;
+      if (columnType != null) {
+         colBasedColType = DBColumnType.fromColumnType(columnType);
+      }
       Object propertyType = getPropertyMapper().getPropertyType();
       DBColumnType res = DBColumnType.fromJavaType(propertyType);
+      if (colBasedColType != null && colBasedColType != res) {
+         if (res == DBColumnType.EnumInt)
+            return res;
+         //if (res != null)
+         //   System.out.println("***");
+         return colBasedColType;
+      }
       // TODO: should we have an annotation for this and print an error if it's not set?  Not all objects can be converted
       // to JSON
       if (res == null)

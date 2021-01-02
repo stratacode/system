@@ -10,44 +10,23 @@ import java.util.List;
 import java.util.Map;
 
 public class UserAgentInfo implements Cloneable {
-   private String pattern;
-   private Pattern patternImpl;
-   private Parselet patternParselet;
-
+   public String userAgent;
    public String platform;
    public ArrayList<UserAgentExtension> extensions;
 
    public boolean isBrowser = false;
+   public boolean isTablet = false;
    public boolean isRobot = false;
 
-   public void init() {
-      patternImpl = Pattern.initURLPattern(UserAgentInfo.class, pattern);
-      patternParselet = patternImpl.getParselet(URLPatternLanguage.getURLPatternLanguage(), UserAgentInfo.class);
-   }
+   public String browser;
+   public String browserVersion;
+   public String osName;
 
    public static List<String> mobilePlatforms = new ArrayList<String>();
    {
       mobilePlatforms.add("iPhone");
       mobilePlatforms.add("Android");
       mobilePlatforms.add("Mobile");
-   }
-
-   public static List<UserAgentInfo> userAgentInfos = new ArrayList<UserAgentInfo>();
-   static {
-      // Any browsers that don't use Mozilla/5.0 now?
-      UserAgentInfo browserInfo = new UserAgentInfo();
-      browserInfo.pattern = "Mozilla/5.0{whiteSpace}({platform=userAgentComment}){whiteSpace}{extensions=userAgentExts}";
-      browserInfo.init();
-      browserInfo.isBrowser = true;
-      userAgentInfos.add(browserInfo);
-
-      // TODO: this is a catchall for now but it would be nice to get some type of data model from the robot
-      // traffic as part of the management UI options
-      browserInfo = new UserAgentInfo();
-      browserInfo.pattern = "{platform=userAgentName}[/{whiteSpace}{versionString}]{whiteSpace}{extensions=userAgentExts}";
-      browserInfo.init();
-      browserInfo.isRobot = true;
-      userAgentInfos.add(browserInfo);
    }
 
    final static Map<String,UserAgentInfo> userAgentInfoCache = new HashMap<String,UserAgentInfo>();
@@ -60,19 +39,26 @@ public class UserAgentInfo implements Cloneable {
          UserAgentInfo cachedInfo = userAgentInfoCache.get(userAgentStr);
          if (cachedInfo == null) {
             URLPatternLanguage lang = URLPatternLanguage.getURLPatternLanguage();
-            for (UserAgentInfo curInfo:userAgentInfos) {
+            for (UserAgentPattern curPattern:UserAgentPattern.userAgentPatterns) {
                // TODO: this doesn't support some of the parselets we use in the user agent parsing but only
                // happens on the server so it's ok to use the parselet: curInfo.patternImpl.matchString(userAgentStr)
-               if (lang.matchString(userAgentStr, curInfo.patternParselet)) {
-                  retInfo = curInfo.clone();
-                  //curInfo.patternImpl.updateInstance(userAgentStr, retInfo);
-                  lang.parseIntoInstance(userAgentStr, curInfo.patternParselet, retInfo);
+               if (lang.matchString(userAgentStr, curPattern.patternParselet)) {
+                  retInfo = curPattern.defaultInfo.clone();
+                  retInfo.userAgent = userAgentStr;
+                  lang.parseIntoInstance(userAgentStr, curPattern.patternParselet, retInfo);
+
+                  retInfo.initValues();
+                  break;
                }
             }
          }
+         else
+            return cachedInfo;
       }
-      if (retInfo == null)
+      if (retInfo == null) {
          retInfo = new UserAgentInfo();
+         retInfo.userAgent = userAgentStr;
+      }
       userAgentInfoCache.put(userAgentStr, retInfo);
       return retInfo;
    }
@@ -86,6 +72,73 @@ public class UserAgentInfo implements Cloneable {
       }
    }
 
+   private void initValues() {
+      if (platform == null)
+         return;
+      if (platform.contains("Android")) {
+         if (!hasExtension("Mobile"))
+            isTablet = true;
+      }
+      else if (platform.contains("iPad"))
+         isTablet = true;
+
+      if (platform.contains("Linux"))
+         osName = "Linux";
+      else if (platform.contains("Windows"))
+         osName = "Windows";
+      else if (platform.contains("Macintosh"))
+         osName = "MacOS";
+      else
+         osName = platform;
+
+      if (!isRobot) {
+         String vers = getExtensionVersion("Chrome");
+         if (vers != null) {
+            browser = "Chrome";
+            browserVersion = vers;
+         }
+         else if ((vers = getExtensionVersion("Safari")) != null) {
+            browser = "Safari";
+            browserVersion = vers;
+         }
+         else if ((vers = getExtensionVersion("Firefox")) != null) {
+            browser = "Firefox";
+            browserVersion = vers;
+         }
+         else if ((vers = getExtensionVersion("OPR")) != null) {
+            browser = "Opera";
+            browserVersion = vers;
+         }
+         else {
+            browser = platform;
+            browserVersion = null;
+         }
+      }
+      else
+         browser = platform;
+   }
+
+   public boolean hasExtension(String extName) {
+      if (extensions == null)
+         return false;
+      for (int i = 0; i < extensions.size(); i++) {
+         UserAgentExtension uae = extensions.get(i);
+         if (uae.name.contains(extName))
+            return true;
+      }
+      return false;
+   }
+
+   public String getExtensionVersion(String extName) {
+      if (extensions == null)
+         return null;
+      for (int i = 0; i < extensions.size(); i++) {
+         UserAgentExtension uae = extensions.get(i);
+         if (uae.name.contains(extName))
+            return uae.version;
+      }
+      return null;
+   }
 
    public static boolean listItemInString(List<String> list, String toFind) {
       for (String elem:list)

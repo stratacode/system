@@ -207,14 +207,14 @@ public class JSONDeserializer implements JSONResolver {
             if (isMap && nextNameLen > 4) {
                if (isRefPrefix(nextNameStr, 0)) {
                   // Maps can have an object value in place of the string key
-                  nextNameKey = parser.resolveRefString(nextNameStr, nextNameLen);
+                  nextNameKey = parser.resolveRefString(nextNameStr, nextNameLen, null);
                   if (nextNameKey == null) {
                      System.out.println("*** Failed to resolve map key reference: " + nextNameStr);
                   }
                }
             }
             if (!hasObjValue) {
-               propVal = parser.parseJSONValue();
+               propVal = parser.parseJSONValue(null);
             }
             else {
                Object inst = resolveObject(nextNameStr, true);
@@ -394,7 +394,7 @@ public class JSONDeserializer implements JSONResolver {
       parser.expectNextName(JSONFormat.MethodArgs.callId.name());
       CharSequence callIdVal = parser.parseString(false);
       parser.expectNextName(JSONFormat.MethodArgs.args.name());
-      List args = parser.parseArray();
+      List args = parser.parseArray(null);
       boolean restartSyncQueue = false;
       if (methName != null && callIdVal != null) {
          // Make sure the state is set up before the remote method call.  While queuing is probably the most efficient way to

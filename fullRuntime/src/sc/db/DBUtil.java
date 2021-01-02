@@ -296,11 +296,24 @@ public class DBUtil {
                return "<bytearray>";
             return base64Encoder.encodeToString((byte[]) val);
          }
+         case Inet:
+         case Cidr:
+            return val.toString();
+
       }
       return val.toString();
    }
 
-   private static Class pgObject = null;
+   private static Class pgObjectClass = null;
+
+   private static Class getPGObjectClass() {
+      if (pgObjectClass == null) {
+         pgObjectClass = (Class) DynUtil.findType("org.postgresql.util.PGobject");
+         if (pgObjectClass == null)
+            throw new IllegalArgumentException("Missing postgresql class: org.postgresql.util.PGobject - check for postgres jdbc library in classpath");
+      }
+      return pgObjectClass;
+   }
 
    public static void setStatementValue(PreparedStatement st, int index, DBColumnType dbColumnType, Object val, Object pType) throws SQLException {
       if (val == null) {
@@ -354,12 +367,8 @@ public class DBUtil {
             String jsonStr = JSON.toJSON(val, pType, null).toString();
             // TODO: using reflection here because we don't want this dependency unless using the postgresql driver.
             // We should add a general 'value converter' interface and register an implementation from the pgsql layer
-            if (pgObject == null) {
-               pgObject = (Class) DynUtil.findType("org.postgresql.util.PGobject");
-               if (pgObject == null)
-                  throw new IllegalArgumentException("Missing postgresql class: org.postgresql.util.PGobject - check for postgres jdbc library in classpath");
-            }
-            Object pgo = DynUtil.createInstance(pgObject, null);
+            Class pgObjectCl = getPGObjectClass();
+            Object pgo = DynUtil.createInstance(pgObjectCl, null);
             DynUtil.setProperty(pgo, "type", "jsonb");
             DynUtil.setProperty(pgo, "value", jsonStr);
             st.setObject(index, pgo, Types.OTHER);
@@ -367,10 +376,20 @@ public class DBUtil {
          case ByteArray:
             st.setBytes(index, (byte[]) val);
             break;
+         case Inet:
+         case Cidr:
+            pgObjectCl = getPGObjectClass();
+            Object pginet = DynUtil.createInstance(pgObjectCl, null);
+            DynUtil.setProperty(pginet, "type", dbColumnType == DBColumnType.Inet ? "inet" : "cidr");
+            DynUtil.setProperty(pginet, "value", val.toString());
+            st.setObject(index, pginet, Types.OTHER);
+            break;
+
          default:
             throw new IllegalArgumentException("unrecognized type in setStatementValue");
       }
    }
+
 
    public static Object getResultSetByIndex(ResultSet rs, int index, DBPropertyDescriptor dbProp) throws SQLException {
       Object propertyType = dbProp.getPropertyType();
@@ -477,13 +496,26 @@ public class DBUtil {
                return JSON.toObject(propertyType, jsonStr, refResolver);
             }
             else
-               throw new UnsupportedOperationException("Unrecognized type from getObject");
+               throw new UnsupportedOperationException("Unrecognized result set type from getObject for json property");
          case Reference:
             if (refType == null)
                throw new UnsupportedOperationException("No refType provided for Reference column");
             return getResultSetByName(rs, colName, refType.primaryTable.idColumns.get(0));
          case ByteArray:
             return rs.getBytes(colName);
+         case Inet:
+         case Cidr:
+            Object inres = rs.getObject(colName);
+            if (inres == null)
+               return null;
+            if (inres.getClass().getName().contains("PGobject")) {
+               String inetStr = (String) DynUtil.getPropertyValue(inres, "value");
+               if (inetStr == null || inetStr.length() == 0)
+                  return null;
+               return inetStr;
+            }
+            else
+               throw new UnsupportedOperationException("Unrecognized type from getObject for inet column");
          default:
             throw new UnsupportedOperationException("Unrecognized type from getObject");
       }
@@ -587,6 +619,19 @@ public class DBUtil {
             return getResultSetByIndex(rs, index, refType.primaryTable.idColumns.get(0));
          case ByteArray:
             return rs.getBytes(index);
+         case Inet:
+         case Cidr:
+            Object inres = rs.getObject(index);
+            if (inres == null)
+               return null;
+            if (inres.getClass().getName().contains("PGobject")) {
+               String inStr = (String) DynUtil.getPropertyValue(inres, "value");
+               if (inStr == null || inStr.length() == 0)
+                  return null;
+               return inStr;
+            }
+            else
+               throw new UnsupportedOperationException("Unrecognized type from getObject for inet/cidr column");
          default:
             throw new UnsupportedOperationException("Unrecognized type from getObject");
       }
@@ -638,6 +683,8 @@ public class DBUtil {
          return "java.math.BigDecimal";
       else if (type.equalsIgnoreCase("bytea"))
          return "byte[]";
+      else if (type.equalsIgnoreCase("inet") || type.equalsIgnoreCase("cidr"))
+         return "String";
       return null;
    }
 
@@ -764,7 +811,7 @@ public class DBUtil {
       String javaTypeName = getJavaTypeFromSQLType(sqlTypeName);
       if (javaTypeName != null)
          return javaTypeName;
-      DBTypeDescriptor dbTypeDesc = DBTypeDescriptor.getByTableName(javaTypeName);
+      DBTypeDescriptor dbTypeDesc = DBTypeDescriptor.getByTableName(sqlTypeName);
       if (dbTypeDesc != null)
          return dbTypeDesc.getTypeName();
       return "Object";
@@ -836,9 +883,14 @@ public class DBUtil {
       return res;
    }
 
-   public static String createSalt() {
+   public static byte[] createSalt() {
       byte[] salt = new byte[16];
       randGen.nextBytes(salt);
+      return salt;
+   }
+
+   public static String createSalt64() {
+      byte[] salt = createSalt();
       String res = base64Encoder.encodeToString(salt);
       if (testMode)
          addTestToken(res, "secure-salt");
@@ -861,7 +913,19 @@ public class DBUtil {
       }
    }
 
-   public static int importCSVFile(String fileName, Object rowType, String separator, List<String> properties) {
+   public static String hashString(byte[] salt, String input, boolean weakHash) {
+      try {
+         MessageDigest md = MessageDigest.getInstance(weakHash ? "SHA-1" : "SHA-512");
+         md.update(salt);
+         byte[] buf = md.digest(input.getBytes(StandardCharsets.UTF_8));
+         return base64Encoder.encodeToString(buf);
+      }
+      catch (NoSuchAlgorithmException exc) {
+         throw new IllegalArgumentException("DBUtil.hashString failed with: " + exc);
+      }
+   }
+
+   public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, List<String> properties) {
       int lineCt = 0;
       File file = new File(fileName);
       BufferedReader reader = null;
@@ -875,22 +939,46 @@ public class DBUtil {
          String nextLine;
          while ((nextLine = reader.readLine()) != null) {
             lineCt++;
-            String[] values = nextLine.split(separator);
+            String[] values = StringUtil.split(nextLine, separator);
 
             // If there is one fewer value, the last property is treated as empty or null - we just won't set it. We could also make sure there really is a \t\r\n at the end
             if (values.length != numProps && values.length != numProps - 1)
                throw new IllegalArgumentException("Column mismatch - file has: " + values.length + " but expected: " + properties.size() + " for line: " + lineCt);
+
+            if (headerRow && lineCt == 1) {
+               StringBuilder sb = new StringBuilder();
+               sb.append("*** Importing cvs file: " + fileName + " with columns: ");
+               for (int i = 0; i < values.length; i++) {
+                  if (i != 0)
+                     sb.append(", ");
+                  String prop = properties.get(i);
+                  if (prop == null)
+                     sb.append("skipping col: ");
+                  else
+                     sb.append("prop: " + prop + " = col:");
+                  sb.append(values[i]);
+               }
+               System.out.println(sb);
+               continue;
+            }
 
             IDBObject obj = dbTypeDesc.createInstance();
             int numValues = values.length;
             for (int pi = 0; pi < numValues; pi++) {
                String strVal = values[pi];
                String propName = properties.get(pi);
+               if (propName == null)
+                  continue; // Allows us to skip columns
                DBPropertyDescriptor propDesc = dbTypeDesc.getPropertyDescriptor(propName);
                if (propDesc == null)
                   throw new IllegalArgumentException("No property: " + propName + " in DBTypeDescriptor: " + dbTypeDesc);
 
-               Object val = propDesc.stringToValue(strVal);
+               Object val;
+               if (strVal.length() == 0) {
+                  val = null;
+               }
+               else
+                  val = propDesc.stringToValue(strVal);
                ((DBObject) obj.getDBObject()).setPropertyInPath(propName, val);
             }
             obj.dbInsert(false);
@@ -913,7 +1001,37 @@ public class DBUtil {
       return lineCt;
    }
 
-
+   /**
+    * TODO: this is for debugging only right now - it seems like we lose info from the schema to the metadata so this helps
+    * translate what the metadata is expressing about the data type
+    */
+   public static String getNameForJDBCType(int colType) {
+      switch (colType) {
+         case Types.VARCHAR:
+            return "text";
+         case Types.INTEGER:
+            return "integer";
+         case Types.BIGINT:
+            return "bigint";
+         case Types.TINYINT:
+            return "tinyint";
+         case Types.SMALLINT:
+            return "smallint";
+         case Types.FLOAT:
+            return "float";
+         case Types.DOUBLE:
+            return "double";
+         case Types.BOOLEAN:
+         case Types.BIT:
+            return "bit";
+         case Types.DATE:
+            return "timestamp";
+         case Types.OTHER:
+            return "other";
+         default:
+            return "<missing-name-for-type:" + colType + ">";
+      }
+   }
 
 }
 

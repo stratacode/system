@@ -1976,6 +1976,10 @@ public class IdentifierExpression extends ArgumentsExpression {
             System.err.println("*** Failed to start identifier expression - eval returning null");
             return null;
          }
+         if (idTypes[0] == null) { // This happened once in the IDE from an annotation eval - not sure why
+            System.err.println("*** Null idType for identifier expression - eval returning null");
+            return null;
+         }
 
          JavaModel jmodel = getJavaModel();
          switch (idTypes[0]) {

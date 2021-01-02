@@ -60,6 +60,11 @@ public class Window implements IObjectId {
 
    public boolean sessionInvalid = false;
 
+   // Even when using localhost, in test mode provides a remoteIp address that's configurable from tests and scripts
+   public String testRemoteIp;
+
+   public static String globalTestRemoteIp;
+
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
 
    public static int DefaultWidth = 1100;
@@ -117,6 +122,16 @@ public class Window implements IObjectId {
       return errorCount;
    }
 
+   private List<IWindowEventListener> eventListeners;
+
+   public void addEventListener(IWindowEventListener listener) {
+      if (eventListeners == null)
+         eventListeners = new ArrayList<IWindowEventListener>();
+      eventListeners.add(listener);
+   }
+
+   public UserAgentInfo userAgentInfo;
+
    public static Window createNewWindow(String requestURL, String serverName, int serverPort, String requestURI,
                                         String pathInfo, String queryStr, String userAgentStr, IPageDispatcher pageDispatcher) {
       Window win = new Window();
@@ -134,7 +149,10 @@ public class Window implements IObjectId {
             if (dpr != -1.0)
                win.setDevicePixelRatio(dpr);
          }
+         win.userAgentInfo = userAgentInst;
       }
+      else
+         win.userAgentInfo = new UserAgentInfo();
       win.location = new Location(win);
       Location loc = win.location;
       if (serverPort == 80) {
@@ -156,6 +174,8 @@ public class Window implements IObjectId {
       win.document = win.documentTag = new Document();
       win.history = new History(win);
       win.screen = new Screen(win);
+      if (PTypeUtil.testMode && globalTestRemoteIp != null)
+         win.testRemoteIp = globalTestRemoteIp;
       return win;
    }
 
@@ -235,5 +255,19 @@ public class Window implements IObjectId {
 
    public void invalidateSession() {
       sessionInvalid = true;
+   }
+
+   public void windowClosed() {
+      if (eventListeners != null) {
+         for (IWindowEventListener listener:eventListeners)
+            listener.windowClosed(this);
+      }
+   }
+
+   public void screenSizeChanged() {
+      if (eventListeners != null) {
+         for (IWindowEventListener listener:eventListeners)
+            listener.screenSizeChanged(this);
+      }
    }
 }

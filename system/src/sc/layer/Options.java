@@ -9,6 +9,7 @@ import sc.db.DBUtil;
 import sc.lang.AbstractInterpreter;
 import sc.lang.JavaLanguage;
 import sc.lang.html.Element;
+import sc.lang.html.Window;
 import sc.lang.js.JSRuntimeProcessor;
 import sc.lang.pattern.Pattern;
 import sc.lang.sql.SchemaManager;
@@ -637,6 +638,11 @@ public class Options {
                         testScriptName = args[++i];
                      }
                      runTests = true;
+                  }
+                  else if (opt.equals("tip")) {
+                     if (i == args.length - 1)
+                        System.err.println("*** missing arg to run -tip");
+                     Window.globalTestRemoteIp = args[++i];
                   }
                   else
                      Options.usage("Unrecognized option: " + opt, args);

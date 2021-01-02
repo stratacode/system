@@ -65,8 +65,17 @@ public class SchemaManager {
 
    /** The tables/columns in currentSchema not found in dbMetadata */
    public DBMetadata dbMissingMetadata;
+   /** The tables/columns in DBMetadata not found in currentSchema */
+   public DBMetadata dbExtraMetadata;
 
    public List<DBSchemaType> notUsedTypeSchemas = new ArrayList<DBSchemaType>();
+
+   public static final Set<String> dbMetadataTables = new HashSet<String>();
+   static {
+      dbMetadataTables.add("db_schema_type");
+      dbMetadataTables.add("db_schema_version");
+      dbMetadataTables.add("db_schema_current_version");
+   }
 
    public enum SchemaMode {
       Prompt, Update, Accept
@@ -259,6 +268,44 @@ public class SchemaManager {
                         dbMissingMetadata.addMetadata(missingData);
                   }
                }
+
+               dbExtraMetadata = null;
+               for (TableInfo tableInfo:dbMetadata.tableInfos) {
+                  String tableName = tableInfo.tableName;
+
+                  if (isMetadataTable(tableName))
+                     continue;
+
+                  CreateTable createTable = null;
+                  for (SQLFileModel typeSchema:currentSchema) {
+                     createTable = typeSchema.findCreateTable(tableName);
+                     if (createTable != null)
+                        break;
+                  }
+                  if (createTable == null) {
+                     if (dbExtraMetadata == null)
+                        dbExtraMetadata = new DBMetadata();
+                     dbExtraMetadata.tableInfos.add(tableInfo);
+                  }
+                  else {
+                     ArrayList<ColumnInfo> extraCols = null;
+                     for (ColumnInfo colInfo:tableInfo.colInfos) {
+                        ColumnDef colDef = createTable.findColumn(colInfo.colName);
+                        if (colDef == null) {
+                           if (extraCols == null)
+                              extraCols = new ArrayList<ColumnInfo>();
+                           extraCols.add(colInfo);
+                        }
+                     }
+                     if (extraCols != null) {
+                        TableInfo ti = new TableInfo();
+                        ti.colInfos = extraCols;
+                        if (dbExtraMetadata == null)
+                           dbExtraMetadata = new DBMetadata();
+                        dbExtraMetadata.tableInfos.add(ti);
+                     }
+                  }
+               }
             }
          }
 
@@ -275,6 +322,10 @@ public class SchemaManager {
             }
          }
       }
+   }
+
+   private boolean isMetadataTable(String tableName) {
+      return dbMetadataTables.contains(tableName);
    }
 
    public void markSchemaNotReady() {
@@ -771,7 +822,9 @@ public class SchemaManager {
             modelsToSort.add(newModels.get(i));
          }
          for (int i = 0; i < nchanges; i++) {
-            modelsToSort.add(changedTypes.get(i).alterModel);
+            SchemaTypeChange change = changedTypes.get(i);
+            if (change.alterModel != null)
+               modelsToSort.add(change.alterModel);
          }
          ArrayList<SQLFileModel> sortedModels = sortSQLModels(modelsToSort);
          try {
@@ -805,11 +858,7 @@ public class SchemaManager {
          DBSchemaVersion curVersion = info.getCurrentVersion();
          curVersion.setSchemaSQL(newModel.toLanguageString());
          curVersion.setDateApplied(new Date());
-         if (change.alterModel == null) {
-            System.out.println("*** Missing alter schema commands for change");
-            continue;
-         }
-         String alterSQL = change.alterModel.toLanguageString();
+         String alterSQL = change.alterModel == null ? "" : change.alterModel.toLanguageString();
          curVersion.setAlterSQL(alterSQL);
          DBUtil.verbose("Accepted new schema for type: " + typeName + " with alter script for: " + dataSourceName + " and buildLayer: " + buildLayer);
          updateDBSchema(updater, typeName, info, newModel, buildLayer);

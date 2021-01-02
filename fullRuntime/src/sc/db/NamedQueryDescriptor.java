@@ -158,6 +158,9 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
                      }
                      idVal = idVals;
                   }
+                  // In Postgres, when a function query returns a single row, it returns an empty row rather than no rows
+                  if (idVal == null)
+                     break;
 
                   DBPropertyDescriptor typeIdProp = dbTypeDesc.getTypeIdProperty();
                   int typeId = -1;

@@ -2253,6 +2253,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    public Object namedQuery(String queryName, Object...args) {
+      if (!started)
+         startAndActivate();
       DBTransaction curTx = DBTransaction.getOrCreate();
       NamedQueryDescriptor namedQuery = namedQueryIndex == null ? null : namedQueryIndex.get(queryName);
       if (namedQuery != null)

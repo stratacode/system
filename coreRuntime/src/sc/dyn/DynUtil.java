@@ -15,6 +15,7 @@ import sc.util.BTreeMap;
 import sc.util.IdentityWrapper;
 
 import java.lang.reflect.Modifier;
+import java.lang.reflect.ParameterizedType;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -1847,6 +1848,13 @@ public class DynUtil {
    }
 
    public static Object getComponentType(Object type) {
+      if (type instanceof ParameterizedType) {
+         ParameterizedType ptype = (ParameterizedType) type;
+         java.lang.reflect.Type[] args = ptype.getActualTypeArguments();
+         if (args == null || args.length == 0)
+            return null;
+         return args[0];
+      }
       if (dynamicSystem != null)
          return dynamicSystem.getComponentType(type);
       if (type instanceof Class) {

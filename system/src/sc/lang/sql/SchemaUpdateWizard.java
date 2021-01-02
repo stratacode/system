@@ -70,7 +70,9 @@ public class SchemaUpdateWizard extends CommandWizard {
       print("   q - quit schema update wizard");
       print("   t - go to next type");
       print("   a - accept current schema for this layer without updating database schema");
-      print("   d - show drop schema");
+      print("   d - diff current schema with database metadata");
+      print("   D - show drop schema");
+      print("   r - refresh database metadata");
       print(" <i> - select type by number");
    }
 
@@ -124,8 +126,11 @@ public class SchemaUpdateWizard extends CommandWizard {
          print("---");
       }
 
-      if (mgr.dbMissingMetadata != null && (mgr.noCurrentSchema || mgr.initFromDBFailed)) {
+      if (mgr.dbMissingMetadata != null && (!mgr.noCurrentSchema && !mgr.initFromDBFailed)) {
          print("- Warning: current database is missing these items:" + mgr.dbMissingMetadata + "\n---");
+      }
+      if (mgr.dbExtraMetadata != null) {
+         print("- Warning: current database has extra items:" + mgr.dbExtraMetadata + "\n---");
       }
    }
 
@@ -144,7 +149,8 @@ public class SchemaUpdateWizard extends CommandWizard {
       for (int i = 0; i < changes.size(); i++) {
          SchemaManager.SchemaTypeChange change = changes.get(i);
          int ix = i + nsz;
-         print((ix == currentTypeIx ? "*": "") + "[" + ix + "] changed: " + change.fromModel.srcType.typeName);
+         print((ix == currentTypeIx ? "*": "") + "[" + ix + "] changed: " + change.fromModel.srcType.typeName +
+                (change.alterModel == null ? " (no alter ddl)" : " (alter ddl available)"));
          printUpgradeWarning(change);
       }
    }
@@ -214,7 +220,12 @@ public class SchemaUpdateWizard extends CommandWizard {
                case 'c':
                   StringBuilder alterSB = mgr.getAlterSchema();
                   if (alterSB == null) {
-                     printNewSchema();
+                     if (mgr.dbMissingMetadata != null) {
+                        print("--- No alter schema despite missing tables/columns - showing entire schema.");
+                        printNewSchema();
+                     }
+                     else
+                        print("--- No alter schema and no missing metadata");
                   }
                   else {
                      print("--- SQL alter/create commands to update existing schema:");
@@ -276,6 +287,7 @@ public class SchemaUpdateWizard extends CommandWizard {
                      print("Accepting existing schema...");
                      if (mgr.updateSchema(system.buildLayer, false)) {
                         waitForQuit = true;
+                        mgr.needsInitFromDB = true;
                         mgr.initFromDB(system.buildLayer, false);
                         if (!mgr.schemaChanged) {
                            waitForQuit = true;
@@ -283,7 +295,8 @@ public class SchemaUpdateWizard extends CommandWizard {
                            print("Enter q to exit and continue");
                         }
                         else {
-                           print("Warning: schema accepted but metadata does not match");
+                           if (mgr.dbMissingMetadata != null || mgr.dbExtraMetadata != null)
+                              print("Warning: schema accepted but metadata does not match");
                            printList();
                         }
                      }
@@ -291,10 +304,28 @@ public class SchemaUpdateWizard extends CommandWizard {
                         print("Accept schema failed");
                   }
                   break;
-               case 'd':
+               case 'D':
                   print("--- SQL drop commands to remove existing schema:");
                   print(mgr.getDropSchema().toString());
                   print("---");
+                  break;
+               case 'r':
+                  mgr.needsInitFromDB = true;
+                  mgr.initFromDB(system.buildLayer, false);
+                  // Fall through and show the differences
+               case 'd':
+                  // TODO: do a refresh of the meta data here?
+                  if (mgr.dbExtraMetadata == null && mgr.dbMissingMetadata == null) {
+                     print("- No differences in metadata between schema and database");
+                  }
+                  else {
+                     if (mgr.dbMissingMetadata != null) {
+                        print("--- Database is missing:\n" + mgr.dbMissingMetadata + "\n----");
+                     }
+                     if (mgr.dbExtraMetadata != null) {
+                        print("--- Database has extra info:\n" + mgr.dbExtraMetadata + "\n----");
+                     }
+                  }
                   break;
                default:
                   print("Unrecognized command: " + cmdChar);
@@ -327,8 +358,12 @@ public class SchemaUpdateWizard extends CommandWizard {
          print(change.fromModel.toLanguageString());
          print("   --- new schema:");
          print(change.toModel.toLanguageString());
-         print("   --- alter schema:");
-         print(change.alterModel.toLanguageString());
+         if (change.alterModel == null)
+            print("- no alter schema");
+         else {
+            print("   --- alter schema:");
+            print(change.alterModel.toLanguageString());
+         }
          // TODO: print alter table schema here?
       }
    }
