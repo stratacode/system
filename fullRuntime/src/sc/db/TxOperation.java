@@ -346,8 +346,6 @@ public abstract class TxOperation {
             DBColumnType colType = columnTypes.get(i);
             if (colRefType != null && colType != DBColumnType.Json)
                colType = DBColumnType.LongId;
-            if (i == columnValues.size() || i == columnPTypes.size())
-               System.out.println("***");
             logSB.append(DBUtil.formatValue(columnValues.get(i), colType, colRefType, columnPTypes.get(i)));
          }
       }
