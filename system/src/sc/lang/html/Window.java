@@ -67,8 +67,9 @@ public class Window implements IObjectId {
 
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
 
-   public static int DefaultWidth = 1100;
-   public static int DefaultHeight = 500;
+   // Picking an odd value for these so that we can use it to tell when the screenWidth is not determined
+   public static int DefaultWidth = 1101;
+   public static int DefaultHeight = 501;
 
    // TODO - we could have the client set these via an XMLHTTP request but the whole point is to render CSS and HTML
    // up front properly.  We could at least choose different values for different user-agents.

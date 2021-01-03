@@ -298,7 +298,7 @@ public class SchemaManager {
                         }
                      }
                      if (extraCols != null) {
-                        TableInfo ti = new TableInfo();
+                        TableInfo ti = new TableInfo(tableName);
                         ti.colInfos = extraCols;
                         if (dbExtraMetadata == null)
                            dbExtraMetadata = new DBMetadata();

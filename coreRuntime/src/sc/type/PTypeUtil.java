@@ -594,7 +594,9 @@ public class PTypeUtil {
    // I could imagine having an option to show this relative to start-session or start-thread time or even displaying multiple time spaces in the same log to diagnose different scenarios
    public static String getTimeDelta(long startTime, long now) {
       if (startTime == 0)
-         return "<server not yet started!>";
+         return "<no start time>";
+      if (now == 0)
+         return "<no end time>";
       StringBuilder sb = new StringBuilder();
       long elapsed = now - startTime;
       sb.append("+");

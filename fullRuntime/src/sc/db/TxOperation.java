@@ -115,15 +115,23 @@ public abstract class TxOperation {
       ArrayList<List<Object>> batchList = batchSz == 0 ? null : new ArrayList<List<Object>>();
 
       boolean hasLmt = false;
-      if (lmtProp != null && !columnNames.contains(lmtProp.columnName)) {
+      int lmtIndex = -1;
+      if (lmtProp != null) {
          hasLmt = true;
-         columnNames.add(lmtProp.columnName);
-         columnTypes.add(lmtProp.getDBColumnType());
-         columnValues.add(lmtValue = new Date());
-         if (columnRefTypes != null)
-            columnRefTypes.add(null);
-         columnPTypes.add(null);
-         numCols++;
+         lmtIndex = columnNames.indexOf(lmtProp.columnName);
+         lmtValue = new Date();
+         if (lmtIndex == -1) {
+            columnNames.add(lmtProp.columnName);
+            columnTypes.add(lmtProp.getDBColumnType());
+            lmtIndex = columnValues.size();
+            columnValues.add(lmtValue);
+            if (columnRefTypes != null)
+               columnRefTypes.add(null);
+            columnPTypes.add(null);
+            numCols++;
+         }
+         else if (columnValues.get(lmtIndex) == null)
+            columnValues.set(lmtIndex, lmtValue);
       }
 
       StringBuilder sb = new StringBuilder();
@@ -171,8 +179,10 @@ public abstract class TxOperation {
                sb.append(", (");
                if (logSB != null)
                   logSB.append(", (");
-               if (hasLmt)
-                  batchValues.add(lmtValue);
+               if (hasLmt) {
+                  if (batchValues.get(lmtIndex) == null)
+                     batchValues.set(lmtIndex, lmtValue);
+               }
                appendColumnValueList(sb, logSB, numCols, columnTypes, columnRefTypes, columnPTypes, batchValues);
                sb.append(")");
                if (logSB != null)
