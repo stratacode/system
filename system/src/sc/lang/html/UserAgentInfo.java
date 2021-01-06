@@ -88,6 +88,8 @@ public class UserAgentInfo implements Cloneable {
          osName = "Windows";
       else if (platform.contains("Macintosh"))
          osName = "MacOS";
+      else if (platform.contains("iPhone OS"))
+         osName = "iPhone";
       else
          osName = platform;
 

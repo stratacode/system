@@ -19,14 +19,17 @@ fi
 if [ ! -d example ] ; then
   git clone https://github.com/stratacode/example.git
 fi
-if [ ! -d managementUI ] ; then
-  git clone https://github.com/stratacode/managementUI.git
+if [ ! -d programEditor ] ; then
+  git clone https://github.com/stratacode/programEditor.git
 fi
 if [ ! -d integrationTest ] ; then
   git clone https://github.com/stratacode/integrationTest.git
 fi
 if [ ! -d test ] ; then
   git clone https://github.com/stratacode/test.git
+fi
+if [ ! -d siteBuilder ] ; then
+  git clone https://github.com/stratacode/siteBuilder.git
 fi
 
 cd ..
