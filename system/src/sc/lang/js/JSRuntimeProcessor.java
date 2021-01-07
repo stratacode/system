@@ -799,8 +799,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    }
 
    public SrcEntry getJSSrcEntryFromTypeName(Layer genLayer, String buildSrcDir, String fullTypeName) {
-      LayeredSystem sys = getLayeredSystem();
-      String fileName = FileUtil.addExtension(JSUtil.convertTypeName(sys, fullTypeName), "js");
+      //LayeredSystem sys = getLayeredSystem();
+      String fileName = FileUtil.addExtension(fullTypeName.replace('.', FileUtil.FILE_SEPARATOR_CHAR), "js");
+      //String fileName = FileUtil.addExtension(JSUtil.convertTypeName(sys, fullTypeName), "js");
       String genPrefix = FileUtil.unnormalize(genJSPrefix);
       // These go into the buildSrcDir because there's no use for them in the web root.  Also, they are put into the .deps file - if they don't exist, they force
       // a regenerate.  That's cause they are returned from getProcessedFiles.  Not entirely sure we need that but dep generated files must be in the buildSrcDir
