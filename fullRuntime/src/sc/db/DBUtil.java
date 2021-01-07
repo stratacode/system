@@ -916,7 +916,8 @@ public class DBUtil {
    public static String hashString(byte[] salt, String input, boolean weakHash) {
       try {
          MessageDigest md = MessageDigest.getInstance(weakHash ? "SHA-1" : "SHA-512");
-         md.update(salt);
+         if (salt != null)
+            md.update(salt);
          byte[] buf = md.digest(input.getBytes(StandardCharsets.UTF_8));
          return base64Encoder.encodeToString(buf);
       }

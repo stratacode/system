@@ -7,6 +7,7 @@ package sc.lang.java;
 import sc.classfile.CFClass;
 import sc.classfile.CFMethod;
 import sc.db.BaseTypeDescriptor;
+import sc.db.DBUtil;
 import sc.dyn.*;
 import sc.lang.*;
 import sc.lang.html.Element;
@@ -4712,8 +4713,28 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       // inner type.
       if (getNeedsDynInnerStub())
          return base + "." + typeName;
-      else
-         return base.replace(".", INNER_STUB_SEPARATOR) + INNER_STUB_SEPARATOR + typeName;
+      else {
+         String res = base.replace(".", INNER_STUB_SEPARATOR) + INNER_STUB_SEPARATOR + typeName;
+         if (res.length() > 230) {
+            StringBuilder newRes = new StringBuilder();
+            int ix = res.indexOf(INNER_STUB_SEPARATOR);
+            if (ix == -1)
+               return res;
+            newRes.append(res.substring(0, ix));
+            newRes.append(INNER_STUB_SEPARATOR);
+            newRes.append("x");
+            String hashStr = DBUtil.hashString(null, res, true);
+            hashStr = hashStr.replace("-", "_x");
+            newRes.append(hashStr);
+            newRes.append(INNER_STUB_SEPARATOR);
+            newRes.append(typeName);
+            if (newRes.length() > 255) {
+               System.err.println("*** Inner stub type name too long!");
+            }
+            return newRes.toString();
+         }
+         return res;
+      }
    }
 
    public String getInnerStubFileName() {
