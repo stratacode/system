@@ -3787,13 +3787,18 @@ public class ModelUtil {
                // In dynamic model, a glue expression may not have been transformed so it will still have references to Elements.  We'll get the output expression here which creates the tag type
                // if needed.  TODO: maybe we should split GlueExpression.transformTemplate into two steps - one to produce the expression and the other to replace and then we would skip the eval here?
                Element elem = (Element) def;
-               Expression outExpr = elem.getOutputExpression();
-               outExpr.parentNode = elem;
-               if (!outExpr.isStarted())
-                  ParseUtil.initAndStartComponent(outExpr);
-               Object exprRes = outExpr.eval(String.class, ctx);
-               if (exprRes != null)
-                  sb.append(exprRes.toString());
+               if (elem.needsObject()) {
+                  Expression outExpr = elem.getOutputExpression();
+                  outExpr.parentNode = elem;
+                  if (!outExpr.isStarted())
+                     ParseUtil.initAndStartComponent(outExpr);
+                  Object exprRes = outExpr.eval(String.class, ctx);
+                  if (exprRes != null)
+                     sb.append(exprRes.toString());
+               }
+               else {
+                  elem.execTagStatements(sb, ctx);
+               }
 
                /*
                sb.append("<");

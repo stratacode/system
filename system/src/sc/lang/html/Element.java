@@ -1314,6 +1314,11 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                      strExprs.add(expr);
                   }
                }
+               else if (child instanceof TemplateStatement) {
+                  // TODO: the outputExpression produces a string but the contract here is to execute the statements
+                  // where there's an 'out' variable that's a StringBuilder being produced.
+                  System.err.println("*** TemplateStatement is child of tag object!");
+               }
                else {
                   // TODO: what other cases show up here?  We are inside of an expression context and run into something other than an element, expression or string?
                }
@@ -1336,6 +1341,101 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          }
       }
       return null;
+   }
+
+   public void execTagStatements(StringBuilder str, ExecutionContext ctx) {
+      if (!isVisible())
+         return;
+
+      str.append("<");
+      str.append(lowerTagName());
+
+      ArrayList<Attr> attList = getInheritedAttributes();
+      if (attList != null) {
+         for (Attr att:attList) {
+            if (isHtmlAttribute(att.name)) { // Do we need to draw the attribute
+               Expression outputExpr = att.getOutputExpr();
+               boolean isConstant = outputExpr == null || outputExpr instanceof StringLiteral;
+               if (!staticContentOnly || isConstant) {
+                  if (isBooleanAttribute(att.name) && outputExpr != null && !(outputExpr instanceof StringLiteral)) {
+                     Object res = outputExpr.eval(Boolean.class, ctx);
+                     if (res != null && (Boolean) res) {
+                        str.append(" ");
+                        str.append(att.name);
+                     }
+                  }
+                  else {
+                     str.append(" ");
+                     str.append(att.name);
+                     str.append("=");
+                     if (outputExpr == null || outputExpr instanceof StringLiteral) {
+                        if (att.isString()) {
+                           str.append("\'");
+                           str.append(att.getOutputString());
+                           str.append("\'");
+                        }
+                        else {
+                           System.out.println("*** unrecognized type in attribute list");
+                        }
+                     }
+                     else {
+                        str.append("\"");
+                        str.append(outputExpr.eval(null, ctx));
+                        str.append("\"");
+                     }
+                  }
+               }
+               else if (att.value instanceof Expression) // this expression has been disabled due to being out of scope
+                  ((Expression) att.value).inactive = true;
+            }
+         }
+      }
+      str = addExtraAttributes(str, null);
+
+      if (tagName.equalsIgnoreCase("option") && getAttribute("selected") == null) {
+         if (this instanceof Option) {
+            if (((Option) this).getSelected())
+               str.append(" selected");
+         }
+      }
+      if (needsId() && !isSingletonTag()) {
+         str.append(" id='");
+         str.append(getId());
+      }
+      if (!needsBody && (selfClose != null && selfClose))
+         str.append("/>");
+      else {
+         str.append(">");
+      }
+
+      if (children != null) {
+         for (Object child:children) {
+            if (child instanceof Expression) {
+               Object childRes = ((Expression) child).eval(null, ctx);
+               if (childRes != null)
+                  str.append(childRes.toString());
+            }
+            else if (PString.isString(child)) {
+               str.append(child.toString());
+            }
+            else if (child instanceof Element) {
+               ((Element) child).execTagStatements(str, ctx);
+            }
+            else if (child instanceof TemplateStatement) {
+               TemplateStatement tst = (TemplateStatement) child;
+               tst.exec(ctx);
+            }
+            else if (child != null ){
+               System.err.println("*** Unhandled type of child in stateless tag element");
+               // TODO: what other cases show up here?  We are inside of an expression context and run into something other than an element, expression or string?
+            }
+         }
+      }
+      if ((selfClose == null || !selfClose || needsBody) && closeTagName != null) {
+         str.append("</");
+         str.append(closeTagName);
+         str.append(">");
+      }
    }
 
    /** This method gets called from two different contexts and for tags which are both dynamic and static so it's
