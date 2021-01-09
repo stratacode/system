@@ -63,6 +63,8 @@ public class Window implements IObjectId {
    // Even when using localhost, in test mode provides a remoteIp address that's configurable from tests and scripts
    public String testRemoteIp;
 
+   public int windowId;
+
    public static String globalTestRemoteIp;
 
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
