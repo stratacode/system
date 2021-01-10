@@ -71,27 +71,33 @@ public class JSON {
 
          String className = (String) map.get("class");
          if (className != null) {
-            instType = DynUtil.findType(className);
-            if (instType == null) {
-               System.err.println("Database reference to missing class: " + className);
-               throw new IllegalArgumentException("Database reference to missing class: " + className);
+            if (resolver != null) {
+               instType = resolver.resolveClass(className);
+
+               if (propertyType != null && propertyType != instType && !DynUtil.isAssignableFrom(propertyType, instType)) {
+                  instType = null;
+                  System.err.println("*** Resolved class name: " + className + " for JSON does not match property type: " + DynUtil.getTypeName(propertyType, false));
+               }
             }
          }
-         Object inst = DynUtil.newInnerInstance(instType, null, null);
-         for (Map.Entry<String,Object> ent:map.entrySet()) {
-            String propName = ent.getKey();
-            Object propVal = ent.getValue();
-            if (propName.equals("class"))
-               continue;
-            IBeanMapper mapper = DynUtil.getPropertyMapping(instType, propName);
-            if (mapper == null) {
-               System.err.println("*** No property: " + propName + " in propertyType: " + DynUtil.getTypeName(instType, false) + " for JSON deserialization");
-               continue;
+         if (instType != null) {
+            Object inst = DynUtil.newInnerInstance(instType, null, null);
+            for (Map.Entry<String,Object> ent:map.entrySet()) {
+               String propName = ent.getKey();
+               Object propVal = ent.getValue();
+               if (propName.equals("class"))
+                  continue;
+               IBeanMapper mapper = DynUtil.getPropertyMapping(instType, propName);
+               if (mapper == null) {
+                  System.err.println("*** No property: " + propName + " in propertyType: " + DynUtil.getTypeName(instType, false) + " for JSON deserialization");
+                  continue;
+               }
+               Object newPropVal = convertTo(mapper.getGenericType(), propVal, resolver);
+               DynUtil.setProperty(inst, propName, newPropVal);
             }
-            Object newPropVal = convertTo(mapper.getGenericType(), propVal, resolver);
-            DynUtil.setProperty(inst, propName, newPropVal);
+            return inst;
          }
-         return inst;
+         return value; // TODO: is this right - returning a map here - should we throw an exception instead?
       }
       else if (value instanceof CharSequence) {
          if (propertyType == Date.class) {

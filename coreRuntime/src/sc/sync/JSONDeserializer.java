@@ -433,4 +433,14 @@ public class JSONDeserializer implements JSONResolver {
    public Object resolveRef(String name, Object expectedType) {
       return resolveObject(name, false);
    }
+
+   /**
+    * This API is used by the DB layer to resolve arbitrary classes that are serialized in JSON. Because those JSON
+    * objects are created from trusted code, it's ok to do that but for sync'd applications, we require the classes to
+    * all be resolved with the sync system, to avoid the Java serialization security problems.
+    */
+   public Object resolveClass(String className) {
+      System.err.println("*** Class property ignored in JSONDeserializer");
+      return null;
+   }
 }

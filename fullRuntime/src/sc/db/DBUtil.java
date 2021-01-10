@@ -414,6 +414,14 @@ public class DBUtil {
          else
             return DynUtil.resolveName(refName, true, false);
       }
+      public Object resolveClass(String className) {
+         Object instType = DynUtil.findType(className);
+         if (instType == null) {
+            System.err.println("Database reference to missing class: " + className);
+            throw new IllegalArgumentException("Database reference to missing class: " + className);
+         }
+         return instType;
+      }
    };
 
    public static Object getResultSetByName(ResultSet rs, String colName, Object propertyType, DBColumnType colType, DBTypeDescriptor refType) throws SQLException {
