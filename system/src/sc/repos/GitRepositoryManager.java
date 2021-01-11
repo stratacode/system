@@ -64,7 +64,7 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
          mgr.info("Running: " + mgr.argsToString(args));
       }
       StringBuilder errors = new StringBuilder();
-      String res = FileUtil.execCommand(null, args, null, 0, false, errors);
+      String res = FileUtil.execCommand(null, args, null, null, 0, false, errors);
       if (res == null)
          return "Git repository: " + src.pkg.packageName + " install cmd: " + StringUtil.arrayToString(args.toArray()) + " failed: " + errors;
 
@@ -73,7 +73,7 @@ public class GitRepositoryManager extends AbstractRepositoryManager {
          args.add("git");
          args.add("checkout");
          args.add(branchSel);
-         res = FileUtil.execCommand(resDir, args, null, 0, false, errors);
+         res = FileUtil.execCommand(resDir, args, null, null, 0, false, errors);
          if (res == null)
             return "Git repository: " + src.pkg.packageName + " checkout cmd: " + StringUtil.arrayToString(args.toArray()) + " failed: " + errors;
       }

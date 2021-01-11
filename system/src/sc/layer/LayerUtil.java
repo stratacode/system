@@ -630,7 +630,7 @@ public class LayerUtil implements LayerConstants {
                      System.out.println("Running: " + StringUtil.arrayToCommand(unjarArgs.toArray()));
                   }
                   StringBuilder errors = new StringBuilder();
-                  if (FileUtil.execCommand(zipTemp.getPath(), unjarArgs, "", 0, verbose, errors) == null)
+                  if (FileUtil.execCommand(zipTemp.getPath(), unjarArgs, "", null, 0, verbose, errors) == null)
                      System.err.println("*** Failed to unjar with " + unjarArgs + " error output: " + errors);
                   mergeFile = zipTemp;
 

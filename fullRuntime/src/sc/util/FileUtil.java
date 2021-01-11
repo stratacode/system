@@ -302,11 +302,11 @@ public class FileUtil {
    }
 
    public static String exec(String... args) {
-      return exec(null, false, args);
+      return exec(null, null, false, args);
    }
 
-   public static String exec(String input, boolean echoOutput, String... args) {
-      return execCommand(null, Arrays.asList(args), input, 0, echoOutput, null);
+   public static String exec(String input, Map<String,String> env, boolean echoOutput, String... args) {
+      return execCommand(null, Arrays.asList(args), input, env, 0, echoOutput, null);
    }
 
    public static int fork(String inputString, boolean echoOutput, String... args) {
@@ -331,7 +331,7 @@ public class FileUtil {
    }
 
    public static String execCommand(List<String> args, String inputString) {
-      return execCommand(null, args, inputString, 0, false, null);
+      return execCommand(null, args, inputString, null, 0, false, null);
    }
 
    public static StringBuilder readInputStream(InputStream is) {
@@ -369,7 +369,7 @@ public class FileUtil {
       return null;
    }
 
-   public static String execCommand(String currentDir, List<String> args, String inputString, int successResult, boolean echoOutput, StringBuilder errorRes) {
+   public static String execCommand(String currentDir, List<String> args, String inputString, Map<String,String> env, int successResult, boolean echoOutput, StringBuilder errorRes) {
       // Handle simple unix shell scripts so we don't have to have special logic for windows to run as long as
       // cygwin or the shell at least is installed
       args = fixArgsForSystem(args);
@@ -377,6 +377,11 @@ public class FileUtil {
       ProcessBuilder pb = new ProcessBuilder(args);
       if (currentDir != null)
          pb.directory(new File(currentDir));
+
+      if (env != null) {
+         Map<String,String> pbEnv = pb.environment();
+         pbEnv.putAll(env);
+      }
 
       try {
          if (errorRes != null)
@@ -497,7 +502,7 @@ public class FileUtil {
          System.err.println("*** unzip failed because overwrite is false and " + resName + " exists");
          return false;
       }
-      String zipRes = overwrite ? exec(null, true, "unzip", "-o", zipFile, "-d", resName) : exec(null, true, "unzip", zipFile, "-d", resName);
+      String zipRes = overwrite ? exec(null, null, true, "unzip", "-o", zipFile, "-d", resName) : exec(null, null, true, "unzip", zipFile, "-d", resName);
       if (zipRes == null) {
          System.err.println("*** zip failed");
          return false;

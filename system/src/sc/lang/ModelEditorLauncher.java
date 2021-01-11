@@ -50,7 +50,7 @@ public class ModelEditorLauncher extends Thread implements IEditorSession {
          interpreter.addEditSession(sessionName, this);
       String res = null;
       try {
-         res = FileUtil.execCommand(null, args, "", 0, false, null);
+         res = FileUtil.execCommand(null, args, "", null, 0, false, null);
       }
       finally {
          if (doWait)
