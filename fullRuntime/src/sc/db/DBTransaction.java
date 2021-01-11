@@ -59,6 +59,10 @@ public class DBTransaction {
       lastThreadName = Thread.currentThread().getName();
    }
 
+   public int getNumOps() {
+      return operationList == null ? 0 : operationList.size();
+   }
+
    public void addOp(TxOperation op) {
       if (operationList == null) {
          operationList = new ArrayList<TxOperation>();

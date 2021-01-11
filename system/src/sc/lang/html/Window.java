@@ -260,10 +260,10 @@ public class Window implements IObjectId {
       sessionInvalid = true;
    }
 
-   public void windowClosed() {
+   public void windowClosed(boolean sessionExpired) {
       if (eventListeners != null) {
          for (IWindowEventListener listener:eventListeners)
-            listener.windowClosed(this);
+            listener.windowClosed(this, sessionExpired);
       }
    }
 
