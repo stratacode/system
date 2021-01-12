@@ -32,8 +32,9 @@ public class SCModel extends JavaModel {
    public String toLanguageString() {
       if (parseNode == null) {
          Object genRes = SCLanguage.INSTANCE.generate(this, false);
-         if (genRes instanceof IParseNode)
+         if (genRes instanceof IParseNode) {
             parseNode = (IParseNode) genRes;
+         }
          else
             System.out.println("Generation error for model: " + toModelString());
       }
