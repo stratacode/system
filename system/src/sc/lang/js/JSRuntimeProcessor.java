@@ -587,7 +587,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                if (jsFiles == null) {
                   // Do not need annotation classes to be converted to JS for any use cases we support so far but still need to generate the Java.
                   if (td instanceof AnnotationTypeDeclaration) {
-                     return model.getProcessedFiles(genLayer, buildSrcDir, generate);
+                     return resFiles;
                   }
                   saveJSTypeToFile(td, genLayer, buildSrcDir, resFiles);
 
@@ -734,6 +734,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       // For Java types specified in a final/compiled layer, we will never transform - need to set this here to enable incremental JS builds.
       if (javaModel.transformedInLayer == null)
          javaModel.transformedInLayer = system.currentBuildLayer;
+
+      //if (td.getEnclosingType() == null)
+      //   javaModel.clearParseNode();
 
       return resEnt;
    }
@@ -3084,6 +3087,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                         }
                      }
                   }
+
+                  type.getJavaModel().clearParseNode();
                }
             }
             else if (enclType == null) {
