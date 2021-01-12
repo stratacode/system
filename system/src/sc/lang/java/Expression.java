@@ -1068,7 +1068,9 @@ public abstract class Expression extends Statement implements IValueNode, ITyped
 
    public String toSafeLanguageString() {
       if (parseNode == null) {
-         restoreParseNode();
+         // ?? I think this makes debugging the restore code awkward
+         // since it seems to be called from the debugger 
+         //restoreParseNode();
       }
       if (parseNode == null || parseNodeInvalid)
          return toGenerateString();
