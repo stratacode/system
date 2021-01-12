@@ -274,7 +274,10 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
 
    public Statement deepCopy(int options, IdentityHashMap<Object,Object> oldNewMap) {
       Statement res = (Statement) super.deepCopy(options, oldNewMap);
-      res.fromStatement = this;
+      // When cloning the model for a different layered system, don't have the new one point back to the old
+      // like we do when we are about to transform the new one
+      if ((options & ISemanticNode.CopyIndependent) == 0)
+         res.fromStatement = this;
       res.excluded = excluded;
       if ((options & CopyInitLevels) != 0) {
          res.errorArgs = errorArgs;

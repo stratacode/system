@@ -10831,7 +10831,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    JavaModel cloneModel(Layer peerLayer, JavaModel orig) {
-      JavaModel copy = (JavaModel) orig.deepCopy(ISemanticNode.CopyParseNode,  null);
+      JavaModel copy = (JavaModel) orig.deepCopy(ISemanticNode.CopyParseNode | ISemanticNode.CopyIndependent,  null);
       copy.setLayeredSystem(this);
       copy.switchLayers(peerLayer);
 
