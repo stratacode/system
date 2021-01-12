@@ -875,6 +875,7 @@ public class ParentParseNode extends AbstractParseNode {
          if (newVal != null) {
             if (oldVal.getParseNode().getParselet() == getParselet())
                newVal.setParseNode(this);
+            // else - there might be a parent parse node that produced this value
             value = newVal;
          }
          else { // This is a semantic value - like an extra list or something which was not included in the model itself.  So this parse node refers to something in the old parse tree which is probably not great so make a clone here.
