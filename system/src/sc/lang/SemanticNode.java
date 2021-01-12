@@ -769,6 +769,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    private void appendAtString(StringBuilder sb, int indent, boolean addFile, boolean addAt, boolean addNear, Parselet parselet) {
+      if (parseNode == null)
+         return;
       restoreParseNode();
       IParseNode pp = parseNode;
       if (pp == null) {
@@ -832,6 +834,8 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    }
 
    public String computeNearString(int indent) {
+      if (parseNode == null)
+         return "";
       restoreParseNode();
       IParseNode pp = parseNode;
       if (pp == null) {
