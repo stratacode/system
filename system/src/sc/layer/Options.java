@@ -213,6 +213,12 @@ public class Options {
     */
    @Constant public boolean modelCacheEnabled = true;
 
+   /**
+    * When running the compiler, do we use the internal compiler api or fork a process to run JavaC. It's gone back and forth which is
+    * faster, but right now the external compiler seems to be about 10% faster and uses less of the heap so it's the default.
+    */
+   @Constant public boolean externalCompile = true;
+
    /** When modelCacheEnabled=true, if lazyParseNodeCache is true, we do not restore the parse-node tree until it's requested for a given model */
    @Constant public boolean lazyParseNodeCache = true;
 
@@ -385,12 +391,16 @@ public class Options {
                      editEditor = true;
                   else if (opt.equals("emc"))
                      modelCacheEnabled = true;
+                  else if (opt.equals("exc"))
+                     externalCompile = true;
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
                case 'i':
                   if (opt.equals("ie"))
                      installExisting = true;
+                  if (opt.equals("ic"))
+                     externalCompile = false;
                   else if (opt.equals("id")) {
                      if (args.length < i + 1)
                         Options.usage("Missing arg to install directory (-id) option", args);

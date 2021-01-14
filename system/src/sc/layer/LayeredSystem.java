@@ -9757,12 +9757,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                if (numToCompile > 0) {
                   PerfMon.start("javaCompile");
                   HashSet<String> errorFiles = new HashSet<String>();
-                  if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler, errorFiles) == 0) {
-                     if (!buildInfo.buildJars())
+                  if (options.externalCompile) {
+                     if (LayerUtil.compileJavaFiles(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler) == 0) {
+                        if (!buildInfo.buildJars())
+                           compileFailed = true;
+                     }
+                     else {
                         compileFailed = true;
+                     }
                   }
                   else {
-                     compileFailed = true;
+                     if (LayerUtil.compileJavaFilesInternal(bd.toCompile, genLayer.getBuildClassesDir(), getClassPathForLayer(genLayer, true, genLayer.getBuildClassesDir(), true), options.debug, javaSrcVersion, messageHandler, errorFiles) == 0) {
+                        if (!buildInfo.buildJars())
+                           compileFailed = true;
+                     }
+                     else {
+                        compileFailed = true;
+                     }
                   }
 
                   if (compileFailed) {

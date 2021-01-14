@@ -477,25 +477,22 @@ public class LayerUtil implements LayerConstants {
             ProcessBuilder pb = new ProcessBuilder(args);
             pb.redirectErrorStream(true);
 
-            System.out.println("*** Starting compile: " + StringUtil.argsToString(args));
-
             Process p = pb.start();
 
-            BufferedInputStream bis = new BufferedInputStream(p.getInputStream());
-            byte [] buf = new byte[1024];
-            int len;
-            while ((len = bis.read(buf, 0, buf.length)) != -1)
-               System.out.write(buf, 0, len);
+            BufferedReader bis = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            String line;
+            while ((line = bis.readLine()) != null) {
+               if (line.startsWith("Note: ") || line.startsWith("warning: ")) // Remove warnings from Java about deprecation and stuff like that - not critical but reduces the output volume for test scripts
+                  continue;
+               System.out.println(line);
+            }
             int stat = p.waitFor();
-            System.out.println("*** Compile process exited with: " + stat);
             return stat;
          }
-         catch (InterruptedException exc)
-         {
+         catch (InterruptedException exc) {
             System.err.println("*** compile of: " + args.toString() + " - wait interrupted: " + exc);
          }
-         catch (IOException exc)
-         {
+         catch (IOException exc) {
             System.err.println("*** compile of: " + args.toString() + " failed: " + exc);
          }
          return -1;
