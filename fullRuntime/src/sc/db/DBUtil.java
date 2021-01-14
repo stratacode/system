@@ -936,7 +936,7 @@ public class DBUtil {
 
    private final static int BatchSize = 1000;
 
-   public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, List<String> properties) {
+   public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, String commentPrefix, List<String> properties) {
       int lineCt = 0;
       File file = new File(fileName);
       BufferedReader reader = null;
@@ -952,6 +952,10 @@ public class DBUtil {
          ArrayList<IDBObject> resInsts = new ArrayList<IDBObject>();
          while ((nextLine = reader.readLine()) != null) {
             lineCt++;
+            if (nextLine.length() == 0)
+               continue;
+            if (commentPrefix != null && nextLine.startsWith(commentPrefix))
+               continue;
             String[] values = StringUtil.split(nextLine, separator);
 
             // If there is one fewer value, the last property is treated as empty or null - we just won't set it. We could also make sure there really is a \t\r\n at the end
