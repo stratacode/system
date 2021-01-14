@@ -1446,8 +1446,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
                if (transformedModel == null || transformedInLayer == null ||
                       (transformedModel.getTransformed() && transformedInLayer != layeredSystem.currentBuildLayer) && changedSinceLayer(transformedInLayer, layeredSystem.currentBuildLayer))
                   cloneTransformedModel();
-               if (parseNode == null)
-                  restoreParseNode();
 
                // Already transformed
                if (transformedModel.getTransformed()) {
@@ -1784,10 +1782,11 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          ParseUtil.initAndStartComponent(this);
          ParseUtil.processComponent(this);
       }
-      restoreParseNode();
       transformedModel = (JavaModel) this.deepCopy(CopyAll | CopyTransformed, null);
       transformedModel.nonTransformedModel = this;
       transformedInLayer = layeredSystem.currentBuildLayer;
+      if (transformedModel.parseNode == null)
+         transformedModel.restoreParseNode();
       JavaModel modModel = getModifiedModel();
       if (modModel != null)
          modModel.cloneTransformedModel();
@@ -3594,13 +3593,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
       return false;
    }
 
-   //public static int numRestoredModels = 0;
-   //public static int numClearedModels = 0;
-   //public static Map<String,Integer> restoredTable = new HashMap<String,Integer>();
-
    public boolean restoreParseNode() {
       if (parseNode == null) {
-         //System.out.println("*** Restoring parse nodes for: " + getSrcFile());
          LayeredSystem sys = getLayeredSystem();
          SrcEntry srcEnt = getSrcFile();
          if (srcEnt == null || sys == null)
@@ -3612,12 +3606,6 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
          }
          else if (sys.options.verbose)
             sys.verbose("Restored parse node for: " + this);
-         /*
-         numRestoredModels++;
-         Integer old = restoredTable.put(srcEnt.absFileName, 1);
-         if (old != null)
-            restoredTable.put(srcEnt.absFileName, old + 1);
-         */
       }
       if (parseNode == null) {
          System.err.println("*** Failed to restore parse node!");
@@ -3629,20 +3617,10 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
    public void clearParseNode() {
       if (parseNode != null) {
-         //numClearedModels++;
-         //System.out.println("*** Clearing parse nodes for: " + getSrcFile());
          parseNode.setSemanticValue(null, true, false);
-         if (transformedModel != null && transformedModel.parseNode != null) {
-            transformedModel.parseNode.setSemanticValue(null, true, false);
-         }
-
-         /*
-         Integer old = restoredTable.remove(getSrcFile().absFileName);
-         if (old == null)
-            System.err.println("*** cleared parse node not found");
-         else if (old > 1)
-            restoredTable.put(getSrcFile().absFileName, old - 1);
-         */
+      }
+      if (transformedModel != null && transformedModel.parseNode != null) {
+         transformedModel.parseNode.setSemanticValue(null, true, false);
       }
    }
 }
