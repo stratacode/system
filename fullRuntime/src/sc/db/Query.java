@@ -45,6 +45,14 @@ public abstract class Query {
       return new OpQuery(propName, op, value);
    }
 
+   // TODO: finish implementing this - maybe with an 'exists' query?  I wanted to use it for the userManager findUsersBySite
+   // query that needs to find all user accounts that have visited a site over a time period. But then it comes to sorting
+   // the users and we want to sort them by the most recent session - that requires a group by user.id max(session.timestamp) type
+   // of thing that required a custom DB query - now implemented by a stored procedure
+   //public static Query includesItem(String propName, Query subQuery) {
+   //   return new IncludesItemQuery(propName, subQuery);
+   //}
+
    public List<String> getAllPropertyNames() {
       ArrayList<String> res = new ArrayList<String>();
       addAllPropertyNames(res);
