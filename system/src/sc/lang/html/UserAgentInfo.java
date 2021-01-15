@@ -3,6 +3,7 @@ package sc.lang.html;
 import sc.lang.pattern.Pattern;
 import sc.lang.pattern.URLPatternLanguage;
 import sc.parser.Parselet;
+import sc.type.PTypeUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -47,6 +48,9 @@ public class UserAgentInfo implements Cloneable {
                   retInfo.userAgent = userAgentStr;
                   lang.parseIntoInstance(userAgentStr, curPattern.patternParselet, retInfo);
 
+                  if (!PTypeUtil.testMode)
+                     System.out.println("UserAgent matched: " + userAgentStr + " pattern: " + curPattern.pattern + " isRobot: " + retInfo.isRobot + " platform: " + retInfo.platform);
+
                   retInfo.initValues();
                   break;
                }
@@ -73,8 +77,10 @@ public class UserAgentInfo implements Cloneable {
    }
 
    private void initValues() {
-      if (platform == null)
+      if (platform == null) {
+         System.err.println("UserAgent - no platform found for: " + userAgent);
          return;
+      }
       if (platform.contains("Android")) {
          if (!hasExtension("Mobile"))
             isTablet = true;
