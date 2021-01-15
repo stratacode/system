@@ -1118,10 +1118,16 @@ public class SelectQuery implements Cloneable {
       res.append(" FROM ");
       DBUtil.appendIdent(res, null, mainTable.tableName);
       for (int i = 1; i < selectTables.size(); i++) {
-         res.append(" LEFT OUTER JOIN ");
          SelectTableDesc joinTableDesc = selectTables.get(i);
-         DBUtil.appendIdent(res, null, joinTableDesc.getTableDecl());
-         res.append(" ON ");
+         if (joinTableDesc.outerJoin) {
+            res.append(" LEFT OUTER JOIN ");
+            DBUtil.appendIdent(res, null, joinTableDesc.getTableDecl());
+            res.append(" ON ");
+         }
+         else {
+            res.append(", ");
+            DBUtil.appendIdent(res, null, joinTableDesc.getTableDecl());
+         }
          appendJoinTable(res, mainTableDesc, joinTableDesc);
       }
       return res;

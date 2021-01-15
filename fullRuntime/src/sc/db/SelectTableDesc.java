@@ -29,6 +29,8 @@ class SelectTableDesc {
    // Only set if this table is used more than once
    String alias;
 
+   boolean outerJoin = true;
+
    boolean selectDynColumn = false;
 
    SelectTableDesc(TableDescriptor table, List<DBPropertyDescriptor> props) {
