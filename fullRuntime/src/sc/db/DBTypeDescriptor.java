@@ -864,6 +864,33 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return groupQuery.runQuery(curTx, null);
    }
 
+
+   public int count(Query query) {
+      List<String> propNames = query.getAllPropertyNames();
+      List<Object> propValues = query.getAllPropertyValues();
+      IDBObject proto = propNames == null ? null : initPrototypeForQuery(propNames, propValues);
+      // Initialize the wrapper query - the one that will join across multiple DBs
+      SelectGroupQuery groupQuery = initQuery(null, propNames, true);
+      if (proto != null) {
+         DBObject protoDB = (DBObject) proto.getDBObject();
+
+         // Add all of the tables requires for the query
+         addPropBindingTables(groupQuery, protoDB, propNames);
+
+         // Build the where clause
+         boolean first = addQueryProps(query, groupQuery, protoDB, true, QCombine.And);
+
+         // If it's a polymorphic query, add the constraint for the sub-types returned
+         addBaseTypeClause(groupQuery, protoDB, propNames, first);
+
+         // Add the parameters to the query
+         addQueryParams(query, groupQuery, protoDB, true, QCombine.And);
+      }
+
+      DBTransaction curTx = DBTransaction.getOrCreate();
+      return groupQuery.countQuery(curTx, null);
+   }
+
    private void initTypeInstances() {
       synchronized (this) {
          if (typeInstances == null)
