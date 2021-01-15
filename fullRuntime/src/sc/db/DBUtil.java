@@ -673,7 +673,7 @@ public class DBUtil {
    }
 
    public static String getJavaTypeFromSQLType(String type) {
-      if (type.equalsIgnoreCase("serial") || type.equalsIgnoreCase("integer"))
+      if (type.equalsIgnoreCase("serial") || type.equalsIgnoreCase("integer") || type.equalsIgnoreCase("int") || type.equalsIgnoreCase("int4"))
          return "int";
       else if (type.equalsIgnoreCase("bigserial") || type.equalsIgnoreCase("bigint"))
          return "long";
