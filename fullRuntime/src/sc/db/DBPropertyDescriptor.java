@@ -486,7 +486,7 @@ public class DBPropertyDescriptor {
       int numCols = getNumColumns();
       if (numCols == 1)  {
          val = DBUtil.getResultSetByName(rs, colName, this);
-         if (refDBTypeDesc != null && val != null) {
+         if (refDBTypeDesc != null && val != null && !isJsonReference()) {
             DBPropertyDescriptor typeIdProperty = refDBTypeDesc.getTypeIdProperty();
             int typeId = -1;
             if (typeIdProperty != null) {
