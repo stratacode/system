@@ -675,7 +675,13 @@ public class DBObject implements IDBObject {
       for (String protoProp:protoProps) {
          DBPropertyDescriptor pdesc = dbTypeDesc.getPropertyDescriptor(protoProp);
          if (pdesc.multiRow) {
-            DBUtil.error("Failed to init multi-valued prototype property: " + protoProp + ": " + pdesc + " - don't handle list prototype properties yet");
+            //ArrayList<Object> oneVal = new ArrayList<Object>(1);
+            //if (pdesc.refDBTypeDesc != null) {
+            //   oneVal.add(pdesc.refDBTypeDesc.createPrototype(false));
+            //   setPropertyInPath(protoProp, oneVal);
+            //}
+            //else
+            DBUtil.error("Failed to init multi-valued prototype property: " + protoProp + ": " + pdesc + " - don't handle list prototype properties of this type yet");
          }
          else {
             if (pdesc.refDBTypeDesc != null) {
@@ -695,11 +701,21 @@ public class DBObject implements IDBObject {
       String[] propArr = StringUtil.split(propPath, '.');
       Object curInst = getInst();
       int pathLen = propArr.length;
+      //DBTypeDescriptor curTypeDesc = dbTypeDesc;
       int lastIx = pathLen - 1;
       for (int i = 0; i < lastIx; i++) {
-         curInst = DynUtil.getPropertyValue(curInst, propArr[i]);
+         String curProp = propArr[i];
+         curInst = DynUtil.getPropertyValue(curInst, curProp);
          if (curInst == null)
             throw new NullPointerException("Null reference in DBObject.setPropertyInPath path");
+         //DBPropertyDescriptor propDesc = curTypeDesc.getPropertyDescriptor(curProp);
+         //if (propDesc == null)
+         //   System.err.println("*** No db property descriptor found for value: " + curProp);
+         // In initProtoProperties we will have created a single element list to store the prototype values for this
+         // multi-valued property
+         //else if (propDesc.multiRow) {
+         //   curInst = ((List) curInst).get(0);
+         //}
       }
       DynUtil.setPropertyValue(curInst, propArr[lastIx], value);
    }
