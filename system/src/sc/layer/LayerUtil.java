@@ -443,13 +443,18 @@ public class LayerUtil implements LayerConstants {
       }
    }
 
-   private static void addFileNamesToCompile(Collection<SrcEntry> srcEnts, String buildDir, List<String> args) {
+   private static void addFileNamesToCompile(Collection<SrcEntry> srcEnts, String buildDir, List<String> args, boolean relPathsToWorkingDir) {
       for (SrcEntry src:srcEnts) {
          File classFile = new File(buildDir,
                  FileUtil.concat(src.relFileName,  FileUtil.replaceExtension(src.baseFileName, "class")));
          File srcFile = new File(src.absFileName);
-         if (!classFile.exists() || classFile.lastModified() < srcFile.lastModified())
-            args.add(src.absFileName);
+         if (!classFile.exists() || classFile.lastModified() < srcFile.lastModified()) {
+            if (relPathsToWorkingDir && src.absFileName.startsWith(buildDir)) {
+               args.add(src.absFileName.substring(buildDir.length()+1));
+            }
+            else
+               args.add(src.absFileName);
+         }
       }
    }
    
@@ -458,7 +463,7 @@ public class LayerUtil implements LayerConstants {
          List<String> args = new ArrayList<String>(srcEnts.size() + 5);
          args.add("javac");
 
-         addFileNamesToCompile(srcEnts, buildDir, args);
+         addFileNamesToCompile(srcEnts, buildDir, args, true);
 
          args.add("-d");
          args.add(buildDir);
@@ -476,6 +481,7 @@ public class LayerUtil implements LayerConstants {
          try {
             ProcessBuilder pb = new ProcessBuilder(args);
             pb.redirectErrorStream(true);
+            pb.directory(new File(buildDir));
 
             Process p = pb.start();
 
