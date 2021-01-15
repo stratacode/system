@@ -8,11 +8,13 @@ import sc.lang.sc.PropertyAssignment;
 import sc.lang.template.Template;
 import sc.layer.Layer;
 import sc.layer.LayeredSystem;
+import sc.layer.SrcEntry;
 import sc.parser.IParseNode;
 import sc.parser.ParseError;
 import sc.parser.ParseUtil;
 import sc.type.CTypeUtil;
 import sc.type.IBeanMapper;
+import sc.util.FileUtil;
 import sc.util.StringUtil;
 
 import java.util.*;
@@ -218,10 +220,30 @@ public class DBProvider {
          if (tmpStoreInExtendsTable != null)
             storeInExtendsTable = tmpStoreInExtendsTable;
 
-         String tmpSchemaSQL = (String) ModelUtil.getAnnotationValue(typeDecl, "sc.db.SchemaSQL", "value");
+         String fileSQL = (String) ModelUtil.getAnnotationValue(typeDecl, "sc.db.SchemaSQL", "file");
+         String valueSchemaSQL = (String) ModelUtil.getAnnotationValue(typeDecl, "sc.db.SchemaSQL", "value");
+         String tmpSchemaSQL = null;
+         if (fileSQL != null) {
+            Layer layer = ModelUtil.getLayerForType(sys, typeDecl);
+            if (layer == null)
+               sys.error("@SchemaSQL annotation on class: " + typeDecl + " no layer for type ");
+            else {
+               SrcEntry fileEnt = layer.getLayerFileFromRelName(fileSQL, true, true);
+               if (fileEnt == null) {
+                  sys.error("@SchemaSQL annotation on class: " + typeDecl + " missing file: " + fileSQL + " expecting file in layer path for: " + layer);
+               }
+               else {
+                  tmpSchemaSQL = FileUtil.getFileAsString(fileEnt.absFileName);
+                  if (valueSchemaSQL != null && valueSchemaSQL.length() > 0)
+                     tmpSchemaSQL = tmpSchemaSQL + "\n" + valueSchemaSQL;
+               }
+            }
+         }
+         else if (valueSchemaSQL != null)
+            tmpSchemaSQL = valueSchemaSQL;
+
          if (tmpSchemaSQL != null) {
             schemaSQL = tmpSchemaSQL;
-
             if (schemaSQL.length() > 0) {
                Object parseRes = SQLLanguage.getSQLLanguage().parseString(schemaSQL);
                if (parseRes instanceof ParseError) {
