@@ -473,6 +473,7 @@ public class LayerUtil implements LayerConstants {
             args.add("-source");
             args.add(srcVersion);
          }
+         args.add("-implicit:class"); // disable annotation processing since it gives warnings if we leave out a file on the argument list to compile
          if (debug)
             args.add("-g");
          // args.add("-target");
