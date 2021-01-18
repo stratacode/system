@@ -266,13 +266,15 @@ public class HTMLElement<RE> extends Element<RE> {
 
    }
 
-   // To be called on the client only where it calls the DOM focus element
+   // Set the focus to this element. With clientOnly=true, all calls processed will turn into remote calls in the
+   // generated code. If called directly from the server (either in Java that's not processed or from the command line)
+   // it will use the invokeRemote method to call the client method.
    @sc.obj.Exec(clientOnly=true)
    public void focus() {
       Element root = getRootTag();
       if (root instanceof IPage) {
          IPageDispatcher dispatcher = ((IPage) root).getPageDispatcher();
-         dispatcher.invokeRemote(this, HTMLElement.class, "focus", Void.class, null, null);
+         dispatcher.invokeRemote(this, HTMLElement.class, "focus", Void.class, null);
          return;
       }
       System.err.println("*** No sync context for remote focus method");

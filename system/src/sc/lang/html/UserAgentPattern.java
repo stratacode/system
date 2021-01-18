@@ -23,18 +23,28 @@ public class UserAgentPattern {
    static {
       // Any browsers that don't use Mozilla/5.0 now?
       UserAgentPattern browserPattern = new UserAgentPattern();
-      browserPattern.pattern = "Mozilla/5.0{whiteSpace}\\({platform=userAgentComment}\\){whiteSpace}{extensions=userAgentExts}";
+      browserPattern.pattern = "Mozilla/5.0{whiteSpace}{platform=userAgentComment}{whiteSpace}{extensions=userAgentExts}";
       browserPattern.init();
       browserPattern.defaultInfo.isBrowser = true;
       userAgentPatterns.add(browserPattern);
 
-      // TODO: this is a catchall for now but it would be nice to get some type of data model from the robot
-      // traffic as part of the management UI options
+      UserAgentPattern extensionsPattern = new UserAgentPattern();
+      extensionsPattern.pattern = "Mozilla/5.0{whiteSpace}{extensions=userAgentExts}";
+      extensionsPattern.init();
+      userAgentPatterns.add(extensionsPattern);
+
       UserAgentPattern robotPattern = new UserAgentPattern();
       robotPattern.pattern = "{platform=userAgentName}[/{whiteSpace}{versionString}]{whiteSpace}{extensions=userAgentExts}";
       robotPattern.init();
       robotPattern.defaultInfo.isRobot = true;
       userAgentPatterns.add(robotPattern);
+
+      // Just the comment string - e.g. '(compatible;PetalBot;+https://aspiegel.com/petalbot)'
+      UserAgentPattern robotPattern2 = new UserAgentPattern();
+      robotPattern2.pattern = "{platform=userAgentComment}";
+      robotPattern2.init();
+      robotPattern2.defaultInfo.isRobot = true;
+      userAgentPatterns.add(robotPattern2);
    }
 
 }

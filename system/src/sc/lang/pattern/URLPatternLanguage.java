@@ -55,14 +55,14 @@ public class URLPatternLanguage extends SCLanguage {
    }
 
    //public SymbolChoice uaNameSpecialChar = new SymbolChoice('+', '.', ':');
-   public SymbolChoice uaCommentSpecialChar = new SymbolChoice('+', '.', ':', '/', ';', ' ', ',');
-   public Parselet userAgentName = new OrderedChoice("('','')", REPEAT, alphaNumChar, digits /*, uaNameSpecialChar*/);
-   public Parselet userAgentComment = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, uaCommentSpecialChar);
+   public SymbolChoice uaCommentSpecialChar = new SymbolChoice('+', '.', ':', '/', ';', ' ', ',', '-');
+   public Parselet userAgentName = new OrderedChoice("('','','','')", REPEAT, alphaNumChar, digits, new Symbol(" "), period /*, uaNameSpecialChar*/);
+   public Parselet userAgentCommentBody = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, uaCommentSpecialChar);
+   public Parselet userAgentComment = new Sequence("(,.,)", OPTIONAL, openParen, userAgentCommentBody, closeParen);
 
-   public Parselet versionString = new OrderedChoice("('','','')", REPEAT, digits, alphaNumChar, period);
+   public Parselet versionString = new OrderedChoice("('','','')", REPEAT, digits, alphaNumChar, new SymbolChoice("-", "."));
 
    // In the browser user-agent string, the list of extensions name/version (...)
    public Parselet userAgentExts = new Sequence("([])", OPTIONAL | REPEAT,
-           new Sequence("UserAgentExtension(name,,version,,comment)", userAgentName, new Symbol("/"), versionString, whiteSpace,
-            new Sequence("(,.,)", OPTIONAL, openParen, userAgentComment, closeParen)));
+           new Sequence("UserAgentExtension(name,*,,comment)", userAgentName, new Sequence("(,version)", OPTIONAL, new Symbol("/"), versionString), whiteSpace, userAgentComment));
 }

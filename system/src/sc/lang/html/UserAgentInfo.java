@@ -10,6 +10,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Provides information about a particular http user-agent - obtained by parsing the user-agent header.
+ * A small number of patterns are registered that use the UserAgentInfo class as the target. The patterns can
+ * set the properties of this class directly - e.g. platform, and extensions. Once we've organized the information,
+ * we look for patterns in the platform and extensions using a normal method and cache the results.
+ * Based on the user-agent, we can provide a default screen width/height to use for the tag objects in rendering the
+ * initial HTML.
+ */
 public class UserAgentInfo implements Cloneable {
    public String userAgent;
    public String platform;
@@ -22,6 +30,8 @@ public class UserAgentInfo implements Cloneable {
    public String browser;
    public String browserVersion;
    public String osName;
+
+   public static int CacheSizeLimit = 10000;
 
    public static List<String> mobilePlatforms = new ArrayList<String>();
    {
@@ -40,6 +50,7 @@ public class UserAgentInfo implements Cloneable {
          UserAgentInfo cachedInfo = userAgentInfoCache.get(userAgentStr);
          if (cachedInfo == null) {
             URLPatternLanguage lang = URLPatternLanguage.getURLPatternLanguage();
+            int ix = 0;
             for (UserAgentPattern curPattern:UserAgentPattern.userAgentPatterns) {
                // TODO: this doesn't support some of the parselets we use in the user agent parsing but only
                // happens on the server so it's ok to use the parselet: curInfo.patternImpl.matchString(userAgentStr)
@@ -54,6 +65,7 @@ public class UserAgentInfo implements Cloneable {
                   retInfo.initValues();
                   break;
                }
+               ix++;
             }
          }
          else
@@ -62,8 +74,14 @@ public class UserAgentInfo implements Cloneable {
       if (retInfo == null) {
          retInfo = new UserAgentInfo();
          retInfo.userAgent = userAgentStr;
+         retInfo.platform = userAgentStr;
+         System.err.println("*** Unrecognized format for user-agent string: " + userAgentStr);
+         retInfo.isRobot = true;
       }
-      userAgentInfoCache.put(userAgentStr, retInfo);
+      if (userAgentInfoCache.size() < CacheSizeLimit)
+         userAgentInfoCache.put(userAgentStr, retInfo);
+      else
+         System.err.println("*** User-agent cache exceeded limit: " + CacheSizeLimit + " not caching user-agent: " + userAgentStr);
       return retInfo;
    }
 
@@ -76,10 +94,37 @@ public class UserAgentInfo implements Cloneable {
       }
    }
 
+   String getExtensionsString() {
+      if (extensions == null || extensions.size() == 0)
+         return null;
+      StringBuilder sb = new StringBuilder();
+      int ix = 0;
+      for (UserAgentExtension ext:extensions) {
+         if (ix != 0)
+            sb.append(" ");
+         sb.append(ext.name);
+         sb.append("/");
+         sb.append(ext.version);
+         if (ext.comment != null) {
+            sb.append(" (");
+            sb.append(ext.comment);
+            sb.append(")");
+         }
+         ix++;
+      }
+      return sb.toString();
+   }
+
    private void initValues() {
       if (platform == null) {
-         System.err.println("UserAgent - no platform found for: " + userAgent);
-         return;
+         if (extensions == null || extensions.size() == 0) {
+            System.err.println("UserAgent - no platform or extensions found for: " + userAgent);
+            return;
+         }
+         else {
+            // There's no primary platform so we'll put everything into the platform string
+            platform = getExtensionsString();
+         }
       }
       if (platform.contains("Android")) {
          if (!hasExtension("Mobile"))
@@ -117,12 +162,44 @@ public class UserAgentInfo implements Cloneable {
             browser = "Opera";
             browserVersion = vers;
          }
+         // Does not look like a browser - look for a few specific bots tht don't act like browsers
          else {
+            if (platform.contains("AhrefsBot")) {
+               browser = "AhrefsBot";
+               browserVersion = null;
+               isRobot = true;
+            }
+            else {
+               vers = getExtensionVersion("YandexBot") ;
+               if (vers != null) {
+                  browser = "YandexBot";
+                  browserVersion = vers;
+                  isRobot = true;
+               }
+               else {
+                  browser = platform;
+                  browserVersion = null;
+               }
+            }
+         }
+
+         // Everything is set now but sometimes bots pose as browsers so to catch those, look for some more patterns
+         String botVers = getExtensionVersion("Googlebot");
+
+         // specific bots we might want to log separately
+         if (botVers != null || platform.contains("Googlebot")) {
+            isRobot = true;
+            browser = "Googlebot";
+            browserVersion = botVers;
+         }
+         // generic bots and other catch-all patterns
+         else if (platform.contains("bot") || platform.contains("Bot") || platform.contains("pider")) {
+            isRobot = true;
             browser = platform;
             browserVersion = null;
          }
       }
-      else
+      else // already a bot based on the pattern
          browser = platform;
    }
 
