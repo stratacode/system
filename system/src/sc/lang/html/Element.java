@@ -118,6 +118,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    // walk down the tree and fire changed events to notify listeners of what needs to be sync'd to the remote client
    public transient boolean refreshTagsScheduled = false;
 
+   public transient boolean refreshTagsNeeded = false;
+
    public transient String startTagCache, bodyCache;
    private transient CacheMode cache;
 
@@ -5887,6 +5889,32 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void scheduleRefreshTags() {
       if (refreshTagsScheduled)
          return;
+      if (this instanceof IPage) {
+         List<CurrentScopeContext> pageCtxs = ((IPage) this).getCurrentScopeContexts();
+         if (pageCtxs != null && pageCtxs.size() > 0) {
+            CurrentScopeContext scopeCtx = CurrentScopeContext.getThreadScopeContext();
+            if (scopeCtx == null) {
+               refreshTagsNeeded = true;
+               System.err.println("Warning: refreshTags called no scopeCtx: " + scopeCtx + " where page has ctx: " + pageCtxs);
+               return;
+            }
+            else {
+               boolean found = false;
+               for (int pi = 0; pi < pageCtxs.size(); pi++) {
+                  CurrentScopeContext csc = pageCtxs.get(pi);
+                  if (csc == scopeCtx || csc.sameContexts(scopeCtx)) {
+                     found = true;
+                     break;
+                  }
+               }
+               if (!found) {
+                  refreshTagsNeeded = true;
+                  System.err.println("Warning: refreshTags called scopeCtx: " + scopeCtx + " with page ctxs: " + pageCtxs);
+                  return;
+               }
+            }
+         }
+      }
       refreshTagsScheduled = true;
       DynUtil.invokeLater(new Runnable() {
          public void run() {
@@ -5897,6 +5925,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public void refreshTags(boolean parentBodyChanged) {
+      refreshTagsNeeded = false;
       if (replaceWith != null) {
          replaceWith.refreshTags(parentBodyChanged);
          return;
