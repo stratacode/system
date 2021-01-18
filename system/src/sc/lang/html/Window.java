@@ -66,6 +66,7 @@ public class Window implements IObjectId {
    public int windowId;
 
    public static String globalTestRemoteIp;
+   public static String globalTestUserAgent;
 
    private static IBeanMapper[] windowSyncProps = new IBeanMapper[] {innerWidthProp, innerHeightProp, devicePixelRatioProp};
 

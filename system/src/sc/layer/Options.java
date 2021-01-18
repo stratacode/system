@@ -654,6 +654,11 @@ public class Options {
                         System.err.println("*** missing arg to run -tip");
                      Window.globalTestRemoteIp = args[++i];
                   }
+                  else if (opt.equals("tua")) {
+                     if (i == args.length - 1)
+                        System.err.println("*** missing arg to run -tua");
+                     Window.globalTestUserAgent = args[++i];
+                  }
                   else
                      Options.usage("Unrecognized option: " + opt, args);
                   break;
