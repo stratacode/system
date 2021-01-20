@@ -5895,7 +5895,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             CurrentScopeContext scopeCtx = CurrentScopeContext.getThreadScopeContext();
             if (scopeCtx == null) {
                refreshTagsNeeded = true;
-               System.err.println("Warning: refreshTags called no scopeCtx: " + scopeCtx + " where page has ctx: " + pageCtxs);
+               if (verbose)
+                  System.out.println("RefreshTags with no scopeCtx: " + scopeCtx + " for page with ctx list: " + pageCtxs);
                return;
             }
             else {
