@@ -299,6 +299,12 @@ public class CurrentScopeContext {
       }
    }
 
+   /** Wake up anyone listening for changes to the event context in this current scope context */
+   public void scopeChanged() {
+      ScopeContext eventCtx = getEventScopeContext();
+      if (eventCtx != null)
+         eventCtx.scopeChanged();
+   }
 
    public synchronized void markWaiting(boolean val) {
       contextIsReady = val;

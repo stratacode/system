@@ -5909,8 +5909,15 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                   }
                }
                if (!found) {
-                  refreshTagsNeeded = true;
-                  System.err.println("Warning: refreshTags called scopeCtx: " + scopeCtx + " with page ctxs: " + pageCtxs);
+                  if (!refreshTagsNeeded) {
+                     if (verbose)
+                        System.out.println("Cross scope refreshTags call - current ctx: " + scopeCtx + " trying to refresh page with contexts: " + pageCtxs);
+                     refreshTagsNeeded = true;
+                     for (int pi = 0; pi < pageCtxs.size(); pi++) {
+                        CurrentScopeContext csc = pageCtxs.get(pi);
+                        csc.scopeChanged();
+                     }
+                  }
                   return;
                }
             }
