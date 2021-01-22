@@ -600,7 +600,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       else
          id = new MultiColIdentity(idArgs);
 
-      return lookupInstById(id, -1, false, true);
+      IDBObject res = lookupInstById(id, -1, false, true);
+      if (res != null && ((DBObject)res.getDBObject()).isPrototype())
+         res = null;
+      return res;
    }
 
    public List<? extends IDBObject> findAll(List<String> orderByNames, int startIx, int maxResults) {
@@ -954,8 +957,11 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       // If requested, select the default (primary table) property group - if the row does not exist, the object does not exist
       if (selectDefault) {
-         if (!dbObj.dbFetchDefault())
+         if (!dbObj.dbFetchDefault()) {
+            // TODO: should we optionally cache a null-sentinel here for some time to avoid re-executing the same null result queries?
+            typeInstances.remove(id);
             return null;
+         }
       }
       if (dbObj.wrapper != inst)
          return dbObj.wrapper;
