@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang;
@@ -73,7 +73,11 @@ public class PatternLanguage extends BaseLanguage {
                         new SymbolChoice(NOT, "\\", "{", "}", "[", "]", "(", ")", "!", "*", EOF));
 
    // A variable is a variableDef surrounded by braces
-   Sequence variable = new Sequence("(,.,)", new Symbol("{"), new Sequence("PatternVariable(name,*)", identifier, new Sequence("(,equalsName)", OPTIONAL, new Symbol("="), identifier)), new Symbol("}"));
+   Sequence variable =
+           new Sequence("(,.,)", new Symbol("{"),
+                        new Sequence("PatternVariable(name,*)", identifier,
+                                     new Sequence("(,equalsName)", OPTIONAL, new Symbol("="), identifier)),
+                        new Symbol("}"));
 
    SymbolChoice optionSymbols = new SymbolChoice( OPTIONAL | REPEAT, "!", "*");
 
@@ -82,7 +86,8 @@ public class PatternLanguage extends BaseLanguage {
    Sequence nestedPattern = new Sequence("Pattern(optionSymbols,,elements,)");
 
    // A pattern element is an Object - either a String or a Variable.
-   Parselet patternElements = new OrderedChoice("([], [], [], [])", OPTIONAL | REPEAT, escapedString, variable, optionalPattern, nestedPattern);
+   Parselet patternElements = new OrderedChoice("([], [], [], [])", OPTIONAL | REPEAT, escapedString,
+                                                variable, optionalPattern, nestedPattern);
    {
       optionalPattern.set(optionSymbols, new Symbol("["), patternElements, new Symbol("]"));
       nestedPattern.set(optionSymbols, new Symbol("("), patternElements, new Symbol(")"));

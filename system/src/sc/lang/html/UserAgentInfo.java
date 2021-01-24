@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
+ */
+
 package sc.lang.html;
 
 import sc.lang.pattern.Pattern;
@@ -144,6 +148,53 @@ public class UserAgentInfo implements Cloneable {
       else
          osName = platform;
 
+      // Do a robot detection first because some robots will have a normal user agent and put the
+      // bot extension part at the end.
+      if (!isRobot) {
+         if (platform.contains("AhrefsBot")) {
+            browser = "AhrefsBot";
+            browserVersion = null;
+            isRobot = true;
+            isBrowser = false;
+         }
+         else {
+            String vers = getExtensionVersion("YandexBot") ;
+            if (vers != null) {
+               browser = "YandexBot";
+               browserVersion = vers;
+               isRobot = true;
+               isBrowser = false;
+            }
+            else if ((vers = getExtensionVersion("zgrab")) != null) {
+               browser = "zgrab";
+               browserVersion = vers;
+               isRobot = true;
+               isBrowser = false;
+            }
+            else {
+               browser = platform;
+               browserVersion = null;
+            }
+         }
+         // Everything is set now but sometimes bots pose as browsers so to catch those, look for some more patterns
+         String botVers = getExtensionVersion("Googlebot");
+
+         // specific bots we might want to log separately
+         if (botVers != null || platform.contains("Googlebot")) {
+            isRobot = true;
+            isBrowser = false;
+            browser = "Googlebot";
+            browserVersion = botVers;
+         }
+         // generic bots and other catch-all patterns
+         else if (platform.contains("bot") || platform.contains("Bot") || platform.contains("pider") || platform.contains("rawler")) {
+            isRobot = true;
+            isBrowser = false;
+            browser = platform;
+            browserVersion = null;
+         }
+      }
+
       if (!isRobot) {
          String vers = getExtensionVersion("Chrome");
          if (vers != null) {
@@ -162,39 +213,7 @@ public class UserAgentInfo implements Cloneable {
             browser = "Opera";
             browserVersion = vers;
          }
-         // Does not look like a browser - look for a few specific bots tht don't act like browsers
          else {
-            if (platform.contains("AhrefsBot")) {
-               browser = "AhrefsBot";
-               browserVersion = null;
-               isRobot = true;
-            }
-            else {
-               vers = getExtensionVersion("YandexBot") ;
-               if (vers != null) {
-                  browser = "YandexBot";
-                  browserVersion = vers;
-                  isRobot = true;
-               }
-               else {
-                  browser = platform;
-                  browserVersion = null;
-               }
-            }
-         }
-
-         // Everything is set now but sometimes bots pose as browsers so to catch those, look for some more patterns
-         String botVers = getExtensionVersion("Googlebot");
-
-         // specific bots we might want to log separately
-         if (botVers != null || platform.contains("Googlebot")) {
-            isRobot = true;
-            browser = "Googlebot";
-            browserVersion = botVers;
-         }
-         // generic bots and other catch-all patterns
-         else if (platform.contains("bot") || platform.contains("Bot") || platform.contains("pider")) {
-            isRobot = true;
             browser = platform;
             browserVersion = null;
          }
@@ -233,8 +252,9 @@ public class UserAgentInfo implements Cloneable {
    }
 
    public boolean isMobile() {
-      if (mobilePlatforms.contains(platform))
-         return true;
+      for (String mobilePlatform:mobilePlatforms)
+         if (platform.contains(mobilePlatform))
+            return true;
       if (extensions != null) {
          for (UserAgentExtension ext:extensions)
             if (mobilePlatforms.contains(ext.name) || (ext.comment != null && listItemInString(mobilePlatforms, ext.comment)))
@@ -253,5 +273,26 @@ public class UserAgentInfo implements Cloneable {
 
    public double getDefaultDevicePixelRatio() {
       return isMobile() ? 2.0 : 1.0;
+   }
+
+   public static void main(String[] args) {
+      if (args.length != 1)
+         System.out.println("Supply a user agent string as the only argument");
+      else
+         System.out.println(UserAgentInfo.getUserAgent(args[0]));
+   }
+
+   public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("- UserAgent: " + userAgent + "\n");
+      sb.append("  isBrowser: " + isBrowser + "\n");
+      sb.append("  isRobot: " + isRobot + "\n");
+      sb.append("  isTablet: " + isTablet + "\n");
+      sb.append("  isMobile: " + isMobile() + "\n");
+      sb.append("  platform: " + platform + "\n");
+      sb.append("  browser: " + browser + "\n");
+      sb.append("  browserVers: " + browserVersion + "\n");
+      sb.append("  os: " + osName + "\n---\n");
+      return sb.toString();
    }
 }

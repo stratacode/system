@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang;

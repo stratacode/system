@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.type;
@@ -398,7 +398,9 @@ public class PTypeUtil {
 
       try {
          if (method instanceof Method) {
-            return ((Method) method).invoke(thisObject, argValues);
+            Method meth = (Method) method;
+            argValues = convertVarargValues(meth, argValues);
+            return meth.invoke(thisObject, argValues);
          }
          else
             throw new IllegalArgumentException("Unrecognized type of method to TypeUtil.invokeMethod: " + method);
@@ -1278,5 +1280,45 @@ public class PTypeUtil {
          sb.append("0");
       sb.append(elapsed);
       return sb.toString();
+   }
+
+   public static Object[] convertVarargValues(Method method, Object[] argValues) {
+      int numParams = method.getParameterCount();
+      int numArgs = argValues == null ? 0 : argValues.length;
+      boolean isVarArgs = numParams != 0 && method.isVarArgs();
+      if (isVarArgs) {
+         Object[] repeatVal = null;
+         boolean redoArgs = false;
+         if (numArgs < numParams) {
+            repeatVal = new Object[0];
+            redoArgs = true;
+         }
+         else {
+            int last = numParams - 1;
+            Object lastVal = argValues == null ? null : argValues[last];
+            if (numParams != numArgs || !(lastVal instanceof Object[])) {
+               int numRepeat = numArgs + 1 - numParams;
+               Parameter param = method.getParameters()[last];
+               Class paramType = param.getType();
+               Class cl = paramType.getComponentType();
+
+               repeatVal = (Object[]) PTypeUtil.newArray(cl, numRepeat);
+               for (int i = 0; i < numRepeat; i++) {
+                  repeatVal[i] = argValues[last++];
+               }
+               redoArgs = true;
+            }
+         }
+         if (redoArgs) {
+            int last = numParams - 1;
+            Object[] newArgValues = new Object[numParams];
+            for (int i = 0; i < last; i++) {
+               newArgValues[i] = argValues[i];
+            }
+            newArgValues[last] = repeatVal;
+            argValues = newArgValues;
+         }
+      }
+      return argValues;
    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021. Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang;
@@ -16,10 +16,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** This is the main implementation class for the Java parser and grammar.  Like all languages 
+/**
+ * This is the main implementation class for the Java parser and grammar.  Like all languages
  * built with the parselets framework, it exposes fields for each Parselet.  Some of these are
  * marked "public" so that you can parse and manipulate individual language elements like a
-* statement or an initializer
+ * statement or an initializer
  */
 public class JavaLanguage extends BaseLanguage {
    protected static final String[] JAVA_KEYWORDS = {
@@ -34,7 +35,8 @@ public class JavaLanguage extends BaseLanguage {
            "finally",   "long",        "strictfp",   "volatile",  "const",
            "float",     "native",      "super",      "while",     "enum"};
 
-   protected static final List<String> CLASS_LEVEL_KEYWORDS = Arrays.asList("class", "enum", "const", "final", "abstract", "native", "volatile", "public", "private", "interface", "transient", "synchronized");
+   protected static final List<String> CLASS_LEVEL_KEYWORDS = Arrays.asList("class", "enum", "const", "final",
+                "abstract", "native", "volatile", "public", "private", "interface", "transient", "synchronized");
 
    protected static Set<IString> JAVA_KEYWORD_SET = new HashSet<IString>(Arrays.asList(PString.toPString(JAVA_KEYWORDS)));
 
@@ -78,7 +80,8 @@ public class JavaLanguage extends BaseLanguage {
    //Sequence imports = (Sequence) importDeclaration.copyWithOptions(REPEAT | OPTIONAL);
    Sequence imports = new Sequence("([])", REPEAT | OPTIONAL, importDeclaration);
 
-   KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char", "int", "float", "long", "double", "void");
+   KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char",
+                                                        "int", "float", "long", "double", "void");
 
    Sequence primitiveType = new Sequence("PrimitiveType(typeName,)", primitiveTypeName, spacing);
 
@@ -98,25 +101,29 @@ public class JavaLanguage extends BaseLanguage {
    OrderedChoice typeArgument = new OrderedChoice("<typeArgument>", argType,
                 // The questionMark mapping here is only needed so the generation matches this node properly
                 new Sequence("ExtendsType(questionMark,*)",OPTIONAL, questionMark,
-                             new Sequence("(operator,typeArgument)", OPTIONAL, new SemanticTokenChoice("extends", "super"), argType)));
+                             new Sequence("(operator,typeArgument)", OPTIONAL,
+                                          new SemanticTokenChoice("extends", "super"), argType)));
 
-   Sequence typeArgumentList = new Sequence("([],[])", OPTIONAL, typeArgument, new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument));
-   // Note: not using greaterThanSkipOnError here and other type arg lists because it confuses the parsing of partial binary expressions
+   Sequence typeArgumentList = new Sequence("([],[])", OPTIONAL, typeArgument,
+                                            new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument));
+   // Note: not using skipOnError for greaterThan here and other type args for better partial parsing of binary exprs
    Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThan);
    {
       typeArguments.ignoreEmptyList = false;
    }
    public Sequence optTypeArguments = new Sequence("(.)", OPTIONAL, typeArguments);
 
-   Sequence classTypeChainedTypes = new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT, periodSpace, identifier, optTypeArguments);
+   Sequence classTypeChainedTypes = new Sequence("ClassType(, typeName, typeArguments)", OPTIONAL | REPEAT,
+                                                 periodSpace, identifier, optTypeArguments);
 
-   public Sequence classOrInterfaceType =
-           new Sequence("ClassType(typeName, typeArguments, chainedTypes)", identifier, optTypeArguments, classTypeChainedTypes);
+   public Sequence classOrInterfaceType = new Sequence("ClassType(typeName, typeArguments, chainedTypes)",
+                                                       identifier, optTypeArguments, classTypeChainedTypes);
    {
       type.set(new OrderedChoice(classOrInterfaceType, primitiveType), openCloseSqBrackets);
    }
 
-   Sequence typeBound = new Sequence("BoundType(baseType, boundTypes)", SKIP_ON_ERROR, type, new Sequence("(,[])", OPTIONAL, new SymbolSpace("&"), type));
+   Sequence typeBound = new Sequence("BoundType(baseType, boundTypes)", SKIP_ON_ERROR, type,
+                                     new Sequence("(,[])", OPTIONAL, new SymbolSpace("&"), type));
    Sequence typeList = new Sequence("([],[])", type, new Sequence("(,[])", OPTIONAL | REPEAT, comma, type));
 
    // Forward declarations see below for definition
@@ -186,17 +193,20 @@ public class JavaLanguage extends BaseLanguage {
    Sequence classCreatorRest = new Sequence("(arguments, classBody)", arguments, optClassBody);
    OrderedChoice typeOrQuestion = new OrderedChoice(argType, new Sequence("ExtendsType(questionMark)", questionMark));
    Sequence simpleTypeArguments = new Sequence("(,[],)", OPTIONAL, lessThan,
-           new Sequence("([],[])", OPTIONAL, typeOrQuestion, new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion))
-           , greaterThan);
+           new Sequence("([],[])", OPTIONAL, typeOrQuestion,
+                        new Sequence("(,[])",OPTIONAL | REPEAT, comma, typeOrQuestion)), greaterThan);
    Sequence innerCreator =
            new Sequence("NewExpression(typeArguments, typeIdentifier, *)", simpleTypeArguments, identifier, classCreatorRest);
 
-   public Sequence arrayElementExpression = new Sequence("ArrayElementExpression(arrayDimensions)", new Sequence("(,[],)", REPEAT, openSqBracket, expression, closeSqBracket));
+   public Sequence arrayElementExpression =
+           new Sequence("ArrayElementExpression(arrayDimensions)", new Sequence("(,[],)", REPEAT, openSqBracket,
+                                                                                    expression, closeSqBracket));
 
    OrderedChoice identifierSuffix = new OrderedChoice(OPTIONAL,
          arrayElementExpression,
          new Sequence("IdentifierExpression(arguments)", arguments),
-         new Sequence("TypedMethodExpression(,typeArguments,typedIdentifier,arguments)", periodSpace, simpleTypeArguments, identifier, arguments),
+         new Sequence("TypedMethodExpression(,typeArguments,typedIdentifier,arguments)", periodSpace,
+                      simpleTypeArguments, identifier, arguments),
          new Sequence("(,,.)", periodSpace, newKeyword, innerCreator));
 
    Sequence parenExpression = new Sequence("ParenExpression(,expression,)", openParen, expression, closeParenSkipOnError);

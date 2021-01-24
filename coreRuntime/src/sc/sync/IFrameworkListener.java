@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
+ */
+
 package sc.sync;
 
 /** Hook for frameworks to be notified after a sync update has been applied. */

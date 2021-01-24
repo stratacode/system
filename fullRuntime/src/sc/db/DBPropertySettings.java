@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
+ */
+
 package sc.db;
 
 /** Set on a property inside of a class with DBTypeSettings to control how or whether the property is mapped to a column in the DB  */

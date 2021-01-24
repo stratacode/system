@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang.js;
@@ -11,17 +11,24 @@ import sc.parser.*;
 import java.util.Set;
 
 /**
- * Language grammar for Javascript.
+ * Language grammar for Javascript. This only supports the old-style javascript and right now requires semi-colons at
+ * the end of each line.
  *
- * Extending the SCLanguage to make it easier to convert from SC to JS via the grammar.  Rather than defining a new grammar from scratch, we
- * replace and change the Java grammar so it can parse Javascript files.   Partly this is because we can then easily map parselets from one language
- * to the other by looking up in the class hierarchy, but we could have a more general way to do that (so for example that two sub-classes of Java, or two completely independent
- * languages map to each other based on mapping names or some import/export mechanism).  The most important thing is that during a conversion from one language to the
- * next, you can just change the language of a parseNode and re-generate it's code in the new language by applying the new grammar rules in reverse.  That involves finding the parselet
+ * TODO: add a custom parselet for supporting optional semi-colons
+ * TODO: add support for more modern syntax in JS
+ *
+ * Extending the SCLanguage to make it easier to convert from SC to JS via the grammar.  Rather than defining a new
+ * grammar from scratch, we replace and change the Java grammar so it can parse Javascript files.   Partly this is
+ * because we can then easily map parselets from one language to the other by looking up in the class hierarchy, but
+ * we could have a more general way to do that (so for example that two sub-classes of Java, or two completely independent
+ * languages map to each other based on mapping names or some import/export mechanism).  The most important thing is that
+ * during a conversion from one language to the next, you can just change the language of a parseNode and re-generate
+ * it's code in the new language by applying the new grammar rules in reverse.  That involves finding the parselet
  * in one language that maps to the next.
  *
- * The other way of looking at this is that some language needs to be the lingua-franca and the base language - it doesn't really matter which one.  Everything else gets derived from that one.
- * It's not a bad model because it ensures consistency in the name-space.
+ * The other way of looking at this is that some language needs to be the lingua-franca and the base language - it
+ * doesn't really matter which one.  Everything else gets derived from that one. It's not a bad model because it
+ * ensures consistency in the name-space.
  */
 public class JSLanguage extends SCLanguage implements IParserConstants {
    public final static JSLanguage INSTANCE = new JSLanguage();

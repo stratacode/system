@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
+ */
+
 package sc.layer;
 
 /** When application code has a dependency on StrataCode, there are three options */

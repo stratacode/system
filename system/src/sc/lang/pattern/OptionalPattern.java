@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
+ */
+
 package sc.lang.pattern;
 
 public class OptionalPattern extends Pattern {

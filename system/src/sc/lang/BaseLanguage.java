@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang;
@@ -44,7 +44,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
    public String [] hexLetters = {"a", "b", "c", "d", "e", "f"};
 
-   public void addDigitChar(String s, int i) {
+   protected void addDigitChar(String s, int i) {
       digits.addExpectedValue(s);
       optDigits.addExpectedValue(s);
       hexDigits.addExpectedValue(s);

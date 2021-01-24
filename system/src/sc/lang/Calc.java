@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang;
@@ -9,12 +9,13 @@ import sc.parser.*;
 
 import java.io.StringReader;
 
-public class Calc extends Language implements IParserConstants
-{
+public class Calc extends Language implements IParserConstants {
    SymbolChoice lineTerminator = new SymbolChoice("\r\n", "\r", "\n");
 
    OrderedChoice whiteSpace = new OrderedChoice("whitespace", SKIP);
-   { whiteSpace.add(new Symbol(" "), new Symbol("\t"), new Symbol("\f"), lineTerminator); }
+   {
+      whiteSpace.add(new Symbol(" "), new Symbol("\t"), new Symbol("\f"), lineTerminator);
+   }
 
    Sequence EOLComment = new Sequence("eolcomment",
          new Symbol(SKIP, "//"),

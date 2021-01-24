@@ -650,11 +650,15 @@ public class Options {
                      runTests = true;
                   }
                   else if (opt.equals("tip")) {
+                     testMode = true;
+                     headlessSet = true;
                      if (i == args.length - 1)
                         System.err.println("*** missing arg to run -tip");
                      Window.globalTestRemoteIp = args[++i];
                   }
                   else if (opt.equals("tua")) {
+                     testMode = true;
+                     headlessSet = true;
                      if (i == args.length - 1)
                         System.err.println("*** missing arg to run -tua");
                      Window.globalTestUserAgent = args[++i];

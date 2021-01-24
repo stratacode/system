@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014. Jeffrey Vroom. All Rights Reserved.
+ * Copyright (c) 2021.  Jeffrey Vroom. All Rights Reserved.
  */
 
 package sc.lang.java;
@@ -3027,15 +3027,15 @@ public class ModelUtil {
       return declaresConstructor(sys, td, parameters, ctx, null);
    }
 
-   public static Object declaresConstructor(LayeredSystem sys, Object td, List<?> parameters, ITypeParamContext ctx, Object refType) {
+   public static Object declaresConstructor(LayeredSystem sys, Object td, List<?> args, ITypeParamContext ctx, Object refType) {
       Object res;
       if (td instanceof ITypeDeclaration) {
-         if ((res = ((ITypeDeclaration)td).declaresConstructor(parameters, ctx)) != null)
+         if ((res = ((ITypeDeclaration)td).declaresConstructor(args, ctx)) != null)
             return res;
       }
       else if (td instanceof Class) {
-         int paramsLen = parameters == null ? 0 : parameters.size();
-         Object[] types = parametersToTypeArray(parameters, ctx);
+         int argLen = args == null ? 0 : args.size();
+         Object[] types = parametersToTypeArray(args, ctx);
          Object[] list = getConstructors(td, null);
          res = null;
          Object[] prevExprTypes = null;
@@ -3051,10 +3051,11 @@ public class ModelUtil {
             Object toCheck = list[i];
             Object[] parameterTypes = ModelUtil.getParameterTypes(toCheck);
             int paramLen = (parameterTypes == null ? 0 : parameterTypes.length) - paramStart;
-            int last = paramLen - 1 + paramStart;
-            if (paramLen != paramsLen) {
+            int lastParam = paramLen - 1 + paramStart;
+            int lastArg = argLen - 1;
+            if (paramLen != argLen) {
                // If the last guy is not a repeating parameter, it can't match
-               if (last < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[last]) || paramsLen < last)
+               if (lastParam < 0 || !ModelUtil.isVarArgs(toCheck) || !ModelUtil.isArray(parameterTypes[lastParam]) || argLen < lastParam)
                   continue;
             }
 
@@ -3062,7 +3063,7 @@ public class ModelUtil {
             if (!(toCheck instanceof ParamTypedMethod) && ModelUtil.isParameterizedMethod(toCheck)) {
 
                // TODO: resultClass converted to definedIntype here - we could do a wrapper for the getClass method
-               paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, parameters, null, null);
+               paramMethod = new ParamTypedMethod(sys, toCheck, ctx, td, args, null, null);
 
                parameterTypes = paramMethod.getParameterTypes(true);
                toCheck = paramMethod;
@@ -3070,24 +3071,25 @@ public class ModelUtil {
                   continue;
             }
 
-            if (paramLen == 0 && paramsLen == 0) {
+            if (paramLen == 0 && argLen == 0) {
                if (refType == null || checkAccess(refType, toCheck))
-                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, parameters);
+                  res = ModelUtil.pickMoreSpecificMethod(res, toCheck, null, null, args);
             }
             else {
                int j;
-               Object[] nextExprTypes = new Object[paramsLen];
-               for (j = 0; j < paramsLen; j++) {
+               Object[] nextExprTypes = new Object[argLen];
+               for (j = 0; j < argLen; j++) {
                   Object paramType;
-                  if (j > last) {
-                     if (!ModelUtil.isArray(paramType = parameterTypes[last]))
+                  int jparam = j+paramStart;
+                  if (jparam > lastParam) {
+                     if (!ModelUtil.isArray(paramType = parameterTypes[lastParam]))
                         break;
                   }
                   else
-                     paramType = parameterTypes[j+paramStart];
+                     paramType = parameterTypes[jparam];
 
                   Object exprType;
-                  Object exprObj = parameters.get(j);
+                  Object exprObj = args.get(j);
 
                   if (exprObj instanceof Expression) {
                      if (paramType instanceof ParamTypeDeclaration)
@@ -3104,7 +3106,7 @@ public class ModelUtil {
 
                   if (exprType != null && !ModelUtil.isAssignableFrom(paramType, exprType, false, ctx)) {
                      // Repeating parameters... if the last parameter is an array match if the component type matches
-                     if (j >= last && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
+                     if (jparam >= lastParam && ModelUtil.isArray(paramType) && ModelUtil.isVarArgs(toCheck)) {
                         if (!ModelUtil.isAssignableFrom(ModelUtil.getArrayComponentType(paramType), types[j], false, ctx)) {
                            break;
                         }
@@ -3113,9 +3115,9 @@ public class ModelUtil {
                         break;
                   }
                }
-               if (j == paramsLen) {
+               if (j == argLen) {
                   if (refType == null || checkAccess(refType, toCheck)) {
-                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, parameters);
+                     res = ModelUtil.pickMoreSpecificMethod(res, toCheck, nextExprTypes, prevExprTypes, args);
                      if (res == toCheck)
                         prevExprTypes = nextExprTypes;
                   }
@@ -4100,6 +4102,7 @@ public class ModelUtil {
       }
       else if (method instanceof AbstractMethodDefinition) {
          AbstractMethodDefinition methDef = (AbstractMethodDefinition) method;
+         argValues = convertVarargValues(method, argValues);
          if (methDef.isDynMethod())
             return ((AbstractMethodDefinition) method).callVirtual(thisObj, argValues);
          Object invMeth = methDef.getRuntimeMethod();
@@ -4122,10 +4125,49 @@ public class ModelUtil {
             throw new IllegalArgumentException("No method: " + method + " on: " + thisObj);
          }
          return callMethod(thisObj, methodObj, argValues);
-
       }
       else
          throw new UnsupportedOperationException();
+   }
+
+   public static Object[] convertVarargValues(Object method, Object[] argValues) {
+      int numParams = getNumParameters(method);
+      int numArgs = argValues == null ? 0 : argValues.length;
+      boolean isVarArgs = numParams != 0 && ModelUtil.isVarArgs(method);
+      if (isVarArgs) {
+         Object[] repeatVal = null;
+         boolean redoArgs = false;
+         if (numArgs < numParams) {
+            repeatVal = new Object[0];
+            redoArgs = true;
+         }
+         else {
+            int last = numParams - 1;
+            Object lastVal = argValues == null ? null : argValues[last];
+            if (numParams != numArgs || !(lastVal instanceof Object[])) {
+               int numRepeat = numArgs + 1 - numParams;
+               Object paramType = ModelUtil.getParameterTypes(method)[last];
+               Object paramCompType = ModelUtil.getArrayComponentType(paramType);
+               Class cl = ModelUtil.getCompiledClass(paramCompType);
+
+               repeatVal = (Object[]) PTypeUtil.newArray(cl, numRepeat);
+               for (int i = 0; i < numRepeat; i++) {
+                  repeatVal[i] = argValues[last++];
+               }
+               redoArgs = true;
+            }
+         }
+         if (redoArgs) {
+            int last = numParams - 1;
+            Object[] newArgValues = new Object[numParams];
+            for (int i = 0; i < last; i++) {
+               newArgValues[i] = argValues[i];
+            }
+            newArgValues[last] = repeatVal;
+            argValues = newArgValues;
+         }
+      }
+      return argValues;
    }
 
    /** A simple direct invoke of either an interpreted or compiled method once values are bound to parameters */
