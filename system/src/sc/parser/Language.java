@@ -502,7 +502,7 @@ public abstract class Language extends LayerFileComponent {
             System.err.println("No layer named: " + layerName + " for styleFile method");
             return null;
          }
-         absFileName = FileUtil.concat(layer.getDefaultBuildDir(), buildPathPrefix == null ? null : FileUtil.unnormalize(buildPathPrefix), fileName);
+         absFileName = FileUtil.concat(layer.getDefaultBuildSrcDir(), buildPathPrefix == null ? null : FileUtil.unnormalize(buildPathPrefix), fileName);
          // Want to start the layer before we start loading types into it.  Otherwise, when it gets started we see that we have types to replace when we really don't.
          layer.checkIfStarted();
       }

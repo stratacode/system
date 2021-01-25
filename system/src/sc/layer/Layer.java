@@ -1602,14 +1602,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return LayerUtil.getLayerClassFileDirectory(this, layerPathName, false);
    }
 
+   public String getDefaultBuildSrcDir() {
+      return LayerUtil.getLayerClassFileDirectory(this, layerPathName, true);
+   }
+
    public void initBuildDir() {
       if (buildDir == null)
-         buildDir = LayerUtil.getLayerClassFileDirectory(this, layerPathName, false);
+         buildDir = getDefaultBuildDir();
       else // Translate configured relative paths to be relative to the layer's path on disk
          buildDir = FileUtil.getRelativeFile(layerPathName, buildDir);
 
       if (buildSrcDir == null) {
-         buildSrcDir = FileUtil.concat(LayerUtil.getLayerClassFileDirectory(this, layerPathName, true), layeredSystem.getRuntimePrefix(), getBuildSrcSubDir());
+         buildSrcDir = getDefaultBuildSrcDir();
+         buildSrcDir = FileUtil.concat(getDefaultBuildSrcDir(), layeredSystem.getRuntimePrefix(), getBuildSrcSubDir());
       }
       else
          buildSrcDir = FileUtil.getRelativeFile(layerPathName, buildSrcDir);
