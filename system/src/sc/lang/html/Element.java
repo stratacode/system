@@ -4525,8 +4525,16 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             outputRepeatBody(repeatVal, sb, ctx);
          }
          else {
-            callOutputStartTag(sb, ctx);
-            callOutputBody(sb, ctx);
+            // Even with caching disabled, still need to store the startTagCache and bodyCache because they are used
+            // for finding diffs for server tags
+            StringBuilder startSB = new StringBuilder();
+            callOutputStartTag(startSB, ctx);
+            startTagCache = startSB.toString();
+            sb.append(startTagCache);
+            StringBuilder bodySB = new StringBuilder();
+            callOutputBody(bodySB, ctx);
+            bodyCache = bodySB.toString();
+            sb.append(bodyCache);
             callOutputEndTag(sb, ctx);
          }
       }
@@ -4705,8 +4713,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
          outputRepeatBody(repeatVal,  sb, null);
       }
       String newInnerHTML = sb.toString();
-      if (cacheEnabled)
-         bodyCache = newInnerHTML;
+      // Updating this even if cache is not enabled for server tags, so we can tell when it's actually changed
+      bodyCache = newInnerHTML;
       return newInnerHTML;
    }
 
@@ -4729,8 +4737,9 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       StringBuilder sb = new StringBuilder();
       outputStartTag(sb, null);
       String newStartTagTxt = sb.toString();
-      if (cacheEnabled)
-         startTagCache = newStartTagTxt;
+      // need to update this even if the cache is enabled because we use the cache for server tags. We might set
+      // the serverTag variable after rendering the tag as well
+      startTagCache = newStartTagTxt;
       return newStartTagTxt;
    }
 
@@ -6017,8 +6026,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    }
 
    public boolean isCacheEnabled() {
-      if (serverTag) // server tags need the cache to be enable
-         return true;
       if (cache == null || cache == CacheMode.Unset) {
          Element enclTag = getEnclosingTag();
          if (enclTag != null)
