@@ -467,9 +467,16 @@ public class PTypeUtil {
       }
    }
 
-   static Timer timer = new Timer("PTypeUtil.addScheduledJob ");
+   static Timer timer;
+   private static final Object timerLock = new Object();
 
    public static Object addScheduledJob(final Runnable toRun, long delay, boolean repeat) {
+      if (timer == null) {
+         synchronized (timerLock) {
+            if (timer == null)
+               timer = new Timer("PTypeUtil.addScheduledJob");
+         }
+      }
       TimerTask task = new TimerTask() {
           public void run() {
              toRun.run();
