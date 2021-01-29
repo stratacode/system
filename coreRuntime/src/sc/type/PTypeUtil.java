@@ -467,13 +467,14 @@ public class PTypeUtil {
       }
    }
 
+   static Timer timer = new Timer("PTypeUtil.addScheduledJob ");
+
    public static Object addScheduledJob(final Runnable toRun, long delay, boolean repeat) {
       TimerTask task = new TimerTask() {
           public void run() {
              toRun.run();
           }
       };
-      Timer timer = new Timer("Timer: " + toRun.toString());
       if (repeat)
          timer.schedule(task, delay, delay);
       else

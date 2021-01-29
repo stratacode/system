@@ -957,6 +957,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          }
          else // We do not know the concrete class yet for this object so just return
             return null;
+
+         checkCacheSize();
       }
 
       // If requested, select the default (primary table) property group - if the row does not exist, the object does not exist
@@ -970,6 +972,14 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       if (dbObj.wrapper != inst)
          return dbObj.wrapper;
       return inst;
+   }
+
+   private final static int cacheCheckInterval = 100;
+
+   private void checkCacheSize() {
+      int size = typeInstances.size();
+      if (size > cacheCheckInterval && ((size % cacheCheckInterval) == 0))
+         DBUtil.info("DB cache size: " + size + " for type " + getTypeName());
    }
 
    public IDBObject createInstance() {
@@ -1008,6 +1018,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (res != null)
             return res;
          typeInstances.put(id, inst);
+         checkCacheSize();
          if (clearTransient) {
             DBObject dbObj = (DBObject) inst.getDBObject();
 
@@ -1072,6 +1083,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             if (!(old instanceof DBObject))
                DBUtil.verbose("Replacing instance of type: " + this + " with id: " + id);
          }
+         else
+            checkCacheSize();
       }
       DBUtil.mapTestInstance(inst);
    }
