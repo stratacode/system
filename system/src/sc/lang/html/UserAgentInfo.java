@@ -213,6 +213,10 @@ public class UserAgentInfo implements Cloneable {
             browser = "Opera";
             browserVersion = vers;
          }
+         else if ((vers = getVersionForCommentString("FBAV")) != null || ((vers = getVersionForCommentString("FBSV")) != null)) {
+            browser = "FB";
+            browserVersion = vers;
+         }
          else {
             browser = platform;
             browserVersion = null;
@@ -239,6 +243,17 @@ public class UserAgentInfo implements Cloneable {
       for (int i = 0; i < extensions.size(); i++) {
          UserAgentExtension uae = extensions.get(i);
          if (uae.name.contains(extName))
+            return uae.version;
+      }
+      return null;
+   }
+
+   public String getVersionForCommentString(String str) {
+      if (extensions == null)
+         return null;
+      for (int i = 0; i < extensions.size(); i++) {
+         UserAgentExtension uae = extensions.get(i);
+         if (uae.comment != null && uae.comment.contains(str))
             return uae.version;
       }
       return null;

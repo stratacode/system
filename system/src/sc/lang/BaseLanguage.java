@@ -520,20 +520,20 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public class SymbolChoiceSpace extends Sequence {
       SymbolChoice choice;
 
-      SymbolChoiceSpace(String...values) {
+      public SymbolChoiceSpace(String...values) {
          this("('',)",0,values);
       }
-      SymbolChoiceSpace(int options, String...values) {
+      public SymbolChoiceSpace(int options, String...values) {
          this("('',)", options, values);
       }
-      SymbolChoiceSpace(String name, int options, String...values) {
+      public SymbolChoiceSpace(String name, int options, String...values) {
          super(name, options | NOERROR);
          int symOptions = options & IGNORE_CASE;
          choice = new SymbolChoice(NOERROR | symOptions, values);
          add(choice, spacing);
       }
 
-      SymbolChoiceSpace(String symbol) {
+      public SymbolChoiceSpace(String symbol) {
          this(0, symbol);
       }
 

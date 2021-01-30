@@ -54,11 +54,14 @@ public class URLPatternLanguage extends SCLanguage {
       //integer.setSemanticValueClass(Integer.class);  - this actually disables the type conversion we had built in :(
    }
 
+   SymbolChoiceSpace openUserAgentComment = new SymbolChoiceSpace("(", "[");
+   SymbolChoiceSpace closeUserAgentComment = new SymbolChoiceSpace(")", "]");
+
    //public SymbolChoice uaNameSpecialChar = new SymbolChoice('+', '.', ':');
-   public SymbolChoice uaCommentSpecialChar = new SymbolChoice('+', '.', ':', '/', ';', ' ', ',', '-');
+   public SymbolChoice uaCommentSpecialChar = new SymbolChoice('+', '.', ':', '/', ';', ' ', ',', '-', '&');
    public Parselet userAgentName = new OrderedChoice("('','','','')", REPEAT, alphaNumChar, digits, new Symbol(" "), period /*, uaNameSpecialChar*/);
    public Parselet userAgentCommentBody = new OrderedChoice("('','','')", REPEAT, alphaNumChar, digits, uaCommentSpecialChar);
-   public Parselet userAgentComment = new Sequence("(,.,)", OPTIONAL, openParen, userAgentCommentBody, closeParen);
+   public Parselet userAgentComment = new Sequence("(,.,)", OPTIONAL, openUserAgentComment, userAgentCommentBody, closeUserAgentComment);
 
    public Parselet versionString = new OrderedChoice("('','','')", REPEAT, digits, alphaNumChar, new SymbolChoice("-", "."));
 
