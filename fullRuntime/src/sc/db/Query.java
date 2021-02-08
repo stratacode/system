@@ -45,8 +45,17 @@ public abstract class Query {
       return new OpQuery(propName, QCompare.Match, value);
    }
 
+   /** Value here can be a List or array */
+   public static Query in(String propName, Object value) {
+      return new OpQuery(propName, QCompare.In, value);
+   }
+
    public static Query op(String propName, QCompare op, Object value) {
       return new OpQuery(propName, op, value);
+   }
+
+   public static Query op(String propName, Object... values) {
+      return new OpQuery(propName, QCompare.In, values);
    }
 
    // TODO: finish implementing this - maybe with an 'exists' query?  I wanted to use it for the userManager findUsersBySite
@@ -66,6 +75,9 @@ public abstract class Query {
       ArrayList<Object> res = new ArrayList<Object>();
       addAllPropertyValues(res);
       return res;
+   }
+   public List<String> getNonProtoProps() {
+      return null;
    }
    public abstract void addAllPropertyNames(List<String> res);
    public abstract void addAllPropertyValues(List<Object> res);

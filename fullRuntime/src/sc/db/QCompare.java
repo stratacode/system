@@ -6,7 +6,8 @@ package sc.db;
 
 public enum QCompare {
    Equals("=", "=="), Match(null, null), NotEquals("!=", "!="),
-   GreaterThan(">", ">"), LessThan("<", "<"), GreaterThanEq(">=", ">="), LessThanEq("<=", "<=");
+   GreaterThan(">", ">"), LessThan("<", "<"), GreaterThanEq(">=", ">="), LessThanEq("<=", "<="),
+   In(null, null);
 
    String sqlOp;
    String javaOp;

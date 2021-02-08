@@ -940,7 +940,13 @@ public class DBUtil {
 
    private final static int BatchSize = 1000;
 
-   public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, String commentPrefix, List<String> properties) {
+   public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, String commentPrefix,
+                                   List<String> properties) {
+      return importCSVFile(fileName, rowType, separator, headerRow, commentPrefix, properties, null, false);
+   }
+
+   public static int importCSVFile(String fileName, Object rowType, String separator, boolean headerRow, String commentPrefix,
+                                   List<String> properties, String idProperty, boolean doUpdate) {
       int lineCt = 0;
       File file = new File(fileName);
       BufferedReader reader = null;
@@ -1002,12 +1008,61 @@ public class DBUtil {
                   val = propDesc.stringToValue(strVal);
                ((DBObject) obj.getDBObject()).setPropertyInPath(propName, val);
             }
-            // Queuing here allows the transaction to batch up the inserts
-            obj.dbInsert(true);
-
             resInsts.add(obj);
 
             if (resInsts.size() >= BatchSize) {
+               ArrayList<IDBObject> toInsertList;
+               if (idProperty == null || !doUpdate) {
+                  toInsertList = resInsts;
+               }
+               else {
+                  ArrayList<IDBObject> toUpdateList = new ArrayList<IDBObject>();
+                  ArrayList<Object> idValues = new ArrayList<Object>();
+                  DBPropertyDescriptor idDesc = dbTypeDesc.getPropertyDescriptor(idProperty);
+                  IBeanMapper mapper = idDesc.getPropertyMapper();
+                  for (IDBObject toCheck:resInsts) {
+                     Object idVal = mapper.getPropertyValue(toCheck, false, false);
+                     idValues.add(idVal);
+                  }
+                  List<? extends IDBObject> existsList = dbTypeDesc.findByIds(idValues.toArray());
+
+                  int unchanged = 0;
+                  if (existsList == null || existsList.size() == 0)
+                     toInsertList = resInsts;
+                  else {
+                     Map<Object,IDBObject> curIndex = new HashMap<Object, IDBObject>();
+                     toInsertList = new ArrayList<IDBObject>();
+                     for (IDBObject exists:existsList) {
+                        Object idVal = mapper.getPropertyValue(exists, false, false);
+                        curIndex.put(idVal, exists);
+                     }
+                     for (IDBObject toCheck:resInsts) {
+                        IDBObject exists = curIndex.get(mapper.getPropertyValue(toCheck, false, false));
+                        if (exists != null) {
+                           if (!((DBObject) exists.getDBObject()).equalProps((DBObject) toCheck.getDBObject()))
+                              toUpdateList.add(toCheck);
+                           else
+                              unchanged++;
+                        }
+                        else
+                           toInsertList.add(toCheck);
+                     }
+                  }
+                  if (toUpdateList.size() > 0)
+                     System.out.println("Updating: " + toUpdateList.size() + " city records");
+                  if (unchanged > 0)
+                     System.out.println("Found: " + unchanged + " unchanged city records");
+                  for (IDBObject toUpdate:toUpdateList)
+                     toUpdate.dbUpdate();
+               }
+
+               if (toInsertList.size() > 0)
+                  System.out.println("Inserting: " + toInsertList.size() + " city records");
+               for (IDBObject toInsert:toInsertList) {
+                  // Queuing here allows the transaction to batch up the inserts
+                  toInsert.dbInsert(true);
+               }
+
                curTx.commit();
                for (IDBObject resInst:resInsts)
                   DynUtil.dispose(resInst);

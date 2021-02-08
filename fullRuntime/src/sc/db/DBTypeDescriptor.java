@@ -610,6 +610,15 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return res;
    }
 
+   public List<? extends IDBObject> findByIds(Object... ids) {
+      if (primaryTable.idColumns.size() == 1) {
+         DBPropertyDescriptor id = primaryTable.idColumns.get(0);
+         return query(Query.in(id.propertyName, ids), null, null, -1, -1);
+      }
+      else
+         throw new UnsupportedOperationException("findByIds - not yet supported for multi column ids");
+   }
+
    public List<? extends IDBObject> findAll(List<String> orderByNames, int startIx, int maxResults) {
       return findBy(null, null, null, orderByNames, startIx, maxResults);
    }
@@ -844,24 +853,37 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    public List<? extends IDBObject> query(Query query, String selectGroup, List<String> orderByProps, int startIx, int maxResults) {
-      List<String> propNames = query.getAllPropertyNames();
+      List<String> protoPropNames = query.getAllPropertyNames();
       List<Object> propValues = query.getAllPropertyValues();
-      IDBObject proto = propNames == null ? null : initPrototypeForQuery(propNames, propValues);
+      IDBObject proto = protoPropNames == null ? null : initPrototypeForQuery(protoPropNames, propValues);
+      List<String> nonProtoProps = query.getNonProtoProps();
+      List<String> allPropNames;
+      if (nonProtoProps != null) {
+         if (protoPropNames == null)
+            allPropNames = nonProtoProps;
+         else {
+            allPropNames = new ArrayList<String>(protoPropNames);
+            allPropNames.addAll(nonProtoProps);
+         }
+      }
+      else
+         allPropNames = protoPropNames;
+
       // Initialize the wrapper query - the one that will join across multiple DBs
-      SelectGroupQuery groupQuery = initQuery(selectGroup, propNames, true);
+      SelectGroupQuery groupQuery = initQuery(selectGroup, allPropNames, true);
       if (proto != null) {
          DBObject protoDB = (DBObject) proto.getDBObject();
 
          // Add all of the tables requires for the query
-         addPropBindingTables(groupQuery, protoDB, propNames);
+         addPropBindingTables(groupQuery, protoDB, protoPropNames);
 
          // Build the where clause
          boolean first = addQueryProps(query, groupQuery, protoDB, true, QCombine.And);
 
          // If it's a polymorphic query, add the constraint for the sub-types returned
-         addBaseTypeClause(groupQuery, protoDB, propNames, first);
+         addBaseTypeClause(groupQuery, first);
 
-         // Add the parameters to the query
+         // Add the parameter values to the query
          addQueryParams(query, groupQuery, protoDB, true, QCombine.And);
       }
       groupQuery.setQueryAttributes(orderByProps, startIx, maxResults);
@@ -888,7 +910,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          boolean first = addQueryProps(query, groupQuery, protoDB, true, QCombine.And);
 
          // If it's a polymorphic query, add the constraint for the sub-types returned
-         addBaseTypeClause(groupQuery, protoDB, propNames, first);
+         addBaseTypeClause(groupQuery, first);
 
          // Add the parameters to the query
          addQueryParams(query, groupQuery, protoDB, true, QCombine.And);
@@ -1364,7 +1386,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       addPropListToQuery(groupQuery, proto, props, QCombine.And, first);
 
-      addBaseTypeClause(groupQuery, proto, props, first && numProps == 0);
+      addBaseTypeClause(groupQuery, first && numProps == 0);
    }
 
    private void addPropListToQuery(SelectGroupQuery groupQuery, DBObject proto, List<String> props, QCombine operator, boolean first) {
@@ -1379,7 +1401,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
    }
 
-   private void addBaseTypeClause(SelectGroupQuery groupQuery, DBObject proto, List<String> props, boolean first) {
+   private void addBaseTypeClause(SelectGroupQuery groupQuery, boolean first) {
       if (baseType != null) {
          int[] typeIds = getTypeIdList();
          if (typeIds != null && typeIds.length > 0) {
@@ -1515,7 +1537,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       return res;
    }
 
-   private void appendDBPropParamValue(SelectQuery curQuery, String parentProp, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue) {
+   private void appendDBPropParamValue(SelectQuery curQuery, String parentProp, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue, Object compareVal) {
       if (logSB != null) {
          if (compareOp != null) {
             if (propValue == null) {
@@ -1539,6 +1561,16 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   logSB.append(" ILIKE ");
                   DBUtil.appendVal(logSB, propValue, null, null);
                }
+               else if (compareOp == QCompare.In) {
+                  logSB.append(" IN (");
+                  int numValues = DynUtil.getArrayLength(compareVal);
+                  for (int i = 0; i < numValues; i++) {
+                     if (i != 0)
+                        logSB.append(", ");
+                     DBUtil.appendVal(logSB, DynUtil.getArrayElement(compareVal, i), null, null);
+                  }
+                  logSB.append(")");
+               }
                else {
                   logSB.append(" ");
                   logSB.append(compareOp.sqlOp);
@@ -1546,15 +1578,27 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   DBUtil.appendVal(logSB, propValue, null, null);
                }
             }
-            curQuery.paramValues.add(propValue);
-            curQuery.paramTypes.add(dbProp.getDBColumnType());
+            if (compareOp == QCompare.In) {
+               int numValues = DynUtil.getArrayLength(compareVal);
+               List<Object> pvs = curQuery.paramValues;
+               List<DBColumnType> pts = curQuery.paramTypes;
+               DBColumnType pt = dbProp.getDBColumnType();
+               for (int i = 0; i < numValues; i++) {
+                  pvs.add(DynUtil.getArrayElement(compareVal, i));
+                  pts.add(pt);
+               }
+            }
+            else {
+               curQuery.paramValues.add(propValue);
+               curQuery.paramTypes.add(dbProp.getDBColumnType());
+            }
          }
       }
    }
 
    private void appendJSONPropParamValue(SelectQuery curQuery, DBPropertyDescriptor dbProp, StringBuilder logSB, QCompare compareOp, Object propValue, String propPath) {
       if (logSB != null) {
-         if (compareOp != QCompare.Match) {
+         if (compareOp.sqlOp != null) {
             DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType(), dbProp.refDBTypeDesc);
             logSB.append(" ");
             logSB.append(compareOp.sqlOp);
@@ -1563,9 +1607,21 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          curQuery.appendJSONLogWhereColumn(logSB, dbProp.getTableName(), dbProp.columnName, propPath);
       }
       if (compareOp != null) {
-         if (logSB != null && compareOp == QCompare.Match) {
-            logSB.append(" ILIKE ");
-            DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType(), dbProp.refDBTypeDesc);
+         if (logSB != null && compareOp.sqlOp == null) {
+            if (compareOp == QCompare.Match) {
+               logSB.append(" ILIKE ");
+               DBUtil.appendVal(logSB, propValue, dbProp.getDBColumnType(), dbProp.refDBTypeDesc);
+            }
+            else if (compareOp == QCompare.In) {
+               logSB.append(" IN (");
+               int numValues = DynUtil.getArrayLength(propValue);
+               for (int i = 0; i < numValues; i++) {
+                  if (i != 0)
+                     logSB.append(", ");
+                  DBUtil.appendVal(logSB, DynUtil.getArrayElement(propValue, i), null, null);
+               }
+               logSB.append(")");
+            }
          }
          curQuery.paramValues.add(propValue);
          curQuery.paramTypes.add(dbProp.getSubDBColumnType(propPath));
@@ -1579,7 +1635,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       SelectQuery curQuery = groupQuery.curQuery;
       StringBuilder logSB = curQuery.logSB;
       if (dbProp != null) {
-         appendDBPropParamValue(curQuery, CTypeUtil.getPackageName(propNamePath), dbProp, logSB, compareOp, propValue);
+         appendDBPropParamValue(curQuery, CTypeUtil.getPackageName(propNamePath), dbProp, logSB, compareOp, propValue, compareVal);
       }
       else {
          String[] propNames = StringUtil.split(propNamePath, '.');
@@ -1698,7 +1754,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
          if (queryProp != null) {
             //Object propValue = DynUtil.getPropertyValue(curObj.getInst(), queryProp.propertyName);
             Object propValue = null; // Do we need this at all with compareOp == null - if it.s an a.b it might not be defined since we don't set 'a' in this case
-            appendDBPropParamValue(curQuery, getParentPropertyName(varBind), queryProp, curQuery.logSB, null, propValue);
+            appendDBPropParamValue(curQuery, getParentPropertyName(varBind), queryProp, curQuery.logSB, null, propValue, null);
          }
          else {
             Object lastBinding = varBind.getChainElement(numInChain-1);
@@ -2198,6 +2254,16 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
             curQuery.appendWhereColumn(parentPropPath, dbProp);
             if (comparator == QCompare.Match)
                curQuery.whereAppend(" ILIKE ? ");
+            else if (comparator == QCompare.In) {
+               curQuery.whereAppend(" IN ( ");
+               int numValues = DynUtil.getArrayLength(propValue);
+               for (int i = 0; i < numValues; i++) {
+                  if (i != 0)
+                     curQuery.whereAppend(", ");
+                  curQuery.whereAppend("?");
+               }
+               curQuery.whereAppend(")");
+            }
             else if (comparator != null) {
                curQuery.whereAppend(" " + comparator.sqlOp + " ? ");
             }
@@ -2215,6 +2281,9 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   curQuery.appendJSONWhereColumn(pathProp.getTableName(), pathProp.columnName, pathRes.toString());
                   if (comparator == QCompare.Match) {
                      curQuery.whereAppend(" ILIKE ? ");
+                  }
+                  else if (comparator == QCompare.In) {
+                     System.err.println("*** Error - need support for JSON property with IN query");
                   }
                   else if (comparator != null) {
                      curQuery.whereAppend(" " + comparator.sqlOp + " ? ");

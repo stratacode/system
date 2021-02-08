@@ -1048,4 +1048,20 @@ public class DBObject implements IDBObject {
          return obj.dbSetIdProp(propName, propVal, oldVal);
       return null;
    }
+
+   public boolean equalProps(DBObject other) {
+      if (other.dbTypeDesc != dbTypeDesc)
+         return false;
+      for (DBPropertyDescriptor prop:dbTypeDesc.allDBProps) {
+         Object thisVal = getProperty(prop.propertyName);
+         Object otherVal = other.getProperty(prop.propertyName);
+         if (thisVal instanceof Date && otherVal instanceof Date) {
+            if (((Date) thisVal).getTime() != ((Date) otherVal).getTime())
+               return false;
+         }
+         else if (!DynUtil.equalObjects(thisVal, otherVal))
+            return false;
+      }
+      return true;
+   }
 }

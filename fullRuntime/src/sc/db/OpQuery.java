@@ -4,6 +4,9 @@
 
 package sc.db;
 
+import sc.dyn.DynUtil;
+
+import java.util.ArrayList;
 import java.util.List;
 
 public class OpQuery extends Query {
@@ -21,10 +24,23 @@ public class OpQuery extends Query {
    }
 
    public void addAllPropertyNames(List<String> res) {
+      if (comparator == QCompare.In)
+         return;
       res.add(propName);
    }
 
+   public List<String> getNonProtoProps() {
+      if (comparator == QCompare.In) {
+         ArrayList<String> res = new ArrayList<String>(1);
+         res.add(propName);
+         return res;
+      }
+      return null;
+   }
+
    public void addAllPropertyValues(List<Object> res) {
+      if (comparator == QCompare.In)
+         return;
       if (comparator == QCompare.Match && propValue instanceof CharSequence)
          res.add(DBTypeDescriptor.convertToSQLSearchString(propValue.toString()));
       else
@@ -59,6 +75,16 @@ public class OpQuery extends Query {
          sb.append('"');
          sb.append(propValue.toString());
          sb.append('"');
+         sb.append(")");
+      }
+      else if (comparator == QCompare.In) {
+         sb.append(".in(");
+         int numValues = DynUtil.getArrayLength(propValue);
+         for (int i = 0; i < numValues; i++) {
+            if (i != 0)
+               sb.append(",");
+            DBUtil.appendConstant(sb, DynUtil.getArrayElement(propValue, i));
+         }
          sb.append(")");
       }
       else {
