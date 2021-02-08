@@ -205,6 +205,9 @@ public class CurrentScopeContext {
                if (now - startTime > timeout) {
                   break;
                }
+               CurrentScopeContext threadCtx = CurrentScopeContext.getThreadScopeContext();
+               if (threadCtx != null)
+                  threadCtx.releaseLocks();
                try {
                   if (ScopeDefinition.verbose || PTypeUtil.testMode)
                      System.out.println("--- Waiting for client: " + scopeContextName);
@@ -213,6 +216,10 @@ public class CurrentScopeContext {
                   scopeContextNamesLock.wait(timeout);
                }
                catch (InterruptedException exc) {}
+               finally {
+                  if (threadCtx != null)
+                     threadCtx.acquireLocks();
+               }
             }
             else {
                if (waited && (ScopeDefinition.verbose || PTypeUtil.testMode))
@@ -245,6 +252,10 @@ public class CurrentScopeContext {
                ctx = null;
                break;
             }
+            CurrentScopeContext threadCtx = CurrentScopeContext.getThreadScopeContext();
+            if (threadCtx != null) {
+               threadCtx.popCurrentScopeContext(true);
+            }
             try {
                long waitTime = timeout - (now - startTime);
                if (ScopeDefinition.verbose)
@@ -252,6 +263,10 @@ public class CurrentScopeContext {
                ctx.wait(waitTime);
             }
             catch (InterruptedException exc) {}
+            finally {
+               if (threadCtx != null)
+                  threadCtx.acquireLocks();
+            }
          }
       } while (true);
 
