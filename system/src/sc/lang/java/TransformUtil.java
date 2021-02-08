@@ -540,7 +540,7 @@ public class TransformUtil {
             }
             else {
                if (parameters.currentConstructor instanceof ConstructorDefinition) {
-                  SemanticNodeList<Statement> toInsert = (SemanticNodeList<Statement>) parseCodeTemplate(parameters, postAssignment, SCLanguage.getSCLanguage().blockStatements, true);
+                  SemanticNodeList<Statement> toInsert = (SemanticNodeList<Statement>) parseCodeTemplate(parameters, postAssignment, SCLanguage.getSCLanguage().blockStatements, true, false);
                   ConstructorDefinition cdef = (ConstructorDefinition) parameters.currentConstructor;
                   // Only add it to the first constructor if there's a chain
                   if (!cdef.callsThis())
@@ -1384,7 +1384,7 @@ public class TransformUtil {
 
    public static void addTemplateToTypeBody(BodyTypeDeclaration objType, Object parameters, String initString, String templateName, boolean hidden) {
       SemanticNodeList<Statement> toInsert;
-      Object parseRes =  parseCodeTemplate(parameters, initString, SCLanguage.getSCLanguage().blockStatements, true);
+      Object parseRes =  parseCodeTemplate(parameters, initString, SCLanguage.getSCLanguage().blockStatements, true, false);
       if (parseRes instanceof ParseError) {
          objType.displayError("Unable to parse code snippet from ", templateName, " error:", ((ParseError) parseRes).errorStringWithLineNumbers(initString), " for type: ");
          return;
@@ -1401,12 +1401,12 @@ public class TransformUtil {
    }
 
 
-   public static Object parseCodeTemplate(Object params, String templateStr, Parselet parselet, boolean cache) {
+   public static Object parseCodeTemplate(Object params, String templateStr, Parselet parselet, boolean cache, boolean clearParseNode) {
       Template template = parseTemplate(templateStr, params.getClass(), cache, false, null, null);
-      return parseCodeTemplate(params, template, parselet);
+      return parseCodeTemplate(params, template, parselet, clearParseNode);
    }
 
-   public static Object parseCodeTemplate(Object params, Template template, Parselet parselet) {
+   public static Object parseCodeTemplate(Object params, Template template, Parselet parselet, boolean clearParseNode) {
       String codeToInsert = evalTemplate(params, template);
       PerfMon.start("parseCodeTemplate");
       Object res = parselet.getLanguage().parseString(codeToInsert, parselet);
@@ -1414,6 +1414,10 @@ public class TransformUtil {
          throw new IllegalArgumentException("Parsing - code evaluated during code generation from template: " + template + " code parsed:\n" + codeToInsert + "\n\nerror: " + ((ParseError) res).errorStringWithLineNumbers(codeToInsert));
       Object value = ParseUtil.nodeToSemanticValue(res);
       PerfMon.end("parseCodeTemplate");
+      // This is for performance, so we can save memory since all we care about is the semantic node at this point we can clear the parse node tree
+      if (clearParseNode && value instanceof ISemanticNode)
+         ((ISemanticNode) value).clearParseNode();
+
       return value;
    }
 

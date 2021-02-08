@@ -182,8 +182,10 @@ public class DependencyFile extends SemanticNode implements ILifecycle {
       catch (IllegalArgumentException exc) {
          System.err.println("*** Error reading dependencies: " + exc);
       }
-      if (deps != null)
+      if (deps != null) {
          deps.file = depFile;
+         deps.clearParseNode();
+      }
       return deps;
    }
 }

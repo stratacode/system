@@ -7149,7 +7149,7 @@ public class ModelUtil {
    }
 
    public static Object parseCommandString(Language cmdLang, String command, Parselet start) {
-      // Skip empty lines, though make sure somewhitespace gets in there
+      // Skip empty lines, though make sure some whitespace gets in there
       if (command.trim().length() == 0) {
          return null;
       }

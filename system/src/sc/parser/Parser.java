@@ -992,4 +992,9 @@ public class Parser implements IString {
       }
       return out.toString();
    }
+
+   public void clearForSuccess() {
+      currentErrors = null;
+      resultCache = null;
+   }
 }

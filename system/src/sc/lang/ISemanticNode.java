@@ -198,4 +198,6 @@ public interface ISemanticNode {
     * you can override this method, set additional fields and just make sure they are not marked 'transient'
     */
    public void serialize(ModelOutStream out);
+
+   public void clearParseNode();
 }

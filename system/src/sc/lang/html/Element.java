@@ -3055,7 +3055,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                                "      sc.lang.html.Element elem = new " + objName + "((sc.lang.html.Element)enclosingTag, null, (" + ModelUtil.getTypeName(repeatElementType) + ") val, ix);\n" +
                                "      return elem;\n" +
                                "   }",
-                       SCLanguage.INSTANCE.classBodySnippet, false);
+                       SCLanguage.INSTANCE.classBodySnippet, false, true);
 
                Statement repeatMeth = repeatMethList.get(0);
                repeatMeth.setFromStatement(this);

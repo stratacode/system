@@ -225,6 +225,8 @@ public abstract class Language extends LayerFileComponent {
                   parseTree = incompleteParse(p);
                }
             }
+            else
+               p.clearForSuccess();
          }
          else if (parseTree instanceof ParseError) {
             if (!p.atEOF()) {

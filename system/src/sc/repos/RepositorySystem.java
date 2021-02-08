@@ -173,8 +173,10 @@ public class RepositorySystem {
             System.err.println("*** Remove of repository package - not found");
          }
       }
-      else
-         System.err.println("*** No repository package to remove: " + pkg.packageName);
+      // TODO: right now we call this for both the active and inactive layers but don't separate out the 'store' into
+      // an inactive and active version so we might remove a package in the active layers that's also in the inactive layers
+      //else
+      //   System.err.println("*** No repository package to remove: " + pkg.packageName);
    }
 
    public RepositoryPackage registerAlternateName(RepositoryPackage pkg, String altName) {

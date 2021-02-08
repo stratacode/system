@@ -3616,9 +3616,7 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public void clearParseNode() {
-      if (parseNode != null) {
-         parseNode.setSemanticValue(null, true, false);
-      }
+      super.clearParseNode();
       if (transformedModel != null && transformedModel.parseNode != null) {
          transformedModel.parseNode.setSemanticValue(null, true, false);
       }

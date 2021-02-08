@@ -111,6 +111,7 @@ public class Pattern extends SemanticNode {
          language.classLoader = ((BodyTypeDeclaration) pageType).getLayeredSystem().getSysClassLoader();
       else if (pageType != null)
          language.classLoader = ((Class) pageType).getClassLoader();
+      patternRes.clearParseNode();
       return res;
    }
 

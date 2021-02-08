@@ -932,14 +932,14 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                if (compilerSettings != null) {
                   Template outputMethodTemplate = rootType.findTemplate(compilerSettings, "outputMethodTemplate", null);
                   if (outputMethodTemplate != null) {
-                     decls = (SemanticNodeList) TransformUtil.parseCodeTemplate(new ExprParams(""), outputMethodTemplate, TemplateLanguage.INSTANCE.classBodyDeclarations);
+                     decls = (SemanticNodeList) TransformUtil.parseCodeTemplate(new ExprParams(""), outputMethodTemplate, TemplateLanguage.INSTANCE.classBodyDeclarations, false);
                      if (decls.size() == 0 || decls.size() > 1) {
                         displayError("outputMethodTemplate: ", outputMethodTemplate.getTypeName(), " contained ", decls.size() == 0 ? "no":" too many ", " defs.  Expected one method. Template: ");
                      }
                   }
                }
                if (decls == null) {
-                  decls = (SemanticNodeList) TransformUtil.parseCodeTemplate(new ExprParams(""), getOutputMethodTemplate(), TemplateLanguage.INSTANCE.classBodyDeclarations, true);
+                  decls = (SemanticNodeList) TransformUtil.parseCodeTemplate(new ExprParams(""), getOutputMethodTemplate(), TemplateLanguage.INSTANCE.classBodyDeclarations, true, false);
                   assert decls.size() == 1;
                }
                Object decl = decls.get(0);
@@ -1060,20 +1060,22 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
          Parselet exprParselet = TemplateLanguage.INSTANCE.optExpression;
 
          // This creates the parse-node representation of that statement
+         /*
          Object parseResult = exprParselet.generate(TemplateLanguage.INSTANCE.newGenerateContext(exprParselet, expr), expr);
          if (parseResult instanceof ParseError) {
             displayError("Error parsing template: ", parseResult.toString(), " for expression: ", expr.toString(), " used in template ");
          }
          else if (parseResult instanceof IParseNode) {
+         */
             boolean handled = false;
             // Propagate the original node's position in the file for debug line number mapping
-            if (origStartIndex != -1)
-               ((IParseNode) parseResult).setStartIndex(origStartIndex);
+            //if (origStartIndex != -1)
+            //   ((IParseNode) parseResult).setStartIndex(origStartIndex);
 
             /** statefulContext=false when we are inside of a template statement - i.e. inside of normal code in a method */
             /** TODO: should we use "isdeclaredConstant" to avoid starting the expression here?  It seems like we need to start it eventually anyway so that won't help. */
             if (statefulPage && expr.canMakeBindable() && !expr.isConstant() && statefulContext && (parentElement == null || !parentElement.getStateless())) {
-               Expression resultExpr = (Expression) ParseUtil.nodeToSemanticValue(parseResult);
+               //Expression resultExpr = (Expression) ParseUtil.nodeToSemanticValue(parseResult);
                Element enclTag;
                // The enclosing tag might be nested inside of a non-object.  In that case, just skip the non-object.
                for (enclTag = origExpr.getEnclosingTag(); enclTag != null && !enclTag.needsObject(); enclTag = enclTag.getEnclosingTag()) {
@@ -1153,7 +1155,7 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
                   }
 
                   // Then add to the output method a new identifier expression for the field.
-                  Statement outputCall = getExprStringOutputStatement(fieldName);
+                  Statement outputCall = getIdentStringOutputStatement(fieldName);
                   outputCall.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
                   addToOutputMethod(block, outputCall);
 
@@ -1164,26 +1166,29 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
             if (!handled) {
                if (!mergeStringInOutput(block, expr, null, getSrcStatement(parentElement, decl, lastSrcSt))) {
                   String resultStr;
+                  Statement outputSt;
                   if (escape && escBodyMethod != null && !expr.producesHtml()) {
                      SemanticNodeList<Expression> args = new SemanticNodeList<Expression>();
                      args.add(expr);
                      IdentifierExpression escExpr = IdentifierExpression.createMethodCall(args, escBodyMethod);
-                     resultStr = escExpr.toString();
+                     //resultStr = escExpr.toString();
+                     outputSt = getExprOutputStatement(escExpr);
                   }
-                  else
-                     resultStr = parseResult.toString();
-                  Statement outputSt = getExprStringOutputStatement(resultStr);
-                  if (outputSt != null) {
+                  else {
+                     //resultStr = parseResult.toString();
+                     outputSt = getExprOutputStatement(expr);
+                  }
+                  //if (outputSt != null) {
                      outputSt.fromStatement = getSrcStatement(parentElement, decl, lastSrcSt);
                      addToOutputMethod(block, outputSt);
-                  }
-                  else
-                     origExpr.displayError("Invalid expression for template string - converted to: " + resultStr + " for: ");
+                  //}
+                  //else
+                  //   origExpr.displayError("Invalid expression for template string - converted to: " + resultStr + " for: ");
                }
             }
-         }
-         else
-            throw new UnsupportedOperationException();
+         //}
+         //else
+         //   throw new UnsupportedOperationException();
       }
       else if (PString.isString(decl) || decl instanceof ControlTag) {
          String newStr = decl.toString();
@@ -1323,15 +1328,34 @@ public class Template extends SCModel implements IValueNode, ITypeDeclaration, I
       return Parameter.create(getLayeredSystem(), new Object[] {StringBuilder.class, OutputCtx.class}, new String[] {"out", "ctx"}, null, getModelTypeDeclaration(), this);
    }
 
+   public static Statement getIdentStringOutputStatement(String exprStr) {
+      if (exprStr == null || exprStr.length() == 0 || exprStr.equals(".")) {
+         return null;
+      }
+      SemanticNodeList args = new SemanticNodeList(1);
+      args.add(IdentifierExpression.create(exprStr));
+      return IdentifierExpression.createMethodCall(args, "out.append");
+   }
+
    public static Statement getExprStringOutputStatement(String exprStr) {
       if (exprStr == null || exprStr.length() == 0 || exprStr.equals(".")) {
          return null;
       }
-      return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(exprStr), "out.append(<%= expr %>);", SCLanguage.INSTANCE.blockStatements, true)).get(0);
+      return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(exprStr), "out.append(<%= expr %>);", SCLanguage.INSTANCE.blockStatements, true, true)).get(0);
+   }
+
+   public static Statement getExprOutputStatement(Expression expr) {
+      SemanticNodeList args = new SemanticNodeList(1);
+      args.add(expr);
+      return IdentifierExpression.createMethodCall(args, "out.append");
+      //return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(CTypeUtil.escapeJavaString(stringConstant, '"', false)), "out.append(\"<%= expr %>\");", SCLanguage.INSTANCE.blockStatements, true, true)).get(0);
    }
 
    public static Statement getConstStringOutputStatement(String stringConstant) {
-      return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(CTypeUtil.escapeJavaString(stringConstant, '"', false)), "out.append(\"<%= expr %>\");", SCLanguage.INSTANCE.blockStatements, true)).get(0);
+      SemanticNodeList args = new SemanticNodeList(1);
+      args.add(StringLiteral.create(stringConstant));
+      return IdentifierExpression.createMethodCall(args, "out.append");
+      //return (Statement) ((List) TransformUtil.parseCodeTemplate(new ExprParams(CTypeUtil.escapeJavaString(stringConstant, '"', false)), "out.append(\"<%= expr %>\");", SCLanguage.INSTANCE.blockStatements, true, true)).get(0);
    }
 
    private int replaceStatementGlue(Statement st, int ix, boolean statefulContext) {
