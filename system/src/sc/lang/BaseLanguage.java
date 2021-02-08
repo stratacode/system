@@ -359,7 +359,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
    public class KeywordSpace extends Sequence {
       public KeywordSpace(String name, int options, String symbol) {
          super(name, options | NOERROR);
-         int symbolOpts = options & IGNORE_CASE;
+         int symbolOpts = (options & IGNORE_CASE) | NOERROR;
          add(new Symbol(symbolOpts, symbol), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar), spacing);
          styleName = "keyword";
       }
@@ -385,7 +385,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
       public KeywordChoice(String name, int options, boolean doSpacing, String... expectedValues) {
          super(name, options | NOERROR);
-         int symbolOpts = options & IGNORE_CASE;
+         int symbolOpts = (options & IGNORE_CASE) | NOERROR;
          add(new SymbolChoice(symbolOpts, expectedValues), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar));
          if (doSpacing)
             add(spacing);
@@ -394,7 +394,7 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
 
       public KeywordChoice(int options, String... expectedValues) {
          super("('',)", options | NOERROR);
-         int symbolOpts = options & IGNORE_CASE;
+         int symbolOpts = (options & IGNORE_CASE) | NOERROR;
          add(new SymbolChoice(symbolOpts, expectedValues), new Sequence(NOT | LOOKAHEAD | NOERROR, identifierChar));
          styleName = "keyword";
       }
@@ -438,11 +438,11 @@ public abstract class BaseLanguage extends Language implements IParserConstants 
       }
 
       public SymbolSpace(String symbol, String delim) {
-         this(symbol, delim, 0);
+         this(symbol, delim, NOERROR);
       }
 
       public SymbolSpace(String symbol) {
-         this(symbol, 0);
+         this(symbol, NOERROR);
       }
 
       public String toString() {
