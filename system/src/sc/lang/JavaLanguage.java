@@ -83,7 +83,7 @@ public class JavaLanguage extends BaseLanguage {
    KeywordChoice primitiveTypeName = new KeywordChoice("boolean", "byte", "short", "char",
                                                         "int", "float", "long", "double", "void");
 
-   Sequence primitiveType = new Sequence("PrimitiveType(typeName,)", primitiveTypeName, spacing);
+   Sequence primitiveType = new Sequence("PrimitiveType(typeName,)", NOERROR, primitiveTypeName, spacing);
 
    // TODO: is there a data type mismatch here?
    OrderedChoice typeName = new OrderedChoice("<typeName>", primitiveType, qualifiedIdentifier);
@@ -107,7 +107,7 @@ public class JavaLanguage extends BaseLanguage {
    Sequence typeArgumentList = new Sequence("([],[])", OPTIONAL, typeArgument,
                                             new Sequence("(,[])", OPTIONAL | REPEAT, comma, typeArgument));
    // Note: not using skipOnError for greaterThan here and other type args for better partial parsing of binary exprs
-   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", lessThan, typeArgumentList, greaterThan);
+   Sequence typeArguments = new Sequence("<typeArguments>(,.,)", NOERROR, lessThan, typeArgumentList, greaterThan);
    {
       typeArguments.ignoreEmptyList = false;
    }
@@ -129,7 +129,7 @@ public class JavaLanguage extends BaseLanguage {
    // Forward declarations see below for definition
    public Sequence assignmentExpression = new ChainedResultSequence("(lhs,.)");
    // Java8 Only
-   public Sequence lambdaExpression = new Sequence("LambdaExpression(lambdaParams,,lambdaBody)");
+   public Sequence lambdaExpression = new Sequence("LambdaExpression(lambdaParams,,lambdaBody)", NOERROR);
 
    public OrderedChoice expression = new OrderedChoice(lambdaExpression, assignmentExpression) {
       public Object generate(GenerateContext ctx, Object value) {
@@ -328,7 +328,7 @@ public class JavaLanguage extends BaseLanguage {
         new Sequence("([],[])", varIdentifier, remainingIdentifiers),
         identifierSuffix);
 
-   Sequence classValueExpression = new Sequence("ClassValueExpression(typeIdentifier, arrayBrackets, )", typeIdentifier, openCloseSqBrackets, new KeywordSpace(".class"));
+   Sequence classValueExpression = new Sequence("ClassValueExpression(typeIdentifier, arrayBrackets, )", NOERROR, typeIdentifier, openCloseSqBrackets, new KeywordSpace(".class"));
    {
       // Don't allow just the type to parse as a class value expression in partial values mode - it should have .class at the end
       classValueExpression.minContentSlot = 2;
@@ -419,14 +419,14 @@ public class JavaLanguage extends BaseLanguage {
       unaryExpression.addDefault(unaryExpressionNotPlusMinus);
    }
 
-   Symbol methRefSepLookahead = new Symbol(LOOKAHEAD, "::");
+   Symbol methRefSepLookahead = new Symbol(LOOKAHEAD | NOERROR, "::");
 
    //OrderedChoice methodRefPrefix = new OrderedChoice(classValueExpression, new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, new Symbol(LOOKAHEAD, "::")), type, primaryExpression);
    // Here for Boolean.class::cast we need to match classValueExpression first
    // Using the methRefSepLookahead to avoid false partial parses... it's easy to match a type which is really part of a primary or vice versa.
-   OrderedChoice methodRefPrefix = new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", typeIdentifier, methRefSepLookahead),
-                                                     new Sequence("(.,)", type, methRefSepLookahead),
-                                                     new Sequence("(.,)", primaryExpression, methRefSepLookahead));
+   OrderedChoice methodRefPrefix = new OrderedChoice(new Sequence("TypeExpression(typeIdentifier,)", NOERROR, typeIdentifier, methRefSepLookahead),
+                                                     new Sequence("(.,)",  NOERROR, type, methRefSepLookahead),
+                                                     new Sequence("(.,)", NOERROR, primaryExpression, methRefSepLookahead));
    {
       // Matching typeIdentifier - which can be either a type or an identifier expression first.  That type picks the right one at runtime.  After that we match type,
       // then primary since a type name can match more than a primary expression in some cases.
@@ -521,7 +521,7 @@ public class JavaLanguage extends BaseLanguage {
 
    Sequence annotations = new Sequence("<annotations>([])", REPEAT | OPTIONAL, annotation);
 
-   Sequence voidType = new Sequence("PrimitiveType(typeName,)", new SemanticToken("void"), spacing);
+   Sequence voidType = new Sequence("PrimitiveType(typeName,)", NOERROR, new SemanticToken("void"), spacing);
 
    OrderedChoice typeOrVoid = new OrderedChoice(type, voidType);
 
