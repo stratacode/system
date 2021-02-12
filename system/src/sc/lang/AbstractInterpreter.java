@@ -1544,6 +1544,11 @@ public abstract class AbstractInterpreter extends EditorContext implements ISche
          return type;
       }
       else {
+         // Because we might have already created instances of this type without this new child, it's possible that we'll
+         // change the return of 'needsOwnClass' from false to true by adding this new statement. If getCompiledClassName()
+         // is called again after that, it sees a different class name that's not compatible with the instances and so we
+         // can't properly resolve references to children. See the script swingTestEdit.txt as part of the swingQuizEdit test
+         parentType.checkForStaleAdd();
          ParentParseNode pn = (ParentParseNode) type.getParseNode();
          // Before we add an incomplete definition into the parse tree we need to swap in the right parselet.
          // otherwise, when we add a body it won't be able to find the body in the parselet's grammar.
