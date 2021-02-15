@@ -289,8 +289,12 @@ public class CurrentScopeContext {
       if (ctx == null)
          System.err.println("**** CurrentScopeContext.markReady - no scope for scopeContextName: " + scopeContextName);
       else if (!ctx.contextIsReady) {
-         if (ScopeDefinition.verbose)
-            System.out.println("ScopeContextName " + scopeContextName + " is ready");
+         if (ScopeDefinition.verbose) {
+            if (val)
+               System.out.println("ScopeContextName " + scopeContextName + " is ready");
+            else
+               System.out.println("ScopeContextName " + scopeContextName + " is marked not ready");
+         }
          ctx.markWaiting(val);
       }
    }
@@ -371,6 +375,11 @@ public class CurrentScopeContext {
          first = false;
       }
       sb.append("]");
+      if (scopeContextName != null) {
+         sb.append(" scopeContextName: ");
+         sb.append(scopeContextName);
+      }
+      //sb.append(": " + System.identityHashCode(this));
       return sb.toString();
    }
 

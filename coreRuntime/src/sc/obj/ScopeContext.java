@@ -113,7 +113,8 @@ public abstract class ScopeContext {
    }
 
    public synchronized boolean removeChildContext(ScopeContext childCtx) {
-      return childContexts != null && childContexts.remove(childCtx);
+      boolean res = childContexts != null && childContexts.remove(childCtx);
+      return res;
    }
 
    /** Should be called to initialize the parent/child scopeContexts */
