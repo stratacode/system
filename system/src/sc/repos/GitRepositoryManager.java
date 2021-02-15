@@ -19,8 +19,8 @@ import java.util.ArrayList;
  *  where cloneAddress can be an ssh or https git repository URL and branch-selector, if provided, specifies the branch, commit hash or other arg to 'checkout'.
  */
 public class GitRepositoryManager extends AbstractRepositoryManager {
-   public GitRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
-      super(sys, managerName, rootDir, handler, info);
+   public GitRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info, boolean verbose) {
+      super(sys, managerName, rootDir, handler, info, verbose);
       srcRepository = true;
    }
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {

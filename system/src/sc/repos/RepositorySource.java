@@ -27,6 +27,8 @@ public class RepositorySource implements Serializable {
    public String srcURL;
    public transient RepositoryPackage parentPkg; // For sources defined inside of a sub-directory.  This is the path from the package root to the parent's folder, then url is the modulePath (or path to the package's directory)
    public boolean unzip;
+   /** Set this to true if we need to put the contents of the zip file in a directory with the same name as the base of the zip file (e.g. pgsql) */
+   public boolean unwrapZip;
 
    // Represents the state at which this source was generated when the source came from a dependency.
    // Right now, just stores the tree-depth of the reference
@@ -34,12 +36,13 @@ public class RepositorySource implements Serializable {
 
    public RepositoryPackage pkg;
 
-   public RepositorySource(IRepositoryManager mgr, String url, boolean unzip, RepositoryPackage parentPkg) {
+   public RepositorySource(IRepositoryManager mgr, String url, boolean unzip, boolean unwrapZip, RepositoryPackage parentPkg) {
       this.repository = mgr;
       this.managerName = mgr.getManagerName();
       this.url = url;
       this.srcURL = url;
       this.unzip = unzip;
+      this.unwrapZip = unwrapZip;
       this.parentPkg = parentPkg;
    }
 

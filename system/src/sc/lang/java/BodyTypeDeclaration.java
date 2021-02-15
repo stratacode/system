@@ -1420,7 +1420,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       return null;
    }
 
-   void checkForStaleAdd() {
+   public void checkForStaleAdd() {
       if (isTransformedType())
          return;
       Layer l = getLayer();
@@ -4963,7 +4963,9 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
          else if (sys.options.info && !sys.options.testVerifyMode)
             System.out.println("Compiling: " + toCompileEnts.size() + " stub files");
          HashSet<String> errorFiles = new HashSet<String>();
-         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp, sys.options.debug, sys.javaSrcVersion, sys.messageHandler, errorFiles) != 0) {
+         if (doCompile && LayerUtil.compileJavaFilesInternal(toCompileEnts, bd, cp,
+                 sys.options.debug, sys.options.javaSrcVersion, sys.options.javaTargetVersion,
+                 sys.messageHandler, errorFiles) != 0) {
             displayError("Failed compile step for dynamic type: " + getFullTypeName() + " for ");
          }
       }
@@ -8647,7 +8649,7 @@ public abstract class BodyTypeDeclaration extends Statement implements ITypeDecl
       if (!isLayerType && !isLayerComponent() && layer != null && !isExcludedStub && ModelUtil.execForRuntime(sys, layer, this, sys) == RuntimeStatus.Disabled) {
          if (!excluded) {
             if (sys.options.verbose || sys.options.verboseExec)
-               sys.info("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
+               sys.verbose("Excluding type: " + typeName + " for: " + sys.getProcessIdent());
 
             TypeDeclaration enclType = getEnclosingType();
 

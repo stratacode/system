@@ -29,11 +29,37 @@ public class CreateFunction extends SQLCommand {
 
    void addTableReferences(Set<String> refTableNames) {
       // TODO: look for references in the return type and parameter list
+      String tableName = getRetTableName();
+      if (tableName != null)
+         refTableNames.add(tableName);
    }
 
    public boolean hasReferenceTo(SQLCommand cmd) {
-      // TODO: also look for references in the return type and parameter list
+      if (!(cmd instanceof CreateTable))
+         return false;
+      return true;
+      // TODO: also would look need to look for references in the parameter list and funcOps[..].FuncDef.funcBody property
+      // tht we don't parse. For now, assume that all create functions go after all create tables and it will be good.
+      /*
+      String retTableName = getRetTableName();
+      if (retTableName != null) {
+         CreateTable ct = (CreateTable) cmd;
+         String createTableName = ct.tableName.getIdentifier();
+         if (createTableName.equals(retTableName))
+            return true;
+      }
       return false;
+      */
+   }
+
+   private String getRetTableName() {
+      if (funcReturn instanceof ReturnType) {
+         ReturnType retType = (ReturnType) funcReturn;
+         if (retType.dataType instanceof QualifiedIdentifier) {
+            return ((QualifiedIdentifier) retType.dataType).getIdentifier();
+         }
+      }
+      return null;
    }
 
    public String toDeclarationString() {

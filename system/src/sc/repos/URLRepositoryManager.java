@@ -15,8 +15,8 @@ import java.io.File;
  * From there they are transferred to the installedRoot, which is then typically unzipped.
  */
 public class URLRepositoryManager extends AbstractRepositoryManager {
-   public URLRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
-      super(sys, managerName, rootDir, handler, info);
+   public URLRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info, boolean verbose) {
+      super(sys, managerName, rootDir, handler, info, verbose);
    }
 
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {
@@ -25,8 +25,12 @@ public class URLRepositoryManager extends AbstractRepositoryManager {
       if (src.pkg.unzip)
          src.pkg.definesClasses = false;
       else if (src.pkg.fileNames.size() == 1) {
-         String fileName = src.pkg.fileNames.get(0);
-         installFile = FileUtil.concat(installDir, fileName);
+         // For androidSDK install this created one extra level of indirection since
+         // the androidSDK part is already part of installDir
+         if (src.unwrapZip) {
+            String fileName = src.pkg.fileNames.get(0);
+            installFile = FileUtil.concat(installDir, fileName);
+         }
       }
       // TODO: should we have an option here to set definesClasses true/false for a package url package?
       if (!system.reinstallSystem) {

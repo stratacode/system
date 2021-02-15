@@ -339,11 +339,11 @@ public class LayerUtil implements LayerConstants {
       suppressedCompilerMessages.add("Note: Recompile with -Xlint:unchecked for details.");
    }
 
-   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler messageHandler, Set<String> errorFiles) {
+   public static int compileJavaFilesInternal(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, String targetVersion, IMessageHandler messageHandler, Set<String> errorFiles) {
       JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
       if (compiler == null) {
          System.err.println("*** No internal java compiler found - Do you have the JDK installed and is tools.jar in the system classpath? - trying javac");
-         return compileJavaFiles(srcEnts, buildDir, classPath, debug, srcVersion, messageHandler);
+         return compileJavaFiles(srcEnts, buildDir, classPath, debug, srcVersion, targetVersion, messageHandler);
       }
 
       DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
@@ -458,7 +458,8 @@ public class LayerUtil implements LayerConstants {
       }
    }
    
-   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug, String srcVersion, IMessageHandler handler) {
+   public static int compileJavaFiles(Collection<SrcEntry> srcEnts, String buildDir, String classPath, boolean debug,
+                                      String srcVersion, String targetVersion, IMessageHandler handler) {
       if (srcEnts.size() > 0) {
          List<String> args = new ArrayList<String>(srcEnts.size() + 5);
          args.add("javac");
@@ -476,8 +477,10 @@ public class LayerUtil implements LayerConstants {
          args.add("-implicit:class"); // disable annotation processing since it gives warnings if we leave out a file on the argument list to compile
          if (debug)
             args.add("-g");
-         // args.add("-target");
-         // args.add("1.5");
+         if (targetVersion != null) {
+            args.add("-target");
+            args.add(targetVersion);
+         }
 
          try {
             ProcessBuilder pb = new ProcessBuilder(args);
@@ -997,7 +1000,13 @@ public class LayerUtil implements LayerConstants {
          return;
       }
 
-       usrPathsField.setAccessible(true);
+      try {
+         usrPathsField.setAccessible(true);
+      }
+      catch (RuntimeException exc) {
+         System.err.println("*** Can't add usr_paths to to add a library path directory: " + pathToAdd);
+         return;
+      }
 
        //get array of paths
        final String[] paths = (String[])usrPathsField.get(null);
@@ -1042,22 +1051,22 @@ public class LayerUtil implements LayerConstants {
    }
 
    public static String installLayerBundle(String projectDir, IMessageHandler handler, boolean verbose, String gitURL) {
-      RepositorySystem sys = new RepositorySystem(new RepositoryStore(projectDir), handler, null, verbose, false, false, false);
+      RepositorySystem sys = new RepositorySystem(new RepositoryStore(projectDir), handler, null, true, verbose, false, false, false);
       sys.pkgIndexRoot = FileUtil.concat(projectDir, "idx", "pkgIndex");
       IRepositoryManager mgr = sys.getRepositoryManager("git");
       String fileName = FileUtil.concat("bundles", FileUtil.removeExtension(URLUtil.getFileName(gitURL))); // Remove the '.git' suffix and take the last name as the file name.
       // Just install this package into the packageRoot - don't add the packageName like we do for most packages
-      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL, false, null), null);
+      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL, false, false, null), null);
       String err = pkg.install(null);
       return err;
    }
 
    public static String installDefaultLayers(String resultDir, IMessageHandler handler, boolean verbose, String gitURL) {
-      RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, null, verbose, false, false, false);
+      RepositorySystem sys = new RepositorySystem(new RepositoryStore(resultDir), handler, null, true, verbose, false, false, false);
       IRepositoryManager mgr = sys.getRepositoryManager("git");
       String fileName = gitURL == null ? LayerConstants.DEFAULT_LAYERS_PATH: FileUtil.removeExtension(URLUtil.getFileName(gitURL)); // Remove the '.git' suffix and take the last name as the file name.
       // Just install this package into the packageRoot - don't add the packageName like we do for most packages
-      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL == null ? LayerConstants.DEFAULT_LAYERS_URL : gitURL, false, null), null);
+      RepositoryPackage pkg = new RepositoryPackage(mgr, fileName, null, new RepositorySource(mgr, gitURL == null ? LayerConstants.DEFAULT_LAYERS_URL : gitURL, false, false,null), null);
       //RepositoryPackage pkg = new RepositoryPackage("layers", new RepositorySource(mgr, "ssh://vsgit@stratacode.com/home/git/vs/layers", false));
       String err = pkg.install(null);
       return err;

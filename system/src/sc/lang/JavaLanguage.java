@@ -21,6 +21,9 @@ import java.util.Set;
  * built with the parselets framework, it exposes fields for each Parselet.  Some of these are
  * marked "public" so that you can parse and manipulate individual language elements like a
  * statement or an initializer
+ *
+ * TODO: add support for the 'var' keyword, both to the grammar and the
+ * validation model.
  */
 public class JavaLanguage extends BaseLanguage {
    protected static final String[] JAVA_KEYWORDS = {

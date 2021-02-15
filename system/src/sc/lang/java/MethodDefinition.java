@@ -324,7 +324,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
       return propertyName;
    }
 
-   class JavaCommandInfo {
+   public class JavaCommandInfo {
       String javaArgs, restartJavaArgs, sharedArgs, debugArgs;
       Boolean produceJar;
       String jarFileName;
@@ -416,9 +416,14 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
          scriptSuffix = "";
          String extraArgs = defaultArgs;
          if (defaultArgs != null && defaultArgs.length() > 0) {
-            if (defaultArgs.length() > 0 && !defaultArgs.startsWith(" ")) {
+            if (!defaultArgs.startsWith(" ")) {
                try {
-                  extraArgs = " " + TransformUtil.evalTemplate(this, defaultArgs, false, true, null);
+                  String templOutput = TransformUtil.evalTemplate(this, defaultArgs, false, true, null);
+                  if (templOutput == null) {
+                     System.err.println("*** No template output for template string: " + defaultArgs);
+                  }
+                  else
+                     extraArgs = " " + templOutput;
                }
                catch (IllegalArgumentException exc) {
                   displayError("Failed to parse defaultArgs as a template string: " + defaultArgs);
@@ -536,7 +541,7 @@ public class MethodDefinition extends AbstractMethodDefinition implements IVaria
 
                      String debugArgs = !includeDebug ? "" : " ${DBG_ARGS}";
 
-                     String opensArg="OPENS=\"--add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/java.text=ALL-UNNAMED --add-opens java.base/java.util.concurrent=ALL-UNNAMED --add-opens java.base/java.util.zip=ALL-UNNAMED --add-opens java.base/java.util.regex=ALL-UNNAMED --add-opens java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang.annotation=ALL-UNNAMED --add-opens java.base/java.io=ALL-UNNAMED --add-opens java.desktop/javax.swing=ALL-UNNAMED --add-opens java.desktop/java.awt=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.desktop/javax.swing.text=ALL-UNNAMED --add-opens java.desktop/javax.swing.border=ALL-UNNAMED --add-opens java.desktop/java.awt.event=ALL-UNNAMED\"\n";
+                     String opensArg="OPENS=\"--add-opens java.base/java.lang.reflect=ALL-UNNAMED --add-opens java.base/java.text=ALL-UNNAMED --add-opens java.base/java.util.concurrent=ALL-UNNAMED --add-opens java.base/java.util.zip=ALL-UNNAMED --add-opens java.base/java.util.regex=ALL-UNNAMED --add-opens java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.lang.annotation=ALL-UNNAMED --add-opens java.base/java.io=ALL-UNNAMED --add-opens java.base/java.math=ALL-UNNAMED --add-opens java.desktop/javax.swing=ALL-UNNAMED --add-opens java.desktop/java.awt=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.desktop/javax.swing.text=ALL-UNNAMED --add-opens java.desktop/javax.swing.border=ALL-UNNAMED --add-opens java.desktop/java.awt.event=ALL-UNNAMED --add-opens java.desktop/javax.swing.tree=ALL-UNNAMED\"\n";
                      String javaCompatArg = "if [ -d ${JAVA_HOME}/jmods ] ; then\n" + opensArg +
                                             "else\n" +
                                             "OPENS=\"\"\n" +

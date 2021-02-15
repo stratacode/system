@@ -18,7 +18,7 @@ public class MvnRepositorySource extends RepositorySource {
    public MvnDescriptor desc;
 
    public MvnRepositorySource(IRepositoryManager mgr, String url, boolean unzip, RepositoryPackage parentPkg, MvnDescriptor desc, DependencyContext ctx) {
-      super(mgr, url, unzip, parentPkg);
+      super(mgr, url, unzip, false, parentPkg);
       this.desc = desc;
       this.ctx = ctx;
    }

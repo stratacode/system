@@ -13,8 +13,8 @@ import java.util.ArrayList;
 /**
  */
 public class ScpRepositoryManager extends AbstractRepositoryManager {
-   public ScpRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
-      super(sys, managerName, rootDir, handler, info);
+   public ScpRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info, boolean verbose) {
+      super(sys, managerName, rootDir, handler, info, verbose);
    }
 
    public String doInstall(RepositorySource src, DependencyContext ctx, DependencyCollection deps) {

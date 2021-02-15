@@ -36,7 +36,7 @@ public interface IRepositoryManager {
 
    public RepositorySystem getRepositorySystem();
 
-   RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parent);
+   RepositorySource createRepositorySource(String url, boolean unzip, boolean unwrapZip, RepositoryPackage parent);
 
    /** Is this a repository which defines src (e.g. git) or binaries (e.g. mvn) */
    public boolean isSrcRepository();

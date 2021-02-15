@@ -28,13 +28,13 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
        "https://repo1.maven.org/maven2/"
    };
 
-   public MvnRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info, AbstractRepositoryManager installMgr) {
-      this(sys, managerName, rootDir, handler, info);
+   public MvnRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info, boolean verbose, AbstractRepositoryManager installMgr) {
+      this(sys, managerName, rootDir, handler, info, verbose);
       installRepository = installMgr;
    }
 
-   public MvnRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info) {
-      super(sys, managerName, rootDir, handler, info);
+   public MvnRepositoryManager(RepositorySystem sys, String managerName, String rootDir, IMessageHandler handler, boolean info, boolean verbose) {
+      super(sys, managerName, rootDir, handler, info, verbose);
 
       // Need to make sure both types share the same pomCache and repositories
       if (managerName.equals("mvn")) {
@@ -472,7 +472,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
    }
 
    public RepositoryPackage getOrCreatePackage(String url, RepositoryPackage parent, boolean install) {
-      RepositorySource src = createRepositorySource(url, false, parent);
+      RepositorySource src = createRepositorySource(url, false, false, parent);
       String pkgName = src.getDefaultPackageName();
       RepositoryPackage pkg = system.addPackageSource(this, pkgName, src.getDefaultFileName(), src, install, parent);
       return pkg;
@@ -480,7 +480,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
 
    @Override
    public RepositoryPackage createPackage(String url) {
-      MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false, null);
+      MvnRepositorySource src = (MvnRepositorySource) createRepositorySource(url, false, false, null);
       return new MvnRepositoryPackage(this, src.desc.getPackageName(), src.desc.getJarFileName("jar"), src, null);
    }
 
@@ -523,7 +523,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
       return res;
    }
 
-   public RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parentPkg) {
+   public RepositorySource createRepositorySource(String url, boolean unzip, boolean unwrapZip, RepositoryPackage parentPkg) {
       if (url.startsWith("mvn")) {
          MvnDescriptor desc = MvnDescriptor.fromURL(url);
          MvnRepositorySource src = new MvnRepositorySource(this, url, false, parentPkg, desc, null);
@@ -535,7 +535,7 @@ public class MvnRepositoryManager extends AbstractRepositoryManager {
             MvnRepositorySource src = new MvnRepositorySource(this, url, false, parentPkg, desc, null);
             return src;
          }
-         return super.createRepositorySource(url, unzip, null);
+         return super.createRepositorySource(url, unzip, unwrapZip, null);
       }
    }
 

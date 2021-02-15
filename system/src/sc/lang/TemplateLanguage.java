@@ -212,6 +212,8 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
    /** Use this as the default extends type for any template without an explicit type definition */
    public String defaultExtendsType;
 
+   public SemanticNodeList<Object> templateModifiers;
+
    /** If a template file does not have an explicit &lt;%! TypeName %&gt; statement it will either replace or modify the previous type based on this setting.  For now, static file processors will simply replace the previous type for simplicity.  But schtml and other more sophisticated template types probably should make the default be to modify...*/
    public boolean defaultModify;
 
@@ -287,9 +289,13 @@ public class TemplateLanguage extends SCLanguage implements IParserConstants {
             temp.generateOutputMethod = true;
 
          // Stateful pages need to have a base class to implement the 'invalidate' methods so if there's no extendsType, it's not a stateful page.
-         Object defaultExtendsClass;
          if (defaultExtendsType == null || statefulPages == false)
             temp.statefulPage = false;
+
+         if (templateModifiers != null) {
+            temp.templateModifiers = new SemanticNodeList();
+            temp.templateModifiers.addAll(templateModifiers);
+         }
 
          // Lots of properties are propagated through the template processor from the template so we need to set it even if not processing the template
          temp.templateProcessor = createResultProcessor(temp, fileName);

@@ -83,7 +83,7 @@ public class LayerTypeIndex implements Serializable {
     * may not have been created yet.  If we need to create the layer, be careful to use the layer's layeredSystem so
     * we get the one which is managing this index (since each type index is per-layered system).
     */
-   LayerTypeIndex refreshLayerTypeIndex(LayeredSystem sys, String layerName, long lastModified, RefreshTypeIndexContext refreshCtx) {
+   LayerTypeIndex refreshLayerTypeIndex(LayeredSystem sys, String layerName, long lastModified, RefreshTypeIndexContext refreshCtx, long startTime) {
       File layerFile = sys.getLayerFile(layerName);
       if (layerFile == null) {
          sys.warning("Layer found in type index - not in the layer path: " + layerName + ": " + sys.layerPathDirs);
@@ -96,13 +96,13 @@ public class LayerTypeIndex implements Serializable {
          return null;
 
       if (!pathName.equals(layerPathName)) {
-         return sys.buildLayerTypeIndex(layerName);
+         return sys.buildLayerTypeIndex(layerName, startTime);
       }
 
       /* We want to refresh the layers in layer order so that we set up the modify inheritance types properly */
       if (baseLayerNames != null) {
          for (String baseLayer:baseLayerNames) {
-            sys.refreshLayerTypeIndexFile(baseLayer, refreshCtx, true);
+            sys.refreshLayerTypeIndexFile(baseLayer, refreshCtx, true, startTime);
          }
       }
 
@@ -112,7 +112,7 @@ public class LayerTypeIndex implements Serializable {
 
             if (!srcDirFile.isDirectory()) {
                sys.warning("srcDir removed for layer: " + layerName + ": " + srcDir + " rebuilding index");
-               return sys.buildLayerTypeIndex(layerName);
+               return sys.buildLayerTypeIndex(layerName, startTime);
             }
 
             sys.refreshLayerTypeIndexDir(srcDirFile, "", layerName, this, lastModified);

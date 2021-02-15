@@ -1725,7 +1725,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          List<String> preCompiledSrcDirs = Arrays.asList(srcList);
          for (String preCompiledDir:preCompiledSrcDirs) {
             String ext = FileUtil.getExtension(preCompiledDir);
-            if (ext != null && (ext.equals("jar") || ext.equals("zip"))) {
+            if (isZipExt(ext)) {
                try {
                   ZipFile zipFile = new ZipFile(preCompiledDir);
                   if (srcDirZipFiles == null)
@@ -1765,6 +1765,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       StringBuilder sb = new StringBuilder();
       for (String arg:args)
          sb.append(arg);
+      sb.append(" for layer:");
+      sb.append(this);
       if (layeredSystem != null)
          layeredSystem.reportMessage(MessageType.Debug, sb);
       else
@@ -1773,16 +1775,15 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public void reportMessage(MessageType type, String... args) {
       StringBuilder sb = new StringBuilder();
-      sb.append(type);
-      sb.append(" in layer: ");
-      sb.append(layerPathName);
-      sb.append(": ");
       for (String arg:args)
          sb.append(arg);
+      sb.append(" layer:");
+      sb.append(this);
       if (layeredSystem != null)
          layeredSystem.reportMessage(type, sb);
-      else
+      else {
          System.err.println(sb);
+      }
    }
 
    private boolean addSrcFilesToCache(File dir, String prefix, ArrayList<ReplacedType> replacedTypes, String rootName) {
@@ -1827,7 +1828,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             srcDirCache.put(srcPath, f);
             srcDirCache.put(FileUtil.removeExtension(srcPath), f);
             String rootPath = dir.getPath();
-            layeredSystem.addToPackageIndex(rootPath, this, false, true, absPrefix, fn);
+            layeredSystem.addToPackageIndex(rootPath, this, false, false, true, absPrefix, fn);
 
             String srcRelType = srcPath.replace(FileUtil.FILE_SEPARATOR_CHAR, '.');
 
@@ -1885,7 +1886,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       srcDirCache.put(FileUtil.removeExtension(relFileName), f);
       srcDirCache.put(relFileName, f);
       String absPrefix = FileUtil.concat(packagePrefix.replace('.', FileUtil.FILE_SEPARATOR_CHAR), relDir);
-      layeredSystem.addToPackageIndex(FileUtil.normalize(layerPathName), this, false, true, FileUtil.normalize(absPrefix), srcEnt.baseFileName);
+      layeredSystem.addToPackageIndex(FileUtil.normalize(layerPathName), this, false, false, true, FileUtil.normalize(absPrefix), srcEnt.baseFileName);
       dirIndex.add(FileUtil.removeExtension(srcEnt.baseFileName));
       // If there's an import packageName.* for this type, make sure we add the import
       if (globalPackages != null) {
@@ -2043,7 +2044,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             classDir = FileUtil.getRelativeFile(layerPathName, classDir);
             classDirs.set(i, classDir); // Store the translated path
             String ext = FileUtil.getExtension(classDir);
-            if (ext != null && (ext.equals("jar") || ext.equals("zip"))) {
+            if (isZipExt(ext)) {
                try {
                   zipFiles[i] = new ZipFile(classDir);
                }
@@ -2062,7 +2063,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             classDir = FileUtil.getRelativeFile(layerPathName, classDir);
             externalClassDirs.set(i, classDir); // Store the translated path
             String ext = FileUtil.getExtension(classDir);
-            if (ext != null && (ext.equals("jar") || ext.equals("zip"))) {
+            if (isZipExt(ext)) {
                try {
                   externalZipFiles[i] = new ZipFile(classDir);
                }
@@ -2153,6 +2154,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
             }
          }
       }
+   }
+
+   private boolean isZipExt(String ext) {
+      return ext != null && (ext.equals("jar") || ext.equals("zip") || ext.equals("jmod"));
    }
 
    private void initReplacedTypes() {
@@ -3049,7 +3054,8 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return srcEntries;
    }
 
-   public void startAllTypes() {
+   public boolean startAllTypes(long startTime) {
+      info("Indexing " + srcDirCache.size() + " files");
       for (Iterator<String> srcFiles = getSrcFiles(); srcFiles.hasNext(); )  {
          try {
             layeredSystem.acquireDynLock(false);
@@ -3098,7 +3104,10 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
          finally {
             layeredSystem.releaseDynLock(false);
          }
+         if (!layeredSystem.checkIndexProgress(startTime))
+            return false;
       }
+      return true;
    }
 
    public Set<String> getSrcTypeNames(boolean prependLayerPrefix, boolean includeInnerTypes, boolean restrictToLayer, boolean includeImports) {
@@ -4407,21 +4416,22 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       }
    }
 
-   public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip) {
-      return addRepositoryPackage(pkgName, pkgName, repositoryTypeName, url, unzip);
+   public RepositoryPackage addRepositoryPackage(String pkgName, String repositoryTypeName, String url, boolean unzip, boolean unwrapZip) {
+      return addRepositoryPackage(pkgName, pkgName, repositoryTypeName, url, unzip, unwrapZip);
    }
 
-   /** Adds this repository package to the system.  If you are calling this from the start method, the repository is installed right
-    * away.  If you call it in the initialize method, downstream layers have a chance to modify the package before it's installed - right
-    * before the start method of the layer is called. */
-   public RepositoryPackage addRepositoryPackage(String pkgName, String fileName, String repositoryTypeName, String url, boolean unzip) {
+   /** Adds this repository package to the system for the current layer.  Often called from the layer's start method
+    * so it registers the package with the layer. The package is installed right before the start method
+    * returns.  If this method is called from the initialize method, downstream layers have a chance to
+    * modify the package before it's installed - right before the start method of the layer is called. */
+   public RepositoryPackage addRepositoryPackage(String pkgName, String fileName, String repositoryTypeName, String url, boolean unzip, boolean unwrapZip) {
       RepositorySystem repoSys = layeredSystem.repositorySystem;
       IRepositoryManager mgr = repoSys.getRepositoryManager(repositoryTypeName);
       if (mgr != null) {
          if (repositoryPackages == null)
             repositoryPackages = new ArrayList<RepositoryPackage>();
 
-         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip, null);
+         RepositorySource repoSrc = mgr.createRepositorySource(url, unzip, unwrapZip, null);
          // Add this as a new source.  This will create the package if this is the first definition or add it
          // as a new source if it already exists.
          RepositoryPackage pkg = repoSys.addPackageSource(mgr, pkgName, fileName, repoSrc, started && !disabled, null);
@@ -4584,26 +4594,32 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
       return scopeProcessors.keySet().toString();
    }
 
-   public void initAllTypeIndex() {
+   public boolean initAllTypeIndex(long startTime) {
       if (layerTypesStarted || disabled || excluded)
-         return;
+         return true;
       layerTypesStarted = true;
       if (baseLayers != null) {
          for (Layer base : baseLayers) {
-            base.initAllTypeIndex();
+            base.initAllTypeIndex(startTime);
+
+            if (!layeredSystem.checkIndexProgress(startTime))
+               return false;
          }
       }
       checkIfStarted();
       if (layerTypeIndex == null)
          initTypeIndex();
       // Just walk through and start each of the types in this layer  TODO - include inner types in the type index?
-      startAllTypes();
+      if (!startAllTypes(startTime)) {
+         return false;
+      }
       saveTypeIndex();
       LayerListTypeIndex listTypeIndex = activated ? layeredSystem.typeIndex.activeTypeIndex : layeredSystem.typeIndex.inactiveTypeIndex;
       String name = getLayerName();
       if (name != null) {
          listTypeIndex.addLayerTypeIndex(name, layerTypeIndex);
       }
+      return true;
    }
 
    public boolean hasDefinitionForType(String typeName) {

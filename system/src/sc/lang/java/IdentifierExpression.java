@@ -4002,7 +4002,10 @@ public class IdentifierExpression extends ArgumentsExpression {
          return ctx.resolveName(ModelUtil.getTypeName(boundTypes[0]), returnTypes);
       }
       else {
-         return evalThisReference(ModelUtil.getRuntimeType(enclType), ctx);
+         Object rtType = ModelUtil.getRuntimeType(enclType);
+         if (rtType == null)
+            rtType = enclType; // Might be an inner object optimized so there's compiled class - if so, just use the TypeDeclaration to find it
+         return evalThisReference(rtType, ctx);
       }
    }
 

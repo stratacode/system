@@ -18,7 +18,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
 
    public RepositorySystem system;
    public IMessageHandler msg;
-   public boolean info;
+   public boolean info, verbose;
 
    public boolean active = true;
 
@@ -43,11 +43,11 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       return system;
    }
 
-   public RepositorySource createRepositorySource(String url, boolean unzip, RepositoryPackage parent) {
-      return new RepositorySource(this, url, unzip, parent);
+   public RepositorySource createRepositorySource(String url, boolean unzip, boolean unwrapZip, RepositoryPackage parent) {
+      return new RepositorySource(this, url, unzip, unwrapZip, parent);
    }
 
-   public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info) {
+   public AbstractRepositoryManager(RepositorySystem sys, String mn, String reposRoot, IMessageHandler handler, boolean info, boolean verbose) {
       this.system = sys;
       this.managerName = mn;
       packageRoot = reposRoot;
@@ -152,8 +152,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       if (packageTime == -1) {
          if (installedTime != -1) {
             if (!system.installExisting) {
-               if (info)
-                  info("Package: " + pkg.packageName + " up-to-date: " + getDepsInfo(ctx));
+               verbose("Package: " + pkg.packageName + " up-to-date: " + getDepsInfo(ctx));
                pkg.preInstalled = preInstalled;
             }
             else
@@ -162,8 +161,7 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
       else if (installedTime > packageTime) {
          if (!system.installExisting) {
-            if (info)
-               info("Package: " + pkg.packageName + "  up-to-date: " + getDepsInfo(ctx));
+            verbose("Package: " + pkg.packageName + "  up-to-date: " + getDepsInfo(ctx));
             pkg.preInstalled = preInstalled;
          }
          else if (info) {
@@ -288,6 +286,14 @@ public abstract class AbstractRepositoryManager implements IRepositoryManager {
       }
       if (info)
          System.out.println(infoMessage);
+   }
+
+   public void verbose(String str) {
+      if (msg != null) {
+         msg.reportMessage(str, null, -1, -1, MessageType.Debug);
+      }
+      if (verbose)
+         System.out.println(str);
    }
 
    public void error(String infoMessage) {

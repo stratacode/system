@@ -116,6 +116,9 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
    private static CFClass load(ZipFile zipFile, String classPathName, LayeredSystem system, Layer layer) {
       ClassFile file = null;
       try {
+         String ext = FileUtil.getExtension(zipFile.getName());
+         if (ext != null && ext.equals("jmod"))
+            classPathName = FileUtil.concat("classes", classPathName);
          ZipEntry zipEnt = zipFile.getEntry(FileUtil.normalize(classPathName));
          if (zipEnt != null) {
             InputStream input = zipFile.getInputStream(zipEnt);
@@ -352,8 +355,10 @@ public class CFClass extends JavaTypeDeclaration implements ILifecycle, IDefinit
                JavaType implJavaType = implJavaTypes.get(i);
                Object implParamType = implJavaType.getTypeDeclaration();
                Object implType = ModelUtil.resolveCompiledType(system, implParamType, implJavaType.getFullTypeName());
-               if (implType == null)
+               if (implType == null) {
                   error("Can't find interface: " + implJavaType.getFullTypeName());
+                  implType = ModelUtil.resolveCompiledType(system, implParamType, implJavaType.getFullTypeName());
+               }
                else
                   implementsTypes.add(implType);
             }

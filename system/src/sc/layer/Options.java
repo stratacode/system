@@ -168,6 +168,8 @@ public class Options {
    /** Maximum number of errors to display in one build */
    @Constant public int maxErrors = 100;
 
+   @Constant public int maxTypeIndexMillis = -1;
+
    /** After the first successful build, should we continue to use buildAllFiles or set it to false. */
    @Constant public boolean rebuildAllFiles = false;
 
@@ -235,6 +237,12 @@ public class Options {
    @Constant public boolean refreshDynamicOnly = false;
 
    @Constant public SchemaManager.SchemaMode schemaMode = SchemaManager.SchemaMode.Prompt;
+
+   /** If set, specifies the -source option to the javac compiler */
+   @Constant public String javaSrcVersion = "8";
+
+   /** If set, specifies the -target option to the javac compiler */
+   @Constant public String javaTargetVersion = "8";
 
    boolean restartArg = false;
    boolean headlessSet = false;

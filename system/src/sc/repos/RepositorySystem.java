@@ -35,7 +35,7 @@ public class RepositorySystem {
 
    public String pkgIndexRoot;
 
-   public RepositorySystem(RepositoryStore store, IMessageHandler handler, IClassResolver resolver, boolean info, boolean reinstall, boolean update, boolean installExisting) {
+   public RepositorySystem(RepositoryStore store, IMessageHandler handler, IClassResolver resolver, boolean info, boolean verbose, boolean reinstall, boolean update, boolean installExisting) {
       this.store = store;
 
       msg = handler;
@@ -46,11 +46,11 @@ public class RepositorySystem {
       if (info)
          debug = true;
 
-      addRepositoryManager(new ScpRepositoryManager(this, "scp", store.packageRoot, handler, info));
-      addRepositoryManager(new GitRepositoryManager(this, "git", store.packageRoot, handler, info));
-      addRepositoryManager(new URLRepositoryManager(this, "url", store.packageRoot, handler, info));
-      addRepositoryManager(new MvnRepositoryManager(this, "mvn", store.packageRoot, handler, info));
-      addRepositoryManager(new MvnRepositoryManager(this, "git-mvn", store.packageRoot, handler, info, new GitRepositoryManager(this, "git-mvn", store.packageRoot, handler, info)));
+      addRepositoryManager(new ScpRepositoryManager(this, "scp", store.packageRoot, handler, info, verbose));
+      addRepositoryManager(new GitRepositoryManager(this, "git", store.packageRoot, handler, info, verbose));
+      addRepositoryManager(new URLRepositoryManager(this, "url", store.packageRoot, handler, info, verbose));
+      addRepositoryManager(new MvnRepositoryManager(this, "mvn", store.packageRoot, handler, info, verbose));
+      addRepositoryManager(new MvnRepositoryManager(this, "git-mvn", store.packageRoot, handler, info, verbose, new GitRepositoryManager(this, "git-mvn", store.packageRoot, handler, info, verbose)));
    }
 
    public IRepositoryManager[] repositories;

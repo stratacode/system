@@ -8,5 +8,5 @@ package sc.layer;
 * Created by jvroom on 10/6/14.
 */
 public enum TypeIndexMode {
-   Rebuild, Refresh, Load, Lazy
+   Rebuild, Refresh, RefreshContinue, Load, Lazy
 }

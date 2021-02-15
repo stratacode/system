@@ -466,10 +466,10 @@ public class ClassType extends JavaType {
                         type = layerModel.getModelTypeDeclaration();
                   }
                   else {
-                     Layer layer = curModel.layer.activated ? sys.findLayerByName(layerRelPath, fullTypeName) : sys.getInactiveLayer(fullTypeName, false, false, false, false);
+                     Layer layer = curModel.layer.activated ? sys.findLayerByName(layerRelPath, fullTypeName) : sys.getInactiveLayer(fullTypeName, false, false, true, false);
                      // Relative paths for inactive layers are done separately here.
                      if (layer == null && !curModel.layer.activated) {
-                        layer = sys.getInactiveLayer(CTypeUtil.prefixPath(layerRelPath, fullTypeName), false, false, false, false);
+                        layer = sys.getInactiveLayer(CTypeUtil.prefixPath(layerRelPath, fullTypeName), false, false, true, false);
                      }
                      if (layer != null && layer.model != null)
                         type = layer.model.getModelTypeDeclaration();

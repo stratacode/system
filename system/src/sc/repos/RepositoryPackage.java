@@ -69,7 +69,10 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
    public String url;
    public String type;
 
+   /** True if the download is a zip file that needs to be unpacked */
    public boolean unzip;
+   /** True if the name of the zip should be used to create a new directory for the contents */
+   public boolean unwrapZip;
 
    public String[] srcPaths;
    public String[] webPaths;
@@ -161,7 +164,7 @@ public class RepositoryPackage extends LayerComponent implements Serializable {
          RepositoryPackage pkg = this;
 
          if (url != null) {
-            RepositorySource src = mgr.createRepositorySource(url, unzip, parentPkg);
+            RepositorySource src = mgr.createRepositorySource(url, unzip, unwrapZip, parentPkg);
             if (packageName == null)
                packageName = src.getDefaultPackageName();
             String defaultFile = src.getDefaultFileName();
