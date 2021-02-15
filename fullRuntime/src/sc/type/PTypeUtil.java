@@ -295,16 +295,17 @@ public class PTypeUtil {
       throw new UnsupportedOperationException();
    }
 
-   static IBeanMapper methodDefaultMapper = getPropertyMapping(Method.class, "default");
+   //static IBeanMapper methodDefaultMapper = getPropertyMapping(Method.class, "default");
 
    public static boolean isDefaultMethod(Object meth) {
       //return meth instanceof Method && ((Method) meth).isDefault();
       if (meth instanceof Method) {
+         return ((Method) meth).isDefault();
          // Handle Java8 dependency using reflection so we can run on Java6 as well
-         if (methodDefaultMapper != null) {
-            return (Boolean) methodDefaultMapper.getPropertyValue(meth, false, false);
-         }
-         return false;
+         //if (methodDefaultMapper != null) {
+         //   return (Boolean) methodDefaultMapper.getPropertyValue(meth, false, false);
+         //}
+         //return false;
       }
       throw new UnsupportedOperationException();
    }
@@ -681,7 +682,16 @@ public class PTypeUtil {
 
          for (int i = 0; i < fields.length; i++) {
             Field field = fields[i];
-            field.setAccessible(true);
+            if ((field.getModifiers() & Modifier.PUBLIC) == 0) {
+               try {
+                  // TODO: I think only public fields should be properties now so we can
+                  // probably get rid of this.
+                  field.setAccessible(true);
+               }
+               catch (RuntimeException exc) {
+                  continue;
+               }
+            }
 
             String name = field.getName();
             // Keep this$0 etc because we use them for finding the outer object.  But other properties with $ get omitted.
@@ -715,7 +725,14 @@ public class PTypeUtil {
 
          for (int i = 0; i < methods.length; i++) {
             Method method = methods[i];
-            method.setAccessible(true);
+            if ((method.getModifiers() & Modifier.PUBLIC) == 0) {
+               try {
+                  method.setAccessible(true);
+               }
+               catch(RuntimeException exc) {
+                  continue;
+               }
+            }
             String name = method.getName();
             Class[] ptypes;
             String propName;
