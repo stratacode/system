@@ -175,8 +175,13 @@ public class RTypeUtil {
 
       res = cl.getFields();
       if (res != null) {
-         for (Field f:res)
-            f.setAccessible(true);
+         for (Field f:res) {
+            try {
+               f.setAccessible(true);
+            }
+            catch (RuntimeException exc) {
+            }
+         }
       }
       fieldCache.put(cl, res);
       return res;
@@ -467,7 +472,13 @@ public class RTypeUtil {
          if ((method.getModifiers() & Modifier.VOLATILE) != 0) {
             continue;
          }
-         method.setAccessible(true);
+         try {
+            if ((method.getModifiers() & Modifier.PUBLIC) == 0)
+               method.setAccessible(true);
+         }
+         catch (RuntimeException exc) {
+            continue; // In Java11 some methods cannot be made accessible
+         }
          String methodName = method.getName();
 
          Method[] methodList = cache.get(methodName);
@@ -649,7 +660,13 @@ public class RTypeUtil {
       try {
          Constructor[] arr = resultClass.getDeclaredConstructors();
          for (Constructor cs : arr) {
-            cs.setAccessible(true);
+            try {
+               if ((cs.getModifiers() & Modifier.PUBLIC) == 0)
+                  cs.setAccessible(true);
+            }
+            catch (RuntimeException exc) {
+               continue; // In Java11 some methods cannot be made accessible
+            }
          }
          return arr;
       }
