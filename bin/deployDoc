@@ -2,6 +2,8 @@
 
 set -e
 
+SC=${SC:-"/usr/local/scMain"}
+
 DEPLOY_DIR=/usr/local/scc/deploy
 
 hasStageDir=`ssh scserver@stratacode.com "sh -c 'if [ -f ${DEPLOY_DIR}/currentStageDir ] ; then echo YES; fi'"`
@@ -29,9 +31,9 @@ ROPTS="-zavr --delete --checksum"
 # leverage rsync to minimize deltas over the wire.
 ssh scserver@stratacode.com rsync $ROPTS ${DEPLOY_DIR}/stageDir${CUR}/ ${DEPLOY_DIR}/stageDir${NEXT}
 
-rsync $ROPTS /usr/local/scMain/build/doc_clientOnly/web/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_clientOnly/web
+rsync $ROPTS ${SC}/build/doc_clientOnly/web/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_clientOnly/web
 
-rsync $ROPTS /usr/local/scMain/build/doc_webConfig/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_webConfig
+rsync $ROPTS ${SC}/build/doc_webConfig/ scserver@strataCode.com:${DEPLOY_DIR}/stageDir${NEXT}/doc_webConfig
 
 ssh scserver@stratacode.com rm ${DEPLOY_DIR}/current
 ssh scserver@stratacode.com ln -s ${DEPLOY_DIR}/stageDir${NEXT} ${DEPLOY_DIR}/current

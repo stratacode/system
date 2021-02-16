@@ -68,7 +68,7 @@ public class LayerOrderIndex implements Serializable {
          }
          // This next item in the current list is out of order in the index.
          else if (lastPos != -1 && nextPos < lastPos) {
-            System.out.println("*** Order index - moving: " + layerName + " to after: " + inactiveLayerNames.get(lastPos));
+            //System.out.println("*** Order index - moving: " + layerName + " to after: " + inactiveLayerNames.get(lastPos));
             inactiveLayerNames.remove(nextPos);
             inactiveLayerNames.add(lastPos, layerName);
             anyChanges = true;

@@ -1,6 +1,8 @@
 #!/bin/bash
 
 
+# Will only copy over new files
+#    -add -n to see what will be copied 
 rsync -zavr /usr/local/scc/builds/release scserver@stratacode.com:/usr/local/scc/builds/
 rsync -zavr /usr/local/sc4idea/builds scserver@stratacode.com:/usr/local/sc4idea
 
