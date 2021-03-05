@@ -6967,17 +6967,39 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (bootPath != null) {
             // TODO: not sure we need this anymore
             String[] pathEntries = StringUtil.split(bootPath, FileUtil.PATH_SEPARATOR);
-            // Only add the JDK.  This is needed for importing "*" on system packages.
+            // Only add the JRE classes.  This is needed for importing "*" on system packages and for finding system classes
+            // from the CFClass system with -cc option
             for (String p:pathEntries) {
                if (p.contains("classes.jar") || p.contains("Classes.jar") || p.contains("rt.jar")) {
                   jdkFound = true;
                   addPathToIndex(null, p);
                }
             }
-            /*
-            if (!jdkFound)
-               verbose("No classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + pathEntries);
-             */
+         }
+         // In Java11, sun.boot.class.path is not set so need to add the jmod file to the classpath directly
+         if (!jdkFound) {
+            String homeDir = System.getProperty("java.home");
+            if (homeDir != null) {
+               String modDir = FileUtil.concat(homeDir, "jmods");
+               // Includes the modules that we might find in dependencies for CFClass based apps
+               String[] mods = {"java.base.jmod", "java.desktop.jmod", "java.naming.jmod", "java.datatransfer.jmod"};
+
+               for (String mod:mods) {
+                  String baseFile = FileUtil.concat(modDir, mod);
+                  if (new File(baseFile).canRead()) {
+                     addPathToIndex(null, baseFile);
+                     jdkFound = true;
+                  }
+                  else
+                     error("No java module file: " + baseFile);
+               }
+            }
+         }
+         if (!jdkFound) {
+            if (bootPath != null)
+               verbose("No classes.jar or rt.jar in sun.booth.class.path for JDK imports: " + bootPath);
+            else
+               verbose("No file {java.home}/jmods/java.base.jmod for JDK imports: " + bootPath);
          }
       }
    }
