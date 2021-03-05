@@ -384,9 +384,13 @@ public class FileUtil {
       }
 
       try {
-         if (errorRes != null)
-            pb.redirectErrorStream(true);
+         pb.redirectErrorStream(true);
          Process p = pb.start();
+
+         // The default is Redirect.PIPE, we'll use to write the inputString to the new process. But
+         // thinking the default here should be to pass our standard input to the process and I think that's what this will do
+         if (inputString == null)
+            pb.redirectInput(ProcessBuilder.Redirect.INHERIT);
 
          InputThread inputThread = null;
          if (inputString != null) {
