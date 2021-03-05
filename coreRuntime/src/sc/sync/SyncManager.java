@@ -2171,6 +2171,9 @@ public class SyncManager {
             Bind.removeListener(inst, null, toRemove.valueListener, IListener.VALUE_CHANGED_MASK);
             toRemove.valueListener = null;
          }
+
+         if (toRemove.name != null)
+            objectIndex.remove(toRemove.name);
       }
 
       void removeSyncInst(Object inst, SyncProperties syncProps) {
