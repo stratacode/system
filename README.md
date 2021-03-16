@@ -1,6 +1,18 @@
 # StrataCode system 
 
-Defines three layers (and corresponding IntelliJ modules) used to build the coreRuntime and StrataCode distributions for the 'scc' command.
+### What is StrataCode?
+
+StrataCode is at its core a build-tool for building projects by merging the contents of layers of source files. It also includes extensions to Java built using a unique code-processor and contains a number of associated frameworks for more customizable and scalable systems.
+
+Read [more](https://www.stratacode.com)
+
+### This repository
+
+This is the Java source repository for building the source to StrataCode's scc command, used to build and run a program. It includes the code for the code-processor, data binding, the implementation of the StrataCode extensions to Java, and the Java to JS converter.
+
+This distribution defines three layers (and corresponding IntelliJ modules) used to build the coreRuntime and StrataCode distributions for the 'scc' command.
+
+Normally the scc distribution is built from scc itself, but it's possible to compile and run scc using IntelliJ or build the jar files using Gradle and create a run script by hand.
 
 ## Installing
 
@@ -15,11 +27,11 @@ path to this directory is /home/system: create the file 'scSourcePath' in the
 
 ## coreRuntime 
 
-A standalone set of libraries that implement data binding etc. without dependencies on reflection.  It's used by the GIT framework and exposed as a source bundle for the JS framework.
+A standalone library implementing data binding and type utilities that do not use reflection.  Originally split out for the (now retired) gwt integration where reflection is not present. It's also used as the source bundle for the JS framework. Annotations on classes here determine whether this class is converted to JS or whether a native stub is used to replace the type in the JS version.
 
 ## fullRuntime 
 
-Depends on coreRuntime and overrides a few classes, replacing the coreRuntime versions with versions that use Java's reflection to find properties.  
+Depends on coreRuntime, replacing the main type utilities to provide implementations that use reflection. Full runtime should be in the classpath before core runtime so that it's classes are picked up first.
 
 ## system 
 
@@ -31,4 +43,4 @@ Depends on fullRuntime and contains the LayeredSystem, parsing and language fram
 
 * To build the Documentation, make sure 'scc' is in your path and run bin/makeDoc
 
-StrataCode is written in java so you can also build it without itself, or build it from the IDE in a Java project.  See http://www.stratacode.com/doc/ide/config.html
+StrataCode is written in java so you can also build it without itself, or build it from the IDE in a Java project.  See the [ide-config](http://www.stratacode.com/doc/ide/config.html) doc for more details.
