@@ -38,6 +38,13 @@ public abstract class BaseScopeContext extends ScopeContext {
    }
 
    public void scopeDestroyed(ScopeContext fromParent) {
+      // Do this before we removing the values since SyncContext will be one of the values and is a listener. It looks
+      // for itself it in the scope context.
+      if (destroyListener != null) {
+         destroyListener.scopeDestroyed(this);
+         destroyListener = null;
+      }
+      boolean needsClear = false;
       if (valueTable != null) {
          ArrayList<String> keysToDestroy = new ArrayList<String>(valueTable.size());
          for (String key:valueTable.keySet()) {
@@ -53,11 +60,13 @@ public abstract class BaseScopeContext extends ScopeContext {
                DynUtil.dispose(value);
             }
          }
-         valueTable = null;
+         needsClear = true;
       }
       refTable = null;
       // Destroy the sync context after we dispose of any items directly in the attributes list so they are not disposed of twice.
       super.scopeDestroyed(fromParent);
+      if (needsClear)
+         valueTable = null;
    }
 
 

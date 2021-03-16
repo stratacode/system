@@ -31,7 +31,8 @@ public class RequestScopeContext extends BaseScopeContext {
    }
 
    public void scopeDestroyed(ScopeContext fromParent) {
-      RequestScopeDefinition.removeCurrentRequestScopeContext();
       super.scopeDestroyed(fromParent);
+      // Needs to be done after super.scopeDestroyed so that we can find the sync inst to remove
+      RequestScopeDefinition.removeCurrentRequestScopeContext();
    }
 }

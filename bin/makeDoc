@@ -32,6 +32,7 @@ if [ ! -d bundles/doc/doc/core/examples/todoRun/js ] ; then
 fi
 cp build/example_todo_clientOnly/web/TodoList.html bundles/doc/doc/core/examples/todoRun/
 cp build/example_todo_clientOnly/web/js/*.js bundles/doc/doc/core/examples/todoRun/js/
+cp build/example_todo_clientOnly/web/*.css bundles/doc/doc/core/examples/todoRun/
 
 scc -c -a doc/clientOnly 
 

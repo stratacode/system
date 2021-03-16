@@ -1,3 +1,11 @@
 #!/bin/bash
 
-javadoc -sourcepath /jjv/sc/sc/system/src:/jjv/sc/sc/fullRuntime/src:/jjv/sc/sc/coreRuntime/src -classpath ~/.stratacode/pkgs/jline/jline/2.13/jline-2.13.jar -d /usr/local/scMain/build/doc_clientOnly/web/javadoc sc.lang.html sc.lang.js sc.obj sc.dyn sc.type sc.lang sc.lang.java sc.db sc.lang.template sc.bind sc.layer sc.parser sc.js sc.lifecycle sc.util sc.sync sc.repos sc.repos.mvn 
+SC_DIR=`dirname $BASH_SOURCE[0]`
+SC_DIR=`dirname $SC_DIR`
+
+SC=${SC:-"/usr/local/scMain"}
+
+echo "Building Javadoc for StrataCode in $SC_DIR"
+cd $SC_DIR
+
+javadoc -sourcepath ${SC_DIR}/system/src:${SC_DIR}/fullRuntime/src:${SC_DIR}/coreRuntime/src -classpath ~/.stratacode/pkgs/jline/jline/2.13/jline-2.13.jar -d ${SC}/build/doc_clientOnly/web/javadoc sc.lang.html sc.lang.js sc.obj sc.dyn sc.type sc.lang sc.lang.java sc.db sc.lang.template sc.bind sc.layer sc.parser sc.js sc.lifecycle sc.util sc.sync sc.repos sc.repos.mvn 

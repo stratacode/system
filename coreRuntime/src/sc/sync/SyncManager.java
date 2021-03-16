@@ -683,7 +683,7 @@ public class SyncManager {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
                   ii.setName(objName);
-                  initOnDemandInst(null, inst, ii, false, ii.onDemand && addOnDemandChanges, null);
+                  initOnDemandInst(null, inst, ii, ii.inherited, ii.onDemand && addOnDemandChanges, null);
                }
             }
          }
@@ -1624,7 +1624,9 @@ public class SyncManager {
             addChangedValue(null, inst, propName, curValue, syncProps.syncGroup, null);
       }
 
-      private boolean initProperty(List<SyncLayer.SyncChange> depChanges, Object inst, InstInfo ii, String propName, int flags, boolean inherited, SyncProperties syncProps, boolean addPropChanges, SyncChangeListener syncListener, boolean initial, SyncLayer syncLayer) {
+      private boolean initProperty(List<SyncLayer.SyncChange> depChanges, Object inst, InstInfo ii, String propName,
+                                   int flags, boolean inherited, SyncProperties syncProps, boolean addPropChanges,
+                                   SyncChangeListener syncListener, boolean initial, SyncLayer syncLayer) {
          boolean changeAdded = false;
 
          try {
@@ -2137,21 +2139,22 @@ public class SyncManager {
             System.out.println("Removing sync inst: " + DynUtil.getInstanceName(inst) + " from scope: " + name + (toRemove.inherited ? " inherited from: " + toRemove.parContext.name : ""));
 
          // We only add the listeners on the original instance subscription.  So when removing an inherited instance don't remove the listeners
-         if (!toRemove.inherited && toRemove.initialized) {
-            SyncChangeListener syncListener = getSyncListenerForGroup(syncProps.syncGroup);
-            Object[] props = syncProps.getSyncProperties();
-            if (props != null) {
-               for (Object prop:props) {
-                  removePropertyListener(toRemove, inst, prop, syncProps, syncListener);
+         if (toRemove.initialized) {
+            if (!toRemove.inherited) {
+               if (syncProps != null) {
+                  SyncChangeListener syncListener = getSyncListenerForGroup(syncProps.syncGroup);
+                  Object[] props = syncProps.getSyncProperties();
+                  if (props != null) {
+                     for (Object prop : props) {
+                        removePropertyListener(toRemove, inst, prop, syncProps, syncListener);
+                     }
+                  }
                }
+               removePropertyValueListeners(inst);
             }
-            removePropertyValueListeners(inst);
-
             removeSyncInstFromChildCtxs(inst, syncProps, listenersOnly);
          }
-         else if (toRemove.inherited && removeFromParentList) {
-            if (listenersOnly)
-               System.err.println("*** replacing sync instance but on child context?");
+         if (removeFromParentList && toRemove.inherited) {
             Set<InstInfo> children = toRemove.parContext.childSyncInsts.get(inst);
             if (children == null || !children.remove(toRemove))
                System.err.println("*** Did not find inherited instance to remove for: " + toRemove);
@@ -2160,8 +2163,10 @@ public class SyncManager {
          if (!listenersOnly) {
             if (objectIds != null)
                objectIds.remove(inst);
-            SyncLayer changedLayer = getChangedSyncLayer(syncProps.syncGroup);
-            changedLayer.removeSyncInst(inst);
+            if (syncProps != null) {
+               SyncLayer changedLayer = getChangedSyncLayer(syncProps.syncGroup);
+               changedLayer.removeSyncInst(inst);
+            }
 
             if (initialSyncLayer != null)
                initialSyncLayer.removeSyncInst(inst);
@@ -2227,10 +2232,8 @@ public class SyncManager {
          for (Map.Entry<Object,InstInfo> nameEnt: syncInsts.entrySet()) {
             InstInfo instInfo = nameEnt.getValue();
             Object inst = nameEnt.getKey();
-            if (!instInfo.inherited) {
-               disposeInfoList.add(instInfo);
-               disposeInstList.add(inst);
-            }
+            disposeInfoList.add(instInfo);
+            disposeInstList.add(inst);
          }
          for (int i = 0; i < disposeInfoList.size(); i++) {
             InstInfo instInfo = disposeInfoList.get(i);
@@ -2238,9 +2241,8 @@ public class SyncManager {
             if (instInfo.props == null) {
                if (!instInfo.initialized)
                   continue;
-               System.err.println("*** No sync props for initialized sync inst");
             }
-            removeSyncInstInternal(instInfo, toDispose, instInfo.props, true, false);
+            removeSyncInstInternal(instInfo, toDispose, instInfo.props, true, true);
             // Another problem here is that DB objects can be shared by peer sync contexts - i.e. in a session
             // so disposing of them here is wrong. We really should be just removing the sync inst listeners here
             // I think and maybe only disposing instances that are registered that way in the addSyncInst call.
@@ -3455,9 +3457,7 @@ public class SyncManager {
       SyncContext syncCtx = getRootSyncContextForInst(inst);
       if (syncCtx != null) {
          SyncProperties syncProps = syncCtx.getSyncManager().getSyncProperties(type);
-         if (syncProps != null) {
-            syncCtx.removeSyncInst(inst, syncProps);
-         }
+         syncCtx.removeSyncInst(inst, syncProps);
       }
    }
 

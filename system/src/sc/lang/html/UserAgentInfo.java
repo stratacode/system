@@ -178,6 +178,8 @@ public class UserAgentInfo implements Cloneable {
          }
          // Everything is set now but sometimes bots pose as browsers so to catch those, look for some more patterns
          String botVers = getExtensionVersion("Googlebot");
+         if (botVers == null)
+            botVers = getVersionForCommentString("Googlebot");
 
          // specific bots we might want to log separately
          if (botVers != null || platform.contains("Googlebot")) {
@@ -248,13 +250,32 @@ public class UserAgentInfo implements Cloneable {
       return null;
    }
 
-   public String getVersionForCommentString(String str) {
+   public String getVersionForCommentString(String pattern) {
       if (extensions == null)
          return null;
       for (int i = 0; i < extensions.size(); i++) {
          UserAgentExtension uae = extensions.get(i);
-         if (uae.comment != null && uae.comment.contains(str))
+         int strIx;
+         if (uae.comment != null && (strIx = uae.comment.indexOf(pattern)) != -1) {
+            int len = pattern.length();
+            int start = len + strIx;
+            int commentLen = uae.comment.length();
+            if (commentLen > start) {
+               char nextChar = uae.comment.charAt(start);
+               if (nextChar == '/') {
+                  start++;
+                  int endIx;
+                  for (endIx = start; endIx < commentLen; endIx++) {
+                     nextChar = uae.comment.charAt(endIx);
+                     if (nextChar != '.' && (nextChar < '0' || nextChar > '9'))
+                        break;
+                  }
+                  if (endIx != start)
+                     return uae.comment.substring(start, endIx);
+               }
+            }
             return uae.version;
+         }
       }
       return null;
    }
