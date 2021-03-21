@@ -7,6 +7,7 @@ package sc.obj;
 import sc.dyn.DynUtil;
 import sc.dyn.ScheduledJob;
 import sc.sync.SyncManager;
+import sc.type.PTypeUtil;
 import sc.util.PerfMon;
 
 import java.util.*;
@@ -78,6 +79,8 @@ public abstract class ScopeContext {
          return;
       }
       destroyed = true;
+      if (ScopeDefinition.trace)
+         System.out.println("Destroy ScopeContext: " + this);
       if (destroyListener != null)
          destroyListener.scopeDestroyed(this);
       if (parentContexts != null) {
@@ -104,6 +107,8 @@ public abstract class ScopeContext {
       if (childContexts == null)
          childContexts = new HashSet<ScopeContext>();
       childContexts.add(childCtx);
+      if (ScopeDefinition.trace)
+         System.out.println("Added child context: " + childCtx.getScopeDefinition().getExternalName() + " to: " + getScopeDefinition().getExternalName() + " with: " + childContexts.size() + " total");
    }
 
    public void addParentContext(ScopeContext parent) {
@@ -114,6 +119,14 @@ public abstract class ScopeContext {
 
    public synchronized boolean removeChildContext(ScopeContext childCtx) {
       boolean res = childContexts != null && childContexts.remove(childCtx);
+      if (res) {
+         if (ScopeDefinition.trace) {
+            System.out.println("Removed child context: " + childCtx.getScopeDefinition().getExternalName() + " from: " + getScopeDefinition().getExternalName() + " with: " + childContexts.size() + " remaining");
+         }
+      }
+      else {
+         System.err.println("Failed to remove child context: " + this);
+      }
       return res;
    }
 

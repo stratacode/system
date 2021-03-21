@@ -2219,7 +2219,7 @@ public class SyncManager {
          SyncContext childSyncCtx = (SyncContext) scope.getValue(SC_SYNC_CONTEXT_SCOPE_KEY);
          if (childSyncCtx != null) {
             if (trace)
-               System.out.println("Destroying scope : " + scope.getScopeDefinition().name + ":" + scope.getId());
+               System.out.println("Destroying sync context for scope: " + scope.getScopeDefinition().name + ":" + scope.getId());
             childSyncCtx.disposeContext();
             // Need this to find and remove the sync insts so remove it after we are done.
             scope.setValue(SC_SYNC_CONTEXT_SCOPE_KEY, null);
@@ -2235,6 +2235,17 @@ public class SyncManager {
             disposeInfoList.add(instInfo);
             disposeInstList.add(inst);
          }
+         if (parentContexts != null) {
+            for (SyncContext parCtx : parentContexts) {
+               if (parCtx.childContexts.remove(this)) {
+                  if (trace)
+                     System.out.println("Removed sync context: " + this + " from parent: " + parCtx.scope + " remaining: " + parCtx.childContexts.size());
+               }
+               else
+                  System.err.println("Child sync context: " + this + " not found in parent: " + parCtx.scope);
+            }
+         }
+         // The childContexts will be destroyed in the scopeDestroyed callback from the parent
          for (int i = 0; i < disposeInfoList.size(); i++) {
             InstInfo instInfo = disposeInfoList.get(i);
             Object toDispose = disposeInstList.get(i);
