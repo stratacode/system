@@ -36,7 +36,7 @@ public class Head extends HTMLElement<Object> {
          if (page instanceof HtmlPage) {
             // If there's no JS version of this page, there's no JS version of this style sheet.
             if (page.serverTag) {
-               IPageDispatcher dispatcher = ((HtmlPage) page).pageDispatcher;
+               IPageDispatcher dispatcher = ((HtmlPage) page).getPageDispatcher();
                for (int i = 0; i < styleSheetPaths.length; i++) {
                   IPageEntry pageEnt = dispatcher.lookupPageType("/" +  styleSheetPaths[i]);
                   if (pageEnt != null) {

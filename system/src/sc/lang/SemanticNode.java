@@ -176,18 +176,23 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       validated = false;
       processed = false;
 
-      DynType type = TypeUtil.getPropertyCache(getClass());
-      IBeanMapper[] semanticProps = type.getSemanticPropertyList();
+      // Subclasses like Element can work either like AST nodes of a parse-tree, or as runtime objects. In the latter case,
+      // getting and stopping all public properties is not what we want. They already use getChildren() to stop any
+      // child objects
+      if (getStopSemanticProps()) {
+         DynType type = TypeUtil.getPropertyCache(getClass());
+         IBeanMapper[] semanticProps = type.getSemanticPropertyList();
 
-      for (int i = 0; i < semanticProps.length; i++) {
-         IBeanMapper mapper = semanticProps[i];
-         Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
-         if (val instanceof ILifecycle) {
-            if (val == this) {
-               System.err.println("*** Recursive element tree - child: " + mapper.getPropertyName() + " refers to parent in stop method");
-               return;
+         for (int i = 0; i < semanticProps.length; i++) {
+            IBeanMapper mapper = semanticProps[i];
+            Object val = PTypeUtil.getProperty(this, mapper.getField(), false);
+            if (val instanceof ILifecycle) {
+               if (val == this) {
+                  System.err.println("*** Recursive element tree - child: " + mapper.getPropertyName() + " refers to parent in stop method");
+                  return;
+               }
+               ((ILifecycle) val).stop();
             }
-            ((ILifecycle) val).stop();
          }
       }
    }
@@ -1182,5 +1187,9 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
       if (parseNode != null) {
          parseNode.setSemanticValue(null, true, false);
       }
+   }
+
+   public boolean getStopSemanticProps() {
+      return true;
    }
 }

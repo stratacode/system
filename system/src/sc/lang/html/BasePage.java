@@ -12,6 +12,7 @@ import java.util.Map;
 
 public abstract class BasePage implements IPage {
    private IPageDispatcher pageDispatcher;
+   private IPageEntry pageEnt;
    private int pageVisitCount = 0;
    private boolean cacheEnabled = false;
    private CacheMode cache;
@@ -24,6 +25,14 @@ public abstract class BasePage implements IPage {
 
    public IPageDispatcher getPageDispatcher() {
       return pageDispatcher;
+   }
+
+   public void setPageEntry(IPageEntry pageEnt) {
+      this.pageEnt = pageEnt;
+   }
+
+   public IPageEntry getPageEntry() {
+      return pageEnt;
    }
 
    public void setCurrentScopeContexts(List<CurrentScopeContext> ctxs) {

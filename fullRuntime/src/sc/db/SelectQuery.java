@@ -794,7 +794,7 @@ public class SelectQuery implements Cloneable {
                               // TODO: if this has a reverse property, do we want to update the other side - in this case, add it to the reverseProperty which is a list here
                               //if (propDesc.reversePropDesc != null)  {
                               //}
-                              valDBObj.setPrototype(false);
+                              valDBObj.clearPrototype();
                            }
                         }
                         else if (idVal != null) {
@@ -858,7 +858,7 @@ public class SelectQuery implements Cloneable {
                               // TODO: update the reverse property (a list at this point)?
                               //if (propDesc.reversePropDesc != null)
                               //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
-                              valDBObj.setPrototype(false);
+                              valDBObj.clearPrototype();
                            }
                         }
                      }
@@ -970,7 +970,7 @@ public class SelectQuery implements Cloneable {
                               // TODO: do we need to update the reverse property
                               //if (propDesc.reversePropDesc != null)
                               //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
-                              valDBObj.setPrototype(false);
+                              valDBObj.clearPrototype();
                            }
                         }
                      }
@@ -1004,7 +1004,7 @@ public class SelectQuery implements Cloneable {
                            if (valDBObj.isPrototype()) {
                               //if (propDesc.reversePropDesc != null)
                               //   propDesc.reversePropDesc.getPropertyMapper().setPropertyValue(val, inst);
-                              valDBObj.setPrototype(false);
+                              valDBObj.clearPrototype();
                            }
                         }
                      }

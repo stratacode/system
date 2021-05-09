@@ -14,6 +14,7 @@ import sc.util.StringUtil;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
 /**
  * Stores the metadata for a given type in the system that represents the mapping to a persistence storage
@@ -139,6 +140,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    /** False during the code-generation phase, true when connected to a database */
    public boolean runtimeMode = false;
 
+   public long expireTimeMillis = 60*1000*15;
+
    public Map<Integer,DBTypeDescriptor> subTypesById = null;
    public List<DBTypeDescriptor> subTypes = null;
    public int typeId = -1;
@@ -249,7 +252,7 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
    }
 
-   /** This is the version used from the runtime code, when all info for defining the type is available in the constructor */
+   /** The constructor called from generated runtime code - but the generated code uses the static 'create' method that calls this */
    public DBTypeDescriptor(Object typeDecl, DBTypeDescriptor baseType, int typeId, String dataSourceName, TableDescriptor primary,
                            List<TableDescriptor> auxTables, List<TableDescriptor> multiTables, List<BaseQueryDescriptor> queries, String versionPropName, String schemaSQL, boolean needsAutoId) {
       this(typeDecl, baseType, typeId, dataSourceName, primary, queries, schemaSQL);
@@ -625,7 +628,12 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
    public List<? extends IDBObject> findBy(List<String> propNames, List<Object> propValues, String selectGroup, List<String> orderByNames, int startIx, int maxResults) {
       IDBObject proto = initPrototypeForQuery(propNames, propValues);
-      return matchQuery((DBObject) proto.getDBObject(), propNames, selectGroup, orderByNames, startIx, maxResults);
+      try {
+         return matchQuery((DBObject) proto.getDBObject(), propNames, selectGroup, orderByNames, startIx, maxResults);
+      }
+      finally {
+         DynUtil.dispose(proto);
+      }
    }
 
    private IDBObject initPrototypeForQuery(List<String> propNames, List<Object> propValues) {
@@ -743,7 +751,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       DBTransaction curTx = DBTransaction.getOrCreate();
 
-      return groupQuery.runQuery(curTx, null);
+      try {
+         return groupQuery.runQuery(curTx, null);
+      }
+      finally {
+         if (proto != null)
+            DynUtil.dispose(proto);
+      }
    }
 
    /*
@@ -781,7 +795,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       DBTransaction curTx = DBTransaction.getOrCreate();
 
-      return groupQuery.countQuery(curTx, protoDB);
+      try {
+         return groupQuery.countQuery(curTx, protoDB);
+      }
+      finally {
+         if (proto != null)
+            DynUtil.dispose(proto);
+      }
    }
 
    public int countAll() {
@@ -890,7 +910,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       DBTransaction curTx = DBTransaction.getOrCreate();
 
-      return groupQuery.runQuery(curTx, null);
+      try {
+         return groupQuery.runQuery(curTx, null);
+      }
+      finally {
+         if (proto != null)
+            DynUtil.dispose(proto);
+      }
    }
 
 
@@ -917,7 +943,13 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       }
 
       DBTransaction curTx = DBTransaction.getOrCreate();
-      return groupQuery.countQuery(curTx, null);
+      try {
+         return groupQuery.countQuery(curTx, null);
+      }
+      finally {
+         if (proto != null)
+            DynUtil.dispose(proto);
+      }
    }
 
    private void initTypeInstances() {
@@ -959,6 +991,10 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       DBObject dbObj;
       synchronized (this) {
+         // check again after synchronizing
+         inst = typeInstances.get(id);
+         if (inst != null)
+            return inst;
          // When typeId is unset, this returns null for abstract types or those with sub-types because we don't really know the
          // concrete type. In this case, we will create a stub DBObject to store the id properties and manage access to the query
          // to populate properties on this instance - at which point we learn the type and create the wrapper.
@@ -1138,11 +1174,28 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                   remDBObj.markRemoved();
                else
                   remDBObj.markStopped();
+
+               removeReverseListeners(remDBObj);
                return true;
             }
          }
       }
       return false;
+   }
+
+   private void removeReverseListeners(DBObject dbObj) {
+      if (baseType != null)
+         baseType.removeReverseListeners(dbObj);
+      if (reverseProps != null) {
+         Object inst = dbObj.getInst();
+         for (int i = 0; i < reverseProps.size(); i++) {
+            DBPropertyDescriptor reverseProp = reverseProps.get(i);
+            // Already added this one from the base type
+            if (baseType != null && baseType.reverseProps.contains(reverseProp))
+               continue;
+            Bind.removeListenerOfType(inst, reverseProp.getPropertyMapper(), ReversePropertyListener.class, IListener.VALUE_CHANGED_MASK);
+         }
+      }
    }
 
    public void clearTypeCache() {
@@ -1156,10 +1209,18 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
 
       synchronized (this) {
          for (IDBObject dbObj:typeInstances.values()) {
-            ((DBObject) dbObj.getDBObject()).markStopped();
+            DBObject unwrapped = ((DBObject) dbObj.getDBObject());
+            stopObject(unwrapped);
          }
          typeInstances.clear();
       }
+   }
+
+   private void stopObject(DBObject toStop) {
+      boolean isProto = toStop.isPrototype();
+      toStop.markStopped();
+      if (!isProto)
+         removeReverseListeners(toStop);
    }
 
    public Object getIdColumnValue(Object inst, int ci) {
@@ -1340,15 +1401,20 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
    }
 
    public void initDBObject(DBObject obj) {
+      // This is called from 'init' right when we create the instance so it will be called for transient and
+      // prototypes so need the corresponding removeReverseListener call when the object is stopped.
       if (baseType != null)
          baseType.initDBObject(obj);
       // These are properties in this type that have bi-directional relationships to properties in other types
       // We need to listen to change in this object on these properties in order to keep those other properties in sync
       // with those changes.
       if (reverseProps != null) {
+         Object inst = obj.getInst();
          for (int i = 0; i < reverseProps.size(); i++) {
             DBPropertyDescriptor reverseProp = reverseProps.get(i);
-            Object inst = obj.getInst();
+            // Already added this one from the base type
+            if (baseType != null && baseType.reverseProps.contains(reverseProp))
+               continue;
             Object curVal = DynUtil.getPropertyValue(inst, reverseProp.propertyName);
             ReversePropertyListener listener = new ReversePropertyListener(obj, curVal, reverseProp);
             Bind.addListener(inst, reverseProp.getPropertyMapper(), listener, IListener.VALUE_CHANGED_MASK);
@@ -2490,6 +2556,8 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
       dbObj.setWrapper(newInst, this);
       dbObj.setDBId(dbObj.dbId);
       dbObj.setPrototype(false);
+      // TODO: do we need to add reversePropertyListeners here - maybe only add the new ones that might exist
+      // in the new type
       dbObj.dbTypeDesc.replaceInstance(newInst);
    }
 
@@ -2510,6 +2578,44 @@ public class DBTypeDescriptor extends BaseTypeDescriptor {
                DynUtil.addDynInstance(typeName, inst);
             }
          }
+      }
+   }
+
+   /**
+    * For when an object expired in the cache, but there was still a reference to it - put it back in the cache unless
+    * it's already been replaced. If it has been replaced, all methods will be redirected to the replaced version.
+    */
+   void recacheDBObject(DBObject obj) {
+      if (baseType != null) {
+         baseType.recacheDBObject(obj);
+         return;
+      }
+
+      synchronized (this) {
+         Object dbId = obj.getDBId();
+         IDBObject newInst = typeInstances.get(dbId);
+         if (newInst != null) {
+            obj.replacedBy = newInst;
+         }
+         else {
+            typeInstances.put(dbId, obj.wrapper);
+         }
+      }
+   }
+
+   public void invalidateExpiredItems() {
+      final long now = System.currentTimeMillis();
+      synchronized (this) {
+         typeInstances.entrySet().removeIf(new Predicate<Map.Entry<Object, IDBObject>>() {
+            public boolean test(Map.Entry<Object, IDBObject> obj) {
+               DBObject dbObj = (DBObject) obj.getValue().getDBObject();
+               if (dbObj.instanceLastUsed + expireTimeMillis < now) {
+                  stopObject(dbObj);
+                  return true;
+               }
+               return false;
+            }
+         });
       }
    }
 }

@@ -4,8 +4,10 @@
 
 package sc.js;
 
+import sc.bind.IListener;
 import sc.obj.IObjectId;
 
+import javax.lang.model.element.Element;
 import java.util.ArrayList;
 
 /**
@@ -48,6 +50,8 @@ public class ServerTag implements IObjectId {
    public int hashCode() {
       return id.hashCode();
    }
+
+   public transient IListener serverTagListener;
 
    public boolean equals(Object other) {
       if (other instanceof ServerTag) {

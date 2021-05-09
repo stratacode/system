@@ -174,7 +174,7 @@ public class NamedQueryDescriptor extends BaseQueryDescriptor {
 
                   IDBObject rowInst = resType.lookupInstById(idVal, typeId, true, false);
                   DBObject rowDBObj = (DBObject) rowInst.getDBObject();
-                  rowDBObj.setPrototype(false);
+                  rowDBObj.clearPrototype();
 
                   rowVal = rowInst;
 

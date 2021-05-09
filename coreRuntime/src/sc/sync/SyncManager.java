@@ -634,9 +634,11 @@ public class SyncManager {
          if (info == null) {
             return;
          }
-         for (PropertyValueListener listener:info.valList.values())
-            Bind.removeListener(listener.value, null, listener, IListener.VALUE_CHANGED_MASK);
-         syncListenerInfo.remove(parentObj);
+         else {
+            for (PropertyValueListener listener : info.valList.values())
+               Bind.removeListener(listener.value, null, listener, IListener.VALUE_CHANGED_MASK);
+            syncListenerInfo.remove(parentObj);
+         }
       }
 
       public void registerObjName(Object inst, Object[] args, String objName, boolean fixedName, boolean initInst, boolean receivedChange) {
@@ -683,6 +685,7 @@ public class SyncManager {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
                   ii.setName(objName);
+                  ii.props = props;
                   initOnDemandInst(null, inst, ii, ii.inherited, ii.onDemand && addOnDemandChanges, null);
                }
             }
@@ -697,6 +700,7 @@ public class SyncManager {
                SyncProperties props = getSyncPropertiesForInst(inst);
                if (props != null) {
                   ii.setName(objName);
+                  ii.props = props;
                   initOnDemandInst(null, inst, ii, false, false, null);
                }
             }
@@ -2234,6 +2238,7 @@ public class SyncManager {
             Object inst = nameEnt.getKey();
             disposeInfoList.add(instInfo);
             disposeInstList.add(inst);
+
          }
          if (parentContexts != null) {
             for (SyncContext parCtx : parentContexts) {

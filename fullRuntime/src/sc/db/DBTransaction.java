@@ -30,6 +30,7 @@ public class DBTransaction {
    LinkedHashMap<IDBObject, List<String>> toFetchLater;
 
    public long startTime = System.currentTimeMillis();
+   public long commitTime = -1;
    public boolean completed = false;
 
    /** Set to indicate that the transaction is being committed - a signal to setX methods to allow the field to be updated */
@@ -97,6 +98,7 @@ public class DBTransaction {
     * to enable queuing of inserts and deletes as well.
     */
    public void flush() {
+      commitTime = System.currentTimeMillis();
       while (operationList != null) {
          ArrayList<TxOperation> toApply = operationList;
          operationApplyList = toApply;

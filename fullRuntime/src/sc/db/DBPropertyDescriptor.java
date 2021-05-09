@@ -471,7 +471,7 @@ public class DBPropertyDescriptor {
             // reference refers to a persistent object.
             // TODO: should there be an option to validate the reference here - specifically if it's defined in a
             // different data store?
-            refDBObj.setPrototype(false);
+            refDBObj.clearPrototype();
          }
       }
    }

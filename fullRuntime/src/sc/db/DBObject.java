@@ -167,6 +167,7 @@ public class DBObject implements IDBObject {
       if (cur == null || cur.applyingDBChanges)
          return null;
       synchronized (pendingOps) {
+         instanceLastUsed = cur.startTime;
          int txSz = pendingOps.size();
          TxUpdate upd = null;
          for (int i = 0; i < txSz; i++) {
@@ -206,6 +207,8 @@ public class DBObject implements IDBObject {
    private TxOperation getPendingOperation(DBTransaction curr, String property, boolean createUpdateProp, boolean createInsert,
                                            boolean createDelete, boolean remove, boolean queue) {
       synchronized (pendingOps) {
+         instanceLastUsed = curr.startTime;
+
          // If we've updated the property in this transaction, find the updated value and return
          // a reference to that update so the updated value gets returned - only for that transaction.
          int txSz = pendingOps.size();
@@ -282,7 +285,17 @@ public class DBObject implements IDBObject {
       return null;
    }
 
+   private void restartIfNecessary() {
+      if ((flags & STOPPED) != 0) {
+         fstate = 0;
+         flags &= ~STOPPED;
+         // Note: this can set replacedBy if this instance was replaced by another one in the cache
+         dbTypeDesc.recacheDBObject(this);
+      }
+   }
+
    public PropUpdate dbFetch(String property) {
+      restartIfNecessary();
       if (replacedBy != null)
          return ((DBObject) replacedBy.getDBObject()).dbFetch(property);
 
@@ -354,6 +367,8 @@ public class DBObject implements IDBObject {
    }
 
    public boolean dbFetchDefault() {
+      restartIfNecessary();
+
       if (replacedBy != null)
          return ((DBObject) replacedBy.getDBObject()).dbFetchDefault();
 
@@ -409,8 +424,7 @@ public class DBObject implements IDBObject {
             if (selectQuery.selectProperties(curTransaction, this)) {
                selected = true;
                res = true;
-               if ((flags & PROTOTYPE) != 0)
-                  flags &= ~PROTOTYPE;
+               clearPrototype();
             }
             else {
                if ((flags & PROTOTYPE) == 0) {
@@ -458,6 +472,8 @@ public class DBObject implements IDBObject {
     * in a reverse relationship change.
     */
    public PropUpdate dbSetProp(String propertyName, Object propertyValue, Object oldValue)  {
+      restartIfNecessary();
+
       if (replacedBy != null)
          return ((DBObject) replacedBy.getDBObject()).dbSetProp(propertyName, propertyValue, oldValue);
 
@@ -574,6 +590,7 @@ public class DBObject implements IDBObject {
    }
 
    public void dbDelete(boolean queue) {
+      restartIfNecessary();
       if (replacedBy != null) {
          replacedBy.dbDelete(queue);
          return;
@@ -620,6 +637,8 @@ public class DBObject implements IDBObject {
    }
 
    public boolean dbRefresh() {
+      restartIfNecessary();
+
       if (replacedBy != null)
          return replacedBy.dbRefresh();
 
@@ -665,6 +684,13 @@ public class DBObject implements IDBObject {
 
    public boolean isPrototype() {
       return (flags & PROTOTYPE) != 0;
+   }
+
+   public synchronized void clearPrototype() {
+      if (isPrototype()) {
+         setPrototype(false);
+         //init(); // We didn't add reversePropertyListeners on the prototype so do that here
+      }
    }
 
    public synchronized void setPrototype(boolean val) {
@@ -762,7 +788,13 @@ public class DBObject implements IDBObject {
       }
    }
 
+   long instanceLastUsed = -1;
+
    public synchronized void markStopped() {
+      if ((flags & STOPPED) != 0) {
+         System.err.println("DBObject.markStopped() called on stopped object");
+         return;
+      }
       if ((flags & (PENDING_INSERT | TRANSIENT | PROTOTYPE | REMOVED)) != 0)
          throw new IllegalArgumentException("Invalid state for markStopped: " + getStateString());
       if (changeableListeners != null)
@@ -869,10 +901,14 @@ public class DBObject implements IDBObject {
       return res.toString();
    }
 
+   /** Called once the database has been updated with the changes. Updates the cached values in this instance. */
    void applyUpdates(DBTransaction transaction, ArrayList<PropUpdate> updateList, DBPropertyDescriptor versProp, long newVersion,
                      DBPropertyDescriptor lastModifiedProp, Date lmtValue) {
       synchronized (pendingOps) {
          transaction.commitInProgress = true;
+         if (transaction.commitTime == -1)
+            transaction.commitTime = System.currentTimeMillis();
+         instanceLastUsed = transaction.commitTime;
          try {
             IDBObject inst = getInst();
             boolean needsValidate = inst instanceof IPropValidator;
@@ -974,7 +1010,10 @@ public class DBObject implements IDBObject {
    public void stop() {
       if (isTransient())
          return;
-      if (!dbTypeDesc.removeInstance(this, false))
+      // We do put prototypes into the typeInstances table, to reserve the spot for a particular id we are looking up.
+      // but othertimes, prototypes are not in the typeInstances map so here we are removing it but not printing an error
+      // if it's not there
+      if (!dbTypeDesc.removeInstance(this, false) && !isPrototype())
          DBUtil.error("DBObject.stop: instance not found: " + this);
       else {
          /*
@@ -1023,6 +1062,9 @@ public class DBObject implements IDBObject {
       if (obj != null)
          return obj.dbFetch(prop);
       else {
+         // For when the code-gen ends up calling a getX method before the DBObject has been created. Although we can't
+         // return the db value until the id and DBObject have been created, we add it to a list to get from the DB afterwards
+         // It will send a change event at that time and update any bindings
          DBTransaction curTx = DBTransaction.getCurrent();
          if (curTx != null && curTx.applyingDBChanges) {
             curTx.addFetchLaterProperty(wrapper, prop);

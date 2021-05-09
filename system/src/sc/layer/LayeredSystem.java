@@ -14706,6 +14706,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (type instanceof BodyTypeDeclaration) {
             ((BodyTypeDeclaration) type).stopDynComponent(dynObj);
          }
+         else {
+            if (obj instanceof IStoppable)
+               ((IStoppable) obj).stop();
+            if (obj instanceof IAltComponent)
+               ((IAltComponent) obj)._stop();
+         }
       }
       else {
          if (obj instanceof IStoppable)

@@ -139,7 +139,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
 
    private transient Element replaceWith;
 
-   private transient boolean stopped = false;
+   //private transient boolean stopped = false;
 
    /**
     * For repeat tags, with wrap=true, the body repeats without a wrapper tag.  Instead a wrapper tag based using this element's tag name wraps all of the repeated content without
@@ -5575,9 +5575,21 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       return toString();
    }
 
+   // If we are part of a Template, this instance was parsed and the semantic properties of the class are the ones
+   // that define child AST nodes. Otherwise, getChildren() is called to stop the appropriate children. Stopping all
+   // public properties will stop objects like a TypeDeclaration that happen to be pointed to in the TagObject class.
+   public boolean getStopSemanticProps() {
+      return getEnclosingTemplate() != null;
+   }
+
    /** This method has to be here so we properly remap JS references to here instead of SemanticNode.stop which does not exist in the JS runtime */
    public void stop() {
       super.stop();
+
+      if (serverTagInfo != null) {
+         Bind.removeListener(this, null, serverTagInfo.serverTagListener, IListener.LISTENER_ADDED);
+         serverTagInfo = null;
+      }
       // NOTE: this probably already happens from JavaModel's types array which contains tagObject but just in case
       // that's not up-to-date, stop the tagObject here as well.
       if (tagObject != null) {
@@ -5612,7 +5624,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       needsSuper = false;
       needsBody = false;
       convertingToObject = false;
-      stopped = true;
+      //stopped = true;
    }
 
    public TypeDeclaration getElementTypeDeclaration() {
@@ -5659,18 +5671,6 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
    public void addServerTagFlags(ServerTag st) {
    }
 
-   /** Listens for new bindings to be added to the tag object and checks if any new server tag props need to be added for these new listeners */
-   private class STagBindingListener extends AbstractListener {
-      ServerTag serverTag;
-      private STagBindingListener(ServerTag serverTag) {
-         this.serverTag = serverTag;
-      }
-      public boolean listenerAdded(Object obj, Object prop, Object listener, int eventMask, int priority) {
-         serverTag.listenersValid = false;
-         return true;
-      }
-   }
-
    public ServerTag getServerTagInfo(String id) {
       if (serverTagInfo != null)
          return serverTagInfo;
@@ -5694,7 +5694,8 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       }
       if (stag != null) {
          serverTagInfo = stag;
-         Bind.addListener(this, null, new STagBindingListener(stag), IListener.LISTENER_ADDED);
+         serverTagInfo.serverTagListener = new STagBindingListener(stag);
+         Bind.addListener(this, null, serverTagInfo.serverTagListener, IListener.LISTENER_ADDED);
       }
 
       return stag;

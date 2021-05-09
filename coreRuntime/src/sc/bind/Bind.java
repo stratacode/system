@@ -55,6 +55,20 @@ public class Bind {
    /** The OR'd list of flags to be propagated to all child bindings */
    static int PROPAGATED_FLAGS = SKIP_NULL;
 
+   public static void removeListenerOfType(Object inst, IBeanMapper prop, Object listenerType, int valueChangedMask) {
+      BindingListener listenerPtr = getPropListeners(inst, prop);
+      while (listenerPtr != null) {
+         IListener toRemListener = listenerPtr.listener;
+         Object curListenerType = DynUtil.getType(toRemListener);
+         if (curListenerType == listenerType) {
+            removeListener(inst, prop, toRemListener, valueChangedMask);
+            return;
+         }
+         listenerPtr = listenerPtr.next;
+      }
+      System.err.println("*** Failed to remove listener of type: " + listenerType + " for property: " + prop.getPropertyName() + " on object: " + inst);
+   }
+
    static class BindingListenerEntry {
       int numProps = 0;
       BindingListener[] bindingListeners;

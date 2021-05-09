@@ -43,7 +43,8 @@ public class HtmlPage extends Html implements IPage {
       super(concreteType);
    }
 
-   public IPageDispatcher pageDispatcher;
+   private IPageDispatcher pageDispatcher;
+   private IPageEntry pageEnt;
 
    @sc.obj.EditorSettings(visible=false)
    public void setPageDispatcher(IPageDispatcher pd) {
@@ -51,6 +52,14 @@ public class HtmlPage extends Html implements IPage {
    }
    public IPageDispatcher getPageDispatcher() {
       return pageDispatcher;
+   }
+
+   @sc.obj.EditorSettings(visible=false)
+   public void setPageEntry(IPageEntry pe) {
+      pageEnt = pe;
+   }
+   public IPageEntry getPageEntry() {
+      return pageEnt;
    }
 
    private List<CurrentScopeContext> currentScopeContexts;
@@ -179,5 +188,12 @@ public class HtmlPage extends Html implements IPage {
    }
    public void setPageProperties(Map<String,Object> pp) {
       pageProperties = pp;
+   }
+
+   public void stop() {
+      if (pageEnt != null) {
+         pageDispatcher.destroyPage(this, pageEnt);
+      }
+      super.stop();
    }
 }

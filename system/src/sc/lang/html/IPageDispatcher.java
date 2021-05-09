@@ -12,4 +12,6 @@ public interface IPageDispatcher {
    public IPageEntry lookupPageType(String url);
 
    public RemoteResult invokeRemote(Object obj, Object type, String methName, Object retType, String paramSig, Object...args);
+
+   public void destroyPage(IPage page, IPageEntry pageEnt);
 }

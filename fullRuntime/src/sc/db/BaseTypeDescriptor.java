@@ -10,6 +10,7 @@ import sc.type.CTypeUtil;
 import java.util.HashMap;
 import java.util.Map;
 
+/** Base class for DBEnumDescriptor and DBTypeDescriptor - lifecycle data source, type name */
 public abstract class BaseTypeDescriptor {
    static Map<Object,BaseTypeDescriptor> typeDescriptorsByType = new HashMap<Object,BaseTypeDescriptor>();
    static Map<String,BaseTypeDescriptor> typeDescriptorsByName = new HashMap<String,BaseTypeDescriptor>();

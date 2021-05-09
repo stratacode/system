@@ -26,6 +26,10 @@ public interface IPage {
    void setPageDispatcher(IPageDispatcher dispatcher);
    IPageDispatcher getPageDispatcher();
 
+   @sc.obj.EditorSettings(visible=false)
+   void setPageEntry(IPageEntry dispatcher);
+   IPageEntry getPageEntry();
+
    /** This property is incremented right before the request is invoked */
    void setPageVisitCount(int vc);
    int getPageVisitCount();
