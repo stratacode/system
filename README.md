@@ -1,16 +1,16 @@
 # StrataCode 
 
-StrataCode is an open source build-tool, code-processor, Java to JS converter, and extensions to Java for configuration, components and data binding. It merges directory trees and source code use type-safe merging. Layers in the stack can add new separate services, and include constraints to include/exclude themselves from one or more services. In this way, StrataCode can build and run a complete, coordinated multi-process system. It's a new more complete solution for building pluggable, service oriented systems, reducing code copies, and increasing the flexibility for how software components are defined and managed. 
+StrataCode is an open source build-tool, code-processor, Java to JS converter, and extensions to Java for configuration, components and data binding. It merges directory trees and layers of source code preserving static type checking. Rather than just building on program at a time, scc can be used to build a complete multi-process system. Layers in the stack add services, and include constraints to include/exclude themselves from one or more services. One layered stack splits itself apart into separate stacks that are used to compile and start each service. 
 
-Some layers are dynamic configuration layers, where all files are loaded when each service starts, others are merged at compile time.
+Some layers are dynamic configuration layers, where all files are loaded when each service starts. Most layers though are compiled, the merging happens at build time. Builds generate one or more typical project directories that are compiled and run automtically with framework integrations.
 
-There are a number of frameworks support for a very declarative and flexible experience for developing out of the box.
+The [coreFrameworks](https://github.com/stratacode/coreFramework) provide integrations for web applications, Java swing, and more.
 
 Data binding, events, properties, and components are built as extensions to Java using very little new syntax.
 
 There's an IntelliJ plugin to tie everything together.
 
-Read [more](https://www.stratacode.com)
+Read more at [stratacode.com](https://www.stratacode.com)
 
 This is a long time side project from one developer, but has been tested and debugged with lots of code over many years. There's no commercial support at this time.
 
@@ -39,16 +39,16 @@ path to this directory is /home/system: create the file 'scSourcePath' in the
       ---- /home/myProj/conf/scSourcePath:
       /home/system
 
-### coreRuntime 
+### coreRuntime module
 
 A standalone library implementing data binding. Includes versions of some type utilities that do not use reflection. This library was originally split out for the gwt integration where reflection is not available. It's also used as the source bundle for the JS framework where those type utilities are overridden by native JS implementations. Annotations on classes here determine whether this class is converted to JS or whether a native stub is used to replace the type in the JS version.
 
-### fullRuntime 
+### fullRuntime module
 
 Depends on coreRuntime, but not on system. It replaces the type utilities to provide implementations that do use reflection. Full runtime should be in the classpath before core runtime so that it's classes are picked up first.
 Compiled StrataCode applications that do not use any code-processing features, but do need data binding, properties or components need only depend on fullRuntime.
 
-### system 
+### system module
 
 Depends on fullRuntime and contains the LayeredSystem, parsing and language framework - the 'main' for scc.
 
