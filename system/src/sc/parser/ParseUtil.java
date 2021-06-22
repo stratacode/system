@@ -1203,7 +1203,7 @@ public class ParseUtil  {
       options.scInstallDir = indexDir;
       options.mainDir = indexDir;
 
-      LayeredSystem sys = new LayeredSystem(null, null, null, options, null, null, false, modelIndex);
+      LayeredSystem sys = new LayeredSystem(null, null, null, options, null, null, false, modelIndex, null);
 
       /** Create a single layer to manage externalClasses and source files given to us to parse */
       Layer sysLayer = sys.createLayer("sysLayer", null, null, false, false, false, false, false);

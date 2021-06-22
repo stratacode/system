@@ -137,13 +137,7 @@ import static sc.type.RTypeUtil.systemClasses;
  */
 @sc.js.JSSettings(jsModuleFile="js/sclayer.js", prefixAlias="sc_")
 public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSystem, IClassResolver {
-   /** The list of runtimes required to execute this stack of layers (e.g. javascript and java).  If java is in the list, it will be the first one and represented by a "null" entry. */
-   public static ArrayList<IRuntimeProcessor> runtimes;
-
-   /** The list of processes to build for this stack of layers */
-   public static ArrayList<IProcessDefinition> processes;
-
-   private static boolean procInfoNeedsSave = false;
+   SystemContext sysContext;
 
    /** When you are running with the source to StrataCode, instead of just with sc.jar point this to the source root - i.e. the dir which holds coreRuntime, fullRuntime, and sc */
    public static String scSourcePath = null;
@@ -312,9 +306,6 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    /** Set to true for cases where we create a runtime purely for representing inactive types - e.g. the documentation.  In that case, no active layers are populated */
    public boolean inactiveRuntime = false;
-
-   /** A global setting turned on when in the IDE.  If true the original runtime is always 'java' - the default.  In the normal build env, if there's only one runtime, we never create the default runtime. */
-   public static boolean javaIsAlwaysDefaultRuntime = false;
 
    public AbstractInterpreter cmd;
 
@@ -1219,7 +1210,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private static final String[] defaultGlobalLayerImports = {"sc.layer.LayeredSystem", "sc.util.FileUtil", "java.io.File",
       "sc.repos.RepositoryPackage", "sc.repos.mvn.MvnRepositoryPackage", "sc.layer.LayerFileProcessor", "sc.lang.TemplateLanguage",
       "sc.layer.BuildPhase", "sc.layer.CodeType", "sc.obj.Sync", "sc.obj.SyncMode", "sc.layer.LayerUtil",
-      "sc.layer.RuntimeModuleType", "sc.lang.sql.DBProvider", "sc.db.DBDataSource"};
+      "sc.layer.RuntimeModuleType", "sc.lang.sql.DBProvider", "sc.db.DBDataSource", "sc.layer.ProcessDefinition"};
 
    // These are the set of imports used for resolving types in layer definition files.
    private Map<String,ImportDeclaration> globalLayerImports = new HashMap<String, ImportDeclaration>();
@@ -1421,7 +1412,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   public LayeredSystem(List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames, Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem, boolean startInterpreter, IExternalModelIndex extModelIndex) {
+   public LayeredSystem(List<String> initLayerNames, List<String> explicitDynLayers, String layerPathNames,
+                        Options options, IProcessDefinition useProcessDefinition, LayeredSystem parentSystem,
+                        boolean startInterpreter, IExternalModelIndex extModelIndex, SystemContext sysContext) {
       String lastLayerName = options.buildLayerName;
       String rootClassPath = options.classPath;
       String mainDir = options.mainDir;
@@ -1436,6 +1429,16 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       this.strataCodeInstallDir = scInstallDir;
       if (scInstallDir != null && !new File(scInstallDir).isDirectory())
          error("Specified install directory: " + scInstallDir + " does not exist");
+
+      if (parentSystem != null) {
+         if (sysContext != null)
+            error("Ignoring systemContext param - using the one from parentSystem");
+         this.sysContext = parentSystem.sysContext;
+      }
+      else if (sysContext == null)
+         this.sysContext = new SystemContext();
+      else
+         this.sysContext = sysContext;
 
       lastChangedModelTime = System.currentTimeMillis();
 
@@ -1742,14 +1745,14 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void initRuntimes(List<String> explicitDynLayers, boolean active, boolean openLayer, boolean specifiedOnly, boolean updateDefaultRuntime) {
       LayeredSystem curSys = getCurrent();
       // If we have activated some layers and still don't have any runtimes, we create the default runtime
-      if (runtimes == null && layers.size() != 0)
+      if (sysContext.runtimes == null && layers.size() != 0)
          addRuntime(null, null);
 
       boolean removeExcludedLayers = false;
 
       // Create a new LayeredSystem for each additional runtime we need to satisfy the active set of layers.
       // Then purge any layers from this LayeredSystem which should not be here.
-      if (processes != null && processes.size() > 1 && (peerSystems == null || peerSystems.size() < processes.size() - 1)) {
+      if (sysContext.processes != null && sysContext.processes.size() > 1 && (peerSystems == null || peerSystems.size() < sysContext.processes.size() - 1)) {
          // We want all of the layered systems to use the same buildDir so pass it through options as though you had used the -da option.  Of course if you use -d, it will happen automatically.
          if (options.buildDir == null) {
             if (lastLayer != null && !lastLayer.buildSeparate && options.buildLayerAbsDir == null)
@@ -1758,8 +1761,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
          ArrayList<LayeredSystem> newPeers = new ArrayList<LayeredSystem>();
 
-         for (int ix = 0; ix < processes.size(); ix++) {
-            IProcessDefinition proc = processes.get(ix);
+         for (int ix = 0; ix < sysContext.processes.size(); ix++) {
+            IProcessDefinition proc = sysContext.processes.get(ix);
 
             boolean procIsDisabled = proc != null && isRuntimeDisabled(proc.getRuntimeName());
 
@@ -1851,7 +1854,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // other systems and include the layers in them if they are needed.
       else { // If there's only one runtime, we'll use this layered system for it.
          if (active && runtimeProcessor == null && processDefinition == null) {
-            processDefinition = processes != null && processes.size() > 0 ? processes.get(0) : null;
+            processDefinition = sysContext.processes != null && sysContext.processes.size() > 0 ? sysContext.processes.get(0) : null;
             runtimeProcessor = processDefinition == null ? null : processDefinition.getRuntimeProcessor();
          }
          if (peerSystems != null && active) {  // This only initializes active layers so don't do it if we are not activating a layer - otherwise for doc we'll end up activating JS layers even if the JS runtime is not active
@@ -1887,7 +1890,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // When you run in the layer directory, the other runtime defines the root layer dir which we need as the layer path here since we specify all of the layers using absolute paths
       if (peerLayerPath == null && newLayerDir != null)
          peerLayerPath = newLayerDir;
-      LayeredSystem peerSys = new LayeredSystem(procLayerNames, explicitDynLayers, peerLayerPath, options, proc, this, false, externalModelIndex);
+      LayeredSystem peerSys = new LayeredSystem(procLayerNames, explicitDynLayers, peerLayerPath, options, proc, this, false, externalModelIndex, null);
 
       // The LayeredSystem needs at least the main layered system in its peer list to initialize the layers.  We'll reset this later to include all of the layeredSystems.
       if (peerSys.peerSystems == null) {
@@ -2087,18 +2090,18 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    private void destroySystemInternal() {
       clearActiveLayers(true);
 
-      if (runtimes != null) {
-         for (int i = 0; i < runtimes.size(); i++) {
-            if (DefaultRuntimeProcessor.compareRuntimes(runtimes.get(i), runtimeProcessor)) {
-               runtimes.remove(i);
+      if (sysContext.runtimes != null) {
+         for (int i = 0; i < sysContext.runtimes.size(); i++) {
+            if (DefaultRuntimeProcessor.compareRuntimes(sysContext.runtimes.get(i), runtimeProcessor)) {
+               sysContext.runtimes.remove(i);
                i--;
             }
          }
       }
-      if (processes != null) {
-         for (int i = 0; i < processes.size(); i++) {
-            if (ProcessDefinition.compare(processes.get(i), processDefinition)) {
-               processes.remove(i);
+      if (sysContext.processes != null) {
+         for (int i = 0; i < sysContext.processes.size(); i++) {
+            if (ProcessDefinition.compare(sysContext.processes.get(i), processDefinition)) {
+               sysContext.processes.remove(i);
                i--;
             }
          }
@@ -2187,124 +2190,13 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * Called from a Layer's start method to install a new runtime which that layer requires.  A proc value of "null" means to require the default "java" runtime.  A LayeredSystem is created for each runtime.  Each LayeredSystem haa
     * one runtimeProcessor (or null).
     */
-   public static void addRuntime(Layer fromLayer, IRuntimeProcessor proc) {
-      if (runtimes == null) {
-         runtimes = new ArrayList<IRuntimeProcessor>();
-         if (proc != null && javaIsAlwaysDefaultRuntime)
-            addRuntime(null, null);
-      }
-
-      IRuntimeProcessor existing = null;
-      for (IRuntimeProcessor existingProc:runtimes) {
-         if (proc == null && existingProc == null)
-            return;
-         else if (existingProc != null && proc != null && proc.getRuntimeName().equals(existingProc.getRuntimeName()))
-            existing = existingProc;
-      }
-      // Replace the old runtime - allows a subsequent layer to redefine the parameters of the JSRuntimeProcessor or even subclass it
-      if (existing != null) {
-         int ix = runtimes.indexOf(existing);
-         runtimes.set(ix, proc);
-      }
-      else {
-         // Default is always the first one in the list if it's there.
-         if (proc == null) {
-            runtimes.add(0, null);
-         }
-         else
-            runtimes.add(proc);
-
-         int i;
-         int sz = processes == null ? 0 : processes.size();
-         for (i = 0; i < sz; i++) {
-            IProcessDefinition procDef = processes.get(i);
-            IRuntimeProcessor procProc = procDef == null ? null : procDef.getRuntimeProcessor();
-
-            if (procProc == proc)
-               break;
-         }
-         // Add a new process only if there isn't one already defined for this runtime.
-         if (i == sz) {
-            ProcessDefinition newProcDef = proc == null ? null : new ProcessDefinition();
-            if (newProcDef != null)
-               newProcDef.setRuntimeProcessor(proc);
-            addProcess(fromLayer, newProcDef);
-         }
-      }
-      procInfoNeedsSave = true;
+   public void addRuntime(Layer fromLayer, IRuntimeProcessor proc) {
+      sysContext.addRuntime(fromLayer, proc);
    }
 
-   private void updateProcessDefinition(IProcessDefinition procDef) {
+   void updateProcessDefinition(IProcessDefinition procDef) {
       processDefinition = procDef;
       initTypeIndexDir();
-   }
-
-   private static void initProcessesList(IProcessDefinition procDef) {
-      if (processes == null) {
-         processes = new ArrayList<IProcessDefinition>();
-         if (procDef != null && javaIsAlwaysDefaultRuntime)
-            addProcess(null, null);
-      }
-   }
-
-   public static void addProcess(Layer fromLayer, IProcessDefinition procDef) {
-      initProcessesList(procDef);
-      IProcessDefinition existing = null;
-      int procIndex = 0;
-      LayeredSystem fromSys = fromLayer == null ? null : fromLayer.layeredSystem;
-      for (IProcessDefinition existingProc:processes) {
-         boolean isDisabled = fromSys != null && existingProc != null && fromSys.isRuntimeDisabled(existingProc.getRuntimeName());
-         if (procDef == null && existingProc == null)
-            return;
-         // If the existing proc is null it's a default runtime and no designated process.  If the new guy has a name and the same runtime process, just use it rather than creating a new one.
-         // Just don't let a disabled process define the main system since that ends up with one too many systems (e.g. Runtime: android happens to be the first process
-         // created - since it's a Java process, it becomes the system but then is disabled).
-         else if (existingProc == null && procDef.getRuntimeProcessor() == null && getProcessDefinition(procDef.getProcessName(), procDef.getRuntimeName()) == null && !isDisabled) {
-            processes.set(procIndex, procDef);
-            if (fromSys != null && fromSys.processDefinition == null)
-               fromSys.updateProcessDefinition(procDef);
-            procInfoNeedsSave = true;
-            return;
-         }
-         else if (existingProc != null && procDef != null && procDef.getRuntimeName().equals(existingProc.getRuntimeName()) && StringUtil.equalStrings(procDef.getProcessName(), existingProc.getProcessName()))
-            existing = existingProc;
-         procIndex++;
-      }
-      // Replace the old runtime - allows a subsequent layer to redefine the parameters of the JSRuntimeProcessor or even subclass it
-      if (existing != null) {
-         int ix = processes.indexOf(existing);
-         processes.set(ix, procDef);
-         if (fromLayer != null && fromLayer.layeredSystem.processDefinition == existing)
-            fromLayer.layeredSystem.updateProcessDefinition(procDef);
-      }
-      else {
-         // Default is always the first one in the list if it's there.
-         if (procDef == null) {
-            processes.add(0, null);
-         }
-         else
-            processes.add(procDef);
-      }
-      procInfoNeedsSave = true;
-
-      // Each process has a runtimeProcessor so make sure to add that runtime, if it's not here
-      IRuntimeProcessor rtProc = procDef == null ? null : procDef.getRuntimeProcessor();
-      if (runtimes == null || !runtimes.contains(rtProc))
-         addRuntime(fromLayer, rtProc);
-   }
-
-   public static boolean createDefaultRuntime(Layer fromLayer, String name, boolean needsContextClassLoader) {
-      if (runtimes != null) {
-         for (IRuntimeProcessor proc:runtimes) {
-            if (proc != null) {
-               String procName = proc.getRuntimeName();
-               if (procName.equals(name))
-                  return false;
-            }
-         }
-      }
-      addRuntime(fromLayer, new DefaultRuntimeProcessor(name, needsContextClassLoader));
-      return true;
    }
 
    /** Use this to find the LayeredSystem to debug for the given runtime (or null for the 'java' runtime0 */
@@ -2338,17 +2230,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return res;
    }
 
-   public static IRuntimeProcessor getRuntime(String name) {
-      if (runtimes == null)
-         return null;
-      for (IRuntimeProcessor proc:runtimes) {
-         if (proc != null) {
-            String procName = proc.getRuntimeName();
-            if (procName.equals(name))
-               return proc;
-         }
-      }
-      return null;
+   public IRuntimeProcessor getRuntime(String name) {
+      return sysContext.getRuntime(name);
    }
 
    public boolean hasActiveRuntime(String name) {
@@ -2365,22 +2248,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return false;
    }
 
-   public static IProcessDefinition getProcessDefinition(String procName, String runtimeName) {
-      if (processes != null) {
-         for (IProcessDefinition proc : processes) {
-            if (proc == null && procName == null && runtimeName == null)
-               return null;
-
-            if (proc != null && StringUtil.equalStrings(procName, proc.getProcessName()) && StringUtil.equalStrings(proc.getRuntimeName(), runtimeName))
-               return proc;
-         }
-      }
-      return null;
-   }
-
    public IProcessDefinition getProcessDefinition(String runtimeName, String procName, boolean restore) {
-      if (processes != null) {
-         for (IProcessDefinition proc : processes) {
+      if (sysContext.processes != null) {
+         for (IProcessDefinition proc : sysContext.processes) {
             if (proc == null && procName == null && runtimeName == null)
                return null;
 
@@ -2396,7 +2266,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                error("Error - unable to restore cached definition of runtime: " + runtimeName);
                return INVALID_PROCESS_SENTINEL;
             }
-            addProcess(null, proc);
+            sysContext.addProcess(null, proc);
          }
          return proc;
       }
@@ -2408,12 +2278,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       if (proc == null) {
          proc = DefaultRuntimeProcessor.readRuntimeProcessor(this, name);
          if (proc != null) {
-            if (runtimes == null) {
-               runtimes = new ArrayList<IRuntimeProcessor>();
-               if (javaIsAlwaysDefaultRuntime)
+            if (sysContext.runtimes == null) {
+               sysContext.runtimes = new ArrayList<IRuntimeProcessor>();
+               if (sysContext.javaIsAlwaysDefaultRuntime)
                   addRuntime(null, null);
             }
-            runtimes.add(proc);
+            sysContext.runtimes.add(proc);
          }
       }
       return proc;
@@ -3643,6 +3513,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       // If we've compiled the system and determined this type is compiled, don't try to load the source type
       // even if it's in the source path or else we'll end up initializing the entire source tree to load whatever
       // dynamic types there are up stream
+      if (systemCompiled && buildInfo == null)
+         System.out.println("***");
       if (systemCompiled && buildInfo.isCompiledType(fullTypeName)) {
          // TODO: move the initialize option down into loadClass to avoid the double lookup here
          Class compiledClass = loadClass(fullTypeName);
@@ -4043,7 +3915,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             Options.usage("The -" + optName + " option was provided without a list of layers.  The -" + optName + " option should be in front of the list of layer names you want to make dynamic.", args);
          }
 
-         sys = new LayeredSystem(options.includeLayers, options.explicitDynLayers, options.layerPath, options, null, null, options.startInterpreter, null);
+         sys = new LayeredSystem(options.includeLayers, options.explicitDynLayers, options.layerPath, options, null, null, options.startInterpreter, null, null);
          if (defaultLayeredSystem == null)
             defaultLayeredSystem = sys;
          currentLayeredSystem.set(sys.systemPtr);
@@ -4748,7 +4620,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
     * You can specify the list of includeFiles to build a subset of files if you know exactly what needs to be processed and transformed but that mode is really only used for testing purposes and may not
     * generate an accurate build.
     */
-   boolean buildSystem(List<String> includeFiles, boolean newLayersOnly, boolean separateLayersOnly) {
+   public boolean buildSystem(List<String> includeFiles, boolean newLayersOnly, boolean separateLayersOnly) {
       setCurrent(this);
 
       if (buildStartTime == -1) {
@@ -4856,7 +4728,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return true;
    }
 
-   void buildCompleted(boolean doPeers) {
+   public void buildCompleted(boolean doPeers) {
       systemCompiled = true;
       needsRefresh = true;
       // Any models that are started after we need to mark as changed.
@@ -7060,23 +6932,23 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                peerSys.saveTypeIndexFiles();
             }
 
-            if (procInfoNeedsSave) {
+            if (sysContext.procInfoNeedsSave) {
                File mainSysFile = new File(getTypeIndexDir(), MAIN_SYSTEM_MARKER_FILE);
                FileUtil.saveStringAsFile(mainSysFile, "Marker file for recognizing the main system", true);
 
-               if (runtimes.size() > 0) {
-                  for (IRuntimeProcessor runtime : runtimes) {
+               if (sysContext.runtimes.size() > 0) {
+                  for (IRuntimeProcessor runtime : sysContext.runtimes) {
                      if (runtime != null && !isRuntimeDisabled(runtime.getRuntimeName())) {
                         DefaultRuntimeProcessor.saveRuntimeProcessor(this, runtime);
                      }
                   }
                }
-               for (IProcessDefinition proc : processes) {
+               for (IProcessDefinition proc : sysContext.processes) {
                   if (proc != null) {
                      ProcessDefinition.saveProcessDefinition(this, proc);
                   }
                }
-               procInfoNeedsSave = false;
+               sysContext.procInfoNeedsSave = false;
             }
          }
       }
@@ -9684,7 +9556,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
                boolean generate = mtt.generate;
                SrcEntry origSrcEnt = null;
 
-               List<SrcEntry> runtimeFiles = runtimeProcessor == null ? model.getProcessedFiles(genLayer, genLayer.buildSrcDir, generate) : runtimeProcessor.getProcessedFiles(model, genLayer, genLayer.buildSrcDir, generate);
+               List<SrcEntry> runtimeFiles = getProcessedFiles(model, genLayer, generate);
                List<SrcEntry> generatedFiles = runtimeFiles == null ? new ArrayList<SrcEntry>(0) : runtimeFiles;
 
                if (model.hasErrors()) {
@@ -9999,6 +9871,11 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          return GenerateCodeStatus.Error;
       }
       return GenerateCodeStatus.Error;
+   }
+
+   public List<SrcEntry> getProcessedFiles(IFileProcessorResult model, Layer genLayer, boolean generate) {
+      List<SrcEntry> runtimeFiles = runtimeProcessor == null ? model.getProcessedFiles(genLayer, genLayer.buildSrcDir, generate) : runtimeProcessor.getProcessedFiles(model, genLayer, genLayer.buildSrcDir, generate);
+      return runtimeFiles;
    }
 
    private void markBuildCompleted(Layer genLayer, BuildPhase phase) {
@@ -11676,10 +11553,8 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          if (res instanceof IFileProcessorResult) {
             IFileProcessorResult procRes = (IFileProcessorResult) res;
             procRes.addSrcFile(srcEnt);
-            // TODO: do we need to set do this only if generate = true?
-            List<SrcEntry> runtimeFiles = runtimeProcessor == null ?
-                                             procRes.getProcessedFiles(buildLayer, buildLayer.buildSrcDir, true) :
-                                             runtimeProcessor.getProcessedFiles(procRes, buildLayer, buildLayer.buildSrcDir, true);
+            // TODO: do we need to set do this only if active = true?
+            List<SrcEntry> runtimeFiles = getProcessedFiles(procRes, buildLayer, true);
             processedFileIndex.put(srcEnt.absFileName, procRes);
 
             // TODO: update the dependencies, clean out any other files, update the buildSrcIndex?
@@ -16338,12 +16213,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
    }
 
    /** Returns true for the IRuntimeProcessor which defines the process which should initialize the other processes. */
-   public static boolean isInitRuntime(IRuntimeProcessor proc) {
+   public boolean isInitRuntime(IRuntimeProcessor proc) {
       // TODO: might need to improve the logic here... this is called early on, before the peerSystems are defined so
       // need to use the runtimes and processes lists to determine which is the process should initialize the other one. It's used
       // for layers like the example.todo.data layer which should not run in both the client and the server, but should run in
       // client-only mode when there's only a client.
-      return runtimes.indexOf(proc) == 0;
+      return sysContext.runtimes.indexOf(proc) == 0;
    }
 
    /** This method is used by BuildInit hooks to inject the set of compile files into generated script tags or other similar patterns for other languages */

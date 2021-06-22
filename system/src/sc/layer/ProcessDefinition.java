@@ -73,8 +73,8 @@ public class ProcessDefinition implements IProcessDefinition, Serializable {
       return useContextClassLoader;
    }
 
-   public static ProcessDefinition create(String procName, String runtimeName, boolean useContextClassLoader) {
-      return new ProcessDefinition(procName, LayeredSystem.getRuntime(runtimeName), useContextClassLoader);
+   public static ProcessDefinition create(LayeredSystem sys, String procName, String runtimeName, boolean useContextClassLoader) {
+      return new ProcessDefinition(procName, sys.getRuntime(runtimeName), useContextClassLoader);
    }
 
    public String toString() {

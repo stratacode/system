@@ -516,19 +516,19 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    /** Creates a new java runtime which is incompatible with the standard Java runtime */
    public void createDefaultRuntime(String runtimeName, boolean useContextClassLoader) {
-      LayeredSystem.createDefaultRuntime(this, runtimeName, useContextClassLoader);
-      setLayerRuntime(LayeredSystem.getRuntime(runtimeName));
+      layeredSystem.sysContext.createDefaultRuntime(this, runtimeName, useContextClassLoader);
+      setLayerRuntime(layeredSystem.getRuntime(runtimeName));
    }
 
    /** Called from the layer definition file to register a new runtime required by this layer.  */
    public void addRuntime(IRuntimeProcessor proc) {
       setLayerRuntime(proc);
-      LayeredSystem.addRuntime(this, proc);
+      layeredSystem.addRuntime(this, proc);
    }
 
    public void addProcess(IProcessDefinition proc) {
       setLayerProcess(proc);
-      LayeredSystem.addProcess(this, proc);
+      layeredSystem.sysContext.addProcess(this, proc);
    }
 
    /** Some layers do not extend a layer bound to a runtime platform and so can run in any layer. */
@@ -1109,7 +1109,7 @@ public class Layer implements ILifecycle, LayerConstants, IDynObject {
 
    public LayerEnabledState isExplicitlyEnabledForRuntime(IRuntimeProcessor proc, boolean checkPeers) {
       if (includeForInit) {
-         if (LayeredSystem.isInitRuntime(proc))
+         if (layeredSystem.isInitRuntime(proc))
             return LayerEnabledState.Enabled;
          else
             return LayerEnabledState.Disabled;
