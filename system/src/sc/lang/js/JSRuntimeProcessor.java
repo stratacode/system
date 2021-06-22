@@ -110,9 +110,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    private transient HashMap<String,LinkedHashMap<JSFileEntry,Boolean>> typesInFileMap = new HashMap<String,LinkedHashMap<JSFileEntry,Boolean>>();
 
-   static class JSFileBodyCache {
-      StringBuilder jsFileBody = new StringBuilder();
-      GenFileLineIndex lineIndex = null;
+   public static class JSFileBodyCache {
+      public StringBuilder jsFileBody = new StringBuilder();
+      public GenFileLineIndex lineIndex = null;
    }
 
    private transient HashMap<String,GenFileLineIndex> lineIndexCache = new HashMap<String, GenFileLineIndex>();
@@ -729,6 +729,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
       }
+      else if (resEnt != null)
+         resFiles.add(resEnt);
 
       JavaModel javaModel = td.getJavaModel();
       // For Java types specified in a final/compiled layer, we will never transform - need to set this here to enable incremental JS builds.
@@ -1521,6 +1523,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String getJSModuleFile(Object type, boolean resolveSrc, boolean create) {
       String typeName = ModelUtil.getTypeName(type);
+      if (typeName.equals("Foo"))
+         System.out.println("***");
       String res = jsBuildInfo.jsModuleNames.get(typeName);
       if (res != null) {
          if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
@@ -1623,7 +1627,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return null;
    }
 
-   private void addJsModuleName(String typeName, String name) {
+   public void addJsModuleName(String typeName, String name) {
       jsBuildInfo.jsModuleNames.put(typeName, name);
    }
 
@@ -1754,7 +1758,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return null;
    }
 
-   void addJSFile(String jsFile) {
+   public void addJSFile(String jsFile) {
       if (!jsBuildInfo.jsFiles.contains(jsFile))
          jsBuildInfo.jsFiles.add(jsFile);
    }
@@ -2203,7 +2207,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
       return TransformUtil.evalTemplate(typeParams, mainTemplate, true, false, null);
    }
 
-   static class JSFileEntry {
+   public static class JSFileEntry {
       String fullTypeName;
 
       // Cases where we are comparing the EnumDeclaration and the ClassDeclaration we generate from it so do not do == type comparison
@@ -2355,12 +2359,9 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          if (sys.options.verbose)
             System.out.println("Generating js file: " + jsFile + " for build layer: " + genLayer);
 
-         JSFileBodyCache jsFileBodyCache = new JSFileBodyCache();
-         jsFileBodyStore.put(jsFile, jsFileBodyCache);
+         JSFileBodyCache jsFileBodyCache = createJSFile(jsFile);
          StringBuilder jsFileBody = jsFileBodyCache.jsFileBody;
-         GenFileLineIndex jsLineIndex = null;
-         if (system.options.genDebugInfo)
-            jsLineIndex = jsFileBodyCache.lineIndex = new GenFileLineIndex(jsFile);
+         GenFileLineIndex jsLineIndex = jsFileBodyCache.lineIndex;
 
          entryPointsFrozen = true;
          try {
@@ -2381,16 +2382,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
                      e.initType(sys);
                   }
                   */
-                  List<BodyTypeDeclaration> addLaterTypes = new ArrayList<BodyTypeDeclaration>();
                   BodyTypeDeclaration btd = e.getResolvedType(sys);
-                  addTypeToFile(btd, typesInFile, jsFile, genLayer, null, addLaterTypes);
-                  while (addLaterTypes.size() > 0) {
-                     List<BodyTypeDeclaration> addNowTypes = addLaterTypes;
-                     addLaterTypes = new ArrayList<BodyTypeDeclaration>();
-                     for (BodyTypeDeclaration addNowType:addNowTypes) {
-                        addTypeToFile(addNowType, typesInFile, jsFile, genLayer, null, addLaterTypes);
-                     }
-                  }
+                  addTypeToFileWithDeps(btd, typesInFile, jsFile, genLayer);
                }
             }
          }
@@ -2480,6 +2473,28 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
          resetBuildLayerState();
 
       PerfMon.end("postProcessJS");
+   }
+
+   public JSFileBodyCache createJSFile(String jsFile) {
+      JSFileBodyCache jsFileBodyCache = new JSFileBodyCache();
+      jsFileBodyStore.put(jsFile, jsFileBodyCache);
+      if (system.options.genDebugInfo)
+         jsFileBodyCache.lineIndex = new GenFileLineIndex(jsFile);
+      return jsFileBodyCache;
+   }
+
+   public void addTypeToFileWithDeps(BodyTypeDeclaration btd,
+                                     LinkedHashMap<JSFileEntry,Boolean> typesInFile, String jsFile,
+                                     Layer genLayer) {
+      List<BodyTypeDeclaration> addLaterTypes = new ArrayList<BodyTypeDeclaration>();
+      addTypeToFile(btd, typesInFile, jsFile, genLayer, null, addLaterTypes);
+      while (addLaterTypes.size() > 0) {
+         List<BodyTypeDeclaration> addNowTypes = addLaterTypes;
+         addLaterTypes = new ArrayList<BodyTypeDeclaration>();
+         for (BodyTypeDeclaration addNowType:addNowTypes) {
+            addTypeToFile(addNowType, typesInFile, jsFile, genLayer, null, addLaterTypes);
+         }
+      }
    }
 
    private static class InitCodeInfo {
@@ -3402,6 +3417,8 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
       }
+      if (!resFiles.contains(jsCoreLib))
+         resFiles.add(0, jsCoreLib);
       return resFiles;
    }
 
@@ -3498,10 +3515,12 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
    public void clearRuntime() {
       jsBuildInfo = null;
       resetBuild();
-      srcPathType = null;
-      templatePrefix = null;
-      genJSPrefix = null;
-      evalTemplateName = typeTemplateName = syncMergeTemplateName = updateMergeTemplateName = null;
+      //srcPathType = null;
+      //templatePrefix = null;
+      //genJSPrefix = null;
+      // These are set when initializing the js.sys layer but we might clear the runtime without
+      // re-initializing all of the layers
+      //evalTemplateName = typeTemplateName = syncMergeTemplateName = updateMergeTemplateName = null;
    }
 
    public class JSUpdateInstanceInfo extends UpdateInstanceInfo {
