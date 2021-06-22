@@ -3936,6 +3936,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
       systemTagClassMap.put("head", Head.class);
       systemTagClassMap.put("body", Body.class);
       systemTagClassMap.put("input", Input.class);
+      systemTagClassMap.put("textarea", Textarea.class);
       systemTagClassMap.put("option", Option.class);
       systemTagClassMap.put("select", Select.class);
       systemTagClassMap.put("form", Form.class);
@@ -3957,7 +3958,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
                          "autocomplete", "list", "tabindex", "minlength", "maxlength", "pattern", "min", "max", "accept", "alt", "multiple",
                          "autofocus", "capture", "dirname", "formaction", "formenctype", "formmethod", "formnovalidate", "formtarget",
                          "height", "list", "readonly", "required", "src", "step", "width"}, null);
-      addTagAttributes("textarea", "element", new String[] {"rows", "cols", "required", "readonly", "form", "name", "placeholder", "size", "tabindex"}, null);
+      addTagAttributes("textarea", "element", new String[] {"autofocus", "defaultvalue", "disabled", "maxLength", "rows", "cols", "required", "readonly", "form", "name", "placeholder", "size", "tabindex", "wrap"}, null);
       addTagAttributes("button", "input", emptyArgs, null);
       addTagAttributes("span", "element", emptyArgs, null);
       addTagAttributes("div", "element", emptyArgs, null);
@@ -6015,6 +6016,7 @@ public class Element<RE> extends Node implements IChildInit, IStatefulPage, IObj
             "mouseUpEvent", "mouseDownMoveUp", "keyDownEvent", "keyUpEvent", "keyPressEvent", "focusEvent", "blurEvent", "clientWidth", "clientHeight", "offsetLeft", "offsetTop", "offsetWidth", "offsetHeight", "scrollWidth", "scrollHeight"}, 0));
       SyncManager.addSyncType(Select.class, new SyncProperties(null, null, new Object[]{"selectedIndex", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Input.class, new SyncProperties(null, null, new Object[]{"value", "checked", "changeEvent"}, Element.class, 0));
+      SyncManager.addSyncType(Textarea.class, new SyncProperties(null, null, new Object[]{"value", "changeEvent"}, Element.class, 0));
       SyncManager.addSyncType(Form.class, new SyncProperties(null, null, new Object[]{"submitEvent", "submitCount", "submitInProgress", "submitError", "submitResult"}, Element.class, 0));
       // We sync this value via the Select tag's selectedIndex. The option tag is not like repeat in that it's one instance rendered over and over with different
       // optionData values. TODO: should a child option tag create a class and the select tag manage the replication like repeat?
