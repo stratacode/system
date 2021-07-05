@@ -984,6 +984,7 @@ public class LayerUtil implements LayerConstants {
       theFile.delete();
       new File(FileUtil.replaceExtension(fileName, "class")).delete();
       new File(FileUtil.replaceExtension(fileName, ReverseDependencies.REVERSE_DEPENDENCIES_EXTENSION)).delete();
+      new File(FileUtil.replaceExtension(fileName, GenFileLineIndex.DEBUG_INDEX_EXT)).delete();
       File dir = theFile.getParentFile();
       String filePart = FileUtil.removeExtension(theFile.getName());
       String[] innerFiles = dir.list(new PatternFilenameFilter(Pattern.compile(filePart + "\\$.*\\.class")));
