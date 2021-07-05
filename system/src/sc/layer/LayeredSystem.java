@@ -1545,7 +1545,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
             newLayerDir = layerPathDirs.get(layerPathDirs.size() - 1).getPath();
          }
          else
-            newLayerDir = mapLayerDirName(".");
+            newLayerDir = LayerUtil.mapLayerDirName(".");
       }
       // We could not find the real StrataCode install dir but we could find a layer so use that
       if (strataCodeMainDir == null)
@@ -5798,22 +5798,12 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return null;
    }
 
-   private String mapLayerDirName(String layerDir) {
-      if (layerDir.equals(".")) {
-         layerDir = System.getProperty("user.dir");
-      }
-      else {
-         layerDir = FileUtil.makeAbsolute(layerDir);
-      }
-      return layerDir;
-   }
-
    /** This uses the same algorithm as findLayer but only computes and validates the layerDefFile's path name. */
    private String findLayerDefFile(String layerDir, String layerPathName, String relDir, String layerPrefix) {
       String layerFileName;
       String layerTypeName;
 
-      layerDir = mapLayerDirName(layerDir);
+      layerDir = LayerUtil.mapLayerDirName(layerDir);
 
       if (layerPathName.equals(".")) {
          layerFileName = System.getProperty("user.dir");
@@ -5849,7 +5839,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String layerGroup;
       boolean inLayerDir = false;
 
-      layerDir = mapLayerDirName(layerDir);
+      layerDir = LayerUtil.mapLayerDirName(layerDir);
 
       if (layerPathName.equals(".")) {
          layerFileName = System.getProperty("user.dir");
@@ -6668,7 +6658,7 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       String layersFileName = FileUtil.concat(".", "layers");
       File layersFile = new File(layersFileName);
       if (layersFile.isDirectory()) {
-         newLayerDir = mapLayerDirName(layersFileName);
+         newLayerDir = LayerUtil.mapLayerDirName(layersFileName);
          if (layerPathDirs == null)
             layerPathDirs = new ArrayList<File>();
          layerPathDirs.add(layersFile);
@@ -14068,9 +14058,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
          int ix = 0;
          while ((ix = modelTypeName.indexOf(".", ix+1)) != -1)
             relDir = FileUtil.concat("..", relDir);
-         if (newLayerDir == null || newLayerDir.equals(mapLayerDirName("."))) {
+         if (newLayerDir == null || newLayerDir.equals(LayerUtil.mapLayerDirName("."))) {
             // Need to make this absolute before we start running the app - which involves switching the current directory sometimes.
-            newLayerDir = mapLayerDirName(relDir);
+            newLayerDir = LayerUtil.mapLayerDirName(relDir);
             if (strataCodeMainDir == null)
                strataCodeMainDir = newLayerDir;
          }

@@ -243,7 +243,7 @@ public class JSON {
       else if (val instanceof Collection || val.getClass().isArray()) {
          sb.append("[");
          int sz = DynUtil.getArrayLength(val);
-         Object arrCompType = DynUtil.getComponentType(pType);
+         Object arrCompType = pType == null ? null : DynUtil.getComponentType(pType);
          for (int i = 0; i < sz; i++) {
             if (i != 0)
                sb.append(", ");

@@ -1353,4 +1353,56 @@ public class LayerUtil implements LayerConstants {
          }
       }
    }
+
+   public static String getLayerPathFromMainDir(String mainDir) {
+      // Must either have a bin, .stratacode, conf or bundles directory to be considered an install dir
+      if (!new File(mainDir, "bin").isDirectory() && !new File(mainDir, LayerConstants.SC_DIR).isDirectory() &&
+          !new File(mainDir, "conf").isDirectory() && !new File(mainDir, "bundles").isDirectory())
+         return null;
+
+      String bundlesFileName = FileUtil.concat(mainDir, "bundles");
+      File bundlesFile = new File(bundlesFileName);
+      boolean inited = false;
+      StringBuilder layerPathBuf = new StringBuilder();
+      if (bundlesFile.isDirectory()) {
+         String[] bundleNames = bundlesFile.list();
+         if (bundleNames == null)
+            return null;
+         for (String bundleName:bundleNames) {
+            String bundleDirName = FileUtil.concat(bundlesFileName, bundleName);
+            File bundleDir = new File(bundleDirName);
+            if (!bundleDir.isDirectory())
+               continue;
+            if (layerPathBuf.length() > 0)
+               layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
+            layerPathBuf.append(bundleDirName);
+         }
+         inited = true;
+      }
+
+      String layersFileName = FileUtil.concat(".", "layers");
+      File layersFile = new File(layersFileName);
+      if (layersFile.isDirectory()) {
+         if (layerPathBuf.length() > 0)
+            layerPathBuf.append(FileUtil.PATH_SEPARATOR_CHAR);
+         layerPathBuf.append(layersFileName);
+         inited = true;
+      }
+
+      if (inited) {
+         return layerPathBuf.toString();
+      }
+      return null;
+   }
+
+   public static String mapLayerDirName(String layerDir) {
+      if (layerDir.equals(".")) {
+         layerDir = System.getProperty("user.dir");
+      }
+      else {
+         layerDir = FileUtil.makeAbsolute(layerDir);
+      }
+      return layerDir;
+   }
+
 }

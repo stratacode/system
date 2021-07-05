@@ -556,6 +556,8 @@ public class PTypeUtil {
    public static Object getReturnType(Object method) {
       if (method instanceof Method)
          return ((Method) method).getReturnType();
+      else if (method instanceof DynRemoteMethod)
+         return ((DynRemoteMethod) method).returnType;
       else
          throw new IllegalArgumentException("Unrecognized type of method: " + method);
    }
