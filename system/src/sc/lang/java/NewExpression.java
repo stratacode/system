@@ -885,7 +885,7 @@ public class NewExpression extends IdentifierExpression {
             enclInstType = getEnclosingType();
       }
 
-      if (enclInstType == null)
+      if (enclInstType == null && boundType != null)
          enclInstType = ModelUtil.getEnclosingInstType(boundType);
 
       setProperty("typeArguments", null);
@@ -920,7 +920,8 @@ public class NewExpression extends IdentifierExpression {
          return newExpr;
       }
       else {
-         setProperty("typeIdentifier", JSUtil.convertTypeName(getLayeredSystem(), typeNameToUse));
+         if (typeNameToUse != null)
+            setProperty("typeIdentifier", JSUtil.convertTypeName(getLayeredSystem(), typeNameToUse));
       }
 
       /* We null these out so no need to transformToJS
