@@ -236,6 +236,12 @@ public class Options {
    /** Set when refreshing the system because usually it's not helpful to refresh changed compiled types - with this true, we will skip them  */
    @Constant public boolean refreshDynamicOnly = false;
 
+   /**
+    * To reduce memory usage, after transforming a model we can clear the parse nodes of parsed models.
+    * But if you might re-transform the same model, as in the Java to JS converter, set this to false
+    */
+   @Constant public boolean clearParseNodes = true;
+
    @Constant public SchemaManager.SchemaMode schemaMode = SchemaManager.SchemaMode.Prompt;
 
    /** If set, specifies the -source option to the javac compiler */

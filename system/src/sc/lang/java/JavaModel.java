@@ -1305,8 +1305,17 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
    }
 
    public String getModelTypeName() {
-      if (srcFiles == null)
-         return null;
+      if (srcFiles == null) {
+         String typeName = types != null && types.size() > 0 ? types.get(0).typeName : null;
+         if (typeName != null && packageDef != null) {
+            String pkgName = packageDef.name;
+            if (layer != null) {
+               pkgName = CTypeUtil.prefixPath(layer.packagePrefix, pkgName);
+            }
+            typeName = CTypeUtil.prefixPath(pkgName, typeName);
+         }
+         return typeName;
+      }
 
       return srcFiles.get(0).getTypeName();
    }
@@ -1711,7 +1720,8 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             didTransform = needsTransform();
       }
 
-      transformedInLayer = getLayeredSystem().currentBuildLayer;
+      LayeredSystem sys = getLayeredSystem();
+      transformedInLayer = sys.currentBuildLayer;
 
       if (!didTransform && !layer.copyPlainJavaFiles) {
          return Collections.singletonList(src);
@@ -1767,7 +1777,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
             }
          }
 
-         clearParseNode();
+         // For performance, we can clear the parse nodes after transformation (unless we might re-transform this same model as in Java to JS)
+         if (sys.options.clearParseNodes)
+            clearParseNode();
          if (innerObjStubs == null)
             return Collections.singletonList(mainSrcEnt);
          else {
@@ -3059,6 +3071,9 @@ public class JavaModel extends JavaSemanticNode implements ILanguageModel, IName
 
       super.stop();
 
+      errorMessages = null;
+      warningMessages = null;
+      hasErrors = false;
       typeInfoInited = false;
       initPackage = false;
       typeIndex.clear();
