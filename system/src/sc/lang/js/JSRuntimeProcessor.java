@@ -97,6 +97,7 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String scLib = "js/sc.js";
    public String jsCoreLib = "js/sccore.js";
+   public String javaSysLib = "js/javasys.js";
 
    public String typeNameSuffix = "_c";
 
@@ -1523,8 +1524,6 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
 
    public String getJSModuleFile(Object type, boolean resolveSrc, boolean create) {
       String typeName = ModelUtil.getTypeName(type);
-      if (typeName.equals("Foo"))
-         System.out.println("***");
       String res = jsBuildInfo.jsModuleNames.get(typeName);
       if (res != null) {
          if (res.equals(NULL_JS_MODULE_NAMES_SENTINEL))
@@ -3417,8 +3416,11 @@ public class JSRuntimeProcessor extends DefaultRuntimeProcessor {
             }
          }
       }
+      // For the Java to JS converter - these two are not detected properly from the dependencies
       if (!resFiles.contains(jsCoreLib))
          resFiles.add(0, jsCoreLib);
+      if (!resFiles.contains(javaSysLib))
+         resFiles.add(1, javaSysLib);
       return resFiles;
    }
 
