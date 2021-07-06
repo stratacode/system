@@ -144,9 +144,9 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
 
    static ThreadLocal<LayerUtil.LayeredSystemPtr> currentLayeredSystem = new ThreadLocal<LayerUtil.LayeredSystemPtr>();
 
-   static LayeredSystem defaultLayeredSystem;
+   public static LayeredSystem defaultLayeredSystem;
 
-   static boolean disableDefaultLayeredSystem = false;
+   public static boolean disableDefaultLayeredSystem = false;
 
    /** The LayeredSystem which is currently associated with the thread's ContextClassLoader. */
    static LayeredSystem contextLoaderSystem;
