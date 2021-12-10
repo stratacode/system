@@ -1192,4 +1192,19 @@ public abstract class SemanticNode implements ISemanticNode, ILifecycle {
    public boolean getStopSemanticProps() {
       return true;
    }
+
+   // returns true for BinaryExpression and BinaryOperand
+   public boolean formatSpaceBeforeAngleBracket() {
+      return false;
+   }
+
+   // Look for the parent to decide whether to add a space after a left paren. 
+   // Returns true for BlockStatement to handle do.. while(
+   public boolean formatLeftParenDelegateToParent() {
+      return false;
+   }
+
+   public boolean spaceAfterParen() {
+      return false;
+   }
 }

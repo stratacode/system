@@ -59,4 +59,9 @@ public class BlockStatement extends AbstractBlockStatement {
    public String getEndBlockString() {
       return "}";
    }
+
+   // Look for the parent to decide whether to add a space after a left paren. 
+   public boolean formatLeftParenDelegateToParent() {
+      return true;
+   }
 }

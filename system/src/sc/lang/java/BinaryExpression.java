@@ -1072,4 +1072,9 @@ public class BinaryExpression extends Expression {
    public boolean isIncompleteStatement() {
       return false;
    }
+
+   // When formatting, less-than or gt-than signs require a space if they are in the midst of a BinaryExpression as they are comparisons, unlike when used for a type param
+   public boolean formatSpaceBeforeAngleBracket() {
+      return true;
+   }
 }

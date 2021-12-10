@@ -13863,6 +13863,10 @@ public class LayeredSystem implements LayerConstants, INameContext, IRDynamicSys
       return getRuntimeType(typeName);
    }
 
+   public Object findTypeWithLoader(String typeName, ClassLoader loader) {
+      return RTypeUtil.loadClass(loader, typeName, true);
+   }
+
    public boolean isObjectType(Object type) {
       return ModelUtil.isObjectType(type);
    }

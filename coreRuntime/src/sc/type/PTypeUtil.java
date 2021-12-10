@@ -467,6 +467,17 @@ public class PTypeUtil {
       }
    }
 
+   public static Object findTypeWithLoader(String typeName, ClassLoader loader) {
+      try {
+         if (loader == null)
+            return findType(typeName);
+         return Class.forName(typeName, true, loader);
+      }
+      catch (ClassNotFoundException exc) {
+         return null;
+      }
+   }
+
    static Timer timer;
    private static final Object timerLock = new Object();
 

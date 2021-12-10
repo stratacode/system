@@ -6,41 +6,57 @@ package sc.parser;
 
 import sc.binf.BinfConstants;
 import sc.binf.ParseInStream;
+import sc.dyn.DynUtil;
 import sc.dyn.RDynUtil;
 import sc.lang.ILanguageModel;
 import sc.lang.ISemanticNode;
 import sc.layer.*;
 import sc.type.DynType;
 import sc.type.IBeanMapper;
-import sc.type.RTypeUtil;
 import sc.util.FileUtil;
 import sc.type.TypeUtil;
 import sc.util.PerfMon;
 import sc.util.StringUtil;
 
-import java.io.*;
-import java.util.*;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 
-/** 
+// TODO: need to implement these in the JS world, at first dummies that throw an error, override to support vfs impls or node.js
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.FileReader;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.File;
+import java.io.PrintWriter;
+import java.io.InputStream;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+/**
  * This is the abstract base class for all language grammars defined in the system (e.g. JavaLanguage, SCLanguage, HTMLLanguage, etc.  It implements some features shared by all languages.  For example,
- * each language an parse a text string and produce a language element - either an entire file 
+ * each language an parse a text string and produce a language element - either an entire file
  * (when you use the default "start parselet") or for a given chunk of code represented by a public
- * parselet (e.g. an initializer).  
+ * parselet (e.g. an initializer).
  * <p>
  * In addition to parsing a language, you can also take an language model - called a SemanticNode in
  * the parselets framework - and re-generate the code corresponding to that model.  In the parselets
  * framework, this is implemented with the "generate" methods.
- * <p> 
+ * <p>
  * Model generation lets you reconstruct the code for objects that are programmatically
  * constructed (e.g. by manually constructing instances for each language type, setting the properties, etc.) or parsed, or parsed and modified.  Each parsed set of SemanticNodes have a parallel parse
- * node tree hanging off of them.  As you change properties in a SemanticNode, by default the 
- * parselets framework will update or regenerate any affected code made by the change.  It can do 
+ * node tree hanging off of them.  As you change properties in a SemanticNode, by default the
+ * parselets framework will update or regenerate any affected code made by the change.  It can do
  * this in two modes - either by invalidating the parse-nodes that are affected and later doing the
- * generation, or it can do the generation in real time as you make property changes to the 
+ * generation, or it can do the generation in real time as you make property changes to the
  * SemanticNode objects.
  * <p>
  * For the most part, this generation comes for free when you write a grammar in Parselets that
- * builds a SemanticNode tree.  You do need to ensure you retain enough information in your 
+ * builds a SemanticNode tree.  You do need to ensure you retain enough information in your
  * SemanticNode trees so that parselets can undo what it parsed.  Spacing, comments, etc. are
  * generally not preserved in the semantic tree.  Instead, parselets use special parse nodes
  * which represent spacing.  Parse nodes support a "format" phase, that runs after generation.  This
@@ -641,7 +657,7 @@ public abstract class Language extends LayerFileComponent {
 
    /**
     * This is the package for this language's model classes.
-    * 
+    *
     * @param pkg
     */
    public void setSemanticValueClassPath(String pkg) {
@@ -664,19 +680,21 @@ public abstract class Language extends LayerFileComponent {
    public Class lookupModelClass(String className) {
       // Might be given an absolute path name so try that first
       if (className.contains(".")) {
-         Class c = RTypeUtil.loadClass(classLoader, className, true);
+         //Class c = RTypeUtil.loadClass(classLoader, className, true);
+         Class c = (Class) DynUtil.findTypeWithLoader(className, classLoader);
          if (c != null)
             return c;
       }
       if (semanticValueClassPath != null) {
          for (int i = 0; i < semanticValueClassPath.length; i++) {
-            Class c = RTypeUtil.loadClass(classLoader, semanticValueClassPath[i] + "." + className, true);
+            //Class c = RTypeUtil.loadClass(classLoader, semanticValueClassPath[i] + "." + className, true);
+            Class c = (Class) DynUtil.findTypeWithLoader(semanticValueClassPath[i] + "." + className, classLoader);
             if (c != null)
                 return c;
          }
       }
       // this also checks for inner classes but is basically like the first call.
-      Class c = RDynUtil.loadClass(className);
+      Class c = (Class) DynUtil.findType(className);
       if (c != null)
          return c;
       return null;

@@ -120,6 +120,8 @@ public interface IDynamicSystem {
 
    Object findType(String typeName);
 
+   Object findTypeWithLoader(String typeName, ClassLoader loader);
+
    boolean isObject(Object obj);
 
    boolean isObjectType(Object type);

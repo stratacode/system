@@ -9,10 +9,6 @@ import sc.lang.ISemanticNode;
 import sc.lang.SemanticNode;
 import sc.lang.SemanticNodeList;
 import sc.lang.html.Element;
-import sc.lang.java.BinaryExpression;
-import sc.lang.java.BinaryOperand;
-import sc.lang.java.BlockStatement;
-import sc.lang.java.Statement;
 import sc.util.FileUtil;
 
 import java.util.IdentityHashMap;
@@ -139,10 +135,9 @@ public class SpacingParseNode extends FormattingParseNode {
                      return;
                   }
                   else {
-                     // For comparison ops, we store the operator as a string
-                     // For type angle brackets, we're in the middle of a ClassType
-                     // TODO: Need to refactor - parser should not depend on this class
-                     if (!(sv instanceof BinaryExpression) && !(sv instanceof BinaryOperand))
+                     // For comparison ops, where we need a space, the sv will be a string so make sure the string case does not return
+                     // Currently we do want the space for BinaryExpression and BinaryOperand, handed in the SemanticNodeMethod
+                     if (!(sv instanceof SemanticNode) || !((SemanticNode) sv).formatSpaceBeforeAngleBracket())
                         return;
                   }
 
@@ -168,10 +163,10 @@ public class SpacingParseNode extends FormattingParseNode {
                      Object prevValue = ctx.prevSemanticValue();
 
                      // For "do while" statements, the previous is a block - get the parent in that case.
-                     if (prevValue instanceof BlockStatement)
-                        prevValue = ((BlockStatement) prevValue).parentNode;
-                     if (prevValue instanceof Statement) {
-                        if (!((Statement) prevValue).spaceAfterParen())
+                     if (prevValue instanceof SemanticNode && ((SemanticNode) prevValue).formatLeftParenDelegateToParent())
+                        prevValue = ((SemanticNode) prevValue).parentNode;
+                     if (prevValue instanceof SemanticNode) {
+                        if (!((SemanticNode) prevValue).spaceAfterParen())
                            return;
                      }
                      else  if (!(prevValue instanceof String) || !prevValue.equals("while"))

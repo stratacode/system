@@ -95,10 +95,6 @@ public abstract class Statement extends Definition implements IUserDataNode, ISr
       return parentNode instanceof LabelStatement && ((LabelStatement) parentNode).labelName.equals(label);
    }
 
-   public boolean spaceAfterParen() {
-      return false;
-   }
-
    public boolean displayTypeError(String...args) {
       if (errorArgs == null) {
          if (super.displayTypeError(args)) {

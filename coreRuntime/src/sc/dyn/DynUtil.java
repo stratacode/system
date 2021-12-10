@@ -1429,6 +1429,17 @@ public class DynUtil {
       return PTypeUtil.findType(typeName);
    }
 
+   public static Object findTypeWithLoader(String typeName, ClassLoader loader) {
+      Type type = Type.getPrimitiveType(typeName);
+      if (type != null)
+         return type.primitiveClass;
+      if (loader == null)
+         return findType(typeName);
+      if (dynamicSystem != null)
+         return dynamicSystem.findTypeWithLoader(typeName, loader);
+      return PTypeUtil.findTypeWithLoader(typeName, loader);
+   }
+
    public static boolean isEvalSupported() {
       return false;
    }

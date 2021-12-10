@@ -10,7 +10,6 @@ import sc.lang.SemanticNodeList;
 import sc.lang.java.BodyTypeDeclaration;
 import sc.lang.java.PrimitiveType;
 import sc.lifecycle.ILifecycle;
-import sc.type.RTypeUtil;
 import sc.util.StringUtil;
 
 import java.util.ArrayList;

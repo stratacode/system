@@ -64,4 +64,8 @@ public class BinaryOperand extends BaseOperand {
       return null;
    }
 
+   public boolean formatSpaceBeforeAngleBracket() {
+      return true;
+   }
+
 }
